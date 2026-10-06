@@ -34,7 +34,7 @@
 //! # A null username
 //!
 //! `EntityPlayer.username` is null until `EntityPlayerSP` copies the
-//! session's (EntityPlayerSP.java:18); the port's player has none yet
+//! session's (EntityPlayerSP.java:20); the port's player has none yet
 //! (`PlayerData::username`, WP-2.5) and neither has the oracle's
 //! `HarnessPlayer`. Taming then stores `null` through
 //! `DataWatcher.updateObject` (`var2.equals(...)`, DataWatcher.java:45) and
