@@ -1,0 +1,11 @@
+{"name":"flat-sand-falls","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":40,
+ "comment":"Sand (id 12) in mid-air: BlockSand.onBlockAdded schedules a tick, updateTick spawns an EntityFallingSand (entityJoinedWorld, seeded by the hook), which lands on the stone platform and places the block again.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"set_block","x":0,"y":66,"z":0,"id":12,"meta":0}],
+ "dumps":[{"every":1,"what":"entity_state","which":"all"},
+          {"every":1,"what":"block","x":0,"y":61,"z":0},
+          {"every":1,"what":"block","x":0,"y":66,"z":0}]}

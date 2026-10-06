@@ -1,0 +1,11 @@
+{"name":"bonemeal-sapling","tier":"B","kind":"tick","seed":123,"dimension":"overworld","ticks":3,
+ "comment":"use_item: bone meal (item 351 = Item.dyePowder, meta 15) on a sapling grows a tree with world.rand (ItemDye.onItemUse, BlockSapling.growTree). Also set_time and set_block_silent.",
+ "ops":[{"t":0,"op":"player","x":-22,"y":70,"z":-58},
+        {"t":0,"op":"set_time","time":1000},
+        {"t":0,"op":"set_block_silent","x":-24,"y":66,"z":-58,"id":6,"meta":0},
+        {"t":1,"op":"use_item","item_id":351,"meta":15,"count":2,"x":-24,"y":66,"z":-58,"side":1}],
+ "dumps":[{"every":1,"what":"world_time"},
+          {"every":1,"what":"block","x":-24,"y":66,"z":-58},
+          {"t":2,"what":"block_box","x0":-32,"y0":64,"z0":-64,"x1":-17,"y1":85,"z1":-49},
+          {"t":2,"what":"entity_state","which":[0]},
+          {"t":2,"what":"rng_state"}]}

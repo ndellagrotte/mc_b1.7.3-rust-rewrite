@@ -1,0 +1,5 @@
+{"name":"arrow-flight","tier":"C","kind":"tick","seed":123,"dimension":"overworld","ticks":40,
+ "comment":"EntityArrow(World) at (-24.5, 75, -58.5), motion (0.6, 0.2, 0.0) towards +x over grass; rotation is derived on the first onUpdate (EntityArrow.java:85-90); it lands and sticks (inGround).",
+ "ops":[{"t":0,"op":"spawn","kind":"Arrow","pos":["0xc038800000000000",75,"0xc04d400000000000"],"id":0},
+        {"t":0,"op":"set_motion","id":0,"motion":["0x3fe3333333333333","0x3fc999999999999a",0]}],
+ "dumps":[{"every":1,"what":"entity_state","which":[0]}]}

@@ -1,0 +1,7 @@
+{"name":"empty-world-20","tier":"B","kind":"tick","seed":123,"dimension":"overworld","ticks":20,
+ "comment":"No player: no random ticks, no mob spawning; world.rand still advances (weather timers, World.updateWeather).",
+ "ops":[{"t":0,"op":"preload","cx":0,"cz":0,"radius":1}],
+ "dumps":[{"every":5,"what":"world_time"},
+          {"every":5,"what":"rng_state"},
+          {"t":19,"what":"scheduled_ticks","full":true},
+          {"t":19,"what":"chunk_digest","x":0,"z":0}]}

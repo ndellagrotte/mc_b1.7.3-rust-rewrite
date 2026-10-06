@@ -1,0 +1,13 @@
+{"name":"flat-torch-light","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":20,
+ "comment":"Standing torch (id 50, meta 5) on the platform; block light spreads through World.updatingLighting (once per tick in the harness).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"set_block","x":0,"y":61,"z":0,"id":50,"meta":5}],
+ "dumps":[{"t":0,"what":"block_box","x0":-4,"y0":60,"z0":-4,"x1":4,"y1":64,"z1":4},
+          {"t":1,"what":"block_box","x0":-4,"y0":60,"z0":-4,"x1":4,"y1":64,"z1":4},
+          {"t":19,"what":"block_box","x0":-4,"y0":60,"z0":-4,"x1":4,"y1":64,"z1":4},
+          {"t":19,"what":"chunk_digest","x":0,"z":0},
+          {"t":19,"what":"rng_state"}]}

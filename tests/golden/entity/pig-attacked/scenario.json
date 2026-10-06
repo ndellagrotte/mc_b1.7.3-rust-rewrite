@@ -1,0 +1,9 @@
+{"name":"pig-attacked","tier":"C","kind":"tick","seed":123,"dimension":"overworld","ticks":30,
+ "comment":"Player (id 0) punches a pig (id 1) at t=10 (attackTargetEntityWithCurrentItem, empty hand); a direct 2-point hit with no attacker at t=20. Also set_rotation and set_pos.",
+ "ops":[{"t":0,"op":"player","x":-22,"y":70,"z":-58},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0xc038800000000000",70,"0xc04d400000000000"],"id":1},
+        {"t":0,"op":"set_rotation","id":1,"yaw":90,"pitch":0},
+        {"t":5,"op":"set_pos","id":1,"pos":["0xc038800000000000",72,"0xc04d400000000000"]},
+        {"t":10,"op":"attack","attacker_id":0,"target_id":1},
+        {"t":20,"op":"attack","target_id":1,"damage":2}],
+ "dumps":[{"every":1,"what":"entity_state","which":[0,1]}]}

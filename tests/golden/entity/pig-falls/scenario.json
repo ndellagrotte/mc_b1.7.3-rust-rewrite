@@ -1,0 +1,4 @@
+{"name":"pig-falls","tier":"C","kind":"tick","seed":123,"dimension":"overworld","ticks":60,
+ "comment":"Pig at (8.5, 90, 8.5); seed 123 has sea (surface y=63) there, so it falls into water.",
+ "ops":[{"t":0,"op":"spawn","kind":"Pig","pos":["0x4021000000000000",90,"0x4021000000000000"],"id":0}],
+ "dumps":[{"every":1,"what":"entity_state","which":"all"}]}

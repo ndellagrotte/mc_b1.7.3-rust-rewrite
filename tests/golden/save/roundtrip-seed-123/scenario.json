@@ -1,0 +1,5 @@
+{"name":"roundtrip-seed-123","tier":"S","kind":"tick","seed":123,"dimension":"overworld","save_format":"mcregion","ticks":5,
+ "comment":"SaveOldDir world in a temp directory; World.saveWorld(true) at t=4, then level.dat and chunk (0,0) read back.",
+ "ops":[{"t":0,"op":"preload","cx":0,"cz":0,"radius":1},
+        {"t":4,"op":"save","chunks":[{"x":0,"z":0}]}],
+ "dumps":[{"t":4,"what":"chunk_digest","x":0,"z":0}]}

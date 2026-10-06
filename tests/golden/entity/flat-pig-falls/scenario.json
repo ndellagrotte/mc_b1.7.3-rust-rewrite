@@ -1,0 +1,9 @@
+{"name":"flat-pig-falls","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":60,
+ "comment":"Pig at (0.5, 70, 0.5) falls onto the stone platform; its wander AI then runs (EntityCreature/EntityAnimal).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",70,"0x3fe0000000000000"],"id":0}],
+ "dumps":[{"every":1,"what":"entity_state","which":"all"}]}

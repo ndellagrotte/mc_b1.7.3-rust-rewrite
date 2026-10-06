@@ -1,0 +1,8 @@
+{"name":"sapling-with-player","tier":"B","kind":"tick","seed":123,"dimension":"overworld","ticks":400,
+ "comment":"Random ticks and mob spawning need a player (World.updateBlocksAndPlayCaveSounds, SpawnerAnimals.performSpawning). Sapling (id 6) on the grass block at (-24,65,-58).",
+ "ops":[{"t":0,"op":"player","x":-22,"y":70,"z":-58},
+        {"t":0,"op":"set_block","x":-24,"y":66,"z":-58,"id":6,"meta":0}],
+ "dumps":[{"every":100,"what":"chunk_digest","x":-2,"z":-4},
+          {"every":100,"what":"block","x":-24,"y":66,"z":-58},
+          {"every":100,"what":"rng_state"},
+          {"every":100,"what":"entity_state","which":[0]}]}

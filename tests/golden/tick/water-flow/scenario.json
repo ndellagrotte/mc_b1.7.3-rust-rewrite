@@ -1,0 +1,9 @@
+{"name":"water-flow","tier":"B","kind":"tick","seed":123,"dimension":"overworld","ticks":60,
+ "comment":"Seed 123 is ocean around (0,0); (-26,-58) is grass at y=66 (top block), so the source is 3 above it. Flowing water (id 8): still water (id 9) placed in the open never notifies itself and stays put (BlockStationary only reacts to neighbour changes).",
+ "ops":[{"t":0,"op":"set_block","x":-26,"y":69,"z":-58,"id":8,"meta":0}],
+ "dumps":[{"every":5,"what":"block","x":-26,"y":69,"z":-58},
+          {"every":5,"what":"block","x":-26,"y":68,"z":-58},
+          {"every":5,"what":"block","x":-26,"y":67,"z":-58},
+          {"every":5,"what":"block","x":-26,"y":66,"z":-58},
+          {"every":5,"what":"scheduled_ticks"},
+          {"t":59,"what":"block_box","x0":-34,"y0":60,"z0":-66,"x1":-18,"y1":72,"z1":-50}]}

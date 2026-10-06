@@ -1,0 +1,12 @@
+{"t":0,"e":"preload","implicit":true,"loaded":0}
+{"t":0,"e":"op","op":"preload","loaded":9}
+{"t":4,"e":"world_time","time":5}
+{"t":4,"e":"rng_state","world_rand":66778228400576,"lcg":-1188957731,"math_random":25214903830}
+{"t":9,"e":"world_time","time":10}
+{"t":9,"e":"rng_state","world_rand":66778228400576,"lcg":-1188957731,"math_random":25214903830}
+{"t":14,"e":"world_time","time":15}
+{"t":14,"e":"rng_state","world_rand":66778228400576,"lcg":-1188957731,"math_random":25214903830}
+{"t":19,"e":"world_time","time":20}
+{"t":19,"e":"rng_state","world_rand":66778228400576,"lcg":-1188957731,"math_random":25214903830}
+{"t":19,"e":"scheduled_ticks","count":0,"blake3":"af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262","entries":[]}
+{"t":19,"e":"chunk_digest","x":0,"z":0,"stage":"tick","blocks":"8154eab7c3929d76669aede9069b3840850ef971b56128449afceff9d0f69acb","data":"111f6c2f2ac0fc43154414a6e3e4c104cb04907e9453d3ac85cc5f55cc015b48","skylight":"691f634a5509c12c1abfb058aa9c6b807e8f045b229c4460cfd870dc339ac5ea","blocklight":"111f6c2f2ac0fc43154414a6e3e4c104cb04907e9453d3ac85cc5f55cc015b48","heightmap":"ffd3f56a11609f6498114ea08e1f22fe4ea0ab776c7473ac2fea52c301ef4222"}
