@@ -312,6 +312,12 @@ pub fn play_block(
                     && var12 != PISTON_STICKY_BASE_ID);
             if not_pullable {
                 // src: BlockPistonBase.java:148-152
+                // Vanilla quirk (the short-pulse "block dropping"): when the
+                // block two ahead was still moving out (var14) it is landed
+                // where it is and not pulled, and the head cell is not
+                // cleared here; the landing block's notification removes the
+                // head instead (BlockPistonExtension.onNeighborBlockChange
+                // finds the moving block, not a piston, behind it).
                 if !var14 {
                     set_ignore_updates(world, id, false);
                     world.set_block_with_notify(x + dx, y + dy, z + dz, 0);
@@ -958,6 +964,29 @@ mod tests {
         assert_eq!(piston(&w, head).unwrap().last_progress, 1.0);
         assert_eq!(id_meta(&mut w, 1, 61, 0), (0, 0));
         assert_eq!(id_meta(&mut w, 0, 61, 0), (PISTON_MOVING_ID, 5));
+    }
+
+    #[test]
+    fn sticky_retraction_during_the_extension_leaves_the_head() {
+        // Powered and unpowered within one tick: the head and the pushed
+        // block are still moving out. Both are finished at once
+        // (clearPistonTileEntity), nothing is pulled, and the stone's landing
+        // removes the head (the quirk noted in play_block).
+        let mut w = world();
+        w.set_block_and_metadata(0, 61, 0, PISTON_STICKY_BASE_ID, 5);
+        w.set_block_and_metadata(1, 61, 0, STONE, 0);
+        update_piston_state_with(&mut w, 0, 61, 0, &mut powered);
+        assert_eq!(id_meta(&mut w, 2, 61, 0), (PISTON_MOVING_ID, 0));
+        update_piston_state(&mut w, 0, 61, 0);
+        assert_eq!(id_meta(&mut w, 0, 61, 0), (PISTON_MOVING_ID, 5));
+        assert_eq!(id_meta(&mut w, 1, 61, 0), (0, 0));
+        assert_eq!(id_meta(&mut w, 2, 61, 0), (STONE, 0));
+        for _ in 0..3 {
+            w.update_entities();
+        }
+        assert_eq!(id_meta(&mut w, 0, 61, 0), (PISTON_STICKY_BASE_ID, 5));
+        assert_eq!(id_meta(&mut w, 1, 61, 0), (0, 0));
+        assert_eq!(id_meta(&mut w, 2, 61, 0), (STONE, 0));
     }
 
     #[test]

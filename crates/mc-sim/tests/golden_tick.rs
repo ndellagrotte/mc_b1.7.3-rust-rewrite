@@ -110,7 +110,7 @@ fixtures! {
     tick_piston_orphan_blocks => "tick" / "piston-orphan-blocks";
     #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 11 (t=1 blocks_full ids: no torch power, no extension)"]
     tick_piston_push_limit => "tick" / "piston-push-limit";
-    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 12 (t=1 blocks_full: no torch power, no extension)"]
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 14 (t=1 blocks_full: no torch power, no extension)"]
     tick_piston_push_stone => "tick" / "piston-push-stone";
     tick_piston_retract_unpowered => "tick" / "piston-retract-unpowered";
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
