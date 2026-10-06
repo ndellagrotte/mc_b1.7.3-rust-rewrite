@@ -602,6 +602,8 @@ and report it. Do not loosen the comparison.
 |---|---|---|
 | 1 | Install the `wasm32-unknown-unknown` standard library. With the Arch toolchain that is `sudo pacman -S rust-wasm`; the alternative is switching to `rustup` (`rustup target add wasm32-unknown-unknown`). Trunk (`cargo install --locked trunk`) is only needed in Phase 5 | WP-0.1 step 7 (the wasm CI check), D9 |
 | 2 | Approve the WP-0.1 tree before Phase 0 continues | Gate 0 |
+| 3 | Decide whether the oracle may apply a **second** scripted rewrite, `Entity.java:96` `this.rand = new Random();` → `harness.HarnessMath.entityRandom(this.entityId)`. §4.2 allows only the `Math.random()` rewrite today. Without it, `EntityMob`/`EntityGhast`/`EntitySlime.getCanSpawnHere` draw from an unseeded `rand` before the join hook can seed it, so hostile-mob spawning fixtures are irreproducible; the harness defaults `difficulty` to 0 meanwhile (see `tools/oracle/census.md` §3) | Tier B/C mob-spawning fixtures (Phase 2) |
+| 4 | Confirm two WP-0.3 decisions taken by the orchestrator: (a) §3.4 rule 5 as recorded (oracle with intrinsics disabled, fdlibm in Rust; 1-ulp divergence from the real client accepted); (b) `JavaHashMap` targets the JDK 8+ algorithm incl. tree bins, written clean-room from a behavioural spec because OpenJDK is GPLv2+CPE and this project is CC0 | Gate 0 |
 
 Everything else is decided. The next action is WP-0.1 in
 `/home/nick/IdeaProjects/mc_b1.7.3-rust-rewrite`.
