@@ -1,0 +1,8 @@
+mc_b1.7.3-rust-rewrite
+
+This project contains code adapted from MinecraftOSS by chasmlol, from the
+2010-rust-rewrite-mashup repository
+(https://github.com/chasmlol/2010-rust-rewrite-mashup), MinecraftOSS commit
+4013a68, licensed under the Apache License, Version 2.0. Adapted files carry
+a header identifying their origin. A copy of the licence is in
+credits/licenses/MinecraftOSS_Apache-2.0.md.
