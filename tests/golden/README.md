@@ -1315,6 +1315,10 @@ not used) loads hotbar slot 0 with a stack before the clicks:
 - `tick/chest-container-clicks` (Tier S): `slot_click` in a double chest's `ContainerChest`
   (`InventoryLargeChest`) and a single chest's, shift-clicks both ways, a container switch;
   then `save`: the chests' `Items` in the `tile_entity` lines.
+- `tick/workbench-crafting`: a `ContainerWorkbench` kept open across clicks: the cake (milk
+  buckets left as empty buckets, `getContainerItem`), buckets (stack limit 1) clicked onto
+  each other, planks shift-clicked out (one craft per shift-click) and the output picked up
+  whole with a right click.
 - `tick/furnace-dispenser-clicks` (Tier S): `ContainerFurnace` (input, fuel, the
   `SlotFurnace` output taken after 200 ticks of smelting, shift-clicks) and
   `ContainerDispenser` (no shift-click move); then `save`.

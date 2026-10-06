@@ -221,6 +221,7 @@ fixtures! {
     tick_inventory_slot_clicks => "tick" / "inventory-slot-clicks";
     tick_chest_container_clicks => "tick" / "chest-container-clicks";
     tick_furnace_dispenser_clicks => "tick" / "furnace-dispenser-clicks";
+    tick_workbench_crafting => "tick" / "workbench-crafting";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test
