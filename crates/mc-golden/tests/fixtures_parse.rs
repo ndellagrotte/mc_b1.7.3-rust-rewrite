@@ -8,7 +8,9 @@ use std::path::Path;
 
 use mc_golden::bits::decode_float;
 use mc_golden::digest::is_blake3_hex;
-use mc_golden::{Scenario, ScenarioKind, TraceLine, all_fixture_dirs, parse_jsonl, read_sidecar};
+use mc_golden::{
+    Scenario, ScenarioKind, Tier, TraceLine, all_fixture_dirs, parse_jsonl, read_sidecar,
+};
 use serde_json::Value;
 
 /// Checks one JSON value; `key` is the field name it sits under.
@@ -77,6 +79,65 @@ fn check_counts(scenario: &Scenario, lines: &[TraceLine], at: &str) {
     }
 }
 
+/// Tier B/C/S scenarios are typed, ops are inside the tick range and every
+/// dump has exactly one of `every` and `t`.
+fn check_tick_model(scenario: &Scenario, dir: &Path) {
+    let at = dir.display();
+    match &scenario.kind {
+        ScenarioKind::Tick(t) => {
+            assert!(t.ticks >= 1, "{at}: ticks");
+            assert!((0..=3).contains(&t.difficulty), "{at}: difficulty");
+            for op in &t.ops {
+                assert!(op.t < t.ticks, "{at}: op {op:?} at t >= ticks");
+            }
+            for d in &t.dumps {
+                assert!(
+                    d.every.is_some() != d.t.is_some(),
+                    "{at}: dump {d:?} needs `every` xor `t`"
+                );
+                assert!(d.every != Some(0), "{at}: every 0");
+                if let Some(dt) = d.t {
+                    assert!(dt < t.ticks, "{at}: dump {d:?} at t >= ticks");
+                }
+            }
+            // Lines are emitted at ticks, so every line's `t` is < ticks.
+            if let Ok(text) = std::fs::read_to_string(dir.join("expected.jsonl")) {
+                for l in parse_jsonl(&text).unwrap() {
+                    assert!(l.t() >= 0 && l.t() < i64::from(t.ticks), "{at}: {l:?}");
+                }
+            }
+            // Serialising and re-parsing is lossless (floats become bit
+            // patterns, which parse to the same values).
+            let json = serde_json::to_string(scenario).unwrap();
+            assert_eq!(
+                &Scenario::parse(&json).unwrap(),
+                scenario,
+                "{at}: round trip"
+            );
+        }
+        ScenarioKind::WorldRead { dir: sidecar, .. } => {
+            assert!(
+                dir.join(sidecar).join("level.dat").is_file(),
+                "{at}: save dir"
+            );
+        }
+        ScenarioKind::Unsupported { kind, .. } => {
+            panic!("{at}: kind `{kind}` is still Unsupported")
+        }
+        _ => {}
+    }
+    if matches!(scenario.tier, Tier::B | Tier::C | Tier::S) {
+        assert!(
+            matches!(
+                scenario.kind,
+                ScenarioKind::Tick(_) | ScenarioKind::WorldRead { .. }
+            ),
+            "{at}: tier {:?} scenario is not tick/world_read",
+            scenario.tier
+        );
+    }
+}
+
 #[test]
 fn all_fixtures_parse() {
     let dirs = all_fixture_dirs().unwrap();
@@ -87,6 +148,7 @@ fn all_fixtures_parse() {
     for dir in &dirs {
         let scenario = Scenario::load(dir).unwrap_or_else(|e| panic!("{e}"));
         let at = dir.display();
+        check_tick_model(&scenario, dir);
         let Some(text) = read_text(&dir.join("expected.jsonl")) else {
             println!("note: {at}: no expected.jsonl yet");
             continue;

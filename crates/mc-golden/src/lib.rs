@@ -19,6 +19,16 @@
 //!   [`TraceLine::nbt_roundtrip`], [`TraceLine::nbt_gzip`],
 //!   [`TraceLine::nbt_file`], [`TraceLine::hash_codes`],
 //!   [`TraceLine::hash_order`]) — emit exactly the documented line shapes.
+//!   Tier B/C/S lines take the tick: [`TraceLine::block`],
+//!   [`TraceLine::blocks_full`], [`TraceLine::scheduled_ticks`],
+//!   [`TraceLine::world_time`], [`TraceLine::rng_state`],
+//!   [`TraceLine::chunk_digest_tick`], [`EntityLine`] (builder for `entity`),
+//!   [`TraceLine::level_dat`], [`TraceLine::world_info`],
+//!   [`TraceLine::region_header`], [`TraceLine::chunk_nbt`],
+//!   [`TraceLine::tile_entity`].
+//! - [`ScenarioKind::Tick`] ([`TickScenario`], [`Op`], [`OpKind`], [`Dump`],
+//!   [`DumpKind`]) and [`ScenarioKind::WorldRead`] — the typed Tier B/C/S
+//!   scenarios; `Unsupported` remains only for kinds not defined yet.
 //! - [`compare()`] / [`Mismatch`] — first-difference report with floats
 //!   decoded (PLAN_v4 §4.4 item 3).
 //! - [`Bits32`] / [`Bits64`] / [`hex_bytes`] / [`blake3_hex`] — the encoding
@@ -55,7 +65,11 @@ pub use compare::{Mismatch, MismatchKind, compare};
 pub use digest::blake3_hex;
 pub use error::GoldenError;
 pub use runner::{all_fixture_dirs, fixture_dir, read_sidecar, run, target_dir, workspace_root};
-pub use scenario::{ChunkSel, Dimension, Draw, HashOp, NbtNode, Scenario, ScenarioKind, Tier};
+pub use scenario::{
+    ChunkPos, ChunkSel, Dimension, Draw, Dump, DumpKind, EntityWhich, HashOp, ItemSpec, NbtNode,
+    Op, OpKind, Scenario, ScenarioKind, TickScenario, Tier, WorldSource,
+};
 pub use trace::{
-    ChunkArrays, RngValue, Stage, TraceLine, TraceParseError, TraceWriter, parse_jsonl,
+    ChunkArrays, EntityLine, EntityState, RngValue, ScheduledTick, Stage, TileItem, TraceLine,
+    TraceParseError, TraceWriter, WorldInfoLine, parse_jsonl,
 };

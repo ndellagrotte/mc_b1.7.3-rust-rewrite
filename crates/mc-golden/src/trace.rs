@@ -190,6 +190,10 @@ pub enum Stage {
     Generated,
     /// After the 3×3 neighbourhood is loaded and the chunk populated.
     Populated,
+    /// A chunk of a ticked world, at the dump's tick (Tier B/C/S `tick`).
+    Tick,
+    /// A chunk as `ChunkLoader` rebuilds it from a save (Tier S `world_read`).
+    Loaded,
 }
 
 impl Stage {
@@ -198,6 +202,8 @@ impl Stage {
         match self {
             Self::Generated => "generated",
             Self::Populated => "populated",
+            Self::Tick => "tick",
+            Self::Loaded => "loaded",
         }
     }
 }
@@ -232,7 +238,8 @@ impl ChunkArrays<'_> {
 }
 
 /// Event constructors for the Tier A shapes in `tests/golden/README.md`.
-/// All use `t = 0`.
+/// All use `t = 0`. (The Tier B/C/S constructors, which take the tick, follow
+/// in a second `impl` block.)
 impl TraceLine {
     /// `{"t":0,"e":"rng","i":..,"call":..,("bound":..,)"v":..}`.
     pub fn rng(i: u64, call: &str, bound: Option<i32>, v: RngValue) -> Self {
@@ -271,15 +278,17 @@ impl TraceLine {
 
     /// `chunk_digest`: blake3 of each array.
     pub fn chunk_digest(x: i32, z: i32, stage: Stage, arrays: &ChunkArrays<'_>) -> Self {
-        Self::chunk_line("chunk_digest", x, z, stage, arrays, blake3_hex)
+        Self::chunk_line(0, "chunk_digest", x, z, stage, arrays, blake3_hex)
     }
 
     /// `chunk_full`: lower-case hex of each array.
     pub fn chunk_full(x: i32, z: i32, stage: Stage, arrays: &ChunkArrays<'_>) -> Self {
-        Self::chunk_line("chunk_full", x, z, stage, arrays, hex_bytes)
+        Self::chunk_line(0, "chunk_full", x, z, stage, arrays, hex_bytes)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn chunk_line(
+        t: i64,
         e: &str,
         x: i32,
         z: i32,
@@ -287,7 +296,7 @@ impl TraceLine {
         arrays: &ChunkArrays<'_>,
         encode: fn(&[u8]) -> String,
     ) -> Self {
-        let mut line = Self::new(0, e)
+        let mut line = Self::new(t, e)
             .with("x", x)
             .with("z", z)
             .with("stage", stage.as_str());
@@ -372,6 +381,390 @@ impl TraceLine {
     }
 }
 
+/// Event constructors for the Tier B/C/S shapes (README "Tier B/C/S
+/// scenarios"). Each takes the tick `t` the line belongs to: the dump's tick
+/// for B/C lines, the `save` op's tick for Tier S lines (`0` for `world_read`).
+impl TraceLine {
+    /// `{"e":"preload","implicit":bool,"loaded":N}` (the implicit one, before
+    /// tick 0, has `implicit: true`; the op's line is [`TraceLine::op`]).
+    pub fn preload_implicit(loaded: u64) -> Self {
+        Self::new(0, "preload")
+            .with("implicit", true)
+            .with("loaded", loaded)
+    }
+
+    /// `{"e":"op","op":name,..}`; add the op's result fields with
+    /// [`TraceLine::with`].
+    pub fn op(t: i64, name: &str) -> Self {
+        Self::new(t, "op").with("op", name)
+    }
+
+    /// `{"e":"block","x","y","z","id","meta","skylight","blocklight"}`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn block(t: i64, x: i32, y: i32, z: i32, id: i32, meta: i32, sky: i32, light: i32) -> Self {
+        Self::new(t, "block")
+            .with("x", x)
+            .with("y", y)
+            .with("z", z)
+            .with("id", id)
+            .with("meta", meta)
+            .with("skylight", sky)
+            .with("blocklight", light)
+    }
+
+    /// `blocks_full` over the inclusive box `min..=max` (corners as
+    /// `[x0, y0, z0]`, `[x1, y1, z1]`); `ids`, `metas`, `skylight` and
+    /// `blocklight` are one byte per block, x outer, z middle, y inner, each
+    /// written as a hex string.
+    pub fn blocks_full(
+        t: i64,
+        min: [i32; 3],
+        max: [i32; 3],
+        ids: &[u8],
+        metas: &[u8],
+        skylight: &[u8],
+        blocklight: &[u8],
+    ) -> Self {
+        Self::new(t, "blocks_full")
+            .with("x0", min[0])
+            .with("y0", min[1])
+            .with("z0", min[2])
+            .with("x1", max[0])
+            .with("y1", max[1])
+            .with("z1", max[2])
+            .with("ids", hex_bytes(ids))
+            .with("metas", hex_bytes(metas))
+            .with("skylight", hex_bytes(skylight))
+            .with("blocklight", hex_bytes(blocklight))
+    }
+
+    /// `scheduled_ticks`: `count` and the BLAKE3 over 24 bytes per entry
+    /// (`x`, `y`, `z`, `blockID` as `i32` LE, `scheduledTime` as `i64` LE), in
+    /// `scheduledTickTreeSet` order. With `full`, also `"entries"`.
+    pub fn scheduled_ticks(t: i64, entries: &[ScheduledTick], full: bool) -> Self {
+        let mut bytes = Vec::with_capacity(entries.len() * 24);
+        for e in entries {
+            for v in [e.x, e.y, e.z, e.block_id] {
+                bytes.extend_from_slice(&v.to_le_bytes());
+            }
+            bytes.extend_from_slice(&e.time.to_le_bytes());
+        }
+        let mut line = Self::new(t, "scheduled_ticks")
+            .with("count", entries.len() as u64)
+            .with("blake3", blake3_hex(&bytes));
+        if full {
+            let rows: Vec<Value> = entries
+                .iter()
+                .map(|e| serde_json::json!([e.x, e.y, e.z, e.block_id, e.time]))
+                .collect();
+            line = line.with("entries", rows);
+        }
+        line
+    }
+
+    /// `{"e":"world_time","time"}`.
+    pub fn world_time(t: i64, time: i64) -> Self {
+        Self::new(t, "world_time").with("time", time)
+    }
+
+    /// `{"e":"rng_state","world_rand","lcg","math_random"}`: the 48-bit state
+    /// of `World.rand`, `field_9437_g` (an `i32`), and the 48-bit state of the
+    /// `Math.random()` stream.
+    pub fn rng_state(t: i64, world_rand: i64, lcg: i32, math_random: i64) -> Self {
+        Self::new(t, "rng_state")
+            .with("world_rand", world_rand)
+            .with("lcg", lcg)
+            .with("math_random", math_random)
+    }
+
+    /// `chunk_digest` with an explicit tick and stage.
+    pub fn chunk_digest_at(t: i64, x: i32, z: i32, stage: Stage, arrays: &ChunkArrays<'_>) -> Self {
+        Self::chunk_line(t, "chunk_digest", x, z, stage, arrays, blake3_hex)
+    }
+
+    /// `chunk_full` with an explicit tick and stage.
+    pub fn chunk_full_at(t: i64, x: i32, z: i32, stage: Stage, arrays: &ChunkArrays<'_>) -> Self {
+        Self::chunk_line(t, "chunk_full", x, z, stage, arrays, hex_bytes)
+    }
+
+    /// `chunk_digest` with `"stage":"tick"` at tick `t`.
+    pub fn chunk_digest_tick(t: i64, x: i32, z: i32, arrays: &ChunkArrays<'_>) -> Self {
+        Self::chunk_digest_at(t, x, z, Stage::Tick, arrays)
+    }
+
+    /// `chunk_full` with `"stage":"tick"` at tick `t`.
+    pub fn chunk_full_tick(t: i64, x: i32, z: i32, arrays: &ChunkArrays<'_>) -> Self {
+        Self::chunk_full_at(t, x, z, Stage::Tick, arrays)
+    }
+
+    /// `{"e":"entity_absent","id"}`.
+    pub fn entity_absent(t: i64, id: i32) -> Self {
+        Self::new(t, "entity_absent").with("id", id)
+    }
+
+    /// `{"e":"level_dat","root":<canonical tree>,"masked":[..]}`.
+    pub fn level_dat(t: i64, root: Value, masked: &[&str]) -> Self {
+        Self::new(t, "level_dat")
+            .with("root", root)
+            .with("masked", masked.to_vec())
+    }
+
+    /// `world_info`: `new WorldInfo(Data)` read back through its getters.
+    #[allow(clippy::too_many_arguments)]
+    pub fn world_info(t: i64, info: &WorldInfoLine<'_>) -> Self {
+        Self::new(t, "world_info")
+            .with("RandomSeed", info.random_seed)
+            .with("SpawnX", info.spawn[0])
+            .with("SpawnY", info.spawn[1])
+            .with("SpawnZ", info.spawn[2])
+            .with("Time", info.time)
+            .with("LevelName", info.level_name)
+            .with("version", info.version)
+            .with("rainTime", info.rain_time)
+            .with("raining", info.raining)
+            .with("thunderTime", info.thunder_time)
+            .with("thundering", info.thundering)
+            .with("dimension", info.dimension)
+            .with("player", info.player)
+    }
+
+    /// `region_header`: `present` are the indices `x + z * 32` with a non-zero
+    /// location entry (`count` is their number); `dbg_len` (file length) and
+    /// the 1024 `locations` go in `dbg`, which is never compared.
+    pub fn region_header(
+        t: i64,
+        name: &str,
+        present: &[u32],
+        timestamps_match: bool,
+        dbg_len: u64,
+        locations: &[i32],
+    ) -> Self {
+        Self::new(t, "region_header")
+            .with("name", name)
+            .with("count", present.len() as u64)
+            .with("present", present.to_vec())
+            .with("timestamps_match", timestamps_match)
+            .with(
+                "dbg",
+                serde_json::json!({"len": dbg_len, "locations": locations}),
+            )
+    }
+
+    /// `{"e":"chunk_nbt","x","z","root":<canonical tree>}`.
+    pub fn chunk_nbt(t: i64, x: i32, z: i32, root: Value) -> Self {
+        Self::new(t, "chunk_nbt")
+            .with("x", x)
+            .with("z", z)
+            .with("root", root)
+    }
+
+    /// `{"e":"chunk_absent","x","z"}`.
+    pub fn chunk_absent(t: i64, x: i32, z: i32) -> Self {
+        Self::new(t, "chunk_absent").with("x", x).with("z", z)
+    }
+
+    /// `tile_entity` for an id with a mapping. `inventory` is `Some((size,
+    /// non-empty slots in slot order))` for an `IInventory`.
+    pub fn tile_entity(
+        t: i64,
+        index: u32,
+        id: &str,
+        class: &str,
+        pos: [i32; 3],
+        inventory: Option<(u32, &[TileItem])>,
+    ) -> Self {
+        let mut line = Self::new(t, "tile_entity")
+            .with("index", index)
+            .with("id", id)
+            .with("known", true)
+            .with("class", class)
+            .with("x", pos[0])
+            .with("y", pos[1])
+            .with("z", pos[2]);
+        if let Some((size, items)) = inventory {
+            let items: Vec<Value> = items
+                .iter()
+                .map(|i| {
+                    serde_json::json!({"slot": i.slot, "id": i.id, "count": i.count, "damage": i.damage})
+                })
+                .collect();
+            line = line.with("size", size).with("items", items);
+        }
+        line
+    }
+
+    /// `tile_entity` for an id with no mapping: `known: false` and nothing
+    /// more.
+    pub fn tile_entity_unknown(t: i64, index: u32, id: &str) -> Self {
+        Self::new(t, "tile_entity")
+            .with("index", index)
+            .with("id", id)
+            .with("known", false)
+    }
+}
+
+/// One `NextTickListEntry` (`scheduled_ticks` entry).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScheduledTick {
+    /// `xCoord`.
+    pub x: i32,
+    /// `yCoord`.
+    pub y: i32,
+    /// `zCoord`.
+    pub z: i32,
+    /// `blockID`.
+    pub block_id: i32,
+    /// `scheduledTime`.
+    pub time: i64,
+}
+
+/// A non-empty inventory slot of a `tile_entity` line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TileItem {
+    /// Slot index.
+    pub slot: i32,
+    /// Item id.
+    pub id: i32,
+    /// Stack size.
+    pub count: i32,
+    /// Damage.
+    pub damage: i32,
+}
+
+/// The fields of a `world_info` line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WorldInfoLine<'a> {
+    /// `RandomSeed`.
+    pub random_seed: i64,
+    /// `SpawnX`, `SpawnY`, `SpawnZ`.
+    pub spawn: [i32; 3],
+    /// `Time`.
+    pub time: i64,
+    /// `LevelName`.
+    pub level_name: &'a str,
+    /// `version`.
+    pub version: i32,
+    /// `rainTime`.
+    pub rain_time: i32,
+    /// `raining`.
+    pub raining: bool,
+    /// `thunderTime`.
+    pub thunder_time: i32,
+    /// `thundering`.
+    pub thundering: bool,
+    /// `dimension`.
+    pub dimension: i32,
+    /// Whether a `Player` compound exists.
+    pub player: bool,
+}
+
+/// Builder for an `entity` line (README `entity` line): the common keys
+/// (`idx`, `id`, `kind`) are set by [`EntityLine::new`]; add the rest with the
+/// typed helpers, then convert with [`EntityLine::build`] or `TraceLine::from`.
+/// `posX/Y/Z`, `prevPosX/Y/Z`, `motionX/Y/Z` are `f64`, `rotationYaw`,
+/// `rotationPitch`, `fallDistance` are `f32`, `rand` is the 48-bit state as an
+/// integer, and `state` holds the kind-specific fields.
+#[derive(Clone, Debug)]
+pub struct EntityLine(TraceLine);
+
+impl EntityLine {
+    /// Starts an `entity` line at tick `t`; `kind` is the Java class simple
+    /// name (`EntityPig`, `HarnessPlayer`, ...).
+    pub fn new(t: i64, idx: u32, id: i32, kind: &str) -> Self {
+        Self(
+            TraceLine::new(t, "entity")
+                .with("idx", idx)
+                .with("id", id)
+                .with("kind", kind),
+        )
+    }
+
+    /// An `f64` field (bit-pattern string).
+    pub fn f64(self, name: &str, v: f64) -> Self {
+        Self(self.0.with_f64(name, v))
+    }
+
+    /// An `f32` field (bit-pattern string).
+    pub fn f32(self, name: &str, v: f32) -> Self {
+        Self(self.0.with_f32(name, v))
+    }
+
+    /// A boolean field.
+    pub fn bool(self, name: &str, v: bool) -> Self {
+        Self(self.0.with(name, v))
+    }
+
+    /// An integer field (`ticksExisted`, `rand`, ...).
+    pub fn int(self, name: &str, v: i64) -> Self {
+        Self(self.0.with(name, v))
+    }
+
+    /// The kind-specific `state` object. Build it with
+    /// [`EntityState`] or `serde_json::json!`.
+    pub fn state(self, state: impl Into<Value>) -> Self {
+        Self(self.0.with("state", state))
+    }
+
+    /// The finished line.
+    pub fn build(self) -> TraceLine {
+        self.0
+    }
+}
+
+impl From<EntityLine> for TraceLine {
+    fn from(e: EntityLine) -> Self {
+        e.0
+    }
+}
+
+/// Builder for the `state` object of an `entity` line, with the same typed
+/// helpers as [`EntityLine`].
+#[derive(Clone, Debug, Default)]
+pub struct EntityState(Map<String, Value>);
+
+impl EntityState {
+    /// An empty state (`{}`, e.g. `EntityFallingSand`).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// An `f32` field (bit-pattern string).
+    pub fn f32(mut self, name: &str, v: f32) -> Self {
+        self.0.insert(name.into(), Bits32::from(v).into());
+        self
+    }
+
+    /// An `f64` field (bit-pattern string).
+    pub fn f64(mut self, name: &str, v: f64) -> Self {
+        self.0.insert(name.into(), Bits64::from(v).into());
+        self
+    }
+
+    /// A boolean field.
+    pub fn bool(mut self, name: &str, v: bool) -> Self {
+        self.0.insert(name.into(), v.into());
+        self
+    }
+
+    /// An integer field.
+    pub fn int(mut self, name: &str, v: i64) -> Self {
+        self.0.insert(name.into(), v.into());
+        self
+    }
+
+    /// Any other JSON value (a string digest, a nested `{id,count,damage}`).
+    pub fn value(mut self, name: &str, v: impl Into<Value>) -> Self {
+        self.0.insert(name.into(), v.into());
+        self
+    }
+}
+
+impl From<EntityState> for Value {
+    fn from(s: EntityState) -> Self {
+        Value::Object(s.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -386,6 +779,44 @@ mod tests {
         let mut w = TraceWriter::new();
         lines.iter().cloned().for_each(|l| w.push(l));
         assert_eq!(parse_jsonl(&w.to_jsonl()).unwrap(), lines);
+    }
+
+    #[test]
+    fn tick_constructors_carry_t() {
+        let a = ChunkArrays {
+            blocks: &[1],
+            data: &[2],
+            skylight: &[3],
+            blocklight: &[4],
+            heightmap: &[5],
+        };
+        let d = TraceLine::chunk_digest_tick(7, -1, 2, &a);
+        assert_eq!((d.t(), d.get("stage")), (7, Some(&"tick".into())));
+        assert_eq!(TraceLine::world_time(3, 4).t(), 3);
+        let s = TraceLine::scheduled_ticks(
+            9,
+            &[ScheduledTick {
+                x: 1,
+                y: 2,
+                z: 3,
+                block_id: 8,
+                time: 10,
+            }],
+            true,
+        );
+        assert_eq!(
+            s.get("entries"),
+            Some(&serde_json::json!([[1, 2, 3, 8, 10]]))
+        );
+        assert_eq!(
+            s.get("blake3").and_then(Value::as_str),
+            Some(
+                blake3_hex(&[
+                    1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 8, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0
+                ])
+                .as_str()
+            )
+        );
     }
 
     #[test]
