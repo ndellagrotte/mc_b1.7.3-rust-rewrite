@@ -103,6 +103,16 @@ fixtures! {
     tick_flat_water_flow => "tick" / "flat-water-flow";
     tick_grass_spread => "tick" / "grass-spread";
     tick_leaves_decay => "tick" / "leaves-decay";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 33 (t=1 blocks_full ids: no torch power, so the pumpkin row does not extend). Then the chest row on the same line needs TileEntityChest (BlockContainer.onBlockAdded, WP-1.6 containers task / WP-1.8): without it the chest is pushed. With a stand-in torch and obsidian for the chest the rest of the trace matched the oracle (WP-1.6d report)"]
+    tick_piston_immovable => "tick" / "piston-immovable";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 47 (t=8 block 0,61,0: no torch power, no extension)"]
+    tick_piston_moving_block_tick => "tick" / "piston-moving-block-tick";
+    tick_piston_orphan_blocks => "tick" / "piston-orphan-blocks";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 11 (t=1 blocks_full ids: no torch power, no extension)"]
+    tick_piston_push_limit => "tick" / "piston-push-limit";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 12 (t=1 blocks_full: no torch power, no extension)"]
+    tick_piston_push_stone => "tick" / "piston-push-stone";
+    tick_piston_retract_unpowered => "tick" / "piston-retract-unpowered";
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
     tick_ray_trace_platform => "tick" / "ray-trace-platform";
     tick_sapling_grow => "tick" / "sapling-grow";
