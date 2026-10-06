@@ -80,6 +80,19 @@ fixtures! {
     entity_pig_knockback => "entity" / "pig-knockback";
     entity_pig_ladder => "entity" / "pig-ladder";
     entity_snowball_egg_flight => "entity" / "snowball-egg-flight";
+    // WP-2.3 task 1: sheep, cow, chicken, wolf. sheep-shear and
+    // wolf-pack-retaliates have a save op (Tier S: golden_save.rs's
+    // COVERED_IN_GOLDEN_TICK).
+    entity_sheep_shear => "entity" / "sheep-shear";
+    entity_cow_milk => "entity" / "cow-milk";
+    entity_chicken_fall_hatch => "entity" / "chicken-fall-hatch";
+    entity_chicken_eggs => "entity" / "chicken-eggs";
+    entity_wolf_hunts_sheep => "entity" / "wolf-hunts-sheep";
+    entity_wolf_pack_retaliates => "entity" / "wolf-pack-retaliates";
+    entity_wolf_rain_shake => "entity" / "wolf-rain-shake";
+    entity_wolf_bone_refused => "entity" / "wolf-bone-refused";
+    #[ignore = "EntityPlayer.getEyeHeight (0.12F, EntityPlayer.java:349-351; WP-2.5): the wolf faces the player's eyes once EntityLiving's idle AI picks the player at t=14; the port uses EntityLiving's height * 0.85 (recorded) and differs first at line 59 (t=15 entity 1, rotationPitch -26.66 for -12.41); lines 1-58 match, and with the player's 0.12 the whole fixture matches (checked by hand)"]
+    entity_wolf_begs_bone => "entity" / "wolf-begs-bone";
     entity_tnt_explode => "entity" / "tnt-explode";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------

@@ -82,9 +82,13 @@ const COVERED: &[(&str, &str)] = &[
     ("save", "tile-entities"),
 ];
 
-/// Tier S fixtures in the `tick` area: `tests/golden_tick.rs` must list them
+/// Tier S fixtures in the `tick` and `entity` areas: `tests/golden_tick.rs` must list them
 /// (its own coverage check), so they are run there and not again here.
-const COVERED_IN_GOLDEN_TICK: &[(&str, &str)] = &[("tick", "dungeon-chest-save")];
+const COVERED_IN_GOLDEN_TICK: &[(&str, &str)] = &[
+    ("tick", "dungeon-chest-save"),
+    ("entity", "sheep-shear"),
+    ("entity", "wolf-pack-retaliates"),
+];
 
 #[test]
 fn save_testworld() {

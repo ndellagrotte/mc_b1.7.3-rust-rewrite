@@ -1046,8 +1046,8 @@ stone platform unless stated, `rng_state` and `entity_state` every tick:
   second TNT block (`World.rand` fuse) and knocks back or destroys items.
 - `tick/tnt-by-fire` (above): fire primes the TNT.
 - `entity/snowball-egg-flight`: two snowballs and an egg (harness kind `Egg`) into a wall and
-  onto the floor; the egg's `nextInt(8)` hatch roll fails with seed 123 (a hatched chicken is
-  WP-2.3: the port would diverge at the next entity line).
+  onto the floor; the egg's `nextInt(8)` hatch roll fails with seed 123 (hatching:
+  `entity/chicken-fall-hatch`, WP-2.3).
 - `entity/painting-art`: four paintings by the position constructor (art draws replayed on
   the seeded `rand`); one loses its wall block and drops at its 101st update, one is hit by a
   snowball (`EntityPainting.attackEntityFrom`).
@@ -1088,14 +1088,61 @@ stated, `rng_state` and `entity_state` every tick (`entity/flat-pig-falls` and
 
 Not pinned by a fixture: `faceEntity` toward a player (`EntityLiving.updatePlayerActionState`'s
 2 % look-at roll reads the player's `getEyeHeight`, `EntityPlayer`'s override, WP-2.5;
-`entity/pig-attacked` diverges at its player punch before the pig looks at the player), and
-paths to an entity (`getPathToEntity`: no b1.7.3 animal has a target). `Pathfinder` is
-unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`). The `entity_state`
+`entity/pig-attacked` diverges at its player punch before the pig looks at the player;
+`entity/wolf-begs-bone` below waits for it). Paths to an entity (`getPathToEntity`) are pinned
+since WP-2.3 by the wolf fixtures below (the wolf is the only b1.7.3 animal with a target).
+`Pathfinder` is also unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`). The `entity_state`
 dump has none of `EntityLiving`'s body yaw and walk state (`renderYawOffset`,
 `field_9361_v`/`9362_u`/`9360_w`/`9359_x`, `legYaw`/`legSwing`), nor `randomYawVelocity`,
 `entityAge`, `livingSoundTime`, `heartsLife`, `field_9346_af`, `attackedAtYaw`, `air` or
 `fire`: those are pinned only through the `rand`/`Math.random()` streams, health and drops,
 and the body yaw and walk state by `crates/mc-sim/tests/living_entities.rs`.
+
+Animals and the wolf (WP-2.3 task 1: `EntitySheep`, `EntityCow`, `EntityChicken`,
+`EntityWolf`), empty world, seed 123, `"mob_spawning": "none"`, a 16×16 stone platform over
+chunk (0, 0) fenced at y = 61, `rng_state` and `entity_state` every tick unless stated. The
+`interact` op's `item_id` puts the stack into the player's hotbar slot first; without one the
+slot keeps what it holds. Where a player is present it stands outside the fence, beyond the
+animals' 8-block look range and out of reach of the drops (its look-at target needs
+`EntityPlayer.getEyeHeight`, its item pickup `EntityPlayer.onLivingUpdate`: WP-2.5):
+
+- `entity/sheep-shear` (player, `save`): shears on a sheep (2–4 wool, three `rand` nudges each,
+  the shears' damage), again on the sheared sheep (nothing), on a second sheep; the save's
+  `Sheared`/`Color`; a sheared sheep dies without a drop, an unsheared one drops its wool.
+  Sheep are white: only `SpawnerAnimals` draws `getRandomFleeceColor` (unit-tested in
+  `crates/mc-sim/tests/animals.rs`).
+- `entity/cow-milk` (player looking up, so the milk bucket's `sendUseItem` ray trace misses):
+  an empty bucket becomes milk; a stack of 3 buckets becomes one milk bucket (vanilla bug:
+  two buckets lost); other items do nothing; hits, a death and the leather drop.
+- `entity/chicken-fall-hatch`: a chicken falls 14 blocks slowed by its wings and lands
+  unhurt (`EntityChicken.fall` is empty); 59 eggs land, three hatch (one of them four
+  chickens) with seed 123; `entity_state` of the chickens and the hatching eggs only.
+- `entity/chicken-eggs` (7300 ticks): three chickens lay their first eggs at t = 6264, 6781,
+  7246 (the constructor's egg timer, redrawn by the oracle's join hook on the seeded stream,
+  which the port's seeded constructor reproduces); `rng_state` every 10 ticks,
+  `entity_state` every 100 and around each egg.
+- `entity/wolf-hunts-sheep` (450 ticks, `entity_state` every 2): b1.7.3 wolves hunt sheep
+  (a `World.rand` 1-in-100 roll, a random sheep within 16 blocks): paths to the target,
+  leaps, bites of 2; both sheep die and drop wool.
+- `entity/wolf-pack-retaliates` (`save`): a pig hits a wolf (damage halved); both wolves target
+  the pig, without anger (not a player), and kill it; a hit with no attacker neither halves nor
+  retaliates; the save's `Angry`/`Sitting`/`Owner`.
+- `entity/wolf-rain-shake`: a wolf in the rain (`set_weather`) is wet; after the rain it
+  shakes for 40 ticks, standing still (`isMovementCeased`), with the shake sound and splash
+  draws; `weather` every tick.
+- `entity/wolf-bone-refused` (player): two bones refused (smoke draws), then stone (false).
+- `entity/wolf-begs-bone` (player 5 blocks away; ignored until WP-2.5's
+  `EntityPlayer.getEyeHeight`): the wolf picks the player as its look target and, seeing a
+  bone in hand, keeps facing it (`looksWithInterest`, `numTicksToChaseTarget = 10`).
+
+Not pinned: the tamed wolf. The oracle's `HarnessPlayer` has a null `username` (only
+`EntityPlayerSP` copies the session's), so a successful taming throws
+`NullPointerException` in `setWolfOwner` (`DataWatcher.updateObject`), as do the owner checks
+(`username.equalsIgnoreCase`); the bone fixtures' ticks are chosen so that every taming roll
+fails. Following and teleporting to the owner, sitting, feeding meat and the tamed branches
+of `attackEntityFrom`/`attackEntity` are unit-tested only (`crates/mc-sim/tests/animals.rs`).
+Anger needs a player (or a player's arrow) as the attacker: the `attack` op's player branch is
+WP-2.5.
 
 Minecart and boat (WP-2.4, task 2), empty world, seed 123, `"mob_spawning": "none"`, the
 stone platform unless stated, `rng_state` and `entity_state` every tick (of the vehicles and

@@ -1,0 +1,12 @@
+{"name": "wolf-hunts-sheep", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 450, "mob_spawning": "none",
+ "comment": "WP-2.3 task 1. b1.7.3 wolves hunt sheep: a wolf (id 0) and two sheep (ids 1, 2) in the fenced stone pen of entity/sheep-shear, no player. EntityWolf.updatePlayerActionState (EntityWolf.java:96-123): an untamed wolf with no target and no path rolls World.rand.nextInt(100) each AI tick; on 0 it takes a random sheep within 16x4x16 (a second World.rand draw) as playerToAttack. EntityCreature then paths to it (World.getPathToEntity) every 20 ticks and calls EntityWolf.attackEntity (:304-324): between 2 and 6 blocks a 1-in-10 leap (motion toward the sheep, 0.4 up), within 1.5 blocks a bite of 2 (EntitySheep.attackEntityFrom = EntityLiving's, the attacker's knock-back). Both sheep die (health 0 at t = 177 and t = 347; one white wool each, EntitySheep.dropFewItems); the wolf's living sounds draw rand.nextInt(3) (EntityWolf.getLivingSound, :70-78). rng_state every tick, entity_state every 2 ticks.",
+ "ops":[{"t": 0, "op": "fill", "x0": 0, "y0": 60, "z0": 0, "x1": 15, "y1": 60, "z1": 15, "id": 1},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 0, "x1": 15, "y1": 61, "z1": 0, "id": 85},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 15, "x1": 15, "y1": 61, "z1": 15, "id": 85},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 1, "x1": 0, "y1": 61, "z1": 14, "id": 85},
+        {"t": 0, "op": "fill", "x0": 15, "y0": 61, "z0": 1, "x1": 15, "y1": 61, "z1": 14, "id": 85},
+        {"t": 0, "op": "spawn", "kind": "Wolf", "pos": ["0x400c000000000000", 61, "0x400c000000000000"], "id": 0},
+        {"t": 0, "op": "spawn", "kind": "Sheep", "pos": ["0x4027000000000000", 61, "0x4027000000000000"], "id": 1},
+        {"t": 0, "op": "spawn", "kind": "Sheep", "pos": ["0x4027000000000000", 61, "0x4012000000000000"], "id": 2}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 2, "what": "entity_state", "which": "all"}]}

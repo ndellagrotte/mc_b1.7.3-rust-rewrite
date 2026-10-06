@@ -1,0 +1,13 @@
+{"name": "wolf-rain-shake", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 200, "mob_spawning": "none",
+ "comment": "WP-2.3 task 1. A wolf (id 0) alone in the fenced stone pen of entity/sheep-shear, no player. t=0 set_weather raining (rain_time 100000): the rain strength passes 0.2 at t = 20 and the wolf is wet until t = 100 (Entity.isWet: canBlockBeRainedOn); EntityWolf.onUpdate (EntityWolf.java:152-196) sets isWolfShaking and holds the animation off. t=60 the rain stops; once the strength is below 0.2 an onLivingUpdate on the ground with no path starts the shake (t = 102; field_25052_g, :143-148; setEntityState(8) is empty in World): it holds the wolf still (isMovementCeased, so EntityCreature wanders no more), plays mob.wolf.shake (two rand draws), runs 40 ticks at +0.05 and from 0.4 spawns up to 7 splash particles a tick (two rand draws each). rng_state, entity_state and weather every tick.",
+ "ops":[{"t": 0, "op": "fill", "x0": 0, "y0": 60, "z0": 0, "x1": 15, "y1": 60, "z1": 15, "id": 1},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 0, "x1": 15, "y1": 61, "z1": 0, "id": 85},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 15, "x1": 15, "y1": 61, "z1": 15, "id": 85},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 1, "x1": 0, "y1": 61, "z1": 14, "id": 85},
+        {"t": 0, "op": "fill", "x0": 15, "y0": 61, "z0": 1, "x1": 15, "y1": 61, "z1": 14, "id": 85},
+        {"t": 0, "op": "spawn", "kind": "Wolf", "pos": ["0x401e000000000000", 61, "0x401e000000000000"], "id": 0},
+        {"t": 0, "op": "set_weather", "rain_time": 100000, "raining": true},
+        {"t": 60, "op": "set_weather", "raining": false}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 1, "what": "entity_state", "which": "all"},
+          {"every": 1, "what": "weather"}]}
