@@ -756,6 +756,14 @@ Redstone (WP-1.6 task c), empty world, seed 123, the stone platform at y = 60; e
   step up and down (`calculateCurrentChanges`' diagonal connections), placed silently and by
   `set_block`; both torches removed at t = 10. `block_box`, `power` and `scheduled_ticks`
   every tick. The `blocksNeedingUpdate` `HashSet` order decides the notification order.
+- `tick/redstone-removal` (tier C): the removal and drop paths. A wire removed from a
+  powered line (`BlockRedstoneWire.onBlockRemoval` propagating at the air cell); the
+  platform block removed under a powered repeater, a wire and an on lever, and the block
+  behind a pressed button (each block's `onNeighborBlockChange` drop path: `dropBlockAsItem`
+  draws `World.rand`, then `setBlockWithNotify` 0 and the `onBlockRemoval` notifications);
+  a pressed button and a pressed wooden plate removed by `set_block` 0 (`onBlockRemoval`
+  while pressed; their pending updates later find air); a pressed plate whose support is
+  removed. `entity_state` (the dropped items), `power`, `scheduled_ticks`.
 - `tick/redstone-torch-inverter`: a lever (switched by `set_block` with meta 13 / 5) into a
   block with a torch on it, and a one-torch clock whose wire runs back into its block: eight
   turn-offs within 100 ticks burn it out (`torchUpdates`, the `random.fizz` draws at t = 30),

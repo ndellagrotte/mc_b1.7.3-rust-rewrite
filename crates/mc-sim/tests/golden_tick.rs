@@ -87,6 +87,7 @@ fixtures! {
     #[ignore = "needs ItemBlock / ItemReed / ItemRedstone.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 8 (t=1 op use_item, field placed); lines 1-7 match. The block hooks it reaches (BlockTorch / BlockLever / BlockButton.onBlockPlaced, BlockRedstoneRepeater.onBlockPlacedBy) are transcribed"]
     tick_redstone_item_placement => "tick" / "redstone-item-placement";
     tick_redstone_ore_touch => "tick" / "redstone-ore-touch";
+    tick_redstone_removal => "tick" / "redstone-removal";
     tick_redstone_torch_inverter => "tick" / "redstone-torch-inverter";
     tick_redstone_wire_line => "tick" / "redstone-wire-line";
     tick_repeater_delays => "tick" / "repeater-delays";
