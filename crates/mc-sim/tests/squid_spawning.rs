@@ -241,6 +241,9 @@ fn entity_list_constructors_and_gaps() {
                     r.state(),
                     "{n}: EntityLiving's draws"
                 );
+                let gap = m.new_instance_gap;
+                assert!(gap.contains(&format!("the {}(World) constructor", m.class)));
+                assert_eq!(w.unimplemented_hits.borrow().get(gap), Some(&1));
             }
         }
     }
@@ -330,9 +333,18 @@ fn sleep_spawning_from_world_tick() {
         assert_eq!(w.world_info.world_time, 24001, "night skipped, then +1");
         assert_eq!(w.loaded_entity_list.len(), entities);
         let hits = w.unimplemented_hits.borrow();
-        let gap = hits
-            .keys()
-            .any(|k| k.starts_with("EntityList: the entity class's (World) constructor"));
+        // The gap records name the class: only nightSpawnEntities' monsters.
+        let monster_gaps: Vec<&str> = spawner::NIGHT_SPAWN_ENTITIES
+            .iter()
+            .map(|c| entity_list::by_class(c).unwrap().new_instance_gap)
+            .collect();
+        let gap = hits.keys().any(|k| monster_gaps.contains(k));
+        assert!(
+            !hits
+                .keys()
+                .any(|k| k.starts_with("EntityList: the ") && !monster_gaps.contains(k)),
+            "no other class reached: {hits:?}"
+        );
         assert_eq!(
             gap, hostile,
             "monster constructors reached only with hostile spawning"

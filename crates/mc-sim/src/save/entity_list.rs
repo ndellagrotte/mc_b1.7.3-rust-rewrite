@@ -20,7 +20,9 @@
 //!   draws (EntityLiving.java:38, :63, :65, :66; no subclass constructor
 //!   draws `Math.random()`), so ids and the `Math.random()` stream stay
 //!   aligned with vanilla;
-//! - the gap is recorded in [`World::unimplemented_hits`];
+//! - the gap is recorded in [`World::unimplemented_hits`] under a record
+//!   naming the class ([`EntityMapping::new_instance_gap`],
+//!   [`EntityMapping::from_nbt_gap`]);
 //! - the stored compound itself is kept by the chunk loader and written
 //!   back, unchanged, after the chunk's live entities when the chunk is
 //!   saved again ([`super::chunk_loader`]), so loading and re-saving a
@@ -79,52 +81,72 @@ pub struct EntityMapping {
     /// Whether it extends `EntityLiving` (its constructor draws
     /// `Math.random()`; module docs).
     pub living: bool,
+    /// The [`World::unimplemented_hits`] record of a [`new_instance`] of
+    /// this class while the port has no `(World)` constructor for it
+    /// (names the class, so a fixture's hits say which constructor it
+    /// reached).
+    pub new_instance_gap: &'static str,
+    /// The record of a [`create_entity_from_nbt`] of this class while the
+    /// port has no `(World)` constructor for it. Starts with
+    /// `"EntityList.createEntityFromNBT"`.
+    pub from_nbt_gap: &'static str,
 }
 
-const fn row(class: &'static str, name: &'static str, id: i32, living: bool) -> EntityMapping {
-    EntityMapping {
-        class,
-        name,
-        id,
-        concrete: true,
-        living,
-    }
+/// One `addMapping(class, name, id)` row: `row!(class, name, id, living)`
+/// for a concrete class, with its two gap records naming the class.
+macro_rules! row {
+    ($class:literal, $name:literal, $id:expr, $living:expr) => {
+        row!($class, $name, $id, $living, true)
+    };
+    ($class:literal, $name:literal, $id:expr, $living:expr, $concrete:expr) => {
+        EntityMapping {
+            class: $class,
+            name: $name,
+            id: $id,
+            concrete: $concrete,
+            living: $living,
+            new_instance_gap: concat!(
+                "EntityList: the ",
+                $class,
+                "(World) constructor (Phase 2; SpawnerAnimals, TileEntityMobSpawner)"
+            ),
+            from_nbt_gap: concat!(
+                "EntityList.createEntityFromNBT: the ",
+                $class,
+                "(World) constructor and readFromNBT (Phase 2)"
+            ),
+        }
+    };
 }
 
 /// `addMapping` calls of `EntityList`'s static initialiser, in order.
 // src: EntityList.java:82-107
 pub const MAPPINGS: [EntityMapping; 24] = [
-    row("EntityArrow", "Arrow", 10, false),
-    row("EntitySnowball", "Snowball", 11, false),
-    row("EntityItem", "Item", 1, false),
-    row("EntityPainting", "Painting", 9, false),
+    row!("EntityArrow", "Arrow", 10, false),
+    row!("EntitySnowball", "Snowball", 11, false),
+    row!("EntityItem", "Item", 1, false),
+    row!("EntityPainting", "Painting", 9, false),
     // src: EntityLiving.java:6 (`public abstract class EntityLiving`)
-    EntityMapping {
-        class: "EntityLiving",
-        name: "Mob",
-        id: 48,
-        concrete: false,
-        living: true,
-    },
-    row("EntityMob", "Monster", 49, true),
-    row("EntityCreeper", "Creeper", 50, true),
-    row("EntitySkeleton", "Skeleton", 51, true),
-    row("EntitySpider", "Spider", 52, true),
-    row("EntityGiantZombie", "Giant", 53, true),
-    row("EntityZombie", "Zombie", 54, true),
-    row("EntitySlime", "Slime", 55, true),
-    row("EntityGhast", "Ghast", 56, true),
-    row("EntityPigZombie", "PigZombie", 57, true),
-    row("EntityPig", "Pig", 90, true),
-    row("EntitySheep", "Sheep", 91, true),
-    row("EntityCow", "Cow", 92, true),
-    row("EntityChicken", "Chicken", 93, true),
-    row("EntitySquid", "Squid", 94, true),
-    row("EntityWolf", "Wolf", 95, true),
-    row("EntityTNTPrimed", "PrimedTnt", 20, false),
-    row("EntityFallingSand", "FallingSand", 21, false),
-    row("EntityMinecart", "Minecart", 40, false),
-    row("EntityBoat", "Boat", 41, false),
+    row!("EntityLiving", "Mob", 48, true, false),
+    row!("EntityMob", "Monster", 49, true),
+    row!("EntityCreeper", "Creeper", 50, true),
+    row!("EntitySkeleton", "Skeleton", 51, true),
+    row!("EntitySpider", "Spider", 52, true),
+    row!("EntityGiantZombie", "Giant", 53, true),
+    row!("EntityZombie", "Zombie", 54, true),
+    row!("EntitySlime", "Slime", 55, true),
+    row!("EntityGhast", "Ghast", 56, true),
+    row!("EntityPigZombie", "PigZombie", 57, true),
+    row!("EntityPig", "Pig", 90, true),
+    row!("EntitySheep", "Sheep", 91, true),
+    row!("EntityCow", "Cow", 92, true),
+    row!("EntityChicken", "Chicken", 93, true),
+    row!("EntitySquid", "Squid", 94, true),
+    row!("EntityWolf", "Wolf", 95, true),
+    row!("EntityTNTPrimed", "PrimedTnt", 20, false),
+    row!("EntityFallingSand", "FallingSand", 21, false),
+    row!("EntityMinecart", "Minecart", 40, false),
+    row!("EntityBoat", "Boat", 41, false),
 ];
 
 /// `stringToClassMapping.get(name)`.
@@ -253,7 +275,8 @@ fn construct(class: &str, world: &mut World) -> Option<Entity> {
 }
 
 /// The world side effects of `new <class>(world)` for a class the port
-/// cannot construct (module docs), and the record `what`.
+/// cannot construct (module docs), and the record `what` (one of `m`'s gap
+/// records, which name the class).
 fn construct_gap(m: &EntityMapping, world: &mut World, what: &'static str) {
     // src: Entity.java:75-113 (the id), EntityLiving.java:6-68 (the draws)
     let mut b = EntityBase::new(world);
@@ -262,10 +285,6 @@ fn construct_gap(m: &EntityMapping, world: &mut World, what: &'static str) {
     }
     world.note_unimplemented(what);
 }
-
-/// The record of a construction the port cannot make outside
-/// `createEntityFromNBT`.
-const NEW_INSTANCE_GAP: &str = "EntityList: the entity class's (World) constructor (Phase 2; SpawnerAnimals, TileEntityMobSpawner)";
 
 /// `entityClass.getConstructor(World.class).newInstance(world)` for the
 /// concrete class `class` of [`MAPPINGS`] (`SpawnerAnimals` holds classes,
@@ -277,7 +296,7 @@ pub fn new_instance(class: &str, world: &mut World) -> Option<Entity> {
         return Some(e);
     }
     match by_class(class).filter(|m| m.concrete) {
-        Some(m) => construct_gap(m, world, NEW_INSTANCE_GAP),
+        Some(m) => construct_gap(m, world, m.new_instance_gap),
         None => world.note_unimplemented("EntityList: a class outside EntityList's table"),
     }
     None
@@ -314,11 +333,7 @@ pub fn create_entity_from_nbt(c: &Compound, world: &mut World) -> Result<FromNbt
             Ok(FromNbt::Created(Box::new(e)))
         }
         None => {
-            construct_gap(
-                m,
-                world,
-                "EntityList.createEntityFromNBT: the entity class's (World) constructor and readFromNBT (Phase 2)",
-            );
+            construct_gap(m, world, m.from_nbt_gap);
             Ok(FromNbt::Gap { class: m.class })
         }
     }

@@ -1189,7 +1189,9 @@ their drops only where a player is present: the player's own update is WP-2.5):
 - `tick/natural-spawn-squid` (WP-2.3, player, difficulty 0): `SpawnerAnimals.performSpawning`
   with mobs that join: a pool more than 24 blocks from the player and the spawn point fills
   with squid packs (construction through `EntityList`'s table, `setLocationAndAngles`,
-  `EntityWaterMob.getCanSpawnHere`, `entityJoinedWorld`, the 4-per-pack and 5-per-world caps);
+  `EntityWaterMob.getCanSpawnHere`, `entityJoinedWorld`, the 4-per-pack limit and the per-pass
+  gate (a pass runs while `countEntities(EntityWaterMob) <= 5 * 289 / 256 = 5`, so the world can
+  exceed 5));
   nothing else is a spawn spot, so no animal constructor is reached.
 - `tick/natural-spawn-pigs` (WP-2.3, generated terrain, player on the grass of
   `tick/sapling-with-player`, difficulty 0): natural animal and squid spawning end to end; needs

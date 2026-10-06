@@ -492,7 +492,9 @@ pub fn perform_sleep_spawning(world: &mut World, var1: &[i32]) -> bool {
 /// the player (range 32), and if it has more than one point and ends
 /// within 1.5 blocks of the player, the monster moves to the free spot by
 /// the bed (or above the column), joins, gets `creatureSpecificInit`, wakes
-/// the player and makes its living sound. True if it joined.
+/// the player and makes its living sound. True once the path test passes
+/// (Java sets `var2`/`var7` whether or not `entityJoinedWorld` added the
+/// monster).
 // src: SpawnerAnimals.java:229-245
 fn sleep_spawn_next_to(
     world: &mut World,
