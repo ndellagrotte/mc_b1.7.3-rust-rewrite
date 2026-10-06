@@ -279,6 +279,17 @@ the clock value passed in by the client.
 5. `Math.sin/cos/atan2/pow/exp/log` go through `mc_core::math`. WP-0.2 decides
    the implementation from a bit-comparison sweep against the oracle JVM; the
    sine table itself is a fixture dumped from the oracle, not recomputed.
+   **Decided (WP-0.3, 2026-10-06):** the sweep showed HotSpot's x86-64
+   `sin`/`cos`/`pow` intrinsics match no available Rust implementation
+   (1 ulp on 1–4 % of inputs), while `atan2`/`atan` are fdlibm already. The
+   oracle therefore runs with `-XX:DisableIntrinsic=_dsin,_dcos,_dtan,_datan2,
+   _dpow,_dexp,_dlog,_dlog10` (see `tools/oracle/env.sh`), which makes
+   `Math.*` bit-identical to `StrictMath` (fdlibm 5.3) on every JDK and CPU,
+   and `mc_core::jmath` transcribes fdlibm 5.3 (`sin`, `cos`, `atan2`,
+   `atan`, `pow`, `log`; `sqrt` is IEEE-exact). Accepted cost: the real
+   client with intrinsics on differs from both by 1 ulp on those inputs.
+   `MathHelper.SIN_TABLE` is unaffected (the `f32` cast hides the ulp) and is
+   computed at start-up, verified against the dumped fixture.
 6. Vanilla bugs are transcribed and flagged, never fixed.
 
 ### 3.5 Client notes
@@ -570,7 +581,7 @@ and report it. Do not loosen the comparison.
 
 | Risk | Mitigation |
 |---|---|
-| JVM `Math.sin`/`cos`/`pow` intrinsics differ from Rust in the last bit | WP-0.2 sweep decides early; the sine table is a dumped fixture; fallbacks are running the oracle with intrinsics disabled, or a `libm`-based implementation matched to it |
+| JVM `Math.sin`/`cos`/`pow` intrinsics differ from Rust in the last bit | **Resolved in WP-0.3** (§3.4 rule 5): oracle runs with intrinsics disabled, Rust transcribes fdlibm 5.3; the sine table is a dumped fixture |
 | `HashSet` iteration order must be reproduced | `JavaHashSet` in `mc-core`, fixture with a known insertion sequence dumped from the oracle |
 | 26.3 behaviour leaks in through copied code | D4 "do not copy" list; reviewer checks origin headers; beta fixtures are the only acceptance |
 | Region writing corrupts a world | Import copies, never edits in place; Tier S write/re-read and cross-read; atomic write-then-rename in the native `Storage`; WP-4.5 validation in the Prism client |
