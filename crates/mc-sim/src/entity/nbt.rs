@@ -26,6 +26,7 @@
 //! | `EntityCreeper` | EntityCreeper.java:18-24 | EntityCreeper.java:26-29 |
 //! | `EntityPigZombie` | EntityPigZombie.java:31-34 | EntityPigZombie.java:36-39 |
 //! | `EntitySlime` | EntitySlime.java:33-36 | EntitySlime.java:38-41 |
+//! | `EntityWaterMob`, `EntitySquid` (`super` only) | EntityWaterMob.java:12-14, EntitySquid.java:26-28 | EntityWaterMob.java:16-18, EntitySquid.java:30-32 |
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
@@ -198,6 +199,9 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
             // src: EntitySlime.java:33-36
             n::set(c, "Size", Tag::Int(super::slime::get_slime_size(e) - 1));
         }
+        // src: EntitySquid.java:26-28, EntityWaterMob.java:12-14 (`super`
+        // only; EntityCreature has no override)
+        K::Squid(l, ..) => write_living(l, c),
         K::PlayerSp(l, p, _) => {
             write_living(l, c);
             write_player(p, c);
@@ -439,6 +443,9 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
             // src: EntityPigZombie.java:36-39
             d.anger_level = n::get_short(c, "Anger")? as i32;
         }
+        // src: EntitySquid.java:30-32, EntityWaterMob.java:16-18 (`super`
+        // only)
+        K::Squid(l, ..) => read_living(l, c)?,
         K::PlayerSp(l, p, _) => {
             read_living(l, c)?;
             read_player(p, c, (px, py, pz), world)?;

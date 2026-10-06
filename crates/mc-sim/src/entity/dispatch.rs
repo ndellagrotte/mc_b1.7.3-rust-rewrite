@@ -34,8 +34,8 @@ use mc_core::{Aabb, Vec3D};
 use super::{
     Entity, EntityKindData as K, animal, arrow, base, boat, chicken, cow, creature, creeper, egg,
     falling_sand, fireball, fish, flying, ghast, giant_zombie, item, lightning_bolt, living,
-    minecart, mob, painting, pig, pig_zombie, sheep, skeleton, slime, snowball, spider, tnt_primed,
-    wolf, zombie,
+    minecart, mob, painting, pig, pig_zombie, sheep, skeleton, slime, snowball, spider, squid,
+    tnt_primed, water_mob, wolf, zombie,
 };
 use crate::world::World;
 
@@ -183,6 +183,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("EntitySnowball", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntitySpider.java:11-17 (super::spider)
     ("EntitySpider", &["canTriggerWalking", "getMountedYOffset"]),
+    // src: EntitySquid.java:63-69 (super::squid, WP-2.3)
+    ("EntitySquid", &["interact", "isInWater"]),
     // src: EntityTNTPrimed.java:30-36, :38-64 (super::tnt_primed)
     (
         "EntityTNTPrimed",
@@ -714,7 +716,8 @@ pub fn interact(e: &mut Entity, world: &mut World, player: &mut Entity) -> bool 
         K::Pig(..) => return pig::interact(e, world, player),
         // src: EntitySheep.java:34-53
         K::Sheep(..) => return sheep::interact(e, world, player),
-        K::Squid(..) => "EntitySquid.interact",
+        // src: EntitySquid.java:63-65
+        K::Squid(..) => return false,
         // src: EntityWolf.java:326-378
         K::Wolf(..) => return wolf::interact(e, world, player),
         // src: Entity.java:908-910
@@ -868,10 +871,12 @@ pub fn push_out_of_blocks(e: &mut Entity, world: &mut World, x: f64, y: f64, z: 
     base::push_out_of_blocks(e, world, x, y, z)
 }
 
-/// `isInWater()`.
-pub fn is_in_water(e: &Entity, world: &World) -> bool {
+/// `isInWater()`. The squid's override pushes the squid with the water's
+/// flow (`handleMaterialAcceleration`), hence `&mut`.
+pub fn is_in_water(e: &mut Entity, world: &mut World) -> bool {
     if let K::Squid(..) = e.kind {
-        world.note_unimplemented("EntitySquid.isInWater");
+        // src: EntitySquid.java:67-69
+        return squid::is_in_water(e, world);
     }
     // src: Entity.java:580-582
     e.base.is_in_water()
@@ -888,8 +893,7 @@ pub fn is_in_water(e: &Entity, world: &World) -> bool {
 // transcribed ancestor's body, except for a `void` override that does not
 // call `super` (whose ancestor body would act, move or draw `rand` where
 // vanilla does not): that arm records and returns with no body. Those are
-// `updatePlayerActionState` of EntityPlayer(SP) and EntitySquid;
-// `moveEntityWithHeading` of EntitySquid; `dropFewItems` of EntitySquid
+// `updatePlayerActionState` of EntityPlayer(SP)
 // (EntityCreature's `attackEntity`/`attackBlockedEntity` bodies are empty
 // anyway). A value-returning override not transcribed yet returns the
 // ancestor's value as a placeholder.
@@ -1042,6 +1046,26 @@ pub const LIVING_TRANSCRIBED: &[(&str, &[&str])] = &[
             "isOnLadder",
         ],
     ),
+    // src: EntitySquid.java:34-61, :71-140 (super::squid, WP-2.3)
+    (
+        "EntitySquid",
+        &[
+            "dropFewItems",
+            "getDeathSound",
+            "getDropItemId",
+            "getHurtSound",
+            "getLivingSound",
+            "getSoundVolume",
+            "moveEntityWithHeading",
+            "onLivingUpdate",
+            "updatePlayerActionState",
+        ],
+    ),
+    // src: EntityWaterMob.java:8-10, :20-26 (super::water_mob, WP-2.3)
+    (
+        "EntityWaterMob",
+        &["canBreatheUnderwater", "getCanSpawnHere", "getTalkInterval"],
+    ),
     // src: EntityWolf.java:66-94, :96-150, :225-227, :250-252, :300-324, :418-420
     // (super::wolf, WP-2.3)
     (
@@ -1093,13 +1117,12 @@ pub const LIVING_NOT_DISPATCHED: &[(&str, &str)] = &[
 
 /// `getTalkInterval()`: ticks between living sounds, at least.
 pub fn get_talk_interval(e: &Entity, world: &World) -> i32 {
+    let _ = world;
     match e.kind {
         // src: EntityAnimal.java:27-29
         K::Pig(..) | K::Sheep(..) | K::Cow(..) | K::Chicken(..) | K::Wolf(..) => 120,
-        K::Squid(..) => {
-            world.note_unimplemented("EntityWaterMob.getTalkInterval");
-            80
-        }
+        // src: EntityWaterMob.java:24-26
+        K::Squid(..) => 120,
         // src: EntityLiving.java:93-95
         _ => 80,
     }
@@ -1124,7 +1147,8 @@ pub fn get_living_sound(e: &mut Entity, world: &World) -> Option<&'static str> {
         K::PigZombie(..) => return Some("mob.zombiepig.zpig"),
         // src: EntitySkeleton.java:11-13
         K::Skeleton(..) => return Some("mob.skeleton"),
-        K::Squid(..) => "EntitySquid.getLivingSound",
+        // src: EntitySquid.java:34-36 (`null`)
+        K::Squid(..) => return None,
         // src: EntityWolf.java:70-78
         K::Wolf(..) => return Some(wolf::get_living_sound(e)),
         // src: EntitySpider.java:29-31
@@ -1163,7 +1187,8 @@ pub fn get_hurt_sound(e: &Entity, world: &World) -> Option<&'static str> {
         K::PigZombie(..) => return Some("mob.zombiepig.zpighurt"),
         // src: EntityWolf.java:80-82
         K::Wolf(..) => return Some("mob.wolf.hurt"),
-        K::Squid(..) => "EntitySquid.getHurtSound",
+        // src: EntitySquid.java:38-40 (`null`)
+        K::Squid(..) => return None,
         // src: EntityZombie.java:26-28
         K::Zombie(..) => return Some("mob.zombiehurt"),
         // src: EntityLiving.java:384-386
@@ -1188,7 +1213,8 @@ pub fn get_death_sound(e: &Entity, world: &World) -> Option<&'static str> {
         K::Sheep(..) => return Some("mob.sheep"),
         // src: EntityCreeper.java:77-79
         K::Creeper(..) => return Some("mob.creeperdeath"),
-        K::Squid(..) => "EntitySquid.getDeathSound",
+        // src: EntitySquid.java:42-44 (`null`)
+        K::Squid(..) => return None,
         // src: EntitySkeleton.java:19-21 (the hurt sound again)
         K::Skeleton(..) => return Some("mob.skeletonhurt"),
         // src: EntityGhast.java:139-141
@@ -1213,7 +1239,8 @@ pub fn get_sound_volume(e: &Entity, world: &World) -> f32 {
     match e.kind {
         // src: EntityCow.java:30-32, EntityWolf.java:88-90
         K::Cow(..) | K::Wolf(..) => return 0.4,
-        K::Squid(..) => world.note_unimplemented("EntitySquid.getSoundVolume"),
+        // src: EntitySquid.java:46-48
+        K::Squid(..) => return 0.4,
         // src: EntityGhast.java:147-149
         K::Ghast(..) => return 10.0,
         // src: EntitySlime.java:139-141
@@ -1247,14 +1274,13 @@ pub fn on_death(e: &mut Entity, world: &mut World, attacker: Option<&Entity>) {
 
 /// `dropFewItems()`.
 pub fn drop_few_items(e: &mut Entity, world: &mut World) {
-    // No super call in this override (EntitySquid.java dropFewItems): record
-    // and run no body (WP-2.3).
     let what = match e.kind {
         // src: EntitySheep.java:23-28
         K::Sheep(..) => return sheep::drop_few_items(e, world),
         // src: EntitySkeleton.java:67-81
         K::Skeleton(..) => return skeleton::drop_few_items(e, world),
-        K::Squid(..) => "EntitySquid.dropFewItems",
+        // src: EntitySquid.java:54-61
+        K::Squid(..) => return squid::drop_few_items(e, world),
         _ => "",
     };
     if !what.is_empty() {
@@ -1284,7 +1310,8 @@ pub fn get_drop_item_id(e: &Entity, world: &World) -> i32 {
         K::Slime(..) => return slime::get_drop_item_id(e),
         // src: EntityPigZombie.java:85-87
         K::PigZombie(..) => return pig_zombie::PORK_COOKED,
-        K::Squid(..) => "EntitySquid.getDropItemId",
+        // src: EntitySquid.java:50-52
+        K::Squid(..) => return 0,
         // src: EntityZombie.java:34-36
         K::Zombie(..) => return zombie::FEATHER,
         // src: EntitySpider.java:70-72
@@ -1303,9 +1330,8 @@ pub fn move_entity_with_heading(e: &mut Entity, world: &mut World, strafe: f32, 
     match e.kind {
         // src: EntityFlying.java:11-61
         K::Ghast(..) => return flying::move_entity_with_heading(e, world, strafe, forward),
-        // No super call (EntitySquid.java moveEntityWithHeading): record
-        // and run no body (WP-2.3).
-        K::Squid(..) => return world.note_unimplemented("EntitySquid.moveEntityWithHeading"),
+        // src: EntitySquid.java:127-129
+        K::Squid(..) => return squid::move_entity_with_heading(e, world),
         K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.moveEntityWithHeading"),
         _ => {}
     }
@@ -1328,8 +1354,10 @@ pub fn is_on_ladder(e: &Entity, world: &mut World) -> bool {
 
 /// `canBreatheUnderwater()`.
 pub fn can_breathe_underwater(e: &Entity, world: &World) -> bool {
+    let _ = world;
     if let K::Squid(..) = e.kind {
-        world.note_unimplemented("EntityWaterMob.canBreatheUnderwater");
+        // src: EntityWaterMob.java:8-10
+        return true;
     }
     // src: EntityLiving.java:579-581
     false
@@ -1356,7 +1384,8 @@ pub fn on_living_update(e: &mut Entity, world: &mut World) {
         K::Chicken(..) => return chicken::on_living_update(e, world),
         // src: EntityWolf.java:125-150
         K::Wolf(..) => return wolf::on_living_update(e, world),
-        K::Squid(..) => "EntitySquid.onLivingUpdate",
+        // src: EntitySquid.java:71-125
+        K::Squid(..) => return squid::on_living_update(e, world),
         // EntityPlayerSP's (client input) calls EntityPlayer's (heal, pick-up,
         // camera), which calls EntityLiving's (WP-2.5).
         K::PlayerSp(..) => "EntityPlayerSP.onLivingUpdate",
@@ -1401,9 +1430,7 @@ pub fn can_despawn(e: &Entity, world: &World) -> bool {
 /// client's movement input after `EntityPlayer`'s, which only advances the
 /// arm swing and does not call `EntityLiving`'s (EntityPlayer.java:158-170,
 /// EntityPlayerSP.java:27-32; WP-2.5). Running `EntityLiving`'s idle AI
-/// there would turn and steer the player where vanilla does not. The
-/// Squid arm runs no body either: its override does not call `super`
-/// (WP-2.3).
+/// there would turn and steer the player where vanilla does not.
 pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
     let what = match e.kind {
         // src: EntityCreature.java:16-116
@@ -1428,9 +1455,8 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
         K::Slime(..) => return slime::update_player_action_state(e, world),
         // src: EntityGhast.java:31-113
         K::Ghast(..) => return ghast::update_player_action_state(e, world),
-        // No super call in this override (EntitySquid.java
-        // updatePlayerActionState): record and run no body (WP-2.3).
-        K::Squid(..) => "EntitySquid.updatePlayerActionState",
+        // src: EntitySquid.java:131-140
+        K::Squid(..) => return squid::update_player_action_state(e, world),
         _ => unreachable!("updatePlayerActionState on a non-living entity"),
     };
     world.note_unimplemented(what);
@@ -1466,7 +1492,8 @@ pub fn get_can_spawn_here(e: &mut Entity, world: &mut World) -> bool {
         | K::GiantZombie(..) => return mob::get_can_spawn_here(e, world),
         // src: EntityPigZombie.java:27-29
         K::PigZombie(..) => return pig_zombie::get_can_spawn_here(e, world),
-        K::Squid(..) => "EntityWaterMob.getCanSpawnHere",
+        // src: EntityWaterMob.java:20-22
+        K::Squid(..) => return water_mob::get_can_spawn_here(e, world),
         // src: EntityGhast.java:151-153
         K::Ghast(..) => return ghast::get_can_spawn_here(e, world),
         // src: EntitySlime.java:134-137

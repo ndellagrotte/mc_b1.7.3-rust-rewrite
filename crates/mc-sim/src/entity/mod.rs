@@ -96,7 +96,9 @@ pub mod skeleton;
 pub mod slime;
 pub mod snowball;
 pub mod spider;
+pub mod squid;
 pub mod tnt_primed;
+pub mod water_mob;
 pub mod wolf;
 pub mod zombie;
 
@@ -128,6 +130,7 @@ pub use skeleton::SkeletonData;
 pub use slime::SlimeData;
 pub use snowball::{SnowballData, ThrowableData};
 pub use spider::SpiderData;
+pub use squid::SquidData;
 pub use tnt_primed::TntPrimedData;
 pub use wolf::WolfData;
 pub use zombie::ZombieData;
@@ -177,8 +180,6 @@ empty_level!(
     WaterMobData,
     /// `EntityWeatherEffect` (EntityWeatherEffect.java).
     WeatherEffectData,
-    /// `EntitySquid` (EntitySquid.java).
-    SquidData,
     /// `EntityPlayerSP` (EntityPlayerSP.java).
     PlayerSpData,
 );
