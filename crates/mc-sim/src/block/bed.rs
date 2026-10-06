@@ -18,8 +18,9 @@
 //! `EntityPlayer.sleepInBedAt` (WP-2.5; its result is taken as "not OK", so
 //! the bed is not marked occupied), `EntityPlayer.bedChunkCoordinates` (the
 //! field is not in [`crate::entity::PlayerData`] yet, WP-2.5; read only for a
-//! sleeping player, and no player can sleep before `sleepInBedAt` exists),
-//! `World.newExplosion` (WP-1.8, the bed exploding outside the overworld).
+//! sleeping player, and no player can sleep before `sleepInBedAt` exists).
+//! The bed exploding outside the overworld is [`World::new_explosion`]
+//! (WP-1.8).
 //! `addChatMessage` is a client-only message: `EntityPlayer`'s body is empty
 //! (EntityPlayer.java:698-699), `EntityPlayerSP`'s writes to the chat GUI
 //! (EntityPlayerSP.java:172-174); a no-op here.
@@ -103,9 +104,15 @@ pub fn block_activated(
         // never used; the explosion is centred on the second block,
         // `(double)((float)var2 + 0.5F)` etc., with power 5.0F and fire.
         let _ = (var16, var17, var11);
-        // src: BlockBed.java:45: world.newExplosion(null, ..., 5.0F, true)
-        // (Explosion, WP-1.8).
-        world.note_unimplemented("World.newExplosion");
+        // src: BlockBed.java:45
+        world.new_explosion(
+            None,
+            (var2 as f32 + 0.5) as f64,
+            (var3 as f32 + 0.5) as f64,
+            (var4 as f32 + 0.5) as f64,
+            5.0,
+            true,
+        );
         return true;
     }
     if is_bed_occupied(var6) {

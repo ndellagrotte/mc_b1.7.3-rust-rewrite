@@ -61,7 +61,6 @@ fixtures! {
 
     // ---- tests/golden/tick -------------------------------------------------------
     tick_activate_workbench_stairs => "tick" / "activate-workbench-stairs";
-    #[ignore = "needs Explosion (World.newExplosion, WP-1.8): first diff line 9 (t=1 blocks_full, field ids: the crater); lines 1-8 match, both bed halves are removed as in the oracle"]
     tick_bed_nether => "tick" / "bed-nether";
     tick_bed_place_and_break => "tick" / "bed-place-and-break";
     #[ignore = "needs ItemBlock / ItemReed / ItemDoor / ItemBed / ItemSlab.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match"]
@@ -83,11 +82,9 @@ fixtures! {
     tick_cactus_reed_growth => "tick" / "cactus-reed-growth";
     tick_chest_double_and_break => "tick" / "chest-double-and-break";
     tick_crops_growth => "tick" / "crops-growth";
-    #[ignore = "BlockRedstoneTorch (redstone task of WP-1.6c): first diff line 13 (t=2 scheduled_ticks, field blake3: the torch's onBlockAdded/canProvidePower are recorded arms, so the dispenser schedules no tick); lines 1-12 match"]
     tick_dispenser_dispense_item => "tick" / "dispenser-dispense-item";
     tick_dispenser_idle => "tick" / "dispenser-idle";
     tick_explosion_crater => "tick" / "explosion-crater";
-    #[ignore = "BlockFire (fire task of WP-1.6b): first diff line 7 (t=1 scheduled_ticks, field blake3: BlockFire.onBlockAdded is a recorded arm, so the fires set by doExplosionA schedule no tick; doExplosionB removes those fires again in both engines); lines 1-6 (incl. the t=1 rng_state after the explosion) match"]
     tick_explosion_fire => "tick" / "explosion-fire";
     tick_furnace_idle => "tick" / "furnace-idle";
     tick_mob_spawner_delay => "tick" / "mob-spawner-delay";
@@ -116,7 +113,6 @@ fixtures! {
     tick_flat_water_flow => "tick" / "flat-water-flow";
     tick_grass_spread => "tick" / "grass-spread";
     tick_leaves_decay => "tick" / "leaves-decay";
-    #[ignore = "needs TileEntityChest (BlockContainer.onBlockAdded / BlockChest, WP-1.6 containers task / WP-1.8): first diff line 33 (t=1 blocks_full, field ids: the chest at z=-2 is pushed (actual 36, BlockPistonMoving) where the oracle refuses it for its tile entity (expected 54)). BlockRedstoneTorch (WP-1.6c) is in and powers the pistons; with obsidian standing in for the chest the rest of the trace matched the oracle (WP-1.6d report)"]
     tick_piston_immovable => "tick" / "piston-immovable";
     tick_piston_moving_block_tick => "tick" / "piston-moving-block-tick";
     tick_piston_orphan_blocks => "tick" / "piston-orphan-blocks";

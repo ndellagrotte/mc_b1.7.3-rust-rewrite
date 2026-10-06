@@ -25,7 +25,7 @@ use mc_sim::tile_entity::{self, furnace::TileEntityFurnace};
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::events::WorldEvent;
 use mc_sim::world::provider::{Dimension, WorldProvider};
-use mc_sim::world::tile_entity::{TileEntity, TileEntityKindData, TileEntityRef};
+use mc_sim::world::tile_entity::{TileEntity, TileEntityKindData, TileEntityPiston, TileEntityRef};
 use mc_sim::world::{World, WorldEnvironment};
 use serde_json::{Map, Value, json};
 
@@ -408,16 +408,31 @@ fn ids_and_exceptions() {
         tile_entity::create_and_load_entity(&bad_id, &w),
         Err(JavaException::ClassCast)
     );
-    // The piston (pistons task) loads its base fields and records the rest.
-    let piston = load(&compound(&[
+    // The piston (pistons task, WP-1.6d): `new TileEntityPiston()` then its
+    // readFromNBT (TileEntityPiston.java:17-18, :128-135); writeToNBT saves
+    // the same compound back (:137-144).
+    let saved = compound(&[
         ("id", Tag::String("Piston".into())),
         ("x", Tag::Int(3)),
-    ]));
+        ("y", Tag::Int(0)),
+        ("z", Tag::Int(0)),
+        ("blockId", Tag::Int(1)),
+        ("blockData", Tag::Int(2)),
+        ("facing", Tag::Int(4)),
+        ("progress", Tag::Float(0.5)),
+        ("extending", Tag::Byte(1)),
+    ]);
+    let piston = load(&saved);
     assert_eq!(
         piston.kind,
-        TileEntityKindData::Untranscribed("TileEntityPiston")
+        TileEntityKindData::Piston(TileEntityPiston {
+            progress: 0.5,
+            last_progress: 0.5,
+            ..TileEntityPiston::new(1, 2, 4, true, false)
+        })
     );
     assert_eq!(piston.x_coord, 3);
+    assert_eq!(tile_entity::write_to_nbt(&piston, &w), saved);
 }
 
 // ---- 3. behaviour ------------------------------------------------------------------

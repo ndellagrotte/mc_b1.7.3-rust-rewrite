@@ -88,18 +88,15 @@ fn notify_pushes_events_and_records_untranscribed_overrides() {
     let mut w = empty_world(1);
     preload(&mut w, 0, 0);
     w.events.drain();
-    // Note block: BlockContainer.onBlockAdded (the tile entity, WP-1.8) is not
-    // transcribed yet (BlockSponge, the example before WP-1.6g, now is).
+    // Note block: BlockContainer.onBlockAdded adds its tile entity (WP-1.8;
+    // the last untranscribed `Block` override this test used, so no block
+    // override records anything any more).
     assert!(w.set_block_with_notify(0, 61, 0, 25));
     let ev = w.events.drain();
     assert!(ev.contains(&WorldEvent::MarkBlockAndNeighborsNeedsUpdate { x: 0, y: 61, z: 0 }));
     assert!(w.events.is_empty());
-    assert_eq!(
-        w.unimplemented_hits
-            .borrow()
-            .get("BlockContainer.onBlockAdded"),
-        Some(&1)
-    );
+    assert!(w.get_block_tile_entity(0, 61, 0).is_some());
+    assert!(w.unimplemented_hits.borrow().is_empty());
     // Sand is transcribed: it schedules its fall check instead (BlockSand.java:12-14).
     assert!(w.set_block_with_notify(2, 61, 0, 12));
     assert!(

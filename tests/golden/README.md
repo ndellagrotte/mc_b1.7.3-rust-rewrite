@@ -917,8 +917,9 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   `tick/door-upper-powered` (lever: the upper half forwarding a power notification to the
   lower half, BlockDoor.java:141-143) and `tick/portal-ignite` (`BlockFire.onBlockAdded` →
   `tryToCreatePortal`) need the redstone and fire tasks, both in.
-- Ignored on the Rust side until their dependencies land: `tick/bed-nether` (`Explosion`),
-  `tick/block-item-placement` (`ItemBlock` and the other placing items, WP-2.6).
+- `tick/bed-nether` needs `Explosion` (WP-1.8, in). Ignored on the Rust side until its
+  dependencies land: `tick/block-item-placement` (`ItemBlock` and the other placing items,
+  WP-2.6).
 
 Tile entities, container blocks and explosions (WP-1.8), empty world, seed 123, the stone
 platform at y = 60 (none needs a player unless it says so):
@@ -934,12 +935,12 @@ platform at y = 60 (none needs a player unless it says so):
   change; a lit furnace stays lit without fuel.
 - `tick/dispenser-dispense-item`: a dispenser powered by a redstone torch placed with
   metadata 1 next to it: `onNeighborBlockChange` schedules, `updateTick` dispenses from an empty
-  inventory (no op can fill one): the 1001 click. Needs the redstone torch in a port.
+  inventory (no op can fill one): the 1001 click. Needs the redstone torch (WP-1.6c, in).
 - `tick/explosion-crater`: the `explode` op (size 4) over dirt on stone with a sand column, an
   obsidian wall and three `EntityItem`s (one destroyed, one shielded, one out of range): rays,
   `destroyedBlockPositions` order, entity damage and knockback, drops, falling sand.
 - `tick/explosion-fire`: a flaming `explode` (size 3): the fires `doExplosionA` sets are cleared
-  again by `doExplosionB` (no fire is left; their scheduled ticks are). Needs `BlockFire` in a port.
+  again by `doExplosionB` (no fire is left; their scheduled ticks are). Needs `BlockFire` (WP-1.6b, in).
 - `tick/mob-spawner-delay` (player): a mob spawner counting down its 20 ticks (three `World.rand`
   draws per tick); `tick/mob-spawner-spawn` continues into the spawn attempts (needs the
   `EntityPig` constructor in a port).
