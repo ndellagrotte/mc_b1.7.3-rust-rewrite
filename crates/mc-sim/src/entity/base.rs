@@ -19,8 +19,9 @@ use mc_core::java_random::JavaRandom;
 use mc_core::math::{self, floor_double, floor_float};
 
 use super::data_watcher::{DataWatcher, WatchValue};
-use super::{Entity, dispatch};
+use super::{Entity, dispatch, item};
 use crate::block::{self, Material, dispatch as block_dispatch};
+use crate::item::ItemStack;
 use crate::world::World;
 
 /// The fields `Entity` declares (Entity.java:7-73), in declaration order.
@@ -874,6 +875,38 @@ pub fn fall(e: &mut Entity, world: &mut World, distance: f32) {
     if let Some(rider) = e.base.ridden_by_entity {
         world.with_entity_mut(rider, |w, r| dispatch::fall(r, w, distance));
     }
+}
+
+/// `Entity.dropItem(id, count)` → `dropItemWithOffset(id, count, 0.0F)`.
+// src: Entity.java:873-875
+pub fn drop_item(e: &Entity, world: &mut World, id: i32, count: i32) {
+    drop_item_with_offset(e, world, id, count, 0.0);
+}
+
+/// `Entity.dropItemWithOffset(id, count, offset)` →
+/// `entityDropItem(new ItemStack(id, count, 0), offset)`.
+// src: Entity.java:877-879
+pub fn drop_item_with_offset(e: &Entity, world: &mut World, id: i32, count: i32, offset: f32) {
+    entity_drop_item(e, world, ItemStack::new(id, count, 0), offset);
+}
+
+/// `Entity.entityDropItem(stack, offset)`: an `EntityItem` at the entity's
+/// position raised by `offset`, pick-up delay 10, joined to the world. (Java
+/// returns the `EntityItem`; it is moved into the world here, so nothing is
+/// returned.)
+// src: Entity.java:881-886
+pub fn entity_drop_item(e: &Entity, world: &mut World, stack: ItemStack, offset: f32) {
+    let mut var3 = item::new_entity_item(
+        world,
+        e.base.pos_x,
+        e.base.pos_y + offset as f64,
+        e.base.pos_z,
+        stack,
+    );
+    if let Some(d) = var3.kind.item_mut() {
+        d.delay_before_can_pickup = 10;
+    }
+    world.spawn_entity_in_world(var3);
 }
 
 /// `isWet()`: in water or rained on.

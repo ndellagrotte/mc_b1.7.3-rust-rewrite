@@ -878,6 +878,68 @@ impl World {
 
     // ---- AABB queries (World.java:1357-1516) ---------------------------------------
 
+    /// `canBlockBePlacedAt(blockId, x, y, z, ignoreCollision, side)`: the
+    /// block's collision box (unless `ignoreCollision`) is free of
+    /// spawn-preventing entities, the target is air or a replaceable block
+    /// (water, lava, fire, snow layer), and the block's
+    /// `canPlaceBlockOnSide` agrees.
+    ///
+    /// The collision box is computed even when `ignoreCollision` discards it,
+    /// as in Java (it can record an untranscribed override).
+    // src: World.java:2096-2114
+    pub fn can_block_be_placed_at(
+        &mut self,
+        block_id: i32,
+        x: i32,
+        y: i32,
+        z: i32,
+        ignore_collision: bool,
+        side: i32,
+    ) -> bool {
+        let var7 = self.get_block_id(x, y, z);
+        let mut var8 = block::block(var7);
+        // `Block.blocksList[var1]` must exist in Java (a null would throw);
+        // an unknown id here is answered false.
+        if block::block(block_id).is_none() {
+            return false;
+        }
+        let mut var10 =
+            block_dispatch::get_collision_bounding_box_from_pool(self, block_id, x, y, z);
+        if ignore_collision {
+            var10 = None;
+        }
+        if let Some(bb) = var10
+            && !self.check_if_aabb_is_clear(&bb)
+        {
+            return false;
+        }
+        // src: World.java:2108-2110 (waterMoving 8, waterStill 9, lavaMoving
+        // 10, lavaStill 11, fire 51, snow 78)
+        if matches!(var7, 8..=11 | 51 | 78) {
+            var8 = None;
+        }
+        block_id > 0
+            && var8.is_none()
+            && block_dispatch::can_place_block_on_side(self, block_id, x, y, z, side)
+    }
+
+    /// `checkIfAABBIsClear(box)`: no live entity with `preventEntitySpawning`
+    /// intersects `box`. Entities taken out for an update are not seen
+    /// ([`crate::entity`] module docs).
+    // src: World.java:1357-1368
+    pub fn check_if_aabb_is_clear(&self, bb: &Aabb) -> bool {
+        let var2 = self.get_entities_within_aabb_excluding_entity(None, bb);
+        for id in var2 {
+            if let Some(var4) = self.entity(id)
+                && !var4.base.is_dead
+                && var4.base.prevent_entity_spawning
+            {
+                return false;
+            }
+        }
+        true
+    }
+
     /// `getIsAnyLiquid(box)`: note the extra `--` on negative minimums
     /// (vanilla, transcribed).
     // src: World.java:1370-1401

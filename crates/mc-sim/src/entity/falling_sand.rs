@@ -13,9 +13,8 @@ use std::collections::BTreeMap;
 use mc_core::math::floor_double;
 use mc_nbt::Tag;
 
-use super::{Entity, EntityBase, EntityKindData, dispatch, item};
+use super::{Entity, EntityBase, EntityKindData, base, dispatch};
 use crate::block::sand;
-use crate::item::ItemStack;
 use crate::world::World;
 
 /// The fields `EntityFallingSand` declares.
@@ -134,35 +133,13 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
             || !world.set_block_with_notify(var1, var2, var3, block_id))
             && !world.multiplayer_world
         {
-            drop_item(e, world, block_id, 1);
+            base::drop_item(e, world, block_id, 1);
         }
     } else if data(e).fall_time > 100 && !world.multiplayer_world {
         // src: EntityFallingSand.java:65-68
-        drop_item(e, world, block_id, 1);
+        base::drop_item(e, world, block_id, 1);
         dispatch::set_entity_dead(e, world);
     }
-}
-
-/// `Entity.dropItem(id, count)` → `dropItemWithOffset(id, count, 0.0F)` →
-/// `entityDropItem(new ItemStack(id, count, 0), 0.0F)`: an `EntityItem` at the
-/// entity's position, pick-up delay 10, joined to the world.
-///
-/// These are `Entity` methods; they live here until `entity/base.rs` takes
-/// them (the only caller so far).
-// src: Entity.java:873-886
-fn drop_item(e: &Entity, world: &mut World, id: i32, count: i32) {
-    let var2: f32 = 0.0;
-    let mut var3 = item::new_entity_item(
-        world,
-        e.base.pos_x,
-        e.base.pos_y + var2 as f64,
-        e.base.pos_z,
-        ItemStack::new(id, count, 0),
-    );
-    if let Some(d) = var3.kind.item_mut() {
-        d.delay_before_can_pickup = 10;
-    }
-    world.spawn_entity_in_world(var3);
 }
 
 /// `EntityFallingSand.writeEntityToNBT(compound)`: `Tile` as a byte.
