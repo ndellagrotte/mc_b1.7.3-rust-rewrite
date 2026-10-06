@@ -1,6 +1,9 @@
 //! `EntityItem` (EntityItem.java): a dropped item stack. Fully transcribed
-//! except `onCollideWithPlayer` (needs the player inventory, WP-2.5). The NBT
-//! bodies are in [`super::nbt`].
+//! (audited line by line in WP-2.4) except the inside of
+//! `onCollideWithPlayer`, which needs `InventoryPlayer.addItemStackToInventory`
+//! (WP-2.5): reaching it is recorded and counts as a failed pickup. The NBT
+//! bodies are in [`super::nbt`]. `canTriggerWalking` is in
+//! [`super::dispatch::can_trigger_walking`].
 
 use mc_core::math::floor_double;
 
@@ -188,4 +191,25 @@ pub fn attack_entity_from(
         e.base.set_entity_dead();
     }
     false
+}
+
+/// `EntityItem.onCollideWithPlayer(player)`: a player touching the item
+/// picks it up once `delayBeforeCanPickup` is 0. The pickup itself
+/// (`player.inventory.addItemStackToInventory(item)`, then the achievements
+/// for wood and leather, `random.pop` with two `rand` draws, `onItemPickup`
+/// and death when the stack is used up) needs the inventory (WP-2.5): it is
+/// recorded and counts as a failed pickup, so nothing is drawn.
+// src: EntityItem.java:110-130
+pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut Entity) {
+    let _ = player;
+    if !world.multiplayer_world {
+        let d = data(e);
+        // src: EntityItem.java:112 (`var2 = item.stackSize`, read before the call)
+        let _var2 = d.item.map(|s| s.stack_size);
+        if d.delay_before_can_pickup == 0 {
+            world.note_unimplemented(
+                "InventoryPlayer.addItemStackToInventory (EntityItem.onCollideWithPlayer)",
+            );
+        }
+    }
 }

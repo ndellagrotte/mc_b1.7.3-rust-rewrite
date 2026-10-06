@@ -5,13 +5,12 @@
 //! BlockFire.java:131) and when an explosion removes it.
 //!
 //! Data methods (`getBlockTextureFromSide`, `quantityDropped` 0) are in
-//! [`crate::block`]. Everything else is transcribed here except the
-//! `EntityTNTPrimed` itself: its constructor and update are WP-2.4, so the
-//! spawn sites record `"EntityTNTPrimed.<init>"` with
-//! [`World::note_unimplemented`] and spawn nothing (see [`spawn_primed`]).
+//! [`crate::block`]. Everything else is transcribed here; the primed TNT
+//! itself is [`crate::entity::tnt_primed`] (WP-2.4).
 
 use crate::block::dispatch;
 use crate::entity::Entity;
+use crate::entity::tnt_primed::{TntPrimedData, new_entity_tnt_primed};
 use crate::item::ItemStack;
 use crate::world::World;
 
@@ -23,10 +22,6 @@ const TNT_ID: i32 = 46;
 /// 256 + 3.
 // src: Item.java:277
 const FLINT_AND_STEEL_ID: i32 = 256 + 3;
-
-/// `EntityTNTPrimed.fuse` as its position constructor leaves it.
-// src: EntityTNTPrimed.java:21
-const PRIMED_FUSE: i32 = 80;
 
 /// `BlockTNT.onBlockAdded(world, x, y, z)`: `super.onBlockAdded` (empty),
 /// then a TNT placed into power primes at once.
@@ -59,12 +54,17 @@ pub fn on_neighbor_block_change(world: &mut World, x: i32, y: i32, z: i32, neigh
 /// a shortened fuse, `world.rand.nextInt(fuse / 4) + fuse / 8`.
 // src: BlockTNT.java:39-43
 pub fn on_block_destroyed_by_explosion(world: &mut World, x: i32, y: i32, z: i32) {
-    // src: BlockTNT.java:40: new EntityTNTPrimed(world, (float)x + 0.5F, …)
-    spawn_primed(world, x, y, z);
-    // src: BlockTNT.java:41: the fuse draw runs on World.rand after the
-    // constructor and before the join; kept so World.rand stays in step.
-    let _fuse = world.rand.next_int_bounded(PRIMED_FUSE / 4) + PRIMED_FUSE / 8;
-    // src: BlockTNT.java:42: world.entityJoinedWorld(var5): WP-2.4 (spawn_primed)
+    // src: BlockTNT.java:40
+    let mut var5 = new_primed(world, x, y, z);
+    // src: BlockTNT.java:41: var5.fuse = world.rand.nextInt(var5.fuse / 4) + var5.fuse / 8
+    if let crate::entity::EntityKindData::TntPrimed(d) = &mut var5.kind {
+        let fuse = d.fuse;
+        *d = TntPrimedData {
+            fuse: world.rand.next_int_bounded(fuse / 4) + fuse / 8,
+        };
+    }
+    // src: BlockTNT.java:42
+    world.spawn_entity_in_world(var5);
 }
 
 /// `BlockTNT.onBlockDestroyedByPlayer(world, x, y, z, meta)`: with bit 1 of
@@ -78,21 +78,18 @@ pub fn on_block_destroyed_by_player(world: &mut World, x: i32, y: i32, z: i32, m
             // src: BlockTNT.java:48
             dispatch::drop_block_as_item_do(world, TNT_ID, x, y, z, ItemStack::new(TNT_ID, 1, 0));
         } else {
-            // src: BlockTNT.java:50-51: construct and join (WP-2.4)
-            spawn_primed(world, x, y, z);
+            // src: BlockTNT.java:50-51
+            let var6 = new_primed(world, x, y, z);
             // src: BlockTNT.java:52: playSoundAtEntity(var6, "random.fuse", 1.0F, 1.0F)
-            // at the entity's feet, posY - yOffset: setPosition put it at
-            // ((float)x + 0.5F, …) and yOffset = height / 2.0F with
-            // setSize(0.98F, 0.98F) (EntityTNTPrimed.java:10-11, :15).
-            let y_offset = 0.98f32 / 2.0f32;
-            world.play_sound_effect(
-                (x as f32 + 0.5) as f64,
-                (y as f32 + 0.5) as f64 - y_offset as f64,
-                (z as f32 + 0.5) as f64,
-                "random.fuse",
-                1.0,
-                1.0,
+            // at the entity's feet (World.java:863-868: posY - yOffset); joining
+            // does not move it.
+            let (sx, sy, sz) = (
+                var6.base.pos_x,
+                var6.base.pos_y - var6.base.y_offset as f64,
+                var6.base.pos_z,
             );
+            world.spawn_entity_in_world(var6);
+            world.play_sound_effect(sx, sy, sz, "random.fuse", 1.0, 1.0);
         }
     }
 }
@@ -126,13 +123,15 @@ pub fn block_activated() -> bool {
     false
 }
 
-/// `new EntityTNTPrimed(world, (float)x + 0.5F, (float)y + 0.5F,
-/// (float)z + 0.5F)` followed by `world.entityJoinedWorld`. The entity
-/// (constructor with its `Math.random()` kick, EntityTNTPrimed.java:14-25,
-/// and its update) is WP-2.4: recorded, nothing spawned and nothing drawn
-/// from the `Math.random()` stream.
-// src: BlockTNT.java:40, :42, :50-51
-fn spawn_primed(world: &mut World, x: i32, y: i32, z: i32) {
-    let _ = (x, y, z);
-    world.note_unimplemented("EntityTNTPrimed.<init>");
+/// `new EntityTNTPrimed(world, (double)((float)x + 0.5F), (double)((float)y
+/// + 0.5F), (double)((float)z + 0.5F))` (the constructor draws the kick from
+/// `Math.random()`, EntityTNTPrimed.java:17).
+// src: BlockTNT.java:40, :50
+fn new_primed(world: &mut World, x: i32, y: i32, z: i32) -> Entity {
+    new_entity_tnt_primed(
+        world,
+        (x as f32 + 0.5) as f64,
+        (y as f32 + 0.5) as f64,
+        (z as f32 + 0.5) as f64,
+    )
 }

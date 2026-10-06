@@ -17,8 +17,8 @@
 
 use mc_core::java_random::JavaRandom;
 use mc_sim::block::dispatch as d;
-use mc_sim::entity::Entity;
 use mc_sim::entity::player::new_entity_player_sp;
+use mc_sim::entity::{Entity, EntityKindData};
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
@@ -360,23 +360,44 @@ fn tnt_broken_without_bit_1_drops_itself() {
     assert!(w.unimplemented_hits.borrow().is_empty());
 }
 
-/// With bit 1 set: an `EntityTNTPrimed` (WP-2.4, recorded) and the fuse
-/// sound at its feet, `(float)y + 0.5F - 0.49F` (BlockTNT.java:50-52,
+/// With bit 1 set: an `EntityTNTPrimed` joins at the block centre with fuse
+/// 80 and its `Math.random()` kick (EntityTNTPrimed.java:14-25), then the
+/// fuse sound at its feet, `(float)y + 0.5F - 0.49F` (BlockTNT.java:50-52,
 /// EntityTNTPrimed.java:10-11). Nothing at all on a multiplayer world.
 #[test]
 fn tnt_broken_with_bit_1_primes() {
     let mut w = empty_world(3);
     w.events.drain();
     let before = w.rand.state();
+    let mut math = w.math_random.clone();
     let n = w.loaded_entity_list.len();
+    let id = w.next_entity_id;
     d::on_block_destroyed_by_player(&mut w, 46, -2, 61, 5, 1);
-    assert_eq!(w.loaded_entity_list.len(), n);
+    assert_eq!(w.loaded_entity_list.len(), n + 1);
     assert_eq!(w.rand.state(), before);
+    assert!(w.unimplemented_hits.borrow().is_empty());
+    let e = w.entity(id).unwrap();
+    assert_eq!(e.kind.java_class(), "EntityTNTPrimed");
     assert_eq!(
-        w.unimplemented_hits.borrow().get("EntityTNTPrimed.<init>"),
-        Some(&1)
+        (e.base.pos_x, e.base.pos_y, e.base.pos_z),
+        (-1.5, 61.5, 5.5)
     );
-    let ev = w.events.drain();
+    let EntityKindData::TntPrimed(t) = &e.kind else {
+        panic!()
+    };
+    assert_eq!(t.fuse, 80);
+    let var8 = (math.next_double() * 3.1415927410125732 * 2.0) as f32;
+    assert_eq!(
+        e.base.motion_x,
+        (-mc_core::math::sin(var8 * 3.1415927 / 180.0) * 0.02) as f64
+    );
+    assert_eq!(w.math_random, math);
+    let ev: Vec<WorldEvent> = w
+        .events
+        .drain()
+        .into_iter()
+        .filter(|e| matches!(e, WorldEvent::PlaySound { .. }))
+        .collect();
     assert_eq!(ev.len(), 1);
     match &ev[0] {
         WorldEvent::PlaySound {
@@ -406,19 +427,21 @@ fn tnt_broken_with_bit_1_primes() {
     assert_eq!(w.loaded_entity_list.len(), n);
 }
 
-/// `onBlockDestroyedByExplosion` draws the fuse, `nextInt(80 / 4) + 80 / 8`,
-/// from `World.rand` (BlockTNT.java:39-43).
+/// `onBlockDestroyedByExplosion` primes a TNT whose fuse is drawn from
+/// `World.rand`, `nextInt(80 / 4) + 80 / 8` (BlockTNT.java:39-43).
 #[test]
 fn tnt_destroyed_by_explosion_draws_the_fuse() {
     let mut w = empty_world(11);
     let mut r = w.rand.clone();
-    r.next_int_bounded(20);
+    let fuse = r.next_int_bounded(20) + 10;
+    let id = w.next_entity_id;
     d::on_block_destroyed_by_explosion(&mut w, 46, 0, 61, 0);
     assert_eq!(w.rand.state(), r.state());
-    assert_eq!(
-        w.unimplemented_hits.borrow().get("EntityTNTPrimed.<init>"),
-        Some(&1)
-    );
+    assert!(w.unimplemented_hits.borrow().is_empty());
+    let Some(EntityKindData::TntPrimed(t)) = w.entity(id).map(|e| &e.kind) else {
+        panic!()
+    };
+    assert_eq!(t.fuse, fuse);
 }
 
 /// Left-click with flint and steel sets metadata 1 without notification

@@ -6,12 +6,18 @@
 //! |---|---|---|
 //! | `EntityItem` | EntityItem.java:97-101 | EntityItem.java:103-108 |
 //! | `EntityFallingSand` | EntityFallingSand.java:73-75 | EntityFallingSand.java:77-79 |
+//! | `EntityTNTPrimed` | EntityTNTPrimed.java:71-73 | EntityTNTPrimed.java:75-77 |
+//! | `EntityArrow` | EntityArrow.java:235-244 | EntityArrow.java:246-255 |
+//! | `EntitySnowball` / `EntityEgg` | EntitySnowball.java:204-211, EntityEgg.java:217-224 | EntitySnowball.java:213-220, EntityEgg.java:226-233 |
+//! | `EntityFireball` | EntityFireball.java:176-183 | EntityFireball.java:185-192 |
+//! | `EntityFish` | EntityFish.java:324-331 | EntityFish.java:333-340 |
+//! | `EntityPainting` | EntityPainting.java:214-220 | EntityPainting.java:222-243 |
+//! | `EntityLightningBolt` | EntityLightningBolt.java:82-83 (empty) | EntityLightningBolt.java:79-80 (empty) |
 //! | `EntityLiving` | EntityLiving.java:557-562 | EntityLiving.java:564-573 |
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
-//! Every other class's own level (`EntityPig`'s `Saddle`, `EntityArrow`'s
-//! `xTile`, …) is Phase 2; reaching it records
+//! Every other class's own level (`EntityPig`'s `Saddle`, …) is Phase 2; reaching it records
 //! `"Entity*.writeEntityToNBT"` / `"Entity*.readEntityFromNBT"` in
 //! [`World::unimplemented_hits`] and writes/reads only the levels above it.
 //! Such entities cannot exist in a world yet (no constructor); a saved one
@@ -114,6 +120,14 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
             }
         }
         K::FallingSand(d) => super::falling_sand::write_entity_to_nbt(d, c),
+        K::TntPrimed(d) => super::tnt_primed::write_entity_to_nbt(d, c),
+        K::Arrow(d) => super::arrow::write_entity_to_nbt(d, c),
+        K::Snowball(d) | K::Egg(d) => super::snowball::write_entity_to_nbt(d, c),
+        K::Fireball(d) => super::fireball::write_entity_to_nbt(d, c),
+        K::Fish(d) => super::fish::write_entity_to_nbt(d, c),
+        K::Painting(d) => super::painting::write_entity_to_nbt(d, c, world),
+        // src: EntityLightningBolt.java:82-83 (empty)
+        K::LightningBolt(..) => {}
         K::PlayerSp(l, p, _) => {
             write_living(l, c);
             write_player(p, c);
@@ -268,6 +282,10 @@ fn as_float(t: &Tag) -> Result<f32, SaveError> {
 /// `readEntityFromNBT(compound)`, dispatched on the class.
 fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Result<(), SaveError> {
     use EntityKindData as K;
+    if let K::Painting(..) = e.kind {
+        // src: EntityPainting.java:222-243 (it calls setDirection on itself)
+        return super::painting::read_entity_from_nbt(e, c, world);
+    }
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     match &mut e.kind {
         K::Item(d) => {
@@ -278,6 +296,13 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
             d.item = Some(ItemStack::from_nbt(&Tag::Compound(var2))?);
         }
         K::FallingSand(d) => super::falling_sand::read_entity_from_nbt(d, c),
+        K::TntPrimed(d) => super::tnt_primed::read_entity_from_nbt(d, c)?,
+        K::Arrow(d) => super::arrow::read_entity_from_nbt(d, c)?,
+        K::Snowball(d) | K::Egg(d) => super::snowball::read_entity_from_nbt(d, c)?,
+        K::Fireball(d) => super::fireball::read_entity_from_nbt(d, c)?,
+        K::Fish(d) => super::fish::read_entity_from_nbt(d, c)?,
+        // src: EntityLightningBolt.java:79-80 (empty)
+        K::LightningBolt(..) => {}
         K::PlayerSp(l, p, _) => {
             read_living(l, c)?;
             read_player(p, c, (px, py, pz), world)?;

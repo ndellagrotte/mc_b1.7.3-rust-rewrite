@@ -11,16 +11,15 @@
 //! `SpawnerAnimals.performSpawning` up to the mob constructors
 //! ([`crate::spawner`]), the chunk-cache `unload100OldestChunks`,
 //! `saveWorld`, `TickUpdates`, `updateBlocksAndPlayCaveSounds` (cave sounds,
-//! the lightning and snow/ice rolls with their biome tests, 80 random ticks
-//! per chunk) and `randomDisplayUpdates`.
+//! the lightning and snow/ice rolls with their biome tests, the strike itself
+//! as an `EntityLightningBolt` weather effect, 80 random ticks per chunk) and
+//! `randomDisplayUpdates`.
 //!
 //! Recorded gaps ([`World::skipped_systems`] / [`World::unimplemented_hits`]),
 //! each where its Java code runs: `SpawnerAnimals.performSleepSpawning`
 //! (WP-2.3, needs the `Pathfinder`), `EntityPlayer.wakeUpPlayer` (WP-2.5),
-//! the `EntityLightningBolt` constructor (WP-2.4: the `World.rand` draws
-//! before it are made; the bolt's own `rand` draws, its fire placement and
-//! its entity id are not), the mob constructors of `performSpawning`
-//! ([`crate::spawner`] module docs).
+//! the mob constructors of `performSpawning` ([`crate::spawner`] module
+//! docs).
 
 use mc_core::java_hash::ChunkCoordIntPair;
 use mc_core::math::floor_double;
@@ -342,13 +341,15 @@ impl World {
                 let var8 = var4 + (var6 >> 8 & 15);
                 let var9 = self.find_top_solid_block(var7, var8);
                 if self.can_block_be_rained_on(var7, var9, var8) {
-                    // addWeatherEffect(new EntityLightningBolt(this, x, y, z))
-                    // (World.java:1927): the bolt is WP-2.4. Not made: its
-                    // entity id, its own rand draws (EntityLightningBolt.java:14-15)
-                    // and the fire it places at difficulty >= 2 (:16-30).
-                    self.note_unimplemented(
-                        "EntityLightningBolt.<init> (World.updateBlocksAndPlayCaveSounds)",
+                    // src: World.java:1927 (the bolt's rand is unseeded in the
+                    // oracle, tools/oracle/census.md §3)
+                    let bolt = crate::entity::lightning_bolt::new_entity_lightning_bolt(
+                        self,
+                        var7 as f64,
+                        var9 as f64,
+                        var8 as f64,
                     );
+                    self.add_weather_effect(bolt);
                     self.field_27168_f = 2; // src: World.java:1928
                 }
             }

@@ -596,8 +596,7 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("BlockStationary", &["onNeighborBlockChange", "updateTick"]),
     // src: BlockStep.java:43-58, :76-90
     ("BlockStep", &["onBlockAdded", "shouldSideBeRendered"]),
-    // src: BlockTNT.java:18-68 (the EntityTNTPrimed spawn is WP-2.4, recorded
-    // as "EntityTNTPrimed.<init>" by super::tnt)
+    // src: BlockTNT.java:18-68 (the primed TNT is crate::entity::tnt_primed)
     (
         "BlockTNT",
         &[

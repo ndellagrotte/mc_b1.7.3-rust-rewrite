@@ -1,18 +1,17 @@
 //! `BlockDispenser` (BlockDispenser.java): fires one item when powered.
 //!
 //! Dispensed arrows, eggs and snowballs are `EntityArrow` / `EntityEgg` /
-//! `EntitySnowball`, whose constructors and headings are Phase 2 (WP-2.4):
-//! those branches record `"EntityArrow.<init>"` (and so on), keep the aux
-//! sounds and particles, and spawn nothing. Any other item is an
-//! `EntityItem`, transcribed in full, with velocity from `updateTick`'s
-//! `Random` (World.rand). The dispenser singleton's `Random`
+//! `EntitySnowball` ([`crate::entity`], WP-2.4) with their heading drawn on
+//! the projectile's own `rand` (before it joins the world: no harness hook,
+//! tools/oracle/census.md §3). Any other item is an `EntityItem`, with
+//! velocity from `updateTick`'s `Random` (World.rand). The dispenser singleton's `Random`
 //! ([`super::BlockStatics::dispenser_random`]) only scatters items when the
 //! block is broken.
 
 use mc_core::math::floor_double;
 
 use super::{block, container, dispatch, opaque_cube_lookup};
-use crate::entity::Entity;
+use crate::entity::{Entity, EntityKindData, arrow, egg, snowball};
 use crate::tile_entity::dispenser::get_random_stack_from_inventory;
 use crate::world::World;
 
@@ -121,18 +120,46 @@ fn dispense_item(world: &mut World, x: i32, y: i32, z: i32, rand: dispatch::Rand
         None => world.play_aux_sfx(1001, x, y, z, 0),
         Some(var12) => {
             if var12.item_id == ARROW {
-                // src: BlockDispenser.java:107-111: new EntityArrow(world, x, y, z),
-                // setArrowHeading(var9, 0.1, var10, 1.1F, 6.0F), doesArrowBelongToPlayer,
-                // entityJoinedWorld (WP-2.4).
-                world.note_unimplemented("EntityArrow.<init>");
+                // src: BlockDispenser.java:107-111
+                let mut var19 = arrow::new_entity_arrow_at(world, var13, var15, var17);
+                arrow::set_arrow_heading(
+                    &mut var19,
+                    var9 as f64,
+                    0.10000000149011612,
+                    var10 as f64,
+                    1.1,
+                    6.0,
+                );
+                if let EntityKindData::Arrow(d) = &mut var19.kind {
+                    d.does_arrow_belong_to_player = true;
+                }
+                world.spawn_entity_in_world(var19);
                 world.play_aux_sfx(1002, x, y, z, 0);
             } else if var12.item_id == EGG {
-                // src: BlockDispenser.java:113-116 (EntityEgg, setEggHeading; WP-2.4)
-                world.note_unimplemented("EntityEgg.<init>");
+                // src: BlockDispenser.java:113-116
+                let mut var22 = egg::new_entity_egg_at(world, var13, var15, var17);
+                egg::set_egg_heading(
+                    &mut var22,
+                    var9 as f64,
+                    0.10000000149011612,
+                    var10 as f64,
+                    1.1,
+                    6.0,
+                );
+                world.spawn_entity_in_world(var22);
                 world.play_aux_sfx(1002, x, y, z, 0);
             } else if var12.item_id == SNOWBALL {
-                // src: BlockDispenser.java:118-121 (EntitySnowball, setSnowballHeading; WP-2.4)
-                world.note_unimplemented("EntitySnowball.<init>");
+                // src: BlockDispenser.java:118-121
+                let mut var23 = snowball::new_entity_snowball_at(world, var13, var15, var17);
+                snowball::set_snowball_heading(
+                    &mut var23,
+                    var9 as f64,
+                    0.10000000149011612,
+                    var10 as f64,
+                    1.1,
+                    6.0,
+                );
+                world.spawn_entity_in_world(var23);
                 world.play_aux_sfx(1002, x, y, z, 0);
             } else {
                 // src: BlockDispenser.java:123-132
@@ -243,16 +270,21 @@ mod tests {
         w
     }
 
-    /// The projectile branches (BlockDispenser.java:106-121) record their
-    /// WP-2.4 constructor, take one item from the slot (the tile entity's
-    /// `Random`, not `World.rand`), spawn nothing, and keep the aux 1002 and
-    /// the smoke aux 2000 with `var9 + 1 + (var10 + 1) * 3`.
+    /// The projectile branches (BlockDispenser.java:106-121) spawn the
+    /// projectile at the face (0.6 out, block centre height) with its heading
+    /// `(var9, 0.1, var10)` at speed 1.1 and spread 6 drawn on its own `rand`
+    /// (seeded `mix(seed, id)` at construction), take one item from the slot
+    /// (the tile entity's `Random`, not `World.rand`), and keep the aux 1002
+    /// and the smoke aux 2000 with `var9 + 1 + (var10 + 1) * 3`.
     #[test]
-    fn projectiles_record_their_gap_and_keep_the_effects() {
-        for (item, gap) in [
-            (ARROW, "EntityArrow.<init>"),
-            (EGG, "EntityEgg.<init>"),
-            (SNOWBALL, "EntitySnowball.<init>"),
+    fn projectiles_spawn_with_their_heading_and_keep_the_effects() {
+        use crate::entity::EntityKindData;
+        use mc_core::java_random::JavaRandom;
+        use mc_core::math::sqrt_double;
+        for (item, class) in [
+            (ARROW, "EntityArrow"),
+            (EGG, "EntityEgg"),
+            (SNOWBALL, "EntitySnowball"),
         ] {
             let mut w = world();
             // Meta 3 faces +z: var9 = 0, var10 = 1.
@@ -265,11 +297,36 @@ mod tests {
             d.dispenser_contents[4] = Some(ItemStack::new(item, 2, 0));
             let world_rand = w.rand.clone();
             let entities = w.loaded_entity_list.len();
+            let id = w.next_entity_id;
             w.events.drain();
             dispense_item(&mut w, 1, 64, 1, super::dispatch::RandomSource::WorldRand);
-            assert_eq!(w.unimplemented_hits.borrow().get(gap), Some(&1), "{gap}");
-            assert_eq!(w.rand, world_rand, "{gap}: no World.rand draw");
-            assert_eq!(w.loaded_entity_list.len(), entities, "{gap}");
+            assert!(w.unimplemented_hits.borrow().is_empty(), "{class}");
+            assert_eq!(w.rand, world_rand, "{class}: no World.rand draw");
+            assert_eq!(w.loaded_entity_list.len(), entities + 1, "{class}");
+            let e = w.entity(id).unwrap();
+            assert_eq!(e.kind.java_class(), class);
+            let pos = (
+                1.0 + 0.0 * 0.6 + 0.5,
+                1.0 * 0.0 + 64.0 + 0.5,
+                1.0 + 1.0 * 0.6 + 0.5,
+            );
+            assert_eq!((e.base.pos_x, e.base.pos_y, e.base.pos_z), pos, "{class}");
+            // src: EntityArrow.java:50-63 with (0, 0.1, 1), 1.1F, 6.0F
+            let mut rand = JavaRandom::new(w.entity_rand_seed_for(id));
+            let var9 = sqrt_double(0.0 + 0.10000000149011612 * 0.10000000149011612 + 1.0) as f64;
+            let mut m = [0.0 / var9, 0.10000000149011612 / var9, 1.0 / var9];
+            for v in &mut m {
+                *v += rand.next_gaussian() * 0.007499999832361937 * 6.0;
+                *v *= 1.100000023841858;
+            }
+            assert_eq!(
+                [e.base.motion_x, e.base.motion_y, e.base.motion_z],
+                m,
+                "{class}"
+            );
+            if let EntityKindData::Arrow(a) = &e.kind {
+                assert!(a.does_arrow_belong_to_player);
+            }
             let TileEntityKindData::Dispenser(d) = &w.tile_entities[&r].kind else {
                 panic!()
             };
@@ -283,7 +340,7 @@ mod tests {
                     _ => None,
                 })
                 .collect();
-            assert_eq!(aux, vec![(1002, 0), (2000, 7)], "{gap}");
+            assert_eq!(aux, vec![(1002, 0), (2000, 7)], "{class}");
         }
     }
 }

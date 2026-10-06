@@ -63,19 +63,35 @@
 //! `EntityFX` and its subclasses (particles) belong to the client (WP-3.7).
 //! `EntityClientPlayerMP` and `EntityOtherPlayerMP` are multiplayer (D3).
 
+pub mod arrow;
 pub mod base;
 pub mod data_watcher;
 pub mod dispatch;
+pub mod egg;
 pub mod falling_sand;
+pub mod fireball;
+pub mod fish;
 pub mod item;
+pub mod lightning_bolt;
 pub mod living;
 pub mod nbt;
+pub mod painting;
 pub mod player;
+pub mod snowball;
+pub mod tnt_primed;
 
+pub use arrow::ArrowData;
 pub use base::EntityBase;
+pub use egg::EggData;
 pub use falling_sand::FallingSandData;
+pub use fireball::FireballData;
+pub use fish::FishData;
 pub use item::ItemData;
+pub use lightning_bolt::LightningBoltData;
 pub use living::LivingData;
+pub use painting::{EnumArt, PaintingData};
+pub use snowball::{SnowballData, ThrowableData};
+pub use tnt_primed::TntPrimedData;
 
 use crate::inventory::InventoryPlayer;
 
@@ -130,24 +146,10 @@ empty_level!(
     FlyingData,
     /// `EntityWeatherEffect` (EntityWeatherEffect.java).
     WeatherEffectData,
-    /// `EntitySnowball` (EntitySnowball.java).
-    SnowballData,
-    /// `EntityEgg` (EntityEgg.java).
-    EggData,
-    /// `EntityFireball` (EntityFireball.java).
-    FireballData,
-    /// `EntityFish` (EntityFish.java, the fishing bobber).
-    FishData,
-    /// `EntityPainting` (EntityPainting.java).
-    PaintingData,
-    /// `EntityTNTPrimed` (EntityTNTPrimed.java).
-    TntPrimedData,
     /// `EntityMinecart` (EntityMinecart.java).
     MinecartData,
     /// `EntityBoat` (EntityBoat.java).
     BoatData,
-    /// `EntityLightningBolt` (EntityLightningBolt.java).
-    LightningBoltData,
     /// `EntityCreeper` (EntityCreeper.java).
     CreeperData,
     /// `EntitySkeleton` (EntitySkeleton.java).
@@ -180,18 +182,6 @@ empty_level!(
     PlayerSpData,
 );
 
-/// `EntityArrow` (EntityArrow.java). Only the fields the `entity_state` trace
-/// reads so far.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ArrowData {
-    /// `inGround` (EntityArrow.java:11).
-    pub in_ground: bool,
-    /// `arrowShake` (EntityArrow.java:13).
-    pub arrow_shake: i32,
-    /// `ticksInAir` (EntityArrow.java:16).
-    pub ticks_in_air: i32,
-}
-
 /// `EntityPlayer` (EntityPlayer.java). Only the fields the world reads so
 /// far (construction: [`player::new_entity_player_sp`]).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -221,6 +211,11 @@ pub struct PlayerData {
     /// spawn, saved as `SpawnX/Y/Z` when set (EntityPlayer.java:320-322,
     /// :332-336, [`nbt`]).
     pub player_spawn_coordinate: Option<mc_core::java_hash::ChunkCoordinates>,
+    /// `fishEntity` (EntityPlayer.java:38), as the bobber's entity id: set by
+    /// `new EntityFish(world, player)` (EntityFish.java:61), cleared when the
+    /// bobber dies (EntityFish.java:148, :381). Read by
+    /// `ItemFishingRod.onItemRightClick` (WP-2.6).
+    pub fish_entity: Option<i32>,
 }
 
 impl PlayerData {

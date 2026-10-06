@@ -25,7 +25,10 @@
 
 use mc_core::{Aabb, Vec3D};
 
-use super::{Entity, EntityKindData as K, base, falling_sand, item, living};
+use super::{
+    Entity, EntityKindData as K, arrow, base, egg, falling_sand, fireball, fish, item,
+    lightning_bolt, living, painting, snowball, tnt_primed,
+};
 use crate::world::World;
 
 /// Overrides already transcribed, by the class that defines them: one row per
@@ -141,16 +144,24 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
             world.note_unimplemented("EntityPlayer.onUpdate");
             living::on_update(e, world);
         }
-        K::Arrow(..) => untranscribed_base_update(e, world, "EntityArrow.onUpdate"),
-        K::Snowball(..) => untranscribed_base_update(e, world, "EntitySnowball.onUpdate"),
-        K::Egg(..) => untranscribed_base_update(e, world, "EntityEgg.onUpdate"),
-        K::Fireball(..) => untranscribed_base_update(e, world, "EntityFireball.onUpdate"),
-        K::Fish(..) => untranscribed_base_update(e, world, "EntityFish.onUpdate"),
-        K::Painting(..) => untranscribed_base_update(e, world, "EntityPainting.onUpdate"),
-        K::TntPrimed(..) => untranscribed_base_update(e, world, "EntityTNTPrimed.onUpdate"),
+        // src: EntityArrow.java:86-233
+        K::Arrow(..) => arrow::on_update(e, world),
+        // src: EntitySnowball.java:87-202
+        K::Snowball(..) => snowball::on_update(e, world),
+        // src: EntityEgg.java:87-215
+        K::Egg(..) => egg::on_update(e, world),
+        // src: EntityFireball.java:61-174
+        K::Fireball(..) => fireball::on_update(e, world),
+        // src: EntityFish.java:123-322
+        K::Fish(..) => fish::on_update(e, world),
+        // src: EntityPainting.java:134-143
+        K::Painting(..) => painting::on_update(e, world),
+        // src: EntityTNTPrimed.java:38-64
+        K::TntPrimed(..) => tnt_primed::on_update(e, world),
         K::Minecart(..) => untranscribed_base_update(e, world, "EntityMinecart.onUpdate"),
         K::Boat(..) => untranscribed_base_update(e, world, "EntityBoat.onUpdate"),
-        K::LightningBolt(..) => untranscribed_base_update(e, world, "EntityLightningBolt.onUpdate"),
+        // src: EntityLightningBolt.java:36-74
+        K::LightningBolt(..) => lightning_bolt::on_update(e, world),
     }
 }
 
@@ -200,8 +211,10 @@ pub fn attack_entity_from(
         | K::LightningBolt(..) => {
             return base::attack_entity_from(e, world, attacker, damage);
         }
-        K::Fireball(..) => "EntityFireball.attackEntityFrom",
-        K::Painting(..) => "EntityPainting.attackEntityFrom",
+        // src: EntityFireball.java:202-219
+        K::Fireball(..) => return fireball::attack_entity_from(e, world, attacker, damage),
+        // src: EntityPainting.java:204-212
+        K::Painting(..) => return painting::attack_entity_from(e, world, attacker, damage),
         K::Minecart(..) => "EntityMinecart.attackEntityFrom",
         K::Boat(..) => "EntityBoat.attackEntityFrom",
         K::Mob(..)
@@ -329,11 +342,12 @@ pub fn can_be_collided_with(e: &Entity, world: &World) -> bool {
     let what = match e.kind {
         // src: EntityLiving.java:81-83
         _ if e.kind.living().is_some() => return !e.base.is_dead,
-        K::Fireball(..) => "EntityFireball.canBeCollidedWith",
-        K::Painting(..) => "EntityPainting.canBeCollidedWith",
+        // src: EntityFireball.java:194-196, EntityPainting.java:200-202 (`return true`)
+        K::Fireball(..) | K::Painting(..) => return true,
         // src: EntityFallingSand.java:33-35
         K::FallingSand(..) => return falling_sand::can_be_collided_with(e),
-        K::TntPrimed(..) => "EntityTNTPrimed.canBeCollidedWith",
+        // src: EntityTNTPrimed.java:34-36
+        K::TntPrimed(..) => return tnt_primed::can_be_collided_with(e),
         K::Minecart(..) => "EntityMinecart.canBeCollidedWith",
         K::Boat(..) => "EntityBoat.canBeCollidedWith",
         // src: Entity.java:751-753
@@ -397,7 +411,8 @@ pub fn get_mounted_y_offset(e: &Entity, world: &World) -> f64 {
 /// `moveEntity(dx, dy, dz)`.
 pub fn move_entity(e: &mut Entity, world: &mut World, dx: f64, dy: f64, dz: f64) {
     match e.kind {
-        K::Painting(..) => world.note_unimplemented("EntityPainting.moveEntity"),
+        // src: EntityPainting.java:245-251
+        K::Painting(..) => return painting::move_entity(e, world, dx, dy, dz),
         K::PlayerSp(..) => world.note_unimplemented("EntityPlayerSP.moveEntity"),
         _ => {}
     }
@@ -445,19 +460,20 @@ pub fn prepare_player_to_spawn(e: &mut Entity, world: &mut World) {
     base::prepare_player_to_spawn(e, world);
 }
 
-/// `onCollideWithPlayer(player)`: `player` is the colliding player, in hand.
+/// `onCollideWithPlayer(player)`: an entity the player touches
+/// (`EntityPlayer.collideWithPlayer`, EntityPlayer.java:210-212, WP-2.5).
 pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut Entity) {
-    let _ = player;
-    let what = match e.kind {
-        K::Arrow(..) => "EntityArrow.onCollideWithPlayer",
-        K::Egg(..) => "EntityEgg.onCollideWithPlayer",
-        K::Item(..) => "EntityItem.onCollideWithPlayer",
-        K::Slime(..) => "EntitySlime.onCollideWithPlayer",
-        K::Snowball(..) => "EntitySnowball.onCollideWithPlayer",
+    match e.kind {
+        // src: EntityItem.java:110-130
+        K::Item(..) => item::on_collide_with_player(e, world, player),
+        // src: EntityArrow.java:257-266
+        K::Arrow(..) => arrow::on_collide_with_player(e, world, player),
+        // src: EntitySnowball.java:222-229, EntityEgg.java:235-242
+        K::Snowball(..) | K::Egg(..) => snowball::on_collide_with_player(e, world, player),
+        K::Slime(..) => world.note_unimplemented("EntitySlime.onCollideWithPlayer"),
         // src: Entity.java:706-707 (empty)
-        _ => return,
-    };
-    world.note_unimplemented(what);
+        _ => {}
+    }
 }
 
 /// `applyEntityCollision(other)`: `other` in hand.
@@ -469,13 +485,14 @@ pub fn apply_entity_collision(e: &mut Entity, world: &mut World, other: &mut Ent
     base::apply_entity_collision(e, world, other);
 }
 
-/// `addVelocity(x, y, z)`.
-pub fn add_velocity(e: &mut Entity, world: &mut World, x: f64, y: f64, z: f64) {
-    if let K::Painting(..) = e.kind {
-        world.note_unimplemented("EntityPainting.addVelocity");
+/// `addVelocity(dx, dy, dz)`.
+pub fn add_velocity(e: &mut Entity, world: &mut World, dx: f64, dy: f64, dz: f64) {
+    match e.kind {
+        // src: EntityPainting.java:253-259
+        K::Painting(..) => painting::add_velocity(e, world, dx, dy, dz),
+        // src: Entity.java:736-740
+        _ => e.base.add_velocity(dx, dy, dz),
     }
-    // src: Entity.java:736-740
-    e.base.add_velocity(x, y, z);
 }
 
 /// `addToPlayerScore(victim, score)`.
@@ -671,12 +688,15 @@ pub fn perform_hurt_animation(e: &mut Entity, world: &mut World) {
 /// `onStruckByLightning(bolt)`.
 pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World, bolt: &Entity) {
     match e.kind {
-        K::Creeper(..) => world.note_unimplemented("EntityCreeper.onStruckByLightning"),
         K::Pig(..) => world.note_unimplemented("EntityPig.onStruckByLightning"),
-        _ => {}
+        K::Creeper(..) => {
+            // src: EntityCreeper.java:141-144 (super, then powered: WP-2.3)
+            world.note_unimplemented("EntityCreeper.onStruckByLightning");
+            base::on_struck_by_lightning(e, world, bolt);
+        }
+        // src: Entity.java:1085-1092
+        _ => base::on_struck_by_lightning(e, world, bolt),
     }
-    // src: Entity.java:1085-1092
-    base::on_struck_by_lightning(e, world, bolt);
 }
 
 /// `onKillEntity(victim)`.
