@@ -1,0 +1,12 @@
+{"name":"spider-leap","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":200,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-2.3b. Stone platform y = 60 over -12..12 with a two-high wall; night (set_time 18000; mobs join at t=1). Player (id 0) at (5.5, 61, 0.5) facing -x, spider (id 1) at (-5.5, 61, 0.5), difficulty 1. EntitySpider.findPlayerToAttack (brightness < 0.5, no sight test), EntitySpider.attackEntity: between 2 and 6 blocks a 1-in-10 roll leaps on the ground (motion toward the target, motionY 0.4), else EntityMob's melee (strength 2); the player ends up against the wall, which the spider climbs (EntitySpider.isOnLadder = isCollidedHorizontally). The player's fields are not dumped (EntityPlayer.attackEntityFrom, WP-2.5); the run stops while the port's player is still alive. rng_state and the spider's entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-12,"y0":60,"z0":-12,"x1":12,"y1":60,"z1":12,"id":1},
+        {"t":0,"op":"fill","x0":-12,"y0":61,"z0":-12,"x1":12,"y1":62,"z1":-12,"id":1},
+        {"t":0,"op":"fill","x0":-12,"y0":61,"z0":12,"x1":12,"y1":62,"z1":12,"id":1},
+        {"t":0,"op":"fill","x0":-12,"y0":61,"z0":-11,"x1":-12,"y1":62,"z1":11,"id":1},
+        {"t":0,"op":"fill","x0":12,"y0":61,"z0":-11,"x1":12,"y1":62,"z1":11,"id":1},
+        {"t":0,"op":"set_time","time":18000},
+        {"t":1,"op":"player","x":"0x4016000000000000","y":61,"z":"0x3fe0000000000000","yaw":90},
+        {"t":1,"op":"spawn","kind":"Spider","pos":["0xc016000000000000",61,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":[1]}]}

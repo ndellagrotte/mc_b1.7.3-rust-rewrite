@@ -1,0 +1,8 @@
+{"name":"zombie-chase-player","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":150,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-2.3b. Stone platform y = 60 over -12..12; night (set_time 18000 at t=0; mobs join at t=1, after the first World.tick recomputed skylightSubtracted, so no daylight burn roll). Player (id 0) at (6.0, 61, 0.5) facing -x, zombie (id 1) at (-4.5, 61, 0.5), difficulty 1 (EntityMob.onUpdate kills mobs on peaceful). EntityMob.findPlayerToAttack (closest player within 16, canEntityBeSeen), World.getPathToEntity, the walk (EntityCreature), EntityMob.attackEntity every 20 ticks (strength 5): the player is knocked back three times (t=91, 111, 131). The player's own fields are not dumped: EntityPlayer.attackEntityFrom (difficulty scaling, 5 -> 2) and damageEntity (armour) are WP-2.5, so its health differs after the first hit (its position does not: EntityLiving's knock-back); the run stops before a fourth hit, which would kill the port's player. rng_state and the zombie's entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-12,"y0":60,"z0":-12,"x1":12,"y1":60,"z1":12,"id":1},
+        {"t":0,"op":"set_time","time":18000},
+        {"t":1,"op":"player","x":"0x4018000000000000","y":61,"z":"0x3fe0000000000000","yaw":90},
+        {"t":1,"op":"spawn","kind":"Zombie","pos":["0xc012000000000000",61,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":[1]}]}

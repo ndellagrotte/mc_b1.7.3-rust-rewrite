@@ -1,0 +1,9 @@
+{"name":"skeleton-shoot","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":300,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-2.3b. Stone platform y = 60 over -10..10 with a fence row (id 85) at x = 0; night (set_time 18000; mobs join at t=1). Player (id 0) at (4.5, 61, 0.5) behind the fence, skeleton (id 1) at (-5.5, 61, 0.5), difficulty 1. EntitySkeleton.attackEntity within 10 blocks: an arrow every 30 ticks of attackTime (new EntityArrow(world, skeleton) whose constructor heading is replaced by the setArrowHeading after entityJoinedWorld, so the oracle's unseeded constructor draws do not show), the bow sound draw, the yaw toward the target, hasAttacked. Arrows 3 and 9 hit the player (EntityPlayer.attackEntityFrom is WP-2.5: the player is not dumped), the others stick in the floor. rng_state and entity_state of ids 1..12 (the skeleton and its arrows) every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-10,"y0":60,"z0":-10,"x1":10,"y1":60,"z1":10,"id":1},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":-10,"x1":0,"y1":61,"z1":10,"id":85},
+        {"t":0,"op":"set_time","time":18000},
+        {"t":1,"op":"player","x":"0x4012000000000000","y":61,"z":"0x3fe0000000000000","yaw":90},
+        {"t":1,"op":"spawn","kind":"Skeleton","pos":["0xc016000000000000",61,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":[1,2,3,4,5,6,7,8,9,10,11,12]}]}

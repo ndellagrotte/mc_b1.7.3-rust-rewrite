@@ -1,0 +1,10 @@
+{"name":"creeper-fuse-explode","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":100,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-2.3b. Stone y = 59 and dirt y = 60 over -10..10, a fence row (id 85) at x = 0; day. Player (id 0) at (2.0, 61, 0.5), creeper (id 1) at (-3.0, 61, 0.5), difficulty 1. The creeper walks to the fence and slides along it; EntityCreeper.attackEntity: within 3 blocks the fuse (watcher byte 16 = 1, timeSinceIgnited + 1, the fuse sound on its first tick), at 30 World.createExplosion(creeper, x, y, z, 3) and setEntityDead (the crater: dirt, stone and fence blocks, their drops). The fence keeps the creeper far enough that the port's player (EntityPlayer.attackEntityFrom is WP-2.5: unscaled damage) survives, so random ticks around it go on as in the oracle. rng_state and the creeper's entity_state every tick (absent after the explosion), block_box of the crater area at t = 99.",
+ "ops":[{"t":0,"op":"fill","x0":-10,"y0":59,"z0":-10,"x1":10,"y1":59,"z1":10,"id":1},
+        {"t":0,"op":"fill","x0":-10,"y0":60,"z0":-10,"x1":10,"y1":60,"z1":10,"id":3},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":-10,"x1":0,"y1":61,"z1":10,"id":85},
+        {"t":1,"op":"player","x":2,"y":61,"z":"0x3fe0000000000000","yaw":90},
+        {"t":1,"op":"spawn","kind":"Creeper","pos":["0xc008000000000000",61,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":[1]},
+          {"t":99,"what":"block_box","x0":-6,"y0":58,"z0":-6,"x1":6,"y1":62,"z1":6}]}

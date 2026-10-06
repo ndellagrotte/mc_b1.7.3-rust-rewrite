@@ -1,0 +1,11 @@
+{"name":"skeleton-sunburn","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":600,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-2.3b. Stone platform y = 60 over -8..8 with a one-high rim; noon (set_time 6000; the skeleton joins at t=1), no player, difficulty 1. EntitySkeleton.onLivingUpdate's daylight burn (isDaytime, brightness > 0.5, canBlockSeeTheSky, then rand.nextFloat() * 30 < (brightness - 0.4) * 2 sets fire 300), Entity's fire damage every 20 ticks through EntityMob.attackEntityFrom (no attacker: Math.random attackedAtYaw), the EntityCreature wander (EntityMob.getBlockPathWeight, all cells equally bright), death and EntitySkeleton.dropFewItems (rand.nextInt(3) arrows, rand.nextInt(3) bones). rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"set_time","time":6000},
+        {"t":1,"op":"spawn","kind":"Skeleton","pos":["0x3fe0000000000000",61,"0x3fe0000000000000"],"id":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

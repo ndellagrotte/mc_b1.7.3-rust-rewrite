@@ -78,6 +78,15 @@ fixtures! {
     entity_pig_burning => "entity" / "pig-burning";
     entity_pig_fall_damage => "entity" / "pig-fall-damage";
     entity_pig_knockback => "entity" / "pig-knockback";
+    // WP-2.3b: monsters, slime, ghast.
+    entity_creeper_fuse_explode => "entity" / "creeper-fuse-explode";
+    entity_ghast_waypoints => "entity" / "ghast-waypoints";
+    entity_pigzombie_anger => "entity" / "pigzombie-anger";
+    entity_skeleton_shoot => "entity" / "skeleton-shoot";
+    entity_skeleton_sunburn => "entity" / "skeleton-sunburn";
+    entity_slime_split => "entity" / "slime-split";
+    entity_spider_leap => "entity" / "spider-leap";
+    entity_zombie_chase_player => "entity" / "zombie-chase-player";
     entity_pig_ladder => "entity" / "pig-ladder";
     entity_snowball_egg_flight => "entity" / "snowball-egg-flight";
     // WP-2.3 task 1: sheep, cow, chicken, wolf. sheep-shear and
