@@ -81,6 +81,10 @@ the blueprint are kept in `docs/` as history.
 > `4013a68`), used under the Apache License 2.0. Adapted files are marked in
 > their headers; see `NOTICE` and `credits/licenses/MinecraftOSS_Apache-2.0.md`.
 
+`crates/mc-core/src/strict_math.rs` transcribes fdlibm 5.3 (Sun Microsystems; freely
+redistributable provided its notice is preserved, which the file does) so that
+`mc_core::jmath` reproduces Java's `StrictMath` bit for bit.
+
 The window and application icons are the Bevy icon, used under its
 [MIT licence](credits/licenses/Bevy_MIT_License.md).
 
