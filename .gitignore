@@ -3,3 +3,10 @@ target/
 .DS_Store
 
 dist/
+
+# Mojang-derived reference material: never committed (PLAN_v4 D8)
+/.reference/
+# oracle build products (PLAN_v4 §4.1)
+/build/oracle/
+/build/oracle-src/
+/build/golden-out/
