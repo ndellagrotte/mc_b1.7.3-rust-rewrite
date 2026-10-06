@@ -713,9 +713,13 @@ pub fn find_player_to_attack(e: &Entity, world: &World) -> Option<i32> {
 
 /// `EntityWolf.attackEntity(target, distance)`: between 2 and 6 blocks a
 /// 1-in-10 leap toward the target (from the ground); within 1.5 blocks and
-/// overlapping vertically, a bite of 2 (4 when tamed) with a 20-tick
-/// cooldown (`attackTime`, which `EntityCreature` does not check: the
-/// wolf bites every AI tick it is close enough).
+/// overlapping vertically, a bite of 2 (4 when tamed), setting
+/// `attackTime` 20.
+///
+/// vanilla bug (transcribed): nothing checks that `attackTime` (unlike
+/// `EntityMob.attackEntity`, EntityMob.java:50), so the wolf bites every AI
+/// tick it is in range; only the target's hurt-resistance window spaces the
+/// hits.
 // src: EntityWolf.java:304-324
 pub fn attack_entity(e: &mut Entity, world: &mut World, target: i32, var2: f32) {
     let Some(var1) = EntityView::of(world, target) else {

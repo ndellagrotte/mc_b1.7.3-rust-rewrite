@@ -71,6 +71,8 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
     };
     let var2 = p.inventory.get_current_item().map(|s| s.item_id);
     if var2 == Some(BUCKET_EMPTY) {
+        // vanilla bug (transcribed): the whole held stack is replaced by one
+        // milk bucket, so milking with a stack of buckets loses the rest.
         let slot = p.inventory.current_item;
         // src: ItemStack.java:13-15, :33-38 (new ItemStack(Item): count 1,
         // damage 0)
