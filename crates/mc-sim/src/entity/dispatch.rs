@@ -798,8 +798,15 @@ pub fn is_in_water(e: &Entity, world: &World) -> bool {
 // `tests/living_dispatch_coverage.rs` against [`LIVING_TRANSCRIBED`] and
 // [`LIVING_NOT_DISPATCHED`], as for the `Entity` methods above). An arm for an
 // override not transcribed yet records `"Class.method"` and runs the nearest
-// transcribed ancestor's body, except where noted (an override that does not
-// call `super`, whose ancestor body would act where vanilla does not).
+// transcribed ancestor's body, except for a `void` override that does not
+// call `super` (whose ancestor body would act, move or draw `rand` where
+// vanilla does not): that arm records and returns with no body. Those are
+// `updatePlayerActionState` of EntityPlayer(SP), EntitySlime, EntityGhast and
+// EntitySquid; `moveEntityWithHeading` of EntityFlying (Ghast) and
+// EntitySquid; `dropFewItems` of EntitySheep, EntitySkeleton and EntitySquid
+// (EntityCreature's `attackEntity`/`attackBlockedEntity` bodies are empty
+// anyway). A value-returning override not transcribed yet returns the
+// ancestor's value as a placeholder.
 
 /// Overrides of `EntityLiving` / `EntityCreature` methods already transcribed,
 /// by the class that defines them (the [`TRANSCRIBED`] convention).
@@ -962,11 +969,17 @@ pub fn on_death(e: &mut Entity, world: &mut World, attacker: Option<&Entity>) {
 
 /// `dropFewItems()`.
 pub fn drop_few_items(e: &mut Entity, world: &mut World) {
-    match e.kind {
-        K::Sheep(..) => world.note_unimplemented("EntitySheep.dropFewItems"),
-        K::Skeleton(..) => world.note_unimplemented("EntitySkeleton.dropFewItems"),
-        K::Squid(..) => world.note_unimplemented("EntitySquid.dropFewItems"),
-        _ => {}
+    // No super call in these overrides (EntitySheep.java, EntitySkeleton.java,
+    // EntitySquid.java dropFewItems): record and run no body (WP-2.3).
+    let what = match e.kind {
+        K::Sheep(..) => "EntitySheep.dropFewItems",
+        K::Skeleton(..) => "EntitySkeleton.dropFewItems",
+        K::Squid(..) => "EntitySquid.dropFewItems",
+        _ => "",
+    };
+    if !what.is_empty() {
+        world.note_unimplemented(what);
+        return;
     }
     // src: EntityLiving.java:424-434
     living::drop_few_items(e, world);
@@ -999,8 +1012,10 @@ pub fn get_drop_item_id(e: &Entity, world: &World) -> i32 {
 /// `moveEntityWithHeading(strafe, forward)`.
 pub fn move_entity_with_heading(e: &mut Entity, world: &mut World, strafe: f32, forward: f32) {
     match e.kind {
-        K::Ghast(..) => world.note_unimplemented("EntityFlying.moveEntityWithHeading"),
-        K::Squid(..) => world.note_unimplemented("EntitySquid.moveEntityWithHeading"),
+        // No super call (EntityFlying.java, EntitySquid.java
+        // moveEntityWithHeading): record and run no body (WP-2.3).
+        K::Ghast(..) => return world.note_unimplemented("EntityFlying.moveEntityWithHeading"),
+        K::Squid(..) => return world.note_unimplemented("EntitySquid.moveEntityWithHeading"),
         K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.moveEntityWithHeading"),
         _ => {}
     }
@@ -1086,7 +1101,9 @@ pub fn can_despawn(e: &Entity, world: &World) -> bool {
 /// client's movement input after `EntityPlayer`'s, which only advances the
 /// arm swing and does not call `EntityLiving`'s (EntityPlayer.java:158-170,
 /// EntityPlayerSP.java:27-32; WP-2.5). Running `EntityLiving`'s idle AI
-/// there would turn and steer the player where vanilla does not.
+/// there would turn and steer the player where vanilla does not. The
+/// Slime, Ghast and Squid arms run no body either: their overrides do not
+/// call `super` (WP-2.3).
 pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
     let what = match e.kind {
         // src: EntityCreature.java:16-116
@@ -1109,17 +1126,15 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
             world.note_unimplemented("EntityWolf.updatePlayerActionState");
             return creature::update_player_action_state(e, world);
         }
-        K::Squid(..) => {
-            world.note_unimplemented("EntitySquid.updatePlayerActionState");
-            return creature::update_player_action_state(e, world);
-        }
+        // No super call in these overrides (EntitySquid.java,
+        // EntitySlime.java, EntityGhast.java updatePlayerActionState):
+        // record and run no body (WP-2.3).
+        K::Squid(..) => "EntitySquid.updatePlayerActionState",
         K::Slime(..) => "EntitySlime.updatePlayerActionState",
         K::Ghast(..) => "EntityGhast.updatePlayerActionState",
         _ => unreachable!("updatePlayerActionState on a non-living entity"),
     };
     world.note_unimplemented(what);
-    // src: EntityLiving.java:689-726
-    living::update_player_action_state(e, world);
 }
 
 /// `getVerticalFaceSpeed()`.

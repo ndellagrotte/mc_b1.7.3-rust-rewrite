@@ -1088,7 +1088,12 @@ Not pinned by a fixture: `faceEntity` toward a player (`EntityLiving.updatePlaye
 2 % look-at roll reads the player's `getEyeHeight`, `EntityPlayer`'s override, WP-2.5;
 `entity/pig-attacked` diverges at its player punch before the pig looks at the player), and
 paths to an entity (`getPathToEntity`: no b1.7.3 animal has a target). `Pathfinder` is
-unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`).
+unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`). The `entity_state`
+dump has none of `EntityLiving`'s body yaw and walk state (`renderYawOffset`,
+`field_9361_v`/`9362_u`/`9360_w`/`9359_x`, `legYaw`/`legSwing`), nor `randomYawVelocity`,
+`entityAge`, `livingSoundTime`, `heartsLife`, `field_9346_af`, `attackedAtYaw`, `air` or
+`fire`: those are pinned only through the `rand`/`Math.random()` streams, health and drops,
+and the body yaw and walk state by `crates/mc-sim/tests/living_entities.rs`.
 
 Vanilla behaviour these fixtures pin down:
 

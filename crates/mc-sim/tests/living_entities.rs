@@ -1,7 +1,8 @@
 //! WP-2.2: unit checks of `EntityLiving`, `EntityAnimal` and `EntityPig`
 //! paths the tick fixtures (`tests/golden/entity/pig-*`) do not reach: the
 //! pig's NBT round trip and `interact`, `getCanSpawnHere`, `heal`,
-//! `knockBack`, `faceEntity`'s sign quirk, `handleHealthUpdate`, despawning.
+//! `knockBack`, `faceEntity`'s sign quirk, `handleHealthUpdate`, despawning,
+//! `onUpdate`'s body yaw and walk state and the leg animation.
 
 use mc_core::Aabb;
 use mc_sim::entity::living::{self, EntityView};
@@ -176,10 +177,13 @@ fn knock_back() {
 
 /// `updateRotation` takes the shorter way and clamps. `faceEntity` steps
 /// from the stored pitch toward the target pitch and stores the result
-/// negated (vanilla bug, transcribed): toward a living target above, the
-/// first call stores the correct look-up pitch, the next one steps from it
-/// (taken as a look-down pitch) and stores another value, so the pitch
-/// alternates between two values instead of settling.
+/// negated (vanilla bug, transcribed): the pitch settles at the negated
+/// target pitch when `|target| <= maxPitchStep / 2`, otherwise it alternates
+/// between two values. Here the target (about 50.5 degrees) is above
+/// 90 / 2: the first call stores the correct look-up pitch, the next one
+/// steps from it (taken as a look-down pitch) and stores another value, and
+/// the third is back at the first. A second target within 45 degrees
+/// settles.
 #[test]
 fn face_entity_pitch_alternates() {
     assert_eq!(living::update_rotation(170.0, -170.0, 30.0), 190.0);
@@ -214,6 +218,25 @@ fn face_entity_pitch_alternates() {
     assert_eq!(pitches[2], pitches[0]);
     // Yaw toward +x is -90; each call turns at most 10 degrees from 0.
     assert_eq!(p.base.rotation_yaw, -30.0);
+
+    // A target within maxPitchStep / 2: the pitch settles at -var13.
+    let t2 = EntityView {
+        pos_y: 62.0,
+        bounding_box: Aabb::new(4.2, 62.0, 0.2, 4.8, 63.8, 0.8),
+        ..t
+    };
+    let var13b = (-(mc_core::math::jmath::atan2(
+        (61.0 + (0.9f32 * 0.85) as f64) - (62.0 + 1.62f32 as f64),
+        4.0,
+    ) * 180.0
+        / 3.1415927410125732)) as f32;
+    assert!(var13b.abs() <= 45.0);
+    for _ in 0..4 {
+        living::face_entity(&mut p, &w, &t2, 10.0, 90.0);
+    }
+    assert_eq!(p.base.rotation_pitch, -var13b);
+    living::face_entity(&mut p, &w, &t2, 10.0, 90.0);
+    assert_eq!(p.base.rotation_pitch, -var13b);
 }
 
 /// `handleHealthUpdate(2)` (hurt): the hurt state, a hurt sound, and
@@ -271,4 +294,73 @@ fn attack_without_attacker() {
     r2.next_float();
     assert_eq!(p.base.rand.state(), r2.state());
     assert!(p.base.been_attacked);
+}
+
+/// `EntityLiving.onUpdate`'s body yaw and walk state (EntityLiving.java:203-290)
+/// and `moveEntityWithHeading`'s leg animation (:538-547), which no fixture
+/// dumps. A dead pig (`isMovementBlocked`: no AI step, so no input motion,
+/// EntityLiving.java:618-622) slides +x on stone, its body facing yaw 0.
+/// The expected values follow the Java statement by statement in `f32`.
+fn slide_dead_pig(rotation_yaw: f32) -> (Entity, f32, f32) {
+    let mut w = world();
+    let mut p = pig_at(&mut w, 0.5, 61.0, 0.5);
+    p.base.rotation_yaw = rotation_yaw;
+    p.base.prev_rotation_yaw = rotation_yaw;
+    {
+        let l = p.kind.living_mut().unwrap();
+        l.health = 0;
+        l.render_yaw_offset = 0.0;
+        l.prev_render_yaw_offset = 0.0;
+    }
+    p.base.motion_x = 0.5;
+    p.base.motion_y = -0.1;
+    living::on_update(&mut p, &mut w);
+    assert!(p.base.on_ground);
+    let dx = p.base.pos_x - p.base.prev_pos_x;
+    let dz = p.base.pos_z - p.base.prev_pos_z;
+    assert_eq!(dz, 0.0);
+    // onUpdate's var5 and moveEntityWithHeading's leg var7.
+    let var5 = mc_core::math::sqrt_double(dx * dx + dz * dz);
+    assert!(var5 > 0.05);
+    let leg = (mc_core::math::sqrt_double(dx * dx + dz * dz) * 4.0f32).min(1.0);
+    (p, var5, leg)
+}
+
+#[test]
+fn on_update_body_yaw_and_limbs() {
+    // Head at 0, moving +x: var6 = atan2(0, dx) deg - 90 = -90; the body
+    // turns 30 % of the way; var10 = 27 (no clamp, no flip, 729 <= 2500).
+    let (p, var5, leg) = slide_dead_pig(0.0);
+    let l = p.kind.living().unwrap();
+    let var6 = 0.0f32 * 180.0 / 3.1415927 - 90.0;
+    let r = 0.0f32 + (var6 - 0.0) * 0.3;
+    let var10 = 0.0f32 - r;
+    assert!(var10.abs() < 75.0 && var10 * var10 <= 2500.0);
+    assert_eq!(l.render_yaw_offset, 0.0 - var10);
+    assert_eq!(l.prev_render_yaw_offset, 0.0);
+    // field_9362_u / field_9361_v: on the ground and moving, eases to 1.
+    assert_eq!(l.prev_on_ground_speed_factor, 0.0);
+    assert_eq!(l.on_ground_speed_factor, (1.0f32 - 0.0) * 0.3);
+    // field_9360_w += var5 * 3; field_9359_x took the old value (0).
+    assert_eq!(l.moved_distance, var5 * 3.0);
+    assert_eq!(l.prev_moved_distance, 0.0);
+    // prevLegYaw = 0; legYaw += (var7 - 0) * 0.4; legSwing += legYaw.
+    assert_eq!(l.prev_leg_yaw, 0.0);
+    assert_eq!(l.leg_yaw, (leg - 0.0) * 0.4);
+    assert_eq!(l.leg_swing, l.leg_yaw);
+
+    // Head at 180, moving +x: var10 = 180 - (-27) wraps to -153, so var11
+    // flips the walk distance, var10 clamps to -75, the body sits at
+    // 180 + 75 and, 75² > 2500, moves another -75 * 0.2; the previous body
+    // yaw (0) is unwrapped by +360 toward it.
+    let (p, var5, _) = slide_dead_pig(180.0);
+    let l = p.kind.living().unwrap();
+    let mut var10 = 180.0f32 - r;
+    var10 -= 360.0;
+    assert!(var10 < -90.0);
+    let var10c = -75.0f32;
+    assert_eq!(l.render_yaw_offset, (180.0 - var10c) + var10c * 0.2);
+    assert_eq!(l.render_yaw_offset, 240.0);
+    assert_eq!(l.prev_render_yaw_offset, 360.0);
+    assert_eq!(l.moved_distance, -(var5 * 3.0));
 }
