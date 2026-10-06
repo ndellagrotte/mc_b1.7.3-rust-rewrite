@@ -40,6 +40,15 @@ fixtures! {
     // what comes after it.
 
     // ---- tests/golden/entity -----------------------------------------------------
+    // WP-2.1 (Entity base physics through EntityItem / EntityFallingSand).
+    entity_falling_sand_on_cactus => "entity" / "falling-sand-on-cactus";
+    entity_item_collision_pair => "entity" / "item-collision-pair";
+    entity_item_in_fire => "entity" / "item-in-fire";
+    entity_item_in_lava => "entity" / "item-in-lava";
+    entity_item_in_water => "entity" / "item-in-water";
+    entity_item_in_web => "entity" / "item-in-web";
+    entity_item_out_of_world => "entity" / "item-out-of-world";
+    entity_item_steps_up => "entity" / "item-steps-up";
     #[ignore = "EntityArrow(World) constructor (WP-2.4): the driver stops at line 2 (t=0 op spawn kind Arrow); line 1 matches. Then EntityArrow.onUpdate; generated and populated terrain is in (WP-1.4, WP-1.7)"]
     entity_arrow_flight => "entity" / "arrow-flight";
     entity_flat_item_drop => "entity" / "flat-item-drop";

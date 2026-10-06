@@ -703,6 +703,34 @@ see below), `tick/flat-flowing-water` (id 8), `tick/flat-sand-falls` (an
 `entity/flat-item-drop`, `entity/flat-pig-falls`. They exist so a port can verify one block
 and one entity before it has terrain generation.
 
+Entity base physics (WP-2.1: `Entity.onEntityUpdate` / `moveEntity` through the two
+transcribed non-living kinds, `EntityItem` and `EntityFallingSand`), empty world, seed 123,
+`"mob_spawning": "none"`, the same platform; `entity_state` every tick (`EntityItem`
+positions are box centres, so an item resting on the platform has `posY` 61.125):
+
+- `entity/item-in-water`: a two-deep still-water pool; an item falls in (the splash and its
+  particles draw from `Entity.rand`, Entity.java:205-236) and one starts in the water (no
+  splash on the first update). `rng_state` every tick.
+- `entity/item-in-lava`: a still-lava pool; an item falls in (`setOnFireFromLava` and the
+  burn of `moveEntity` kill it), one rests beside it, and one starts low in the lava where
+  only `EntityItem.onUpdate`'s lava bounce and the burn reach it. `rng_state` every tick.
+- `entity/item-in-fire`: a fire block on netherrack; the item burns (`isBoundingBoxBurning`
+  → `dealFireDamage`, the fire counter and its `% 20` hit). `rng_state` every tick.
+- `entity/item-in-web`: webs slow a falling and a sliding item (`isInWeb`, Entity.java:303-311).
+- `entity/item-steps-up`: a flow pushes an item against a one-high ledge and a sliding item
+  hits a block (step height 0: no step-up); falling sand lands on a half slab and drops as an
+  item. `rng_state` every 10.
+- `entity/item-out-of-world`: an item falls past the platform edge and is killed below
+  y = −64 (`entity_absent` afterwards).
+- `entity/falling-sand-on-cactus`: falling sand lands on a cactus (`Entity.attackEntityFrom`'s
+  base body) and an item on another loses health each tick. `rng_state` every 10.
+- `entity/item-collision-pair`: two overlapping items do not push each other (`EntityItem`
+  never calls `applyEntityCollision`; that and `isEntityInsideOpaqueBlock` are unit-tested in
+  `crates/mc-sim/tests/entity_base.rs`).
+
+The step-up branch of `moveEntity` (`stepHeight` > 0) needs a living entity and has no
+fixture yet.
+
 Fluids (WP-1.6a: `BlockFluid`, `BlockFlowing`, `BlockStationary`), empty world, seed 123,
 `"mob_spawning": "none"`, on the same platform unless stated; all dump `block_box` of the
 pen and `rng_state` every tick:

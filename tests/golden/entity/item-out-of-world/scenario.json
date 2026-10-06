@@ -1,0 +1,12 @@
+{"name":"item-out-of-world","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","mob_spawning":"none","ticks":130,
+ "comment":"WP-2.1. Item 0 at (9.5, 62.5, 0.5), just past the platform's +x edge, with zero motion: it falls past the platform through the empty world's air and below y = 0; at posY < -64 Entity.onEntityUpdate calls kill() -> setEntityDead (Entity.java:259-261, :279-281) and updateEntities removes it (World.java:1223-1232). Item 1 rests on the platform at (0.5, 61.125, 0.5). entity_state of both every tick (entity_absent for item 0 after its removal).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1,"damage":0},"pos":["0x4023000000000000","0x404f400000000000","0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"set_motion","id":0,"motion":[0,0,0]},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1,"damage":0},"pos":["0x3fe0000000000000","0x404e900000000000","0x3fe0000000000000"],"id":1},
+        {"t":0,"op":"set_motion","id":1,"motion":[0,0,0]}],
+ "dumps":[{"every":1,"what":"entity_state","which":[0,1]}]}
