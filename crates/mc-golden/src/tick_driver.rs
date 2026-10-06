@@ -786,8 +786,15 @@ fn placed_by_op(kind: &str, direction: Option<i32>, minecart_type: Option<i32>) 
 ///   player)`, needs the `player` op; sets the player's `fishEntity`).
 /// - `Minecart` with `type`: `EntityMinecart(world, x, y, z, type)`
 ///   (EntityMinecart.java:57-67, as ItemMinecart.java:16; no draws).
-/// - Any other `EntityList` name: its `(World)` constructor; the mobs not
-///   transcribed yet are an error naming the class.
+/// - Any other `EntityList` name: its `(World)` constructor. The animals
+///   (`Pig`, `Sheep`, `Cow`, `Chicken`, `Wolf`) and the hostile mobs
+///   (`Monster`, `Creeper`, `Skeleton`, `Spider`, `Giant`, `Zombie`,
+///   `Slime`, `Ghast`, `PigZombie`) are WP-2.2's and WP-2.3's. The oracle
+///   replays the slime constructor's size and jump-delay draws on the
+///   seeded `rand` (`TickScenario.seedAfterConstruction`); the port's slime
+///   constructor draws them from its construction-seeded `rand`, which is
+///   that replay. `Squid` is not transcribed yet (an error naming the
+///   class); `Mob` is the abstract `EntityLiving`.
 #[allow(clippy::too_many_arguments)]
 fn construct(
     world: &mut World,
@@ -801,8 +808,9 @@ fn construct(
     minecart_type: Option<i32>,
 ) -> Result<mc_sim::entity::Entity, GoldenError> {
     use mc_sim::entity::{
-        arrow, boat, chicken, cow, egg, falling_sand, fireball, fish, lightning_bolt, minecart,
-        painting, pig, sheep, snowball, tnt_primed, wolf,
+        arrow, boat, chicken, cow, creeper, egg, falling_sand, fireball, fish, ghast, giant_zombie,
+        lightning_bolt, minecart, mob, painting, pig, pig_zombie, sheep, skeleton, slime, snowball,
+        spider, tnt_primed, wolf, zombie,
     };
     let e = match kind {
         "Item" => {
@@ -883,6 +891,15 @@ fn construct(
                 "EntityWolf" => wolf::new_entity_wolf(world),
                 "EntityMinecart" => minecart::new_entity_minecart_empty(world),
                 "EntityBoat" => boat::new_entity_boat_empty(world),
+                "EntityMob" => mob::new_entity_mob(world),
+                "EntityCreeper" => creeper::new_entity_creeper(world),
+                "EntitySkeleton" => skeleton::new_entity_skeleton(world),
+                "EntitySpider" => spider::new_entity_spider(world),
+                "EntityGiantZombie" => giant_zombie::new_entity_giant_zombie(world),
+                "EntityZombie" => zombie::new_entity_zombie(world),
+                "EntitySlime" => slime::new_entity_slime(world),
+                "EntityGhast" => ghast::new_entity_ghast(world),
+                "EntityPigZombie" => pig_zombie::new_entity_pig_zombie(world),
                 _ => {
                     return Err(unsupported(
                         t,
