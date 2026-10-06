@@ -16,7 +16,8 @@
 //! | [`tile_entity`] | `TileEntity*` subclasses, `FurnaceRecipes`, `IInventory` | data in `world::tile_entity::TileEntityKindData`, behaviour and NBT as free functions over a `TileEntityRef` (WP-1.8) |
 //! | [`spawner`] | `SpawnerAnimals`, `EnumCreatureType` | free functions over `&mut World` |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
-//! | [`inventory`] | `InventoryPlayer` | layout only (WP-2.5) |
+//! | [`inventory`] | `InventoryPlayer`, `IInventory` implementations, `Container*`, `Slot*` | inventories and container click logic (WP-2.5); `IInventory` references are [`inventory::InventoryRef`] |
+//! | [`crafting`] | `CraftingManager`, `IRecipe`, `ShapedRecipes`, `ShapelessRecipes`, `RecipeSorter`, `Recipes*` | the sorted recipe list (151) and matching (WP-2.5) |
 //! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | McRegion saves: `SaveOldDir`/`SaveHandler`, `McRegionChunkLoader`, chunk NBT, `EntityList`, import validation (WP-1.9a/b) |
 //! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4), trees (WP-1.6b), population ([`worldgen::populate`], [`worldgen::features`]) done (WP-1.7) |
 //! | [`golden`] | — | read-only views in the golden-trace shapes |
@@ -37,6 +38,7 @@
 #![forbid(unsafe_code)]
 
 pub mod block;
+pub mod crafting;
 pub mod entity;
 pub mod golden;
 pub mod inventory;
