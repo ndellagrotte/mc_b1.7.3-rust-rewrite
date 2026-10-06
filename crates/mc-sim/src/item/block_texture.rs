@@ -299,7 +299,7 @@ pub const fn get_block_texture_from_side_and_metadata(
         BlockKind::Door => {
             if side != 0 && side != 1 {
                 let var3 = if (meta & 4) == 0 {
-                    (meta - 1) & 3
+                    meta.wrapping_sub(1) & 3
                 } else {
                     meta & 3
                 }; // getState
@@ -308,7 +308,7 @@ pub const fn get_block_texture_from_side_and_metadata(
                 } else {
                     let mut var4 = var3 / 2 + ((side & 1) ^ var3);
                     var4 += (meta & 4) / 4;
-                    let mut var5 = tex - (meta & 8) * 2;
+                    let mut var5 = tex.wrapping_sub((meta & 8) * 2);
                     if (var4 & 1) != 0 {
                         var5 = -var5;
                     }
@@ -319,7 +319,7 @@ pub const fn get_block_texture_from_side_and_metadata(
             }
         }
         // src: BlockCrops.java:77-83
-        BlockKind::Crops => tex + if meta < 0 { 7 } else { meta },
+        BlockKind::Crops => tex.wrapping_add(if meta < 0 { 7 } else { meta }),
         // src: BlockPistonBase.java:20-29, :216-222
         BlockKind::PistonBase { .. } => {
             let var3 = meta & 7; // getOrientation

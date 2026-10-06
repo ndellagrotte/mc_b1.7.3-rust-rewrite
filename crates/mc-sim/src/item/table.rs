@@ -334,8 +334,8 @@ const BUCKET_EMPTY: ItemDef = item_bucket(69, 0)
     .set_icon_coord(10, 4)
     .set_item_name("bucket");
 
-/// Item.java:274-379, in source order (ids 256..=359).
-// src: Item.java:274-379
+/// Item.java:274-377, in source order (ids 256..=359).
+// src: Item.java:274-377
 const ITEM_ROWS: [ItemDef; 104] = [
     item_spade(0, Iron)
         .set_icon_coord(2, 5)
@@ -589,7 +589,7 @@ const ITEM_ROWS: [ItemDef; 104] = [
     ItemDef::new(81, ItemKind::Plain)
         .set_icon_coord(9, 3)
         .set_item_name("clay"),
-    // `Block.reed` = 83 (Block.java:674).
+    // `Block.reed` = 83 (Block.java:675).
     item_reed(82, 83)
         .set_icon_coord(11, 1)
         .set_item_name("reeds"),
@@ -678,7 +678,7 @@ pub static RECORDS: [ItemDef; 2] = [
 ];
 
 // Block ids that get an ItemBlock subclass instead of a plain ItemBlock.
-// src: Block.java:609, :610, :621, :625, :627, :636
+// src: Block.java:598, :609, :610, :621, :625, :627, :636
 const CLOTH: i32 = 35;
 const WOOD: i32 = 17;
 const STAIR_SINGLE: i32 = 44;
@@ -734,6 +734,8 @@ const fn build() -> [Option<ItemDef>; 360] {
     let mut id = 0;
     while id < 256 {
         if BLOCKS[id].is_some() && t[id].is_none() {
+            // Block.java:700 blocksList[var0].initializeBlock() is block
+            // state (BlockFire burn rates), see block/table.rs; not item data.
             t[id] = Some(item_block(
                 id as i32 - 256,
                 ItemKind::Block {

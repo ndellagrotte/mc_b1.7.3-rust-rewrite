@@ -220,4 +220,9 @@ reduction rule (tests/golden/README.md) aborts the scenario instead of being
 dropped. Every vanilla call is wrapped so an exception becomes
 `{"exception":"<simple name>"}` in the trace; the dump calls no method with side
 effects on shared state (`getStrVsBlock`/`canHarvestBlock` read block singletons,
-`ItemStack` operations work on fresh stacks).
+`ItemStack` operations work on fresh stacks). The one exception is the
+`block_texture` dump: the piston base face reads the `pistonBase` /
+`pistonStickyBase` singletons' mutable bounds, which `resetStatics` does not
+restore, so `ItemTable` calls `setBlockBoundsForItemRender()` on both first (full
+cube, the static-init state) in case an earlier tick scenario in the same JVM left
+a piston extended.

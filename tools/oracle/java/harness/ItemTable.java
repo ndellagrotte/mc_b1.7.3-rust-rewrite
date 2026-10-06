@@ -58,6 +58,13 @@ final class ItemTable {
                 .put("getHarvestLevel", m.getHarvestLevel()));
         }
 
+        // The piston base textures read the singleton's mutable bounds
+        // (BlockPistonBase.java:24-25), which a tick scenario run earlier in
+        // this JVM may have left extended; resetStatics does not restore
+        // them. setBlockBoundsForItemRender (BlockPistonBase.java:203-205)
+        // gives the full cube, i.e. the static-init state (Block.java ctor).
+        Block.pistonBase.setBlockBoundsForItemRender();
+        Block.pistonStickyBase.setBlockBoundsForItemRender();
         for (int b = 0; b < 256; b++) {
             Block blk = Block.blocksList[b];
             if (blk == null) continue;

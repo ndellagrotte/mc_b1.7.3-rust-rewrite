@@ -5,10 +5,11 @@
 //! stores stacks by value and copies where Java aliases, which every current
 //! call site allows.
 //!
-//! Not here (item behaviour, WP-2.6, and stats, WP-2.7): `useItem`,
-//! `useItemRightClick`, `hitEntity`, `onDestroyBlock`, `useItemOnEntity`,
-//! `onItemDestroyedByUse`, `onCrafting` and `updateAnimation` (whose
-//! `Item.onUpdate` call is behaviour) (ItemStack.java:58-73, :143-172, :212-223).
+//! Not here (item behaviour, WP-2.6, and stats, WP-2.7): `useItem`
+//! (ItemStack.java:58-65), `useItemRightClick` (:71-73), `hitEntity` /
+//! `onDestroyBlock` (:143-157), `onItemDestroyedByUse` / `useItemOnEntity`
+//! (:167-172), and `updateAnimation` (whose `Item.onUpdate` call is
+//! behaviour) / `onCrafting` (:212-223).
 
 use std::collections::BTreeMap;
 
@@ -18,6 +19,11 @@ use super::{ItemDef, JavaException, item};
 use crate::block::BlockDef;
 
 /// `ItemStack` (ItemStack.java:3-7).
+///
+/// Java has no `equals()` override; the derived `==` compares every field
+/// (including `animations_to_go`) and is a Rust convenience only. The
+/// vanilla comparisons are [`ItemStack::is_item_equal`],
+/// [`ItemStack::is_stack_equal`] and [`ItemStack::are_item_stacks_equal`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ItemStack {
     /// `stackSize`.
@@ -61,6 +67,20 @@ impl ItemStack {
             item_id,
             item_damage,
         }
+    }
+
+    /// `new ItemStack(Block, count, damage)`; the one- and two-argument
+    /// overloads pass count 1 and damage 0.
+    // src: ItemStack.java:9-19
+    pub const fn from_block(block: &BlockDef, stack_size: i32, item_damage: i32) -> Self {
+        ItemStack::new(block.block_id, stack_size, item_damage)
+    }
+
+    /// `new ItemStack(Item, count, damage)`; the one- and two-argument
+    /// overloads pass count 1 and damage 0.
+    // src: ItemStack.java:21-31
+    pub const fn from_item(item: &ItemDef, stack_size: i32, item_damage: i32) -> Self {
+        ItemStack::new(item.shifted_index, stack_size, item_damage)
     }
 
     /// `new ItemStack(NBTTagCompound)`. `Err` where Java would throw
@@ -335,6 +355,15 @@ mod tests {
             .unwrap();
         assert_eq!(s.animations_to_go, 5);
         assert_eq!(s.copy().animations_to_go, 0);
+    }
+
+    #[test]
+    fn block_and_item_constructors() {
+        // Block.sand = 12 (Block.java:604); Item.stick = 280 (Item.java:298).
+        let sand = crate::block::block(12).unwrap();
+        assert_eq!(ItemStack::from_block(sand, 3, 0), ItemStack::new(12, 3, 0));
+        let stick = item(280).unwrap();
+        assert_eq!(ItemStack::from_item(stick, 1, 0), ItemStack::new(280, 1, 0));
     }
 
     #[test]
