@@ -997,6 +997,13 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
     if let Some(what) = what {
         untranscribed(world, what);
     }
+    base_can_place_block_at(world, x, y, z)
+}
+
+/// `Block.canPlaceBlockAt`'s base body (the `super.canPlaceBlockAt` of the
+/// overrides): the target is air or ground cover.
+// src: Block.java:501-504
+pub(crate) fn base_can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
     let var5 = world.get_block_id(x, y, z);
     var5 == 0 || super::material_of(var5).get_is_ground_cover()
 }

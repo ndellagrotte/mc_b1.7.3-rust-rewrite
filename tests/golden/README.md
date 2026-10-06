@@ -904,8 +904,16 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   orientations, slabs, a cake, a trapdoor and past a ladder (the collision boxes), and the
   slab merge of `BlockStep.onBlockAdded`.
 - `tick/locked-chest-vanishes`: random ticks remove locked chests.
+- `tick/portal-display`: a player next to silently filled portal blocks, so
+  `randomDisplayUpdates` reaches `BlockPortal.randomDisplayTick`. That tick draws from the
+  unseeded display `Random` (census, World.java:1999) and emits only particles and sounds,
+  so the fixture pins only that it draws nothing from `World.rand` and changes no block;
+  its own draw order is unverified.
 - Ignored on the Rust side until their dependencies land: `tick/door-iron-powered`
-  (redstone torch), `tick/portal-ignite` (`BlockFire.onBlockAdded` →
+  (redstone torch: doors and trapdoors opened by power, and the trapdoor's power branch
+  running on its emptied cell, BlockTrapDoor.java:115-123), `tick/door-upper-powered`
+  (lever: the upper half forwarding a power notification to the lower half,
+  BlockDoor.java:141-143), `tick/portal-ignite` (`BlockFire.onBlockAdded` →
   `tryToCreatePortal`), `tick/bed-nether` (`Explosion`), `tick/block-item-placement`
   (`ItemBlock` and the other placing items, WP-2.6).
 

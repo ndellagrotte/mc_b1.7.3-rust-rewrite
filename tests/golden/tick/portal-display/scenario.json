@@ -1,0 +1,7 @@
+{"name":"portal-display","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":10,"mob_spawning":"none",
+ "comment":"BlockPortal.randomDisplayTick (BlockPortal.java:157-184) under World.randomDisplayUpdates: a 7x5x7 block of portal blocks (id 90) filled silently (fill does not notify, so no frame is needed) next to a player at (-1.5, 61, -1.5), outside the portal (onEntityCollidedWithBlock is not reached). randomDisplayUpdates draws its 6000 positions from World.rand and hands the portal blocks it hits the unseeded `new Random()` of World.java:1999 (census: only particles and sounds, not traced), so what this pins is that randomDisplayTick draws nothing from World.rand and changes no block: rng_state every tick, the portal block at the end.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":0,"x1":6,"y1":65,"z1":6,"id":90},
+        {"t":0,"op":"player","x":"0xbff8000000000000","y":61,"z":"0xbff8000000000000"}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"t":9,"what":"block_box","x0":0,"y0":61,"z0":0,"x1":6,"y1":65,"z1":6}]}

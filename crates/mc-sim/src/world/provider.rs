@@ -114,6 +114,13 @@ impl WorldProvider {
         }
     }
 
+    /// `canRespawnHere()`: true except in the nether (where a bed explodes,
+    /// BlockBed.blockActivated).
+    // src: WorldProvider.java:96-98, WorldProviderHell.java:45-47
+    pub fn can_respawn_here(&self) -> bool {
+        self.dimension != Dimension::Hell
+    }
+
     /// `calculateCelestialAngle(worldTime, partialTick)`; the nether returns 0.5.
     // src: WorldProvider.java:43-58, WorldProviderHell.java:38-40
     pub fn calculate_celestial_angle(&self, world_time: i64, partial: f32) -> f32 {

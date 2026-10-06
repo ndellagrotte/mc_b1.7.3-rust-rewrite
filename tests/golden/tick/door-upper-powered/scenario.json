@@ -1,0 +1,12 @@
+{"name":"door-upper-powered","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":8,"mob_spawning":"none",
+ "comment":"BlockDoor.onNeighborBlockChange's upper-half forward (BlockDoor.java:141-143): an iron door at (6,61,2) (lower meta 0, upper meta 8) and a lever (id 69) at (7,62,2), meta 2 (on the stone pillar at x+1), next to the upper half only. use_item on the lever at t=2 turns it on (BlockLever.blockActivated notifies the neighbours of the lever and of the pillar), at t=5 off. The lower half is two cells from the lever and three from the pillar, so no notification reaches it directly: the upper half, notified with the lever's id (canProvidePower), calls onNeighborBlockChange on the lower half, which reads the power at either half (isBlockIndirectlyGettingPowered of the upper half: the lever's isPoweringTo) and opens, then closes, the door. Setting the lever at t=0 already sends the upper half a power-source notification with the lever off (the door stays shut). Needs BlockLever (redstone task of WP-1.6).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0xc016000000000000","y":61,"z":"0xc016000000000000"},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":2,"x1":8,"y1":62,"z1":2,"id":1},
+        {"t":0,"op":"set_block","x":6,"y":61,"z":2,"id":71},
+        {"t":0,"op":"set_block","x":6,"y":62,"z":2,"id":71,"meta":8},
+        {"t":0,"op":"set_block","x":7,"y":62,"z":2,"id":69,"meta":2},
+        {"t":2,"op":"use_item","x":7,"y":62,"z":2,"side":4},
+        {"t":5,"op":"use_item","x":7,"y":62,"z":2,"side":4}],
+ "dumps":[{"every":1,"what":"block_box","x0":6,"y0":61,"z0":2,"x1":7,"y1":62,"z1":2},
+          {"every":1,"what":"rng_state"}]}

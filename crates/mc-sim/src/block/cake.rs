@@ -133,18 +133,11 @@ fn heal(world: &mut World, e: &mut Entity, var1: i32) {
 /// `canPlaceBlockAt(world, x, y, z)`: `Block`'s test, then `canBlockStay`.
 // src: BlockCake.java:90-92
 pub fn can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
-    if !base_can_place_block_at(world, x, y, z) {
+    if !super::dispatch::base_can_place_block_at(world, x, y, z) {
         false
     } else {
         can_block_stay(world, x, y, z)
     }
-}
-
-/// `Block.canPlaceBlockAt` (`super.canPlaceBlockAt`): air or ground cover.
-// src: Block.java:501-504
-fn base_can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
-    let var5 = world.get_block_id(x, y, z);
-    var5 == 0 || super::material_of(var5).get_is_ground_cover()
 }
 
 /// `onNeighborBlockChange(world, x, y, z, neighborId)`: without a solid

@@ -29,7 +29,6 @@ use mc_core::java_hash::ChunkCoordinates;
 use super::BlockBounds;
 use crate::entity::Entity;
 use crate::world::World;
-use crate::world::provider::Dimension;
 
 /// `headBlockToFootBlockMap`: `{dx, dz}` per direction.
 // src: BlockBed.java:7
@@ -56,13 +55,6 @@ pub const fn is_bed_occupied(meta: i32) -> bool {
 /// `headBlockToFootBlockMap[direction]` (direction is `meta & 3`, so in range).
 fn step(direction: i32) -> [i32; 2] {
     HEAD_BLOCK_TO_FOOT_BLOCK_MAP[direction as usize]
-}
-
-/// `worldProvider.canRespawnHere()`: true except in the nether. Not in
-/// [`crate::world::provider`] yet; a private copy here.
-// src: WorldProvider.java:96-98, WorldProviderHell.java:45-47
-fn can_respawn_here(world: &World) -> bool {
-    world.world_provider.dimension != Dimension::Hell
 }
 
 /// `blockActivated(world, x, y, z, player)`: always true. Redirects to the
@@ -92,7 +84,8 @@ pub fn block_activated(
         }
         var6 = world.get_block_metadata(var2, var3, var4);
     }
-    if !can_respawn_here(world) {
+    // src: BlockBed.java:30
+    if !world.world_provider.can_respawn_here() {
         let mut var16 = var2 as f64 + 0.5;
         let mut var17 = var3 as f64 + 0.5;
         let mut var11 = var4 as f64 + 0.5;

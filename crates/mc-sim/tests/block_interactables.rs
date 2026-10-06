@@ -277,3 +277,57 @@ fn item_render_bounds_and_workbench() {
     let mut p = new_entity_player_sp(&mut w);
     assert!(d::block_activated(&mut w, 58, 0, 61, 0, &mut p));
 }
+
+/// BlockCake.java:76-88 with EntityLiving.heal (EntityLiving.java:296-305):
+/// below 20 health a click heals 3 (capped at 20) and eats a slice
+/// (setBlockMetadataWithNotify); the sixth slice removes the cake
+/// (setBlockWithNotify). At 20 health nothing happens; at 0 health heal does
+/// nothing but the slice is still eaten. The harness cannot lower the
+/// player's health, so `tick/cake-eat` only reaches the 20-health branch.
+#[test]
+fn cake_eating_heals_and_removes_the_cake() {
+    let mut w = empty_world();
+    platform(&mut w);
+    let mut p = new_entity_player_sp(&mut w);
+    let health = |p: &mc_sim::entity::Entity| p.kind.living().unwrap().health;
+    w.set_block(0, 61, 0, CAKE);
+
+    // Health 1: six slices, 3 health each; the sixth removes the cake.
+    p.kind.living_mut().unwrap().health = 1;
+    for (n, (hp, meta)) in [(4, 1), (7, 2), (10, 3), (13, 4), (16, 5)]
+        .into_iter()
+        .enumerate()
+    {
+        assert!(d::block_activated(&mut w, CAKE, 0, 61, 0, &mut p));
+        assert_eq!(health(&p), hp, "slice {}", n + 1);
+        assert_eq!(w.get_block_id(0, 61, 0), CAKE, "slice {}", n + 1);
+        assert_eq!(w.get_block_metadata(0, 61, 0), meta, "slice {}", n + 1);
+    }
+    assert!(d::block_activated(&mut w, CAKE, 0, 61, 0, &mut p));
+    assert_eq!(health(&p), 19);
+    assert_eq!(w.get_block_id(0, 61, 0), 0);
+
+    // Health 19: heal caps at 20 and the slice is eaten; at 20 the next
+    // click changes nothing (`health < 20` fails) but still returns true.
+    w.set_block(1, 61, 0, CAKE);
+    assert!(d::block_activated(&mut w, CAKE, 1, 61, 0, &mut p));
+    assert_eq!(health(&p), 20);
+    assert_eq!(w.get_block_metadata(1, 61, 0), 1);
+    assert!(d::block_activated(&mut w, CAKE, 1, 61, 0, &mut p));
+    assert_eq!(health(&p), 20);
+    assert_eq!(w.get_block_id(1, 61, 0), CAKE);
+    assert_eq!(w.get_block_metadata(1, 61, 0), 1);
+
+    // onBlockClicked eats the same way (BlockCake.java:72-74).
+    p.kind.living_mut().unwrap().health = 15;
+    d::on_block_clicked(&mut w, CAKE, 1, 61, 0, &mut p);
+    assert_eq!(health(&p), 18);
+    assert_eq!(w.get_block_metadata(1, 61, 0), 2);
+
+    // Health 0: `health < 20` holds but heal needs health > 0
+    // (EntityLiving.java:297): no healing, the slice is still eaten.
+    p.kind.living_mut().unwrap().health = 0;
+    assert!(d::block_activated(&mut w, CAKE, 1, 61, 0, &mut p));
+    assert_eq!(health(&p), 0);
+    assert_eq!(w.get_block_metadata(1, 61, 0), 3);
+}

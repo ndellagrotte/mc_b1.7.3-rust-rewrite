@@ -198,16 +198,9 @@ pub fn can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
         false
     } else {
         world.is_block_normal_cube(x, y - 1, z)
-            && base_can_place_block_at(world, x, y, z)
-            && base_can_place_block_at(world, x, y + 1, z)
+            && super::dispatch::base_can_place_block_at(world, x, y, z)
+            && super::dispatch::base_can_place_block_at(world, x, y + 1, z)
     }
-}
-
-/// `Block.canPlaceBlockAt` (`super.canPlaceBlockAt`): air or ground cover.
-// src: Block.java:501-504
-fn base_can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
-    let var5 = world.get_block_id(x, y, z);
-    var5 == 0 || super::material_of(var5).get_is_ground_cover()
 }
 
 #[cfg(test)]
