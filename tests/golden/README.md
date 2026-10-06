@@ -664,6 +664,24 @@ nothing masked. No `seed`: the harness streams use 0, and the output does not de
 region containing chunk (0, −4) with the chest (PLAN_v4 §4.4 item 4). The oracle reads a
 `Chest` at (9, 64, −61) holding 2 planks (id 5, slot 0) and 4 sticks (id 280, slot 1).
 
+Rust side (WP-1.9b): `crates/mc-golden/src/world_read_driver.rs` (`drive_in(fixture_dir)`)
+copies the sidecar directory into a `MemoryStorage` as `world/…`, opens it with
+`World::new_from_save` on a `SaveOldDir` (seed 0, no provider) and emits lines 1–4 through
+`emit_tier_s`, which the tick driver's `save` op shares (`"save_format": "mcregion"` builds the
+world on a `SaveOldDir` over an in-memory storage; `World::try_save_world(true)`, then
+`emit_tier_s` masked). The save code's clock is a fixed `HARNESS_CLOCK_MILLIS` (non-zero
+seconds, so `timestamps_match` holds; `LastPlayed` and the timestamps are never compared).
+One class difference is bridged in the tick driver, as `trace_kind` bridges the name: the
+oracle's `HarnessPlayer` extends `EntityPlayer`, so its `level.dat` player has no `Score`
+(`EntityPlayerSP.writeEntityToNBT`, EntityPlayerSP.java:98-101); the port's player is
+`EntityPlayerSP`, and `HarnessSaveHandler` drops `Score` before `level.dat` is written. Tests:
+`crates/mc-sim/tests/golden_save.rs` (the fixtures, PLAN_v4 §4.4 item 4, write/re-read, the
+D5 import refusal, the `level.dat` shapes of `nbt/level-dat-shape` and
+`nbt/testworld-level-dat`, and the cross-read both ways through
+`tools/oracle/java/harness/WorldReadDir.java`: `read <parent>` prints what the vanilla loaders
+read from `<parent>/world` exactly as a `world_read` scenario, `write <parent>` saves a small
+vanilla world there; run when `build/oracle` exists).
+
 ### Committed Tier B/C/S scenarios
 
 Generated terrain, seed 123 (ocean around the origin; grass at y = 66 near (−26, −58)):
