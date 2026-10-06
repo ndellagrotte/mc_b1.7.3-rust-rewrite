@@ -363,18 +363,11 @@ impl World {
         }
     }
 
-    /// `TileEntity.updateEntity()` dispatch. The base body is empty; the
-    /// concrete tile entities are WP-1.8.
+    /// `TileEntity.updateEntity()` dispatch ([`super::tile_entity::update_entity`]:
+    /// `TileEntityPiston` transcribed, the WP-1.8 kinds recorded).
     // src: TileEntity.java:42-43
     fn update_tile_entity(&mut self, r: super::tile_entity::TileEntityRef) {
-        if let Some(t) = self.tile_entities.get(&r) {
-            match t.kind {
-                super::tile_entity::TileEntityKindData::Untranscribed(class) => {
-                    let _ = class;
-                    self.note_unimplemented("TileEntity*.updateEntity");
-                }
-            }
-        }
+        super::tile_entity::update_entity(self, r);
     }
 
     /// The entity in slot `i`; slots outside an update are never empty.

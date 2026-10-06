@@ -291,6 +291,48 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("BlockLog", &["harvestBlock", "onBlockRemoval"]),
     // src: BlockMushroom.java:13-39
     ("BlockMushroom", &["canBlockStay", "updateTick"]),
+    // src: BlockPistonBase.java:39-41, :43-50, :52-57, :59-64, :112-173,
+    // :175-201, :203-205, :207-210
+    (
+        "BlockPistonBase",
+        &[
+            "blockActivated",
+            "getCollidingBoundingBoxes",
+            "onBlockAdded",
+            "onBlockPlacedBy",
+            "onNeighborBlockChange",
+            "playBlock",
+            "setBlockBoundsBasedOnState",
+            "setBlockBoundsForItemRender",
+        ],
+    ),
+    // src: BlockPistonExtension.java:23-39, :66-72, :78-154
+    (
+        "BlockPistonExtension",
+        &[
+            "canPlaceBlockAt",
+            "canPlaceBlockOnSide",
+            "getCollidingBoundingBoxes",
+            "onBlockRemoval",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+        ],
+    ),
+    // src: BlockPistonMoving.java:15-34, :48-55, :61-74, :80-117
+    (
+        "BlockPistonMoving",
+        &[
+            "blockActivated",
+            "canPlaceBlockAt",
+            "canPlaceBlockOnSide",
+            "dropBlockAsItemWithChance",
+            "getCollisionBoundingBoxFromPool",
+            "onBlockAdded",
+            "onBlockRemoval",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+        ],
+    ),
     // src: BlockPortal.java:10-27, :87-184
     (
         "BlockPortal",
@@ -667,8 +709,10 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Rail { .. } | K::DetectorRail => {
             return super::rail::on_block_added(world, id, x, y, z);
         }
-        K::PistonBase { .. } => "BlockPistonBase.onBlockAdded",
-        K::PistonMoving => "BlockPistonMoving.onBlockAdded",
+        // src: BlockPistonBase.java:59-64
+        K::PistonBase { .. } => return super::piston_base::on_block_added(world, x, y, z),
+        // src: BlockPistonMoving.java:15-16
+        K::PistonMoving => return super::piston_moving::on_block_added(),
         // src: BlockStep.java:43-58
         K::Step { .. } => return super::step::on_block_added(world, id, x, y, z),
         // src: BlockTNT.java:18-25
@@ -717,8 +761,10 @@ pub fn on_block_removal(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Sponge => return super::misc::sponge_on_block_removal(world, x, y, z),
         K::Dispenser => "BlockDispenser.onBlockRemoval",
         K::Note | K::MobSpawner | K::Sign { .. } => "BlockContainer.onBlockRemoval",
-        K::PistonExtension => "BlockPistonExtension.onBlockRemoval",
-        K::PistonMoving => "BlockPistonMoving.onBlockRemoval",
+        // src: BlockPistonExtension.java:23-39
+        K::PistonExtension => return super::piston_extension::on_block_removal(world, x, y, z),
+        // src: BlockPistonMoving.java:18-26
+        K::PistonMoving => return super::piston_moving::on_block_removal(world, x, y, z),
         // src: BlockStairs.java:142-144 (modelBlock.onBlockRemoval)
         K::Stairs { model_block } => return on_block_removal(world, model_block, x, y, z),
         K::Chest => "BlockChest.onBlockRemoval",
@@ -778,9 +824,16 @@ pub fn on_neighbor_block_change(
         K::Rail { .. } | K::DetectorRail => {
             return super::rail::on_neighbor_block_change(world, id, x, y, z, neighbor_id);
         }
-        K::PistonBase { .. } => "BlockPistonBase.onNeighborBlockChange",
-        K::PistonExtension => "BlockPistonExtension.onNeighborBlockChange",
-        K::PistonMoving => "BlockPistonMoving.onNeighborBlockChange",
+        // src: BlockPistonBase.java:52-57
+        K::PistonBase { .. } => {
+            return super::piston_base::on_neighbor_block_change(world, id, x, y, z);
+        }
+        // src: BlockPistonExtension.java:145-154
+        K::PistonExtension => {
+            return super::piston_extension::on_neighbor_block_change(world, x, y, z, neighbor_id);
+        }
+        // src: BlockPistonMoving.java:70-74
+        K::PistonMoving => return super::piston_moving::on_neighbor_block_change(world, x, y, z),
         // src: BlockTNT.java:27-33
         K::Tnt => return super::tnt::on_neighbor_block_change(world, x, y, z, neighbor_id),
         // src: BlockTorch.java:94-124
@@ -882,7 +935,10 @@ pub fn get_collision_bounding_box_from_pool(
         K::Rail { .. } | K::DetectorRail => return None,
         // src: BlockWeb.java:18-20
         K::Web => return super::web::get_collision_bounding_box_from_pool(),
-        K::PistonMoving => "BlockPistonMoving.getCollisionBoundingBoxFromPool",
+        // src: BlockPistonMoving.java:80-92
+        K::PistonMoving => {
+            return super::piston_moving::get_collision_bounding_box_from_pool(world, x, y, z);
+        }
         // src: BlockTorch.java:11-13
         K::Torch | K::RedstoneTorch { .. } => return None,
         // src: BlockFire.java:31-33
@@ -954,8 +1010,18 @@ pub fn get_colliding_bounding_boxes(
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::PistonBase { .. } => Some("BlockPistonBase.getCollidingBoundingBoxes"),
-        K::PistonExtension => Some("BlockPistonExtension.getCollidingBoundingBoxes"),
+        // src: BlockPistonBase.java:207-210
+        K::PistonBase { .. } => {
+            return super::piston_base::get_colliding_bounding_boxes(
+                world, id, x, y, z, mask, list,
+            );
+        }
+        // src: BlockPistonExtension.java:78-119
+        K::PistonExtension => {
+            return super::piston_extension::get_colliding_bounding_boxes(
+                world, id, x, y, z, mask, list,
+            );
+        }
         // src: BlockStairs.java:42-67
         K::Stairs { .. } => {
             return super::stairs::get_colliding_bounding_boxes(world, id, x, y, z, mask, list);
@@ -986,8 +1052,10 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         K::Rail { .. } | K::DetectorRail => {
             return super::rail::can_place_block_at(world, x, y, z);
         }
-        K::PistonExtension => Some("BlockPistonExtension.canPlaceBlockAt"),
-        K::PistonMoving => Some("BlockPistonMoving.canPlaceBlockAt"),
+        // src: BlockPistonExtension.java:66-68
+        K::PistonExtension => return super::piston_extension::can_place_block_at(),
+        // src: BlockPistonMoving.java:28-30
+        K::PistonMoving => return super::piston_moving::can_place_block_at(),
         // src: BlockTorch.java:31-43
         K::Torch | K::RedstoneTorch { .. } => {
             return super::torch::can_place_block_at(world, x, y, z);
@@ -1056,8 +1124,10 @@ pub fn can_place_block_on_side(
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
     let what = match b.kind {
-        K::PistonExtension => Some("BlockPistonExtension.canPlaceBlockOnSide"),
-        K::PistonMoving => Some("BlockPistonMoving.canPlaceBlockOnSide"),
+        // src: BlockPistonExtension.java:70-72
+        K::PistonExtension => return super::piston_extension::can_place_block_on_side(),
+        // src: BlockPistonMoving.java:32-34
+        K::PistonMoving => return super::piston_moving::can_place_block_on_side(),
         // src: BlockLever.java:24-36
         K::Lever => return super::lever::can_place_block_on_side(world, x, y, z, side),
         // src: BlockButton.java:27-37
@@ -1089,8 +1159,10 @@ pub fn block_activated(
         K::Note => "BlockNote.blockActivated",
         // src: BlockBed.java:14-83
         K::Bed => return super::bed::block_activated(world, id, x, y, z, player),
-        K::PistonBase { .. } => "BlockPistonBase.blockActivated",
-        K::PistonMoving => "BlockPistonMoving.blockActivated",
+        // src: BlockPistonBase.java:39-41
+        K::PistonBase { .. } => return super::piston_base::block_activated(),
+        // src: BlockPistonMoving.java:48-55
+        K::PistonMoving => return super::piston_moving::block_activated(world, x, y, z),
         // src: BlockTNT.java:66-68
         K::Tnt => return super::tnt::block_activated(),
         // src: BlockStairs.java:158-160 (modelBlock.blockActivated)
@@ -1251,17 +1323,26 @@ pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i3
         K::Rail { .. } | K::DetectorRail => {
             return super::rail::set_block_bounds_based_on_state(world, id, x, y, z);
         }
-        K::PistonBase { .. } => "BlockPistonBase.setBlockBoundsBasedOnState",
+        // src: BlockPistonBase.java:175-201
+        K::PistonBase { .. } => {
+            return super::piston_base::set_block_bounds_based_on_state(world, id, x, y, z);
+        }
         // src: BlockSnow.java:25-29
         K::Snow => return super::snow::set_block_bounds_based_on_state(world, id, x, y, z),
         // src: BlockDoor.java:60-62
         K::Door => return super::door::set_block_bounds_based_on_state(world, id, x, y, z),
         // src: BlockCake.java:11-17
         K::Cake => return super::cake::set_block_bounds_based_on_state(world, id, x, y, z),
-        K::PistonExtension => "BlockPistonExtension.setBlockBoundsBasedOnState",
+        // src: BlockPistonExtension.java:121-143
+        K::PistonExtension => {
+            return super::piston_extension::set_block_bounds_based_on_state(world, id, x, y, z);
+        }
         // src: BlockLever.java:131-147
         K::Lever => return super::lever::set_block_bounds_based_on_state(world, id, x, y, z),
-        K::PistonMoving => "BlockPistonMoving.setBlockBoundsBasedOnState",
+        // src: BlockPistonMoving.java:94-117
+        K::PistonMoving => {
+            return super::piston_moving::set_block_bounds_based_on_state(world, x, y, z);
+        }
         K::Sign { .. } => "BlockSign.setBlockBoundsBasedOnState",
         // src: BlockPressurePlate.java:122-131
         K::PressurePlate { .. } => {
@@ -1548,7 +1629,8 @@ pub fn play_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, a: i32, b2
     use BlockKind as K;
     let what = match b.kind {
         K::Note => "BlockNote.playBlock",
-        K::PistonBase { .. } => "BlockPistonBase.playBlock",
+        // src: BlockPistonBase.java:112-173
+        K::PistonBase { .. } => return super::piston_base::play_block(world, id, x, y, z, a, b2),
         _ => return,
     };
     untranscribed(world, what);
@@ -1818,7 +1900,10 @@ pub fn drop_block_as_item_with_chance(
             }
             None
         }
-        K::PistonMoving => Some("BlockPistonMoving.dropBlockAsItemWithChance"),
+        // src: BlockPistonMoving.java:61-68
+        K::PistonMoving => {
+            return super::piston_moving::drop_block_as_item_with_chance(world, x, y, z);
+        }
         // src: BlockStairs.java:146-148 (modelBlock.dropBlockAsItemWithChance)
         K::Stairs { model_block } => {
             return drop_block_as_item_with_chance(world, model_block, x, y, z, meta, chance);
@@ -2062,7 +2147,10 @@ pub fn set_block_bounds_for_item_render(world: &mut World, id: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::PistonBase { .. } => "BlockPistonBase.setBlockBoundsForItemRender",
+        // src: BlockPistonBase.java:203-205
+        K::PistonBase { .. } => {
+            return super::piston_base::set_block_bounds_for_item_render(world, id);
+        }
         // src: BlockPressurePlate.java:149-154
         K::PressurePlate { .. } => {
             return super::pressure_plate::set_block_bounds_for_item_render(world, id);
@@ -2155,7 +2243,10 @@ pub fn on_block_placed_by(world: &mut World, id: i32, x: i32, y: i32, z: i32, pl
     use BlockKind as K;
     let what = match b.kind {
         K::Dispenser => "BlockDispenser.onBlockPlacedBy",
-        K::PistonBase { .. } => "BlockPistonBase.onBlockPlacedBy",
+        // src: BlockPistonBase.java:43-50
+        K::PistonBase { .. } => {
+            return super::piston_base::on_block_placed_by(world, x, y, z, placer);
+        }
         // src: BlockStairs.java:166-184
         K::Stairs { .. } => return super::stairs::on_block_placed_by(world, x, y, z, placer),
         K::Furnace { .. } => "BlockFurnace.onBlockPlacedBy",
