@@ -88,6 +88,8 @@ const COVERED_IN_GOLDEN_TICK: &[(&str, &str)] = &[
     ("tick", "dungeon-chest-save"),
     ("entity", "sheep-shear"),
     ("entity", "wolf-pack-retaliates"),
+    ("tick", "chest-container-clicks"),
+    ("tick", "furnace-dispenser-clicks"),
 ];
 
 #[test]

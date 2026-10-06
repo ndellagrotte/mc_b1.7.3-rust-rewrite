@@ -216,6 +216,11 @@ fixtures! {
     tick_rail_slope_bounds => "tick" / "rail-slope-bounds";
     tick_powered_rail_chain => "tick" / "powered-rail-chain";
     tick_powered_rail_lever => "tick" / "powered-rail-lever";
+    // WP-2.5b: crafting, containers and slot clicks.
+    tick_craft_ops => "tick" / "craft-ops";
+    tick_inventory_slot_clicks => "tick" / "inventory-slot-clicks";
+    tick_chest_container_clicks => "tick" / "chest-container-clicks";
+    tick_furnace_dispenser_clicks => "tick" / "furnace-dispenser-clicks";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test
