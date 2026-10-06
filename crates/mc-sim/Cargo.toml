@@ -17,5 +17,6 @@ workspace = true
 # tests/golden_tick.rs: the golden-fixture runner and tick driver (a dev-only
 # cycle, mc-golden depends on mc-sim; cargo allows it for dev-dependencies).
 mc-golden = { path = "../mc-golden" }
-# tests/golden_block_table.rs builds its trace lines as JSON values.
+# tests/golden_block_table.rs builds its trace lines as JSON values;
+# tests/golden_item_table.rs reads the scenario\'s kind-specific fields.
 serde_json.workspace = true

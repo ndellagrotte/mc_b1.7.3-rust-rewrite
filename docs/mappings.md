@@ -35,6 +35,7 @@ mixed-case originals).
 | `World.func_27163_E` | `World::func_27163_e` | Starts rain/thunder strength at 1 if `WorldInfo` says it is raining (World.java:1782-1790) |
 | `World.func_698_b` | `World::func_698_b` | A tile entity's inventory changed: marks the chunk modified and notifies listeners (World.java:2053-2062; called from `TileEntity.onInventoryChanged`, TileEntity.java:70-74) |
 | `World.field_28108_z` | — (not ported yet) | `MapStorage` for map items (World.java:46); WP-2.6 |
+| `BlockStep.field_22037_a` | `item::BLOCK_STEP_FIELD_22037_A` | `static final String[] {"stone", "sand", "wood", "cobble"}`: the slab type names by metadata, read only by `ItemSlab.getItemNameIS` as `"tile.stoneSlab." + field_22037_a[damage]` (BlockStep.java:6, ItemSlab.java:18-20). Kept because the block module may want it under its own name (WP-1.1); the item module needs it for item names |
 | `World.field_1012_M` | — (local `Vec`) | Scratch list returned by `getEntitiesWithinAABBExcludingEntity` (World.java:55, :2013-2029) |
 | `Entity.field_9293_aM` | `EntityBase::field_9293_a_m` | When false, a collision on any axis zeroes the whole move (Entity.java:348-377, :398-428); initialised true (:83) and never cleared in vanilla |
 | `EntityItem.field_803_e` | `ItemData::field_803_e` | Incremented every tick (EntityItem.java:71), never read |
@@ -57,6 +58,15 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `NextTickListEntry.nextTickEntryID` (static) | `World::next_tick_entry_id` | as above |
 | `World.lightingUpdatesScheduled` (static) | `World::lighting_updates_scheduled` | as above |
 | `Block.blocksList` | `block::BLOCKS` / `block::block(id)` | immutable table; run-time-mutable block state is `World::block_statics` |
+| `Item.itemsList` | `item::ITEMS` (ids 0..360), `item::RECORDS` (2256, 2257), `item::item(id)` | immutable table built at compile time (WP-1.2); the 32000-slot array is not materialised |
+| `Item` subclass instance fields (`ItemTool.toolMaterial`, `ItemFood.healAmount`, `ItemBlock.blockID`, …) | `item::ItemKind` variant fields (`ToolData`, `FoodData`, `block_id`, …) | one variant per instantiated class, as `BlockKind` |
+| `Item.itemName` | `ItemDef::item_name` (the `setItemName` argument) | stored without the `"item."` prefix, like `BlockDef::block_name`; `get_item_name()` adds it |
+| `Item.containerItem` | `ItemDef::container_item: Option<i32>` | the container's `shiftedIndex` instead of the `Item` reference |
+| `Item.getStrVsBlock(stack, block)`, `Item.getDamageVsEntity(entity)` | `ItemDef::get_str_vs_block(block)`, `ItemDef::get_damage_vs_entity()` | the unused stack/entity parameters are dropped (no override reads them) |
+| `ItemStack(NBTTagCompound)`, `ItemStack.writeToNBT(c)` | `ItemStack::from_nbt`, `ItemStack::write_to_nbt_into(map)` / `write_to_nbt()` | Rust NBT is a value tree (`mc_nbt::Tag`); `ClassCastException` is `JavaException::ClassCast` |
+| `ItemStack.damageItem(n, entity)` | `ItemStack::damage_item(n) -> bool` | returns "broke"; the caller adds `StatList.objectBreakStats` for players (ItemStack.java:128-130) |
+| `ItemStack.toString()` | `ItemStack::java_to_string()` | not `Display`, to keep the Java format explicit |
+| `Block.getBlockTextureFromSide`, `Block.getBlockTextureFromSideAndMetadata` | `item::block_texture::get_block_texture_from_side(id, side)`, `…_and_metadata(id, side, meta)` | free functions over the block id, in the item module until the block module has them (WP-1.2 report) |
 | `EntityPlayerSP` (class) | `EntityKindData::PlayerSp` | Rust casing |
 | `Block.<instance field>` of a mutable singleton (`BlockFlowing.numAdjacentSources`/`isOptimalFlowDirection`/`flowCost`, `BlockLeaves.adjacentTreeBlocks`, `BlockPistonBase.ignoreUpdates`, `BlockPistonExtension.headTexture`, `BlockRedstoneWire.wiresProvidePower`/`blocksNeedingUpdate`) | `BlockStatics::<singleton>_<field>` (`water_moving`/`lava_moving: FlowingScratch`, `leaves_adjacent_tree_blocks`, `piston_sticky_base_ignore_updates`, `piston_base_ignore_updates`, `piston_extension_head_texture`, `redstone_wire_wires_provide_power`, `redstone_wire_blocks_needing_update`) | run-time state of a singleton is world state (`block` module docs); the prefix is the `Block` static that holds the singleton |
 | `BlockFire.chanceToEncourageFire` / `abilityToCatchFire` (instance fields of `Block.fire`) | `block::CHANCE_TO_ENCOURAGE_FIRE` / `block::ABILITY_TO_CATCH_FIRE` | written once by `initializeBlock` (BlockFire.java:14-24), so immutable data |
