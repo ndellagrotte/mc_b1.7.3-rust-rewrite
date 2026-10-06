@@ -18,6 +18,7 @@ import net.minecraft.src.EntityItem;
 import net.minecraft.src.EntityList;
 import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EntitySlime;
+import net.minecraft.src.Explosion;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
 import net.minecraft.src.MathHelper;
@@ -34,7 +35,7 @@ final class TickScenario {
     private TickScenario() {}
 
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
-            "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save");
+            "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
             "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather");
 
@@ -272,6 +273,9 @@ final class TickScenario {
             case "attack":
                 attack(hw, op, l);
                 break;
+            case "explode":
+                explode(hw, op, l);
+                break;
             case "save":
                 trace.add(l);
                 TierS.save(hw, op, t, trace);
@@ -429,6 +433,32 @@ final class TickScenario {
         } else {
             l.put("via", "direct").put("result", target.attackEntityFrom(attacker, i(op, "damage")));
         }
+    }
+
+    /**
+     * {@code World.createExplosion(null, x, y, z, size)} (World.java:1518-1520), or with
+     * {@code "flaming": true} the body of {@code World.newExplosion(null, x, y, z, size, true)}
+     * (World.java:1522-1528) with the explosion's {@code ExplosionRNG} (Explosion.java:11, a
+     * clock-seeded {@code new Random()}, census §2) set to {@code mix(seed, -6)} before
+     * {@code doExplosionA}, the only method that draws it (the fire roll, Explosion.java:118).
+     * No exploder: nothing is excluded from the entity pass and the attacker is null.
+     */
+    private static void explode(HarnessWorld hw, Map<String, Object> op, Json.Line l) {
+        World w = hw.world;
+        double x = Num.f64(op.get("x")), y = Num.f64(op.get("y")), z = Num.f64(op.get("z"));
+        float size = Num.f32(op.get("size"));
+        boolean flaming = op.containsKey("flaming") && bool(op, "flaming");
+        Explosion e;
+        if (!flaming) {
+            e = w.createExplosion(null, x, y, z, size);
+        } else {
+            e = new Explosion(w, null, x, y, z, size);
+            e.isFlaming = true;
+            ((Random) Reflect.get(Explosion.class, "ExplosionRNG", e)).setSeed(HarnessWorld.mix(hw.seed, -6));
+            e.doExplosionA();
+            e.doExplosionB(true);
+        }
+        l.put("destroyed", e.destroyedBlockPositions.size());
     }
 
     // ---- dumps ------------------------------------------------------------------

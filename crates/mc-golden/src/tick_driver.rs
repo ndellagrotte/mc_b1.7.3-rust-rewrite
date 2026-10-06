@@ -49,6 +49,7 @@
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `spawn` `Item` | [`new_entity_item`], `delayBeforeCanPickup = pickup_delay` (10), [`World::spawn_entity_in_world`] → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
+//! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
 //! | `block` / `block_box` | [`World::block_dump`] |
@@ -579,6 +580,22 @@ fn apply(
                 "EntityPlayer.attackTargetEntityWithCurrentItem and \
                  EntityLiving.attackEntityFrom are not transcribed (WP-2.2, WP-2.5)",
             ));
+        }
+        OpKind::Explode {
+            x,
+            y,
+            z,
+            size,
+            flaming,
+        } => {
+            // src: World.java:1518-1528 (TickScenario.explode: the flaming case
+            // seeds ExplosionRNG with mix(seed, -6), as Explosion::new does)
+            let e = if flaming {
+                world.new_explosion(None, x, y, z, size, true)
+            } else {
+                world.create_explosion(None, x, y, z, size)
+            };
+            line("explode").with("destroyed", e.destroyed_block_positions.len() as u64)
         }
         OpKind::Save { .. } => {
             return Err(unsupported(

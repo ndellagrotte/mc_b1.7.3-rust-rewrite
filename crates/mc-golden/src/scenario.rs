@@ -498,6 +498,26 @@ pub enum OpKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         damage: Option<i32>,
     },
+    /// `World.createExplosion(null, x, y, z, size)`, or with `flaming` the
+    /// body of `World.newExplosion(null, x, y, z, size, true)` with the
+    /// explosion's `ExplosionRNG` seeded `mix(seed, -6)` (WP-1.8).
+    Explode {
+        /// Centre x.
+        #[serde(with = "flex::f64")]
+        x: f64,
+        /// Centre y.
+        #[serde(with = "flex::f64")]
+        y: f64,
+        /// Centre z.
+        #[serde(with = "flex::f64")]
+        z: f64,
+        /// `explosionSize` (`f32`).
+        #[serde(with = "flex::f32")]
+        size: f32,
+        /// `isFlaming`, default false.
+        #[serde(default)]
+        flaming: bool,
+    },
     /// `World.saveWorld(true, null)` then the Tier S dumps (needs
     /// `save_format: "mcregion"`).
     Save {

@@ -522,7 +522,9 @@ port: an entity's `rand` is seeded with `mix(seed, id)` when it is constructed a
 again whenever it joins. Entity ids count from 0 per scenario in construction order.
 Singletons: `Item.itemRand` = `mix(seed, -1)`, `Block.chest`'s = `mix(seed, -2)`,
 `Block.stoneOvenIdle`'s = `mix(seed, -3)`, `Block.stoneOvenActive`'s = `mix(seed, -4)`,
-`Block.dispenser`'s = `mix(seed, -5)`. The `Math.random()` stream is
+`Block.dispenser`'s = `mix(seed, -5)`; an `explode` op's `ExplosionRNG` = `mix(seed, -6)`
+(the port seeds every explosion's so; a `TileEntityDispenser`'s own `Random` has no hook
+and is `mix(seed, -7)` in the port only, census §2). The `Math.random()` stream is
 `JavaRandom::new(seed)`, drawn only at census §1's S and D sites.
 
 **Tick loop.** Before tick 0 the implicit preload runs (below) and emits
@@ -571,6 +573,7 @@ were not loaded yet (population and moving entities may load more).
 | `set_rotation` | `id`, `yaw`, `pitch` | assigns `rotationYaw`/`rotationPitch` (no `% 360`) | `id` |
 | `use_item` | `item_id?`, `count?` (1), `meta?` (0), `x,y,z,side` | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-block branch of `Minecraft.clickMouse(1)` (Minecraft.java:819-850) with the op's hit instead of a ray trace: `PlayerController.sendPlaceBlock` (PlayerController.java:75-82: the block's `blockActivated`, else `ItemStack.useItem` → `Item.onItemUse`); on success `swingItem`; a stack left at size 0 is removed; if nothing was placed, `sendUseItem` (`useItemRightClick`, PlayerController.java:47-61) | `placed`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `attack` | `target_id`, `attacker_id?`, `damage` (unless the attacker is the player) | attacker = the player: `swingItem` then `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814, PlayerController.java:92-94). Otherwise `target.attackEntityFrom(attacker or null, damage)` (Entity.java:746, EntityLiving.java:307) | `target_id`, `via` (`player` \| `direct`), `result` (direct only) |
+| `explode` | `x,y,z` (f64: integer or bit pattern), `size` (f32), `flaming?` (false) | `World.createExplosion(null, x, y, z, size)` (World.java:1518-1520: `newExplosion(…, false)`, Explosion.java:29-164). With `flaming`: the body of `World.newExplosion(null, x, y, z, size, true)` (World.java:1522-1528) with the explosion's `ExplosionRNG` (a clock-seeded `new Random()`, Explosion.java:11, census §2) set to `mix(seed, -6)` before `doExplosionA`; only the fire roll draws it (Explosion.java:118). No exploder: no entity is excluded, the attacker is null. Not part of the implicit preload (WP-1.8) | `destroyed` (size of `destroyedBlockPositions`) |
 | `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` | — then the Tier S lines |
 
 **Dumps.** A dump never loads a chunk; reading an unloaded one is a scenario error.
@@ -916,6 +919,35 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   `tryToCreatePortal`) need the redstone and fire tasks, both in.
 - Ignored on the Rust side until their dependencies land: `tick/bed-nether` (`Explosion`),
   `tick/block-item-placement` (`ItemBlock` and the other placing items, WP-2.6).
+
+Tile entities, container blocks and explosions (WP-1.8), empty world, seed 123, the stone
+platform at y = 60 (none needs a player unless it says so):
+
+- `tick/chest-double-and-break` (player): two chests side by side, `use_item` on one with an
+  empty hand (`BlockChest.blockActivated`), two chest placements next to the pair refused by
+  `BlockChest.canPlaceBlockAt`, then both broken with `set_block` air (an empty inventory
+  scatters nothing). `rng_state` and `block_box` every tick.
+- `tick/note-jukebox-activate` (player): `use_item` on note blocks (`BlockNote.blockActivated`:
+  pitch and `playNoteAt`, true) and an empty jukebox (`blockActivated` false).
+- `tick/furnace-idle`, `tick/dispenser-idle`: furnaces / dispensers placed next to stones,
+  facing from `setDefaultDirection` / `setDispenserDefaultDirection`, one removed, a neighbour
+  change; a lit furnace stays lit without fuel.
+- `tick/dispenser-dispense-item`: a dispenser powered by a redstone torch placed with
+  metadata 1 next to it: `onNeighborBlockChange` schedules, `updateTick` dispenses from an empty
+  inventory (no op can fill one): the 1001 click. Needs the redstone torch in a port.
+- `tick/explosion-crater`: the `explode` op (size 4) over dirt on stone with a sand column, an
+  obsidian wall and three `EntityItem`s (one destroyed, one shielded, one out of range): rays,
+  `destroyedBlockPositions` order, entity damage and knockback, drops, falling sand.
+- `tick/explosion-fire`: a flaming `explode` (size 3): the fires `doExplosionA` sets are cleared
+  again by `doExplosionB` (no fire is left; their scheduled ticks are). Needs `BlockFire` in a port.
+- `tick/mob-spawner-delay` (player): a mob spawner counting down its 20 ticks (three `World.rand`
+  draws per tick); `tick/mob-spawner-spawn` continues into the spawn attempts (needs the
+  `EntityPig` constructor in a port).
+- `tick/sign-pops-off`: wall signs and a sign post losing their support (`BlockSign.onNeighborBlockChange`
+  drops an `Item.sign`), a wall sign with metadata 0 dropping at the first neighbour change.
+- `save/tile-entities` (Tier S, player): one tile entity of each class in chunk (0, 0), the note
+  block clicked twice, then `save`: the `chunk_nbt` `TileEntities` list and the `tile_entity` lines
+  pin every `writeToNBT` shape and the `chunkTileEntityMap` order.
 
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike

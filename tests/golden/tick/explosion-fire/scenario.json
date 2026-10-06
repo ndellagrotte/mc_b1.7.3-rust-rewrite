@@ -1,0 +1,9 @@
+{"name":"explosion-fire","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":20,
+ "mob_spawning":"none",
+ "comment":"WP-1.8 flaming Explosion: the explode op with flaming (World.newExplosion(null, 0.5, 61.5, 0.5, 3, true), ExplosionRNG seeded mix(seed, -6)) at t=1 over a stone floor (y 57-60). doExplosionA places fire (setBlockWithNotify, BlockFire.onBlockAdded) on destroyed positions that are already air above an opaque block, 1 in 3 from ExplosionRNG; doExplosionB then clears every destroyed position again, those fires included (vanilla order: the fire is set before the blocks are removed). scheduled_ticks (full) pins where the fires were (their scheduled ticks stay), rng_state every tick, block_box at t=1 and the end. Needs BlockFire (fire task of WP-1.6) in the port.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":57,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":1,"op":"explode","x":"0x3fe0000000000000","y":"0x404ec00000000000","z":"0x3fe0000000000000","size":3,"flaming":true}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"scheduled_ticks","full":true},
+          {"t":1,"what":"block_box","x0":-6,"y0":56,"z0":-6,"x1":6,"y1":63,"z1":6},
+          {"t":19,"what":"block_box","x0":-6,"y0":56,"z0":-6,"x1":6,"y1":63,"z1":6}]}

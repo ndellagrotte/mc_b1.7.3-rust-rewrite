@@ -1,0 +1,7 @@
+{"name":"mob-spawner-spawn","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":26,
+ "mob_spawning":"none",
+ "comment":"WP-1.8 TileEntityMobSpawner spawn attempts: tick/mob-spawner-delay run past the count-down. From t=20 every tick makes four attempts: EntityList.createEntityInWorld(\"Pig\") (an EntityPig: an entity id and EntityLiving's Math.random draws), getEntitiesWithinAABB, the placement draws (two nextDouble pairs, nextInt(3), nextFloat yaw), getCanSpawnHere (an animal needs grass: false on stone), so nothing joins and delay stays 0. rng_state and entity_state every tick. Needs the EntityPig constructor (WP-2.3) in the port.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0xc012000000000000"},
+        {"t":0,"op":"set_block","x":3,"y":61,"z":3,"id":52}],
+ "dumps":[{"every":1,"what":"rng_state"}]}

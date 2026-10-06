@@ -86,7 +86,7 @@ Consequences:
 | BlockFurnace.java:6 | clock, two singletons | `Block.stoneOvenIdle` / `stoneOvenActive` `furnaceRand`, `mix(seed, -3)` / `mix(seed, -4)` (drop scatter, :159-174) |
 | BlockDispenser.java:6 | clock, singleton | `Block.dispenser.random`, `mix(seed, -5)` (dispensed item velocity, :187-202) |
 | TileEntityDispenser.java:7 | clock, per tile entity | **gap**: which slot fires (:44). No harness hook at tile-entity creation; dispenser scenarios are not reproducible |
-| Explosion.java:11 | clock, per explosion | **gap**: only used for `isFlaming` fire placement (:118), i.e. ghast fireballs; TNT and creeper explosions do not draw it |
+| Explosion.java:11 | clock, per explosion | only used for `isFlaming` fire placement (:118), i.e. ghast fireballs and beds in the Nether; TNT and creeper explosions do not draw it. The `explode` op (WP-1.8) seeds it with `mix(seed, -6)`; still a **gap** for explosions made by entities |
 | Teleporter.java:6 | clock | portal placement orientation (:88); reached only through `Minecraft.usePortal` (client), which the harness never calls |
 | MapGenBase.java:7 | clock, then `setSeed` | reseeded from the world seed before every use (MapGenBase.java:11, :17): deterministic |
 | WorldGenBigTree.java:7 | clock, then `setSeed` | `setSeed(rand.nextLong())` in `generate` before use (:334): deterministic |

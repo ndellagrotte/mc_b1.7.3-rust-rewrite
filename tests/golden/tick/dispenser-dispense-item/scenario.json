@@ -1,0 +1,11 @@
+{"name":"dispenser-dispense-item","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":12,
+ "mob_spawning":"none",
+ "comment":"WP-1.8 BlockDispenser powered by a redstone torch. A dispenser at (0,61,0) (facing 3); at t=2 a lit redstone torch (76) at (-1,61,0) with metadata 1, attached to a stone at (-2,61,0) (metadata given, so BlockTorch.onBlockAdded keeps it). BlockRedstoneTorch.onBlockAdded notifies around it; the dispenser's onNeighborBlockChange sees a power source and isBlockIndirectlyGettingPowered (the torch powers side 4) and schedules a tick (tickRate 4); updateTick then dispenseItem: the inventory is empty (no op can fill a tile entity), so getRandomStackFromInventory draws nothing and the result is the 1001 click. scheduled_ticks (full) and rng_state every tick. Needs BlockRedstoneTorch (redstone task of WP-1.6) in the port.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"set_block","x":-2,"y":61,"z":0,"id":1},
+        {"t":1,"op":"set_block","x":0,"y":61,"z":0,"id":23},
+        {"t":2,"op":"set_block","x":-1,"y":61,"z":0,"id":76,"meta":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"scheduled_ticks","full":true},
+          {"every":1,"what":"power","x":0,"y":61,"z":0},
+          {"t":11,"what":"block_box","x0":-3,"y0":61,"z0":-1,"x1":1,"y1":62,"z1":1}]}

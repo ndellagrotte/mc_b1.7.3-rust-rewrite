@@ -151,6 +151,9 @@ pub fn update_furnace_block_state(var0: bool, world: &mut World, x: i32, y: i32,
         world.set_block_with_notify(x, y, z, STONE_OVEN_IDLE);
     }
     world.block_statics.keep_furnace_inventory = false;
+    // vanilla bug: the new block's onBlockAdded made a second TileEntityFurnace,
+    // which setBlockTileEntity below replaces in the chunk map but which stays in
+    // loadedTileEntityList, ticking an empty furnace at this position.
     world.set_block_metadata_with_notify(x, y, z, var5);
     // `var6.validate()`: a missing tile entity would throw here in Java.
     if let Some(r) = var6 {

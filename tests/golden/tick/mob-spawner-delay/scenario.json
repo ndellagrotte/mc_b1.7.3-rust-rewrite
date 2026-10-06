@@ -1,0 +1,8 @@
+{"name":"mob-spawner-delay","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":20,
+ "mob_spawning":"none",
+ "comment":"WP-1.8 TileEntityMobSpawner count-down: a mob spawner (52) at (3,61,3) on the stone platform, a player 16 blocks or nearer from t=0. Every tick TileEntityMobSpawner.updateEntity draws three World.rand floats (particle position) and counts delay down from 20; t=0..19 are exactly the 20 count-down updates, so no spawn attempt is made (the first is at t=20, tick/mob-spawner-spawn). rng_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0xc012000000000000"},
+        {"t":0,"op":"set_block","x":3,"y":61,"z":3,"id":52}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"t":19,"what":"block","x":3,"y":61,"z":3}]}

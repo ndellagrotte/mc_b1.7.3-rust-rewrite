@@ -219,6 +219,10 @@ impl Explosion {
         self.explosion_size = var1;
 
         // src: Explosion.java:108-122
+        // vanilla bug: the fire goes only on positions in destroyedBlockPositions, and
+        // doExplosionB (run next by newExplosion) clears every one of them, fire
+        // included, so a flaming explosion leaves no fire (only the fires' scheduled
+        // ticks; tests/golden/tick/explosion-fire).
         if self.is_flaming {
             let var32: Vec<ChunkPosition> =
                 self.destroyed_block_positions.iter().copied().collect();

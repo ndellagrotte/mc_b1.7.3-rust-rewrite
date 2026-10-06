@@ -81,7 +81,20 @@ fixtures! {
     #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then population (WP-1.7); BlockSapling.growTree is in (WP-1.6)"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     tick_cactus_reed_growth => "tick" / "cactus-reed-growth";
+    tick_chest_double_and_break => "tick" / "chest-double-and-break";
     tick_crops_growth => "tick" / "crops-growth";
+    #[ignore = "BlockRedstoneTorch (redstone task of WP-1.6c): first diff line 13 (t=2 scheduled_ticks, field blake3: the torch's onBlockAdded/canProvidePower are recorded arms, so the dispenser schedules no tick); lines 1-12 match"]
+    tick_dispenser_dispense_item => "tick" / "dispenser-dispense-item";
+    tick_dispenser_idle => "tick" / "dispenser-idle";
+    tick_explosion_crater => "tick" / "explosion-crater";
+    #[ignore = "BlockFire (fire task of WP-1.6b): first diff line 7 (t=1 scheduled_ticks, field blake3: BlockFire.onBlockAdded is a recorded arm, so the fires set by doExplosionA schedule no tick; doExplosionB removes those fires again in both engines); lines 1-6 (incl. the t=1 rng_state after the explosion) match"]
+    tick_explosion_fire => "tick" / "explosion-fire";
+    tick_furnace_idle => "tick" / "furnace-idle";
+    tick_mob_spawner_delay => "tick" / "mob-spawner-delay";
+    #[ignore = "EntityPig(World) constructor (WP-2.3; TileEntityMobSpawner records EntityList.createEntityInWorld and returns): first diff line 25 (t=20 rng_state, field math_random: EntityLiving's constructor draws); lines 1-24 (the count-down) match"]
+    tick_mob_spawner_spawn => "tick" / "mob-spawner-spawn";
+    tick_note_jukebox_activate => "tick" / "note-jukebox-activate";
+    tick_sign_pops_off => "tick" / "sign-pops-off";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
     tick_fire_burnout_stone => "tick" / "fire-burnout-stone";
