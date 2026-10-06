@@ -10,7 +10,7 @@
 //!   `getEffectiveFlowDecay`, `getIsBlockSolid`, `shouldSideBeRendered`,
 //!   `getCollisionBoundingBoxFromPool`, `getFlowVector`,
 //!   `velocityToAddToEntity`, `getBlockBrightness`, `randomDisplayTick`, the
-//!   static `getFlowDirection` (the renderer's and `EntityBoat`'s), `onBlockAdded`,
+//!   static `getFlowDirection` (RenderBlocks.java:1517), `onBlockAdded`,
 //!   `onNeighborBlockChange`, `checkForHarden`, `triggerLavaMixEffects`.
 //!   `canCollideCheck` is in [`super::dispatch::can_collide_check`]; the
 //!   constant and field-read methods (`getBlockTextureFromSide`,
@@ -326,8 +326,8 @@ pub fn random_display_tick(
 }
 
 /// `BlockFluid.getFlowDirection(blockAccess, x, y, z, material)` (static):
-/// the flow angle the renderer turns the fluid texture by (and `EntityBoat`
-/// reads nothing of it), `-1000` for no horizontal flow. Computed with the
+/// the flow angle the renderer turns the fluid texture by
+/// (RenderBlocks.java:1517), `-1000` for no horizontal flow. Computed with the
 /// `Block.waterMoving` / `Block.lavaMoving` singleton. `None` for another
 /// material, where Java throws a `NullPointerException` (no caller passes
 /// one).
