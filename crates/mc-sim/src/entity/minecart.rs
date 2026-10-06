@@ -491,25 +491,25 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
             }
         }
 
-        let var25;
         let var27 = var1 as f64 + 0.5 + var14[0][0] as f64 * 0.5;
         let var29 = var3 as f64 + 0.5 + var14[0][2] as f64 * 0.5;
         let var31 = var1 as f64 + 0.5 + var14[1][0] as f64 * 0.5;
         let var33 = var3 as f64 + 0.5 + var14[1][2] as f64 * 0.5;
         var15 = var31 - var27;
         var17 = var33 - var29;
-        if var15 == 0.0 {
+        // `var25`: the position along the track (Java declares it 0.0 first).
+        let var25 = if var15 == 0.0 {
             b.pos_x = var1 as f64 + 0.5;
-            var25 = b.pos_z - var3 as f64;
+            b.pos_z - var3 as f64
         } else if var17 == 0.0 {
             b.pos_z = var3 as f64 + 0.5;
-            var25 = b.pos_x - var1 as f64;
+            b.pos_x - var1 as f64
         } else {
             let var35 = b.pos_x - var27;
             let var37 = b.pos_z - var29;
-            let var39 = (var35 * var15 + var37 * var17) * 2.0;
-            var25 = var39;
-        }
+            // var39
+            (var35 * var15 + var37 * var17) * 2.0
+        };
         b.pos_x = var27 + var15 * var25;
         b.pos_z = var29 + var17 * var25;
         let (x, y, z) = (b.pos_x, b.pos_y + b.y_offset as f64, b.pos_z);
@@ -817,7 +817,6 @@ pub fn get_pos(world: &mut World, mut var1: f64, mut var3: f64, mut var5: f64) -
         var3 = (var8 + 1) as f64;
     }
     let var12 = MATRIX[var11 as usize];
-    let var13;
     let var15 = var7 as f64 + 0.5 + var12[0][0] as f64 * 0.5;
     let var17 = var8 as f64 + 0.5 + var12[0][1] as f64 * 0.5;
     let var19 = var9 as f64 + 0.5 + var12[0][2] as f64 * 0.5;
@@ -827,18 +826,19 @@ pub fn get_pos(world: &mut World, mut var1: f64, mut var3: f64, mut var5: f64) -
     let var27 = var21 - var15;
     let var29 = (var23 - var17) * 2.0;
     let var31 = var25 - var19;
-    if var27 == 0.0 {
+    // `var13`: the position along the track (Java declares it 0.0 first).
+    let var13 = if var27 == 0.0 {
         var1 = var7 as f64 + 0.5;
-        var13 = var5 - var9 as f64;
+        var5 - var9 as f64
     } else if var31 == 0.0 {
         var5 = var9 as f64 + 0.5;
-        var13 = var1 - var7 as f64;
+        var1 - var7 as f64
     } else {
         let var33 = var1 - var15;
         let var35 = var5 - var19;
-        let var37 = (var33 * var27 + var35 * var31) * 2.0;
-        var13 = var37;
-    }
+        // var37
+        (var33 * var27 + var35 * var31) * 2.0
+    };
     var1 = var15 + var27 * var13;
     var3 = var17 + var29 * var13;
     var5 = var19 + var31 * var13;

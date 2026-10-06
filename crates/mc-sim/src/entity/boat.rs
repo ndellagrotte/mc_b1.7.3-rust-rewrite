@@ -228,6 +228,7 @@ pub fn set_velocity(e: &mut Entity, var1: f64, var3: f64, var5: f64) {
 
 /// `EntityBoat.onUpdate()` (module docs).
 // src: EntityBoat.java:120-316
+#[allow(clippy::manual_clamp, clippy::identity_op)] // Java's two ifs and `var4 + 0`, kept
 pub fn on_update(e: &mut Entity, world: &mut World) {
     base::on_update(e, world);
     {
