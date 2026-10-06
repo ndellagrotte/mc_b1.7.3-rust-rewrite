@@ -57,7 +57,7 @@ fixtures! {
     entity_item_drop => "entity" / "item-drop";
     #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5); population is in (WP-1.7)"]
     entity_pig_attacked => "entity" / "pig-attacked";
-    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig: expected the op line with kind EntityPig); line 1 (preload) matches. Then EntityPig and water physics (WP-2.1, WP-2.3); population is in (WP-1.7)"]
+    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig: expected the op line with kind EntityPig); line 1 (preload) matches. Then EntityPig (WP-2.3); the Entity base and water physics are in (WP-2.1), population is in (WP-1.7)"]
     entity_pig_falls => "entity" / "pig-falls";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
