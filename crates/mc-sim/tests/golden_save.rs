@@ -1168,17 +1168,29 @@ fn save_list_rename_delete() {
     ));
 }
 
-/// A stored entity of a class the port cannot construct (a cow; the pig is constructible since WP-2.2): its id and
-/// `EntityLiving`'s `Math.random()` draws are consumed, the gap recorded, and
-/// a re-save writes the compound back.
+/// A stored entity of a class the port cannot construct (the first living
+/// `EntityList` class without a constructor yet: the cow was until WP-2.3):
+/// its id and `EntityLiving`'s `Math.random()` draws are consumed, the gap
+/// recorded, and a re-save writes the compound back. Vacuous once every
+/// mob is constructible.
 #[test]
 fn unconstructible_entities_are_kept() {
+    let Some(name) = mc_sim::save::entity_list::MAPPINGS
+        .iter()
+        .filter(|m| m.concrete && m.living)
+        .map(|m| m.name)
+        .find(|n| {
+            mc_sim::save::entity_list::create_entity_in_world(n, &mut empty_world()).is_none()
+        })
+    else {
+        return;
+    };
     let store = store_over(MemoryStorage::default());
     let mut a = build_saved_world(&store, "w");
     a.try_save_world(true).unwrap();
     drop(a);
     let mut cow = BTreeMap::new();
-    cow.insert("id".to_string(), Tag::String("Cow".into()));
+    cow.insert("id".to_string(), Tag::String(name.into()));
     cow.insert(
         "Pos".to_string(),
         Tag::List {
@@ -1211,7 +1223,8 @@ fn unconstructible_entities_are_kept() {
     b.make_deterministic(5);
     let math_before = b.math_random.state();
     b.get_chunk_from_chunk_coords(0, 0);
-    // Item, sand (both built), cow (id 2 consumed); "Mob" is abstract: skipped.
+    // Item, sand (both built), the kept mob (id 2 consumed); "Mob" is
+    // abstract: skipped.
     assert_eq!(b.next_entity_id, 3);
     assert_eq!(b.loaded_entity_list.len(), 2);
     assert_ne!(b.math_random.state(), math_before);
@@ -1230,7 +1243,7 @@ fn unconstructible_entities_are_kept() {
     assert_eq!(
         items.len(),
         3,
-        "item, sand, then the kept cow; the Mob is dropped"
+        "item, sand, then the kept mob; the Mob is dropped"
     );
     assert_eq!(items[2], Tag::Compound(cow));
 }

@@ -67,6 +67,8 @@ pub mod animal;
 pub mod arrow;
 pub mod base;
 pub mod boat;
+pub mod chicken;
+pub mod cow;
 pub mod creature;
 pub mod data_watcher;
 pub mod dispatch;
@@ -83,13 +85,17 @@ pub mod painting;
 pub mod pathfinding;
 pub mod pig;
 pub mod player;
+pub mod sheep;
 pub mod snowball;
 pub mod tnt_primed;
+pub mod wolf;
 
 pub use animal::AnimalData;
 pub use arrow::ArrowData;
 pub use base::EntityBase;
 pub use boat::BoatData;
+pub use chicken::ChickenData;
+pub use cow::CowData;
 pub use creature::CreatureData;
 pub use egg::EggData;
 pub use falling_sand::FallingSandData;
@@ -101,8 +107,10 @@ pub use living::LivingData;
 pub use minecart::MinecartData;
 pub use painting::{EnumArt, PaintingData};
 pub use pig::PigData;
+pub use sheep::SheepData;
 pub use snowball::{SnowballData, ThrowableData};
 pub use tnt_primed::TntPrimedData;
+pub use wolf::WolfData;
 
 use crate::inventory::InventoryPlayer;
 
@@ -169,14 +177,6 @@ empty_level!(
     SlimeData,
     /// `EntityGhast` (EntityGhast.java).
     GhastData,
-    /// `EntitySheep` (EntitySheep.java).
-    SheepData,
-    /// `EntityCow` (EntityCow.java).
-    CowData,
-    /// `EntityChicken` (EntityChicken.java).
-    ChickenData,
-    /// `EntityWolf` (EntityWolf.java).
-    WolfData,
     /// `EntitySquid` (EntitySquid.java).
     SquidData,
     /// `EntityPlayerSP` (EntityPlayerSP.java).

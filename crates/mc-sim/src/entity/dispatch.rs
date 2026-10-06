@@ -32,8 +32,9 @@
 use mc_core::{Aabb, Vec3D};
 
 use super::{
-    Entity, EntityKindData as K, animal, arrow, base, boat, creature, egg, falling_sand, fireball,
-    fish, item, lightning_bolt, living, minecart, painting, pig, snowball, tnt_primed,
+    Entity, EntityKindData as K, animal, arrow, base, boat, chicken, cow, creature, egg,
+    falling_sand, fireball, fish, item, lightning_bolt, living, minecart, painting, pig, sheep,
+    snowball, tnt_primed, wolf,
 };
 use crate::world::World;
 
@@ -66,6 +67,10 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateRiderPosition",
         ],
     ),
+    // src: EntityChicken.java:51-52 (super::chicken, WP-2.3)
+    ("EntityChicken", &["fall"]),
+    // src: EntityCow.java:38-46 (super::cow, WP-2.3)
+    ("EntityCow", &["interact"]),
     // src: EntityEgg.java:87-215, :235-242 (super::egg, super::snowball)
     ("EntityEgg", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityFallingSand.java:26-28, :33-71 (super::falling_sand)
@@ -153,6 +158,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     // src: EntityPig.java:36-43, :71-77 (super::pig, WP-2.2). `onStruckByLightning`
     // records the EntityPigZombie it would spawn (WP-2.3).
     ("EntityPig", &["fall", "interact"]),
+    // src: EntitySheep.java:19-21, :34-53 (super::sheep, WP-2.3)
+    ("EntitySheep", &["attackEntityFrom", "interact"]),
     // src: EntitySnowball.java:87-202, :222-229 (super::snowball)
     ("EntitySnowball", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntitySpider.java:15-17
@@ -162,8 +169,20 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
         "EntityTNTPrimed",
         &["canBeCollidedWith", "canTriggerWalking", "onUpdate"],
     ),
-    // src: EntityWolf.java:30-32
-    ("EntityWolf", &["canTriggerWalking"]),
+    // src: EntityWolf.java:30-40, :152-196, :221-223, :254-298, :326-378, :395-408
+    // (super::wolf, WP-2.3)
+    (
+        "EntityWolf",
+        &[
+            "attackEntityFrom",
+            "canTriggerWalking",
+            "getEntityTexture",
+            "getEyeHeight",
+            "handleHealthUpdate",
+            "interact",
+            "onUpdate",
+        ],
+    ),
 ];
 
 /// Overridden `Entity` methods that deliberately have no entry point here,
@@ -223,10 +242,8 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
             world.note_unimplemented("EntityGhast.onUpdate");
             living::on_update(e, world);
         }
-        K::Wolf(..) => {
-            world.note_unimplemented("EntityWolf.onUpdate");
-            living::on_update(e, world);
-        }
+        // src: EntityWolf.java:152-196
+        K::Wolf(..) => wolf::on_update(e, world),
         K::PlayerSp(..) => {
             world.note_unimplemented("EntityPlayer.onUpdate");
             living::on_update(e, world);
@@ -316,8 +333,10 @@ pub fn attack_entity_from(
         | K::Zombie(..)
         | K::GiantZombie(..) => "EntityMob.attackEntityFrom",
         K::PigZombie(..) => "EntityPigZombie.attackEntityFrom",
-        K::Sheep(..) => "EntitySheep.attackEntityFrom",
-        K::Wolf(..) => "EntityWolf.attackEntityFrom",
+        // src: EntitySheep.java:19-21
+        K::Sheep(..) => return sheep::attack_entity_from(e, world, attacker, damage),
+        // src: EntityWolf.java:254-298
+        K::Wolf(..) => return wolf::attack_entity_from(e, world, attacker, damage),
         K::PlayerSp(..) => "EntityPlayer.attackEntityFrom",
     };
     world.note_unimplemented(what);
@@ -382,7 +401,8 @@ pub fn fall(e: &mut Entity, world: &mut World, distance: f32) {
         K::Ghast(..) => "EntityFlying.fall",
         // src: EntityPig.java:71-77
         K::Pig(..) => return pig::fall(e, world, distance),
-        K::Chicken(..) => "EntityChicken.fall",
+        // src: EntityChicken.java:51-52 (empty: no damage, no rider)
+        K::Chicken(..) => return,
         K::PlayerSp(..) => "EntityPlayer.fall",
         _ if e.kind.living().is_some() => {
             // src: EntityLiving.java:440-452
@@ -463,7 +483,8 @@ pub fn can_be_pushed(e: &Entity, world: &World) -> bool {
 /// `getEyeHeight()`.
 pub fn get_eye_height(e: &Entity, world: &World) -> f32 {
     match e.kind {
-        K::Wolf(..) => world.note_unimplemented("EntityWolf.getEyeHeight"),
+        // src: EntityWolf.java:221-223
+        K::Wolf(..) => return wolf::get_eye_height(e),
         K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.getEyeHeight"),
         _ => {}
     }
@@ -621,8 +642,10 @@ pub fn is_in_range_to_render_dist(e: &Entity, world: &World, dist_sq: f64) -> bo
 /// `getEntityTexture()` (render): the texture path, `None` for Java's
 /// `null`.
 pub fn get_entity_texture(e: &Entity, world: &World) -> Option<&'static str> {
+    let _ = world;
     if let K::Wolf(..) = e.kind {
-        world.note_unimplemented("EntityWolf.getEntityTexture");
+        // src: EntityWolf.java:34-40
+        return Some(wolf::get_entity_texture(e));
     }
     match e.kind.living() {
         // src: EntityLiving.java:77-79
@@ -664,14 +687,17 @@ pub fn interact(e: &mut Entity, world: &mut World, player: &mut Entity) -> bool 
     let what = match e.kind {
         // src: EntityBoat.java:336-346
         K::Boat(..) => return boat::interact(e, world, player),
-        K::Cow(..) => "EntityCow.interact",
+        // src: EntityCow.java:38-46
+        K::Cow(..) => return cow::interact(e, world, player),
         // src: EntityMinecart.java:763-791
         K::Minecart(..) => return minecart::interact(e, world, player),
         // src: EntityPig.java:36-43
         K::Pig(..) => return pig::interact(e, world, player),
-        K::Sheep(..) => "EntitySheep.interact",
+        // src: EntitySheep.java:34-53
+        K::Sheep(..) => return sheep::interact(e, world, player),
         K::Squid(..) => "EntitySquid.interact",
-        K::Wolf(..) => "EntityWolf.interact",
+        // src: EntityWolf.java:326-378
+        K::Wolf(..) => return wolf::interact(e, world, player),
         // src: Entity.java:908-910
         _ => return false,
     };
@@ -770,10 +796,8 @@ pub fn set_velocity(e: &mut Entity, world: &mut World, x: f64, y: f64, z: f64) {
 /// `handleHealthUpdate(status)`.
 pub fn handle_health_update(e: &mut Entity, world: &mut World, status: i8) {
     match e.kind {
-        K::Wolf(..) => {
-            world.note_unimplemented("EntityWolf.handleHealthUpdate");
-            living::handle_health_update(e, world, status);
-        }
+        // src: EntityWolf.java:395-408
+        K::Wolf(..) => wolf::handle_health_update(e, world, status),
         // src: EntityLiving.java:850-866
         _ if e.kind.living().is_some() => living::handle_health_update(e, world, status),
         // src: Entity.java:1047-1048 (empty)
@@ -850,7 +874,7 @@ pub fn is_in_water(e: &Entity, world: &World) -> bool {
 // vanilla does not): that arm records and returns with no body. Those are
 // `updatePlayerActionState` of EntityPlayer(SP), EntitySlime, EntityGhast and
 // EntitySquid; `moveEntityWithHeading` of EntityFlying (Ghast) and
-// EntitySquid; `dropFewItems` of EntitySheep, EntitySkeleton and EntitySquid
+// EntitySquid; `dropFewItems` of EntitySkeleton and EntitySquid
 // (EntityCreature's `attackEntity`/`attackBlockedEntity` bodies are empty
 // anyway). A value-returning override not transcribed yet returns the
 // ancestor's value as a placeholder.
@@ -862,6 +886,28 @@ pub const LIVING_TRANSCRIBED: &[(&str, &[&str])] = &[
     (
         "EntityAnimal",
         &["getBlockPathWeight", "getCanSpawnHere", "getTalkInterval"],
+    ),
+    // src: EntityChicken.java:20-49, :62-76 (super::chicken, WP-2.3)
+    (
+        "EntityChicken",
+        &[
+            "getDeathSound",
+            "getDropItemId",
+            "getHurtSound",
+            "getLivingSound",
+            "onLivingUpdate",
+        ],
+    ),
+    // src: EntityCow.java:18-36 (super::cow, WP-2.3)
+    (
+        "EntityCow",
+        &[
+            "getDeathSound",
+            "getDropItemId",
+            "getHurtSound",
+            "getLivingSound",
+            "getSoundVolume",
+        ],
     ),
     // src: EntityCreature.java:16-116, :159-164 (super::creature)
     (
@@ -876,6 +922,37 @@ pub const LIVING_TRANSCRIBED: &[(&str, &[&str])] = &[
             "getDropItemId",
             "getHurtSound",
             "getLivingSound",
+        ],
+    ),
+    // src: EntitySheep.java:23-32, :67-77 (super::sheep, WP-2.3)
+    (
+        "EntitySheep",
+        &[
+            "dropFewItems",
+            "getDeathSound",
+            "getDropItemId",
+            "getHurtSound",
+            "getLivingSound",
+        ],
+    ),
+    // src: EntityWolf.java:66-94, :96-150, :225-227, :250-252, :300-324, :418-420
+    // (super::wolf, WP-2.3)
+    (
+        "EntityWolf",
+        &[
+            "attackEntity",
+            "canDespawn",
+            "findPlayerToAttack",
+            "getDeathSound",
+            "getDropItemId",
+            "getHurtSound",
+            "getLivingSound",
+            "getMaxSpawnedInChunk",
+            "getSoundVolume",
+            "getVerticalFaceSpeed",
+            "isMovementCeased",
+            "onLivingUpdate",
+            "updatePlayerActionState",
         ],
     ),
 ];
@@ -911,18 +988,24 @@ pub fn get_talk_interval(e: &Entity, world: &World) -> i32 {
 }
 
 /// `getLivingSound()`: `None` for Java's `null`.
-pub fn get_living_sound(e: &Entity, world: &World) -> Option<&'static str> {
+///
+/// `&mut`: `EntityWolf`'s draws from `rand` (EntityWolf.java:73).
+pub fn get_living_sound(e: &mut Entity, world: &World) -> Option<&'static str> {
     let what = match e.kind {
         // src: EntityPig.java:24-26
         K::Pig(..) => return Some("mob.pig"),
-        K::Chicken(..) => "EntityChicken.getLivingSound",
-        K::Cow(..) => "EntityCow.getLivingSound",
+        // src: EntityChicken.java:62-64
+        K::Chicken(..) => return Some("mob.chicken"),
+        // src: EntityCow.java:18-20
+        K::Cow(..) => return Some("mob.cow"),
         K::Ghast(..) => "EntityGhast.getLivingSound",
-        K::Sheep(..) => "EntitySheep.getLivingSound",
+        // src: EntitySheep.java:67-69
+        K::Sheep(..) => return Some("mob.sheep"),
         K::PigZombie(..) => "EntityPigZombie.getLivingSound",
         K::Skeleton(..) => "EntitySkeleton.getLivingSound",
         K::Squid(..) => "EntitySquid.getLivingSound",
-        K::Wolf(..) => "EntityWolf.getLivingSound",
+        // src: EntityWolf.java:70-78
+        K::Wolf(..) => return Some(wolf::get_living_sound(e)),
         K::Spider(..) => "EntitySpider.getLivingSound",
         K::Zombie(..) => "EntityZombie.getLivingSound",
         // src: EntityLiving.java:380-382
@@ -937,16 +1020,20 @@ pub fn get_hurt_sound(e: &Entity, world: &World) -> Option<&'static str> {
     let what = match e.kind {
         // src: EntityPig.java:28-30
         K::Pig(..) => return Some("mob.pig"),
-        K::Chicken(..) => "EntityChicken.getHurtSound",
+        // src: EntityChicken.java:66-68
+        K::Chicken(..) => return Some("mob.chickenhurt"),
         K::Spider(..) => "EntitySpider.getHurtSound",
         K::Creeper(..) => "EntityCreeper.getHurtSound",
-        K::Cow(..) => "EntityCow.getHurtSound",
+        // src: EntityCow.java:22-24
+        K::Cow(..) => return Some("mob.cowhurt"),
         K::Ghast(..) => "EntityGhast.getHurtSound",
         K::Skeleton(..) => "EntitySkeleton.getHurtSound",
-        K::Sheep(..) => "EntitySheep.getHurtSound",
+        // src: EntitySheep.java:71-73
+        K::Sheep(..) => return Some("mob.sheep"),
         K::Slime(..) => "EntitySlime.getHurtSound",
         K::PigZombie(..) => "EntityPigZombie.getHurtSound",
-        K::Wolf(..) => "EntityWolf.getHurtSound",
+        // src: EntityWolf.java:80-82
+        K::Wolf(..) => return Some("mob.wolf.hurt"),
         K::Squid(..) => "EntitySquid.getHurtSound",
         K::Zombie(..) => "EntityZombie.getHurtSound",
         // src: EntityLiving.java:384-386
@@ -961,16 +1048,20 @@ pub fn get_death_sound(e: &Entity, world: &World) -> Option<&'static str> {
     let what = match e.kind {
         // src: EntityPig.java:32-34
         K::Pig(..) => return Some("mob.pigdeath"),
-        K::Chicken(..) => "EntityChicken.getDeathSound",
-        K::Cow(..) => "EntityCow.getDeathSound",
+        // src: EntityChicken.java:70-72
+        K::Chicken(..) => return Some("mob.chickenhurt"),
+        // src: EntityCow.java:26-28
+        K::Cow(..) => return Some("mob.cowhurt"),
         K::Spider(..) => "EntitySpider.getDeathSound",
-        K::Sheep(..) => "EntitySheep.getDeathSound",
+        // src: EntitySheep.java:75-77
+        K::Sheep(..) => return Some("mob.sheep"),
         K::Creeper(..) => "EntityCreeper.getDeathSound",
         K::Squid(..) => "EntitySquid.getDeathSound",
         K::Skeleton(..) => "EntitySkeleton.getDeathSound",
         K::Ghast(..) => "EntityGhast.getDeathSound",
         K::Slime(..) => "EntitySlime.getDeathSound",
-        K::Wolf(..) => "EntityWolf.getDeathSound",
+        // src: EntityWolf.java:84-86
+        K::Wolf(..) => return Some("mob.wolf.death"),
         K::Zombie(..) => "EntityZombie.getDeathSound",
         K::PigZombie(..) => "EntityPigZombie.getDeathSound",
         // src: EntityLiving.java:388-390
@@ -983,11 +1074,11 @@ pub fn get_death_sound(e: &Entity, world: &World) -> Option<&'static str> {
 /// `getSoundVolume()`.
 pub fn get_sound_volume(e: &Entity, world: &World) -> f32 {
     match e.kind {
-        K::Cow(..) => world.note_unimplemented("EntityCow.getSoundVolume"),
+        // src: EntityCow.java:30-32, EntityWolf.java:88-90
+        K::Cow(..) | K::Wolf(..) => return 0.4,
         K::Squid(..) => world.note_unimplemented("EntitySquid.getSoundVolume"),
         K::Ghast(..) => world.note_unimplemented("EntityGhast.getSoundVolume"),
         K::Slime(..) => world.note_unimplemented("EntitySlime.getSoundVolume"),
-        K::Wolf(..) => world.note_unimplemented("EntityWolf.getSoundVolume"),
         _ => {}
     }
     // src: EntityLiving.java:376-378
@@ -1016,10 +1107,11 @@ pub fn on_death(e: &mut Entity, world: &mut World, attacker: Option<&Entity>) {
 
 /// `dropFewItems()`.
 pub fn drop_few_items(e: &mut Entity, world: &mut World) {
-    // No super call in these overrides (EntitySheep.java, EntitySkeleton.java,
-    // EntitySquid.java dropFewItems): record and run no body (WP-2.3).
+    // No super call in these overrides (EntitySkeleton.java, EntitySquid.java
+    // dropFewItems): record and run no body (WP-2.3).
     let what = match e.kind {
-        K::Sheep(..) => "EntitySheep.dropFewItems",
+        // src: EntitySheep.java:23-28
+        K::Sheep(..) => return sheep::drop_few_items(e, world),
         K::Skeleton(..) => "EntitySkeleton.dropFewItems",
         K::Squid(..) => "EntitySquid.dropFewItems",
         _ => "",
@@ -1037,18 +1129,22 @@ pub fn get_drop_item_id(e: &Entity, world: &World) -> i32 {
     let what = match e.kind {
         // src: EntityPig.java:45-47
         K::Pig(..) => return pig::get_drop_item_id(e),
-        K::Cow(..) => "EntityCow.getDropItemId",
+        // src: EntityCow.java:34-36
+        K::Cow(..) => return cow::get_drop_item_id(),
         K::Creeper(..) => "EntityCreeper.getDropItemId",
-        K::Chicken(..) => "EntityChicken.getDropItemId",
+        // src: EntityChicken.java:74-76
+        K::Chicken(..) => return chicken::get_drop_item_id(),
         K::Ghast(..) => "EntityGhast.getDropItemId",
         K::Skeleton(..) => "EntitySkeleton.getDropItemId",
-        K::Sheep(..) => "EntitySheep.getDropItemId",
+        // src: EntitySheep.java:30-32
+        K::Sheep(..) => return sheep::get_drop_item_id(),
         K::Slime(..) => "EntitySlime.getDropItemId",
         K::PigZombie(..) => "EntityPigZombie.getDropItemId",
         K::Squid(..) => "EntitySquid.getDropItemId",
         K::Zombie(..) => "EntityZombie.getDropItemId",
         K::Spider(..) => "EntitySpider.getDropItemId",
-        K::Wolf(..) => "EntityWolf.getDropItemId",
+        // src: EntityWolf.java:92-94
+        K::Wolf(..) => return -1,
         // src: EntityLiving.java:436-438
         _ => return 0,
     };
@@ -1103,8 +1199,10 @@ pub fn on_living_update(e: &mut Entity, world: &mut World) {
         K::Skeleton(..) => "EntitySkeleton.onLivingUpdate",
         K::Zombie(..) => "EntityZombie.onLivingUpdate",
         K::PigZombie(..) => "EntityPigZombie.onLivingUpdate",
-        K::Chicken(..) => "EntityChicken.onLivingUpdate",
-        K::Wolf(..) => "EntityWolf.onLivingUpdate",
+        // src: EntityChicken.java:20-49
+        K::Chicken(..) => return chicken::on_living_update(e, world),
+        // src: EntityWolf.java:125-150
+        K::Wolf(..) => return wolf::on_living_update(e, world),
         K::Squid(..) => "EntitySquid.onLivingUpdate",
         // EntityPlayerSP's (client input) calls EntityPlayer's (heal, pick-up,
         // camera), which calls EntityLiving's (WP-2.5).
@@ -1135,8 +1233,10 @@ pub fn jump(e: &mut Entity, world: &mut World) {
 
 /// `canDespawn()`.
 pub fn can_despawn(e: &Entity, world: &World) -> bool {
+    let _ = world;
     if let K::Wolf(..) = e.kind {
-        world.note_unimplemented("EntityWolf.canDespawn");
+        // src: EntityWolf.java:66-68
+        return wolf::can_despawn(e);
     }
     // src: EntityLiving.java:663-665
     true
@@ -1169,10 +1269,8 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
             world.note_unimplemented("EntityPlayerSP.updatePlayerActionState");
             return;
         }
-        K::Wolf(..) => {
-            world.note_unimplemented("EntityWolf.updatePlayerActionState");
-            return creature::update_player_action_state(e, world);
-        }
+        // src: EntityWolf.java:96-123
+        K::Wolf(..) => return wolf::update_player_action_state(e, world),
         // No super call in these overrides (EntitySquid.java,
         // EntitySlime.java, EntityGhast.java updatePlayerActionState):
         // record and run no body (WP-2.3).
@@ -1186,8 +1284,10 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
 
 /// `getVerticalFaceSpeed()`.
 pub fn get_vertical_face_speed(e: &Entity, world: &World) -> i32 {
+    let _ = world;
     if let K::Wolf(..) = e.kind {
-        world.note_unimplemented("EntityWolf.getVerticalFaceSpeed");
+        // src: EntityWolf.java:225-227
+        return wolf::get_vertical_face_speed(e);
     }
     // src: EntityLiving.java:728-730
     40
@@ -1227,7 +1327,8 @@ pub fn get_can_spawn_here(e: &Entity, world: &mut World) -> bool {
 pub fn get_max_spawned_in_chunk(e: &Entity, world: &World) -> i32 {
     match e.kind {
         K::Ghast(..) => world.note_unimplemented("EntityGhast.getMaxSpawnedInChunk"),
-        K::Wolf(..) => world.note_unimplemented("EntityWolf.getMaxSpawnedInChunk"),
+        // src: EntityWolf.java:418-420
+        K::Wolf(..) => return 8,
         _ => {}
     }
     // src: EntityLiving.java:842-844
@@ -1236,8 +1337,10 @@ pub fn get_max_spawned_in_chunk(e: &Entity, world: &World) -> i32 {
 
 /// `isMovementCeased()` (`EntityCreature`).
 pub fn is_movement_ceased(e: &Entity, world: &World) -> bool {
+    let _ = world;
     if let K::Wolf(..) = e.kind {
-        world.note_unimplemented("EntityWolf.isMovementCeased");
+        // src: EntityWolf.java:250-252
+        return wolf::is_movement_ceased(e);
     }
     // src: EntityCreature.java:12-14
     false
@@ -1253,7 +1356,8 @@ pub fn attack_entity(e: &mut Entity, world: &mut World, target: i32, distance: f
         K::Creeper(..) => world.note_unimplemented("EntityCreeper.attackEntity"),
         K::Skeleton(..) => world.note_unimplemented("EntitySkeleton.attackEntity"),
         K::Spider(..) => world.note_unimplemented("EntitySpider.attackEntity"),
-        K::Wolf(..) => world.note_unimplemented("EntityWolf.attackEntity"),
+        // src: EntityWolf.java:304-324
+        K::Wolf(..) => wolf::attack_entity(e, world, target, distance),
         _ => {}
     }
     // src: EntityCreature.java:145-146 (empty)
@@ -1303,7 +1407,8 @@ pub fn find_player_to_attack(e: &mut Entity, world: &mut World) -> Option<i32> {
         }
         K::Spider(..) => world.note_unimplemented("EntitySpider.findPlayerToAttack"),
         K::PigZombie(..) => world.note_unimplemented("EntityPigZombie.findPlayerToAttack"),
-        K::Wolf(..) => world.note_unimplemented("EntityWolf.findPlayerToAttack"),
+        // src: EntityWolf.java:300-302
+        K::Wolf(..) => return wolf::find_player_to_attack(e, world),
         _ => {}
     }
     // src: EntityCreature.java:155-157

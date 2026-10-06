@@ -4,20 +4,15 @@
 //! ([`throwable_on_update`](super::snowball) with [`hatch`] as the impact
 //! hook).
 //!
-//! # Gap: the chicken
-//!
 //! One egg in 8 hatches one chicken (one in 32 of those, four) where it
-//! lands: `new EntityChicken(world)`, `setLocationAndAngles`,
-//! `entityJoinedWorld`. `EntityChicken` is WP-2.3. The port makes what the
-//! chicken's construction does to the world (the entity id and
-//! `EntityLiving`'s four `Math.random()` draws, EntityLiving.java:38, :63,
-//! :65, :66), records `"EntityChicken.<init> (EntityEgg.onUpdate)"`, and
-//! nothing joins; every `rand` draw of the egg itself is kept. (The
-//! chicken's own `timeUntilNextEgg` draw, EntityChicken.java:17, is on its own
-//! `rand`, which the join hook redraws anyway.)
+//! lands: `new EntityChicken(world)` ([`super::chicken`]),
+//! `setLocationAndAngles` at the egg with the egg's yaw and pitch 0,
+//! `entityJoinedWorld` (WP-2.3; the chicken's egg timer and the harness:
+//! [`super::chicken`] module docs).
 
+use super::Entity;
+use super::chicken::new_entity_chicken;
 use super::snowball::{self, ThrowableData};
-use super::{Entity, EntityBase, LivingData};
 use crate::world::World;
 
 /// The `EntityEgg` level (the fields are `EntitySnowball`'s, renamed).
@@ -62,13 +57,13 @@ fn hatch(e: &mut Entity, world: &mut World) {
             var16 = 4;
         }
         for _ in 0..var16 {
-            // src: EntityEgg.java:163 (new EntityChicken(worldObj): the
-            // Entity and EntityLiving constructors' world side effects)
-            let mut b = EntityBase::new(world);
-            let _ = LivingData::new(world, &mut b);
-            // src: EntityEgg.java:164-165 (setLocationAndAngles(posX, posY,
-            // posZ, rotationYaw, 0.0F), entityJoinedWorld): WP-2.3.
-            world.note_unimplemented("EntityChicken.<init> (EntityEgg.onUpdate)");
+            // src: EntityEgg.java:163-165
+            let mut var21 = new_entity_chicken(world);
+            let b = &e.base;
+            var21
+                .base
+                .set_location_and_angles(b.pos_x, b.pos_y, b.pos_z, b.rotation_yaw, 0.0);
+            world.spawn_entity_in_world(var21);
         }
     }
 }

@@ -66,8 +66,8 @@
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
-//! `spawn` of the mobs other than `Pig`, `Minecart` and `Boat` (their
-//! `(World)` constructors), `attack` with the player as the attacker
+//! `spawn` of the mobs other than `Pig`, `Sheep`, `Cow`, `Chicken`, `Wolf`,
+//! `Minecart` and `Boat` (their `(World)` constructors), `attack` with the player as the attacker
 //! (`EntityPlayer.attackTargetEntityWithCurrentItem`, WP-2.5). `use_item` runs, but every item's `onItemUse` /
 //! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
 //! item does something diverges at the first block or inventory dump after
@@ -786,8 +786,8 @@ fn placed_by_op(kind: &str, direction: Option<i32>, minecart_type: Option<i32>) 
 ///   player)`, needs the `player` op; sets the player's `fishEntity`).
 /// - `Minecart` with `type`: `EntityMinecart(world, x, y, z, type)`
 ///   (EntityMinecart.java:57-67, as ItemMinecart.java:16; no draws).
-/// - Any other `EntityList` name: its `(World)` constructor; the mobs are
-///   not transcribed yet (an error naming the class).
+/// - Any other `EntityList` name: its `(World)` constructor; the mobs not
+///   transcribed yet are an error naming the class.
 #[allow(clippy::too_many_arguments)]
 fn construct(
     world: &mut World,
@@ -801,8 +801,8 @@ fn construct(
     minecart_type: Option<i32>,
 ) -> Result<mc_sim::entity::Entity, GoldenError> {
     use mc_sim::entity::{
-        arrow, boat, egg, falling_sand, fireball, fish, lightning_bolt, minecart, painting, pig,
-        snowball, tnt_primed,
+        arrow, boat, chicken, cow, egg, falling_sand, fireball, fish, lightning_bolt, minecart,
+        painting, pig, sheep, snowball, tnt_primed, wolf,
     };
     let e = match kind {
         "Item" => {
@@ -877,6 +877,10 @@ fn construct(
                 "EntityTNTPrimed" => tnt_primed::new_entity_tnt_primed_empty(world),
                 "EntityFallingSand" => falling_sand::new_entity_falling_sand_empty(world),
                 "EntityPig" => pig::new_entity_pig(world),
+                "EntitySheep" => sheep::new_entity_sheep(world),
+                "EntityCow" => cow::new_entity_cow(world),
+                "EntityChicken" => chicken::new_entity_chicken(world),
+                "EntityWolf" => wolf::new_entity_wolf(world),
                 "EntityMinecart" => minecart::new_entity_minecart_empty(world),
                 "EntityBoat" => boat::new_entity_boat_empty(world),
                 _ => {

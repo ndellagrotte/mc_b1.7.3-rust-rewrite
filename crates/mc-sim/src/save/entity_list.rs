@@ -8,7 +8,8 @@
 //! `(World)` constructor, then `readFromNBT`. The port has those
 //! constructors for `EntityItem`, `EntityFallingSand`, `EntityArrow`,
 //! `EntitySnowball`, `EntityPainting`, `EntityTNTPrimed`, `EntityMinecart`
-//! and `EntityBoat` (WP-2.4) and `EntityPig` (WP-2.2); the other mobs are
+//! and `EntityBoat` (WP-2.4), `EntityPig` (WP-2.2) and `EntitySheep`,
+//! `EntityCow`, `EntityChicken`, `EntityWolf` (WP-2.3); the other mobs are
 //! Phase 2. For the other names of the table, [`create_entity_from_nbt`]
 //! returns [`FromNbt::Gap`]:
 //!
@@ -39,13 +40,17 @@ use super::SaveError;
 use super::nbt::{self as n, Compound};
 use crate::entity::arrow::new_entity_arrow_empty;
 use crate::entity::boat::new_entity_boat_empty;
+use crate::entity::chicken::new_entity_chicken;
+use crate::entity::cow::new_entity_cow;
 use crate::entity::falling_sand::new_entity_falling_sand_empty;
 use crate::entity::item::new_entity_item_empty;
 use crate::entity::minecart::new_entity_minecart_empty;
 use crate::entity::painting::new_entity_painting_empty;
 use crate::entity::pig::new_entity_pig;
+use crate::entity::sheep::new_entity_sheep;
 use crate::entity::snowball::new_entity_snowball_empty;
 use crate::entity::tnt_primed::new_entity_tnt_primed_empty;
+use crate::entity::wolf::new_entity_wolf;
 use crate::entity::{Entity, EntityBase, EntityKindData, LivingData, nbt as entity_nbt};
 use crate::world::World;
 
@@ -171,6 +176,14 @@ fn construct(class: &str, world: &mut World) -> Option<Entity> {
         "EntityBoat" => Some(new_entity_boat_empty(world)),
         // src: EntityPig.java:4-8
         "EntityPig" => Some(new_entity_pig(world)),
+        // src: EntitySheep.java:8-12
+        "EntitySheep" => Some(new_entity_sheep(world)),
+        // src: EntityCow.java:4-8
+        "EntityCow" => Some(new_entity_cow(world)),
+        // src: EntityChicken.java:12-18
+        "EntityChicken" => Some(new_entity_chicken(world)),
+        // src: EntityWolf.java:15-21
+        "EntityWolf" => Some(new_entity_wolf(world)),
         _ => None,
     }
 }

@@ -278,6 +278,9 @@ fn all_kinds(w: &mut World) -> Vec<Entity> {
         K::Pig(LivingData::new(w, b), c(), a(), PigData::default())
     });
     push(w, &|w, b| {
+        // EntitySheep.entityInit (EntitySheep.java:14-17): colour and sheared.
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(0));
         K::Sheep(LivingData::new(w, b), c(), a(), SheepData::default())
     });
     push(w, &|w, b| {
@@ -287,6 +290,15 @@ fn all_kinds(w: &mut World) -> Vec<Entity> {
         K::Chicken(LivingData::new(w, b), c(), a(), ChickenData::default())
     });
     push(w, &|w, b| {
+        // EntityWolf.entityInit (EntityWolf.java:23-28): flags, owner, health.
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(0));
+        b.data_watcher.add_object(
+            17,
+            mc_sim::entity::data_watcher::WatchValue::String(String::new()),
+        );
+        b.data_watcher
+            .add_object(18, mc_sim::entity::data_watcher::WatchValue::Int(0));
         K::Wolf(LivingData::new(w, b), c(), a(), WolfData::default())
     });
     push(w, &|w, b| {

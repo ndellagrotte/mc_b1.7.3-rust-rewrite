@@ -18,10 +18,14 @@
 //! | `EntityLiving` | EntityLiving.java:557-562 | EntityLiving.java:564-573 |
 //! | `EntityAnimal` (`super` only) | EntityAnimal.java:12-14 | EntityAnimal.java:16-18 |
 //! | `EntityPig` | EntityPig.java:14-17 | EntityPig.java:19-22 |
+//! | `EntitySheep` | EntitySheep.java:55-59 | EntitySheep.java:61-65 |
+//! | `EntityCow` (`super` only) | EntityCow.java:10-12 | EntityCow.java:14-16 |
+//! | `EntityChicken` (`super` only) | EntityChicken.java:54-56 | EntityChicken.java:58-60 |
+//! | `EntityWolf` | EntityWolf.java:42-52 | EntityWolf.java:54-64 |
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
-//! Every other class's own level (`EntitySheep`'s `Sheared`, …) is Phase 2; reaching it records
+//! Every other class's own level (`EntitySquid`'s, the monsters', …) is Phase 2; reaching it records
 //! `"Entity*.writeEntityToNBT"` / `"Entity*.readEntityFromNBT"` in
 //! [`World::unimplemented_hits`] and writes/reads only the levels above it.
 //! Such entities cannot exist in a world yet (no constructor); a saved one
@@ -139,6 +143,30 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
             write_living(l, c);
             // src: EntityPig.java:14-17 (EntityAnimal adds nothing, :12-14)
             n::set_boolean(c, "Saddle", super::pig::get_saddled(e));
+        }
+        K::Sheep(l, ..) => {
+            write_living(l, c);
+            // src: EntitySheep.java:55-59 (EntityAnimal adds nothing, :12-14)
+            n::set_boolean(c, "Sheared", super::sheep::get_sheared(e));
+            n::set(
+                c,
+                "Color",
+                Tag::Byte(super::sheep::get_fleece_color(e) as i8),
+            );
+        }
+        // src: EntityCow.java:10-12, EntityChicken.java:54-56 (super only)
+        K::Cow(l, ..) | K::Chicken(l, ..) => write_living(l, c),
+        K::Wolf(l, ..) => {
+            write_living(l, c);
+            // src: EntityWolf.java:42-52 (getWolfOwner() is never null: the
+            // watcher string starts as "" and setWolfOwner(null) throws)
+            n::set_boolean(c, "Angry", super::wolf::is_wolf_angry(e));
+            n::set_boolean(c, "Sitting", super::wolf::is_wolf_sitting(e));
+            n::set(
+                c,
+                "Owner",
+                Tag::String(super::wolf::get_wolf_owner(e).to_string()),
+            );
         }
         K::PlayerSp(l, p, _) => {
             write_living(l, c);
@@ -305,6 +333,29 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         super::pig::set_saddled(e, saddle);
         return Ok(());
     }
+    if let K::Sheep(l, ..) = &mut e.kind {
+        read_living(l, c)?;
+        // src: EntitySheep.java:61-65
+        let sheared = n::get_boolean(c, "Sheared")?;
+        super::sheep::set_sheared(e, sheared);
+        let color = n::get_byte(c, "Color")?;
+        super::sheep::set_fleece_color(e, color as i32);
+        return Ok(());
+    }
+    if let K::Wolf(l, ..) = &mut e.kind {
+        read_living(l, c)?;
+        // src: EntityWolf.java:54-64
+        let angry = n::get_boolean(c, "Angry")?;
+        super::wolf::set_wolf_angry(e, angry);
+        let sitting = n::get_boolean(c, "Sitting")?;
+        super::wolf::set_wolf_sitting(e, sitting);
+        let var2 = n::get_string(c, "Owner")?;
+        if !var2.is_empty() {
+            super::wolf::set_wolf_owner(e, Some(&var2));
+            super::wolf::set_wolf_tamed(e, true);
+        }
+        return Ok(());
+    }
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     match &mut e.kind {
         K::Item(d) => {
@@ -325,6 +376,8 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         K::Boat(..) => {}
         // src: EntityLightningBolt.java:79-80 (empty)
         K::LightningBolt(..) => {}
+        // src: EntityCow.java:14-16, EntityChicken.java:58-60 (super only)
+        K::Cow(l, ..) | K::Chicken(l, ..) => read_living(l, c)?,
         K::PlayerSp(l, p, _) => {
             read_living(l, c)?;
             read_player(p, c, (px, py, pz), world)?;
