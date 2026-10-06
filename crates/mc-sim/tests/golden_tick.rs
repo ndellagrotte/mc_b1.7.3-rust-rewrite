@@ -67,6 +67,8 @@ fixtures! {
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
     tick_fire_burnout_stone => "tick" / "fire-burnout-stone";
+    tick_fire_farmland_rain => "tick" / "fire-farmland-rain";
+    tick_fire_rain_spread => "tick" / "fire-rain-spread";
     tick_fire_spread_planks => "tick" / "fire-spread-planks";
     #[ignore = "BlockFlowing.onBlockAdded/updateTick (fluids task of WP-1.6): first diff line 9 (t=4 scheduled_ticks count 0, expected 5). Lighting (WP-1.3) is in"]
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
