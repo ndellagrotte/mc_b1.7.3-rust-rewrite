@@ -1,0 +1,10 @@
+{"name":"chunk-border","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":30,
+ "comment":"Light crossing the x=15|16 chunk boundary (chunks (0,0) and (1,0)): a stone floor at y=60 over x=10..21, z=2..12, an opaque stone roof at y=64 spanning x=14..18, z=4..8, and glowstone (89) at (15,62,6) under it, placed at t=0 (set_block). Sky light under the roof and block light from the glowstone both have to cross the chunk edge through the light queue.",
+ "ops":[{"t":0,"op":"fill","x0":10,"y0":60,"z0":2,"x1":21,"y1":60,"z1":12,"id":1},
+        {"t":0,"op":"fill","x0":14,"y0":64,"z0":4,"x1":18,"y1":64,"z1":8,"id":1},
+        {"t":0,"op":"set_block","x":15,"y":62,"z":6,"id":89}],
+ "dumps":[{"t":0,"what":"block_box","x0":10,"y0":60,"z0":2,"x1":21,"y1":65,"z1":10},
+          {"every":10,"what":"block_box","x0":10,"y0":60,"z0":2,"x1":21,"y1":65,"z1":10},
+          {"t":29,"what":"chunk_digest","x":0,"z":0},
+          {"t":29,"what":"chunk_digest","x":1,"z":0,"full":true},
+          {"t":29,"what":"rng_state"}]}

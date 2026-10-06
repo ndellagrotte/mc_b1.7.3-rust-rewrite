@@ -659,6 +659,25 @@ see below), `tick/flat-flowing-water` (id 8), `tick/flat-sand-falls` (an
 `entity/flat-item-drop`, `entity/flat-pig-falls`. They exist so a port can verify one block
 and one entity before it has terrain generation.
 
+Lighting (WP-1.3), empty world, seed 123, only blocks that are inert here (stone, glass,
+glowstone; ice, leaves and still water placed silently and without a player). They use the
+existing `block_box`, `block` and `chunk_digest` dumps; `rng_state` at the end ties them to
+the seed for `check-sensitivity.sh`:
+
+- `light/skylight-column`: a 9×9 stone slab at y = 60 (`fill`, t = 0); a 4-high pillar on it
+  at (2, 61..64, 2) placed at t = 5 and removed top down at t = 20 (`set_block`). The slab
+  queues more light updates than one `updatingLighting` call runs (the port's replay:
+  631 left after t = 0, empty after t = 4), so the per-tick `block_box` dumps at t = 0…3 pin
+  the budget; `chunk_digest` with `full` on chunk (0, 0) at the end.
+- `light/blocklight-glowstone`: glowstone at (0, 62, 0) in a stone pen with a partition and a
+  still-water wall (`set_block_silent` / `fill` of id 9), placed at t = 0 and removed at
+  t = 20; propagation and attenuation through air and water, and the light's removal.
+- `light/chunk-border`: a stone roof over x = 14..18 at y = 64 and glowstone at (15, 62, 6):
+  sky and block light across the chunk (0, 0) | (1, 0) edge; digests of both chunks (`full`
+  for (1, 0)).
+- `light/occlusion`: 3-high columns of ice, leaves, still water and glass and a leaves canopy
+  under open sky; `block_box` dumps per column.
+
 Vanilla behaviour these fixtures pin down:
 
 - **Still water placed by `set_block` stays still**: `notifyBlockChange` notifies the six
@@ -668,3 +687,11 @@ Vanilla behaviour these fixtures pin down:
 - **Generated sand falls on the first ticks**: generation and population leave sand above
   air with ticks scheduled by `onBlockAdded`; they fire in the first `TickUpdates` (population
   itself runs with `BlockSand.fallInstantly = true`, ChunkProviderGenerate.java:311, :602).
+- **Light updates run newest first, at most 499 per `updatingLighting` call**:
+  `lightingToUpdate` is a list popped from the end (World.java:1674); the budget is
+  `var1 = 500`, decremented before each update and checked `<= 0` (World.java:1665-1672), so
+  the 500th pending update waits for the next call and the call returns `true`. A new update
+  is first offered to the five newest queued updates of the same type, which may absorb it by
+  growing their box (`MetadataChunkBlock.func_866_a`, World.java:1702-1713), and it is
+  dropped when its box's centre column is not loaded (World.java:1696-1699). Light therefore
+  spreads over several ticks after large edits (`light/skylight-column`).
