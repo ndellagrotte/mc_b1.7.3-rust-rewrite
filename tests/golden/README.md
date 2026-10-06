@@ -749,6 +749,37 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   Java's shared object, and `sendUseItem`'s identity test is an explicit result (`use_item`
   docs there).
 
+Redstone (WP-1.6 task c), empty world, seed 123, the stone platform at y = 60; every
+`scenario.json` has a `comment` with the layout:
+
+- `tick/redstone-wire-line`: a torch and 15 wires (levels 15..1), and a second line over a
+  step up and down (`calculateCurrentChanges`' diagonal connections), placed silently and by
+  `set_block`; both torches removed at t = 10. `block_box`, `power` and `scheduled_ticks`
+  every tick. The `blocksNeedingUpdate` `HashSet` order decides the notification order.
+- `tick/redstone-torch-inverter`: a lever (switched by `set_block` with meta 13 / 5) into a
+  block with a torch on it, and a one-torch clock whose wire runs back into its block: eight
+  turn-offs within 100 ticks burn it out (`torchUpdates`, the `random.fizz` draws at t = 30),
+  a neighbour change at t = 130 relights it after the history expired.
+- `tick/repeater-delays`: four repeaters (delays 1-4) in a row behind a torch, a one-tick
+  lever pulse into a delay-4 repeater, a repeater facing -x; `power` in front of each.
+- `tick/button-lever`: `use_item` (empty hand) on a lever, a button (released by its
+  `updateTick` 20 ticks later; a second press while pressed changes nothing) and a repeater
+  (delay cycling); `ray_trace` into the lever and the button (bounds while pressed).
+- `tick/pressure-plate` (tier C): items fall onto a wooden plate (pressed from inside the
+  item's `moveEntity`, rechecked every 20 ticks, released after `set_pos` moves the item
+  off) and a stone plate (ignores items); `entity_state`, `power`, `ray_trace`.
+- `tick/redstone-ore-touch`: `use_item` on redstone ore (glows, `sparkle` draws from
+  `World.rand`), a layer of glowing ore whose random ticks revert it and whose
+  `randomDisplayTick` draws `World.rand` inside `randomDisplayUpdates`; an item landing on
+  ore does not trigger `onEntityWalking` (`EntityItem.canTriggerWalking` is false).
+- `tick/torch-placement` (tier C): torches and redstone torches on every face of a block,
+  on the floor, on a fence and in mid-air (dropped), the supports removed at t = 10 and
+  t = 20; a redstone torch under a block powering it and an inverter on that block;
+  `ray_trace` against the torches (`BlockTorch.collisionRayTrace` bounds).
+- `tick/redstone-item-placement`: torches, levers, buttons, a repeater and redstone placed
+  from items (`onBlockPlaced`, `onBlockPlacedBy`). The port's test is ignored until
+  `Item.onItemUse` lands (WP-2.6).
+
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
 would need the one-in-100000 roll on a platform column of a rainy biome, and
