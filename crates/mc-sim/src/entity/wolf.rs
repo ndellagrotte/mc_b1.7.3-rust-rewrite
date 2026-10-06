@@ -540,12 +540,13 @@ pub fn get_vertical_face_speed(e: &Entity) -> i32 {
     if is_wolf_sitting(e) { 20 } else { 40 }
 }
 
-/// `getPathOrWalkableBlock(target, distance)` (private): a path to the
+/// `getPathOrWalkableBlock(target, distance)` (private in Java; `target` by
+/// id, public for the tests): a path to the
 /// target (range 16); with none beyond 12 blocks, a teleport to the first
 /// free cell (solid below, two clear above) on the rim of the 5 × 5 square
 /// around the target's feet (x outer, z inner, the inner 3 × 3 skipped).
 // src: EntityWolf.java:229-248
-fn get_path_or_walkable_block(e: &mut Entity, world: &mut World, target: i32, var2: f32) {
+pub fn get_path_or_walkable_block(e: &mut Entity, world: &mut World, target: i32, var2: f32) {
     let Some(tb) = world.entity(target).map(|t| t.base.clone()) else {
         world
             .note_unimplemented("EntityWolf.getPathOrWalkableBlock: the target is not in its slot");
