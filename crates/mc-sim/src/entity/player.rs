@@ -15,8 +15,11 @@
 //! (`new ContainerPlayer(inventory, !multiplayerWorld)`,
 //! EntityPlayer.java:42-43); EntityPlayerSP's `mc`, `movementInput`,
 //! `username` from the session and the stat writer (EntityPlayerSP.java:12-21,
-//! client); the remaining `EntityPlayer` fields (score, swing, camera yaw,
-//! bed and spawn coordinates, portal timers, fishing hook).
+//! client); the remaining `EntityPlayer` fields (score, camera yaw,
+//! bed and spawn coordinates, portal timers, fishing hook). The swing fields
+//! (`isSwinging`, `swingProgressInt`, EntityPlayer.java:14-15) exist and
+//! [`swing_item`] sets them; their per-tick advance in
+//! `updatePlayerActionState` (EntityPlayer.java:158-170) is WP-2.5.
 //!
 //! [`World::unimplemented_hits`]: crate::world::World::unimplemented_hits
 

@@ -608,11 +608,25 @@ fn apply(
 ///    nothing was placed, `used = sendUseItem` ([`send_use_item`]) on the
 ///    slot's stack, if any.
 ///
+/// Stack identity: Java passes the slot's `ItemStack` object around, and
+/// `Item.onItemUse` / `Item.onItemRightClick` mutate it in place (an
+/// `ItemBlock` placement decrements `stackSize`). Stacks are values here, so
+/// the held stack is passed as the hotbar *slot* that holds it
+/// (`Option<usize>`, `None` for Java's `null`): [`item_stack_use_item`] runs
+/// on the stack in that slot and the mutation lands in the slot, and the
+/// size-0 test reads the slot, which is Java's `held` because nothing in
+/// sendPlaceBlock stores another stack into the slot (no b1.7.3
+/// `blockActivated` or `onItemUse` assigns `mainInventory`). Java's identity
+/// test in `sendUseItem` (`var5 != var3`) is the explicit
+/// [`RightClickResult`] instead. WP-2.6 transcribes `onItemUse` and
+/// `onItemRightClick` against these signatures (`&mut ItemStack`), never on
+/// a copy.
+///
 /// Recorded gaps (WP-2.6, item behaviour): `Item.onItemUse` (treated as
 /// returning false, so `ItemStack.useItem` returns false and adds no stat)
-/// and `Item.onItemRightClick` (treated as returning the stack unchanged, so
-/// `sendUseItem` returns false). `blockActivated` goes through the block
-/// dispatch, whose untranscribed overrides record themselves.
+/// and `Item.onItemRightClick` (treated as returning the same stack
+/// unchanged, so `sendUseItem` returns false). `blockActivated` goes through
+/// the block dispatch, whose untranscribed overrides record themselves.
 fn use_item(
     world: &mut World,
     p: &mut mc_sim::entity::Entity,
@@ -622,60 +636,63 @@ fn use_item(
     z: i32,
     side: i32,
 ) -> (bool, bool, Option<ItemStack>) {
-    /// `inventory.mainInventory[inventory.currentItem]`.
-    fn inv_cur(p: &mut mc_sim::entity::Entity) -> &mut Option<ItemStack> {
-        let inv = &mut p
-            .kind
-            .player_mut()
-            .expect("the player op's entity is an EntityPlayer")
-            .inventory;
-        &mut inv.main_inventory[inv.current_item as usize]
-    }
-    /// `inventory.getCurrentItem()` (InventoryPlayer.java:15-17).
-    fn current_item(p: &mc_sim::entity::Entity) -> Option<ItemStack> {
-        p.kind
-            .player()
-            .expect("the player op's entity is an EntityPlayer")
-            .inventory
-            .get_current_item()
-            .copied()
-    }
     if let Some((id, count, meta)) = stack {
+        let inv = &mut player_data(p).inventory;
         // src: ItemStack.java:33-38 (new ItemStack(id, count, damage))
-        *inv_cur(p) = Some(ItemStack::new(id, count.unwrap_or(1), meta.unwrap_or(0)));
+        inv.main_inventory[inv.current_item as usize] =
+            Some(ItemStack::new(id, count.unwrap_or(1), meta.unwrap_or(0)));
     }
     // `new PlayerControllerSP(null)`: its constructor only stores `mc`
     // (PlayerControllerSP.java), and sendPlaceBlock / sendUseItem are
     // PlayerController's (not overridden), which never read it.
     let mut not_placed = true;
-    let held = current_item(p);
+    // held = inv.getCurrentItem(), as the slot holding it.
+    let held = current_item_slot(p);
     let placed = send_place_block(world, p, held, x, y, z, side);
     if placed {
         not_placed = false;
         swing_item(p);
     }
     let mut used = false;
-    if held.is_some() {
-        // Java tests the `held` object, which is the slot's stack (stacks are
-        // values here; nothing has replaced the slot since `held` was read).
-        if inv_cur(p).is_some_and(|s| s.stack_size == 0) {
-            *inv_cur(p) = None;
+    if let Some(slot) = held {
+        // `held.stackSize == 0`: the slot still holds `held` (use_item docs).
+        let inv = &mut player_data(p).inventory;
+        if inv.main_inventory[slot].is_some_and(|s| s.stack_size == 0) {
+            inv.main_inventory[inv.current_item as usize] = None;
         }
         if not_placed {
-            let again = current_item(p);
-            used = again.is_some_and(|s| send_use_item(world, p, s));
+            // again = inv.getCurrentItem(); again != null && sendUseItem(...)
+            used = current_item_slot(p).is_some_and(|again| send_use_item(world, p, again));
         }
     }
-    (placed, used, current_item(p))
+    let current = player_data(p).inventory.get_current_item().copied();
+    (placed, used, current)
+}
+
+/// The `EntityPlayer` level of the `use_item` player.
+fn player_data(p: &mut mc_sim::entity::Entity) -> &mut mc_sim::entity::PlayerData {
+    p.kind
+        .player_mut()
+        .expect("the player op's entity is an EntityPlayer")
+}
+
+/// `inventory.getCurrentItem()` (InventoryPlayer.java:15-17) as the slot that
+/// holds the stack: `Some(currentItem)` when it returns a stack, `None` for
+/// `null`.
+fn current_item_slot(p: &mut mc_sim::entity::Entity) -> Option<usize> {
+    let inv = &player_data(p).inventory;
+    inv.get_current_item().map(|_| inv.current_item as usize)
 }
 
 /// `PlayerController.sendPlaceBlock(player, world, stack, x, y, z, side)`:
-/// the block's `blockActivated`, else `stack.useItem(...)`.
+/// the block's `blockActivated`, else `stack.useItem(...)`. `stack` is the
+/// slot of `mainInventory` holding Java's `var3` (`None` for `null`; see
+/// [`use_item`]).
 // src: PlayerController.java:75-82
 fn send_place_block(
     world: &mut World,
     p: &mut mc_sim::entity::Entity,
-    stack: Option<ItemStack>,
+    stack: Option<usize>,
     x: i32,
     y: i32,
     z: i32,
@@ -687,7 +704,18 @@ fn send_place_block(
     } else {
         match stack {
             None => false,
-            Some(s) => item_stack_use_item(world, p, s, x, y, z, side),
+            Some(slot) => {
+                // The stack is moved out of its slot while the item runs, so
+                // that it and the player can both be borrowed mutably, and
+                // put back afterwards: whatever onItemUse does to it lands
+                // in the slot, as on Java's shared object.
+                let mut s = player_data(p).inventory.main_inventory[slot]
+                    .take()
+                    .expect("sendPlaceBlock's stack is the slot's stack");
+                let r = item_stack_use_item(&mut s, world, p, x, y, z, side);
+                player_data(p).inventory.main_inventory[slot] = Some(s);
+                r
+            }
         }
     }
 }
@@ -695,37 +723,77 @@ fn send_place_block(
 /// `ItemStack.useItem(player, world, x, y, z, side)`:
 /// `getItem().onItemUse(...)`, and on success
 /// `player.addStat(StatList.objectUseStats[itemID], 1)`. `Item.onItemUse` is
-/// item behaviour (WP-2.6): recorded and treated as false (module docs of
-/// [`use_item`]), so no stat is added.
+/// item behaviour (WP-2.6): recorded and treated as false (docs of
+/// [`use_item`]), so no stat is added. While it runs, `stack` is out of the
+/// player's inventory (the slot is empty; [`send_place_block`]).
 // src: ItemStack.java:58-65
 fn item_stack_use_item(
+    stack: &mut ItemStack,
     world: &mut World,
     p: &mut mc_sim::entity::Entity,
-    stack: ItemStack,
     x: i32,
     y: i32,
     z: i32,
     side: i32,
 ) -> bool {
-    let _ = (p, stack, x, y, z, side);
+    let _ = (stack, p, x, y, z, side);
     world.note_unimplemented("Item.onItemUse");
     false
 }
 
+/// What `ItemStack.useItemRightClick` returned, standing in for Java's
+/// identity test `var5 != var3` in `sendUseItem`.
+enum RightClickResult {
+    /// `var3` itself (possibly mutated in place, in the slot).
+    Same,
+    /// Another object (`ItemBucket`, `ItemSoup`, ...). Never `null` in
+    /// b1.7.3: no `onItemRightClick` override returns `null`.
+    #[expect(
+        dead_code,
+        reason = "built by the onItemRightClick overrides (WP-2.6); read by send_use_item"
+    )]
+    Replaced(ItemStack),
+}
+
+/// `ItemStack.useItemRightClick(world, player)`:
+/// `getItem().onItemRightClick(this, world, player)`. Item behaviour
+/// (WP-2.6): recorded and taken to return `this` unchanged.
+// src: ItemStack.java:71-73
+fn item_stack_use_item_right_click(
+    stack: &mut ItemStack,
+    world: &mut World,
+    p: &mut mc_sim::entity::Entity,
+) -> RightClickResult {
+    let _ = (stack, p);
+    world.note_unimplemented("Item.onItemRightClick");
+    RightClickResult::Same
+}
+
 /// `PlayerController.sendUseItem(player, world, stack)`: `useItemRightClick`;
 /// a changed stack (another object, or another size) replaces the slot and
-/// counts as used. `ItemStack.useItemRightClick` →
-/// `Item.onItemRightClick` is item behaviour (WP-2.6): recorded and treated
-/// as returning the same stack, so nothing changes and the result is false.
-// src: PlayerController.java:47-61, ItemStack.java:71-73
-fn send_use_item(world: &mut World, p: &mut mc_sim::entity::Entity, stack: ItemStack) -> bool {
-    let _ = (p, stack);
-    // var4 = var3.stackSize; var5 = var3.useItemRightClick(world, player):
-    // Item.onItemRightClick (WP-2.6) is recorded and taken to return var3
-    // itself, so `var5 != var3 || var5 != null && var5.stackSize != var4` is
-    // false and the slot is left alone.
-    world.note_unimplemented("Item.onItemRightClick");
-    false
+/// counts as used. `stack` is the slot holding Java's `var3` (see
+/// [`use_item`]).
+// src: PlayerController.java:47-61
+fn send_use_item(world: &mut World, p: &mut mc_sim::entity::Entity, stack: usize) -> bool {
+    let mut var3 = player_data(p).inventory.main_inventory[stack]
+        .take()
+        .expect("sendUseItem's stack is the slot's stack");
+    let var4 = var3.stack_size;
+    let r = item_stack_use_item_right_click(&mut var3, world, p);
+    let inv = &mut player_data(p).inventory;
+    // var3 goes back into its slot first: Java's var3 never left it.
+    inv.main_inventory[stack] = Some(var3);
+    let var5 = match r {
+        RightClickResult::Same if var3.stack_size == var4 => return false,
+        RightClickResult::Same => var3,
+        RightClickResult::Replaced(s) => s,
+    };
+    let cur = inv.current_item as usize;
+    inv.main_inventory[cur] = Some(var5);
+    if var5.stack_size == 0 {
+        inv.main_inventory[cur] = None;
+    }
+    true
 }
 
 /// `Dumps.stack`: `{id, count, damage}` or `null`.

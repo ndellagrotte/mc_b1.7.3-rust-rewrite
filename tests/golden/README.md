@@ -744,7 +744,10 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   `null` / `{280,1,0}`; `rng_state` every tick shows the op draws nothing. The Rust driver
   records `Item.onItemUse` / `Item.onItemRightClick` as gaps (item behaviour, WP-2.6) and
   takes the base results, which are what a plain item does
-  (`crates/mc-golden/src/tick_driver.rs`, op table).
+  (`crates/mc-golden/src/tick_driver.rs`, op table). The held stack is passed as its hotbar
+  slot, so the in-place mutations of `onItemUse` / `onItemRightClick` land in the slot as on
+  Java's shared object, and `sendUseItem`'s identity test is an explicit result (`use_item`
+  docs there).
 
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
