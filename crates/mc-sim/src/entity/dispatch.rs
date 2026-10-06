@@ -169,6 +169,9 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("EntityPig", &["fall", "interact"]),
     // src: EntityPigZombie.java:18-25, :49-65 (super::pig_zombie, WP-2.3)
     ("EntityPigZombie", &["attackEntityFrom", "onUpdate"]),
+    // src: EntityPlayer.java:349-351 (transcribed by WP-2.3b: the mobs aim at
+    // and look at the player's eyes; the rest of EntityPlayer is WP-2.5)
+    ("EntityPlayer", &["getEyeHeight"]),
     // src: EntitySheep.java:19-21, :34-53 (super::sheep, WP-2.3)
     ("EntitySheep", &["attackEntityFrom", "interact"]),
     // src: EntitySlime.java:43-66, :98-112, :114-120 (super::slime, WP-2.3)
@@ -492,10 +495,13 @@ pub fn can_be_pushed(e: &Entity, world: &World) -> bool {
 
 /// `getEyeHeight()`.
 pub fn get_eye_height(e: &Entity, world: &World) -> f32 {
+    let _ = world;
     match e.kind {
         // src: EntityWolf.java:221-223
         K::Wolf(..) => return wolf::get_eye_height(e),
-        K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.getEyeHeight"),
+        // src: EntityPlayer.java:349-351 (the player's posY is its eyes:
+        // yOffset 1.62, EntityPlayer.java:44)
+        K::PlayerSp(..) => return 0.12,
         _ => {}
     }
     if e.kind.living().is_some() {
