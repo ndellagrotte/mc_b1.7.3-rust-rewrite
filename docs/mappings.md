@@ -17,7 +17,14 @@ mixed-case originals).
 | `StepSound.field_1678_a` | `StepSound::step_sound_name` | Only read as `"step." + field_1678_a` by `stepSoundDir()`/`stepSoundDir2()` (StepSound.java:22-28); values `"stone"`, `"wood"`, `"gravel"`, … (Block.java:7-15) |
 | `StepSound.field_1677_b` | `StepSound::step_sound_volume` | Returned by `getVolume()` (StepSound.java:14-16); callers pass it as a sound volume (Entity.java:493, EntityLiving.java:448) |
 | `StepSound.field_1679_c` | `StepSound::step_sound_pitch` | Returned by `getPitch()` (StepSound.java:18-20); passed as the pitch (Entity.java:493) |
-| `MetadataChunkBlock.field_1298_b`, `field_1304_c`, `field_1303_d`, `field_1302_e`, `field_1301_f`, `field_1300_g` | `MetadataChunkBlock::bounds[0..6]` | Assigned from the constructor's x0, y0, z0, x1, y1, z1 in that order (MetadataChunkBlock.java:12-20); `func_4127_a` uses them as box min/max (`field_1302_e - field_1298_b + 1`, :22-25). Grouped into one array; WP-1.3 may split them when it transcribes `func_4127_a` |
+| `MetadataChunkBlock.field_1298_b` | `MetadataChunkBlock::min_x` | Constructor's first coordinate (MetadataChunkBlock.java:14); `func_4127_a` loops x from it up to `field_1302_e` (:35) and sizes the box as `field_1302_e - field_1298_b + 1` (:23). Split from WP-0.5's grouped `bounds[0]` |
+| `MetadataChunkBlock.field_1304_c` | `MetadataChunkBlock::min_y` | Second coordinate (:15); the y loop starts there (:65) after clamping it to `>= 0` (:57-59) |
+| `MetadataChunkBlock.field_1303_d` | `MetadataChunkBlock::min_z` | Third coordinate (:16); the z loop starts there (:36) |
+| `MetadataChunkBlock.field_1302_e` | `MetadataChunkBlock::max_x` | Fourth coordinate (:17); inclusive end of the x loop (:35); the `+x` neighbour is notified only at `x + 1 >= field_1302_e` (:135) |
+| `MetadataChunkBlock.field_1301_f` | `MetadataChunkBlock::max_y` | Fifth coordinate (:18); clamped to `<= 127` (:61-63), inclusive end of the y loop (:65) |
+| `MetadataChunkBlock.field_1300_g` | `MetadataChunkBlock::max_z` | Sixth coordinate (:19); inclusive end of the z loop (:36) |
+| `MetadataChunkBlock.func_4127_a(World)` | `MetadataChunkBlock::update_light` | The light update itself: recomputes every block of the box from its neighbours, emission (`Block.lightValue`) or sky access, and opacity, writes it with `setLightValue` and queues neighbours (MetadataChunkBlock.java:22-153); its only caller is `World.updatingLighting` (World.java:1674) |
+| `MetadataChunkBlock.func_866_a(int×6)` | `MetadataChunkBlock::try_merge` | Called by `scheduleLightingUpdate_do` on the five newest queued updates of the same type (World.java:1708-1713): true when the new box is inside this one, or when this one could be grown to include it at a cost of at most 2 in `(max-min)` volume, in which case it is grown in place (MetadataChunkBlock.java:155-206) |
 | `BlockStep.field_22037_a` | `block::STEP_TYPE_NAMES` | Static `{"stone", "sand", "wood", "cobble"}` (BlockStep.java:6), indexed by slab metadata: `ItemSlab.getItemNameIS` returns `super.getItemName() + "." + field_22037_a[damage]` (ItemSlab.java:18-20), and the four entries match the four slab textures of `BlockStep.getBlockTextureFromSideAndMetadata` (BlockStep.java:19-33). Static, so not in the `block_table` dump |
 | `BlockRedstoneRepeater.field_22023_b` | `block::REPEATER_DELAYS` | Static `{1, 2, 3, 4}` (BlockRedstoneRepeater.java:7), indexed by the delay setting `(meta & 12) >> 2`; the scheduled tick delay is twice the entry (BlockRedstoneRepeater.java:36-37, :93-97); the redstone task of WP-1.6 reads it |
 
@@ -43,6 +50,8 @@ mixed-case originals).
 | `BlockRedstoneOre.field_468_a` | `BlockKind::RedstoneOre { field_468_a }` | True for the glowing ore (id 74): the constructor enables random ticks only then (BlockRedstoneOre.java:8-15); pinned per block by `block/block-table` (`fields.field_468_a`) |
 | `TileEntity.field_31007_h` | `TileEntity::field_31007_h` | The "invalid" flag: `isInvalid()` returns it, `invalidate()`/`validate()` set it (TileEntity.java:88-98) |
 | `MetadataChunkBlock.field_1299_a` | `MetadataChunkBlock::field_1299_a` | Which light (`EnumSkyBlock`) the update is for (MetadataChunkBlock.java:4, :13) |
+| `Chunk.func_1014_a` | — (not ported) | Empty in `Chunk` and `EmptyChunk` (Chunk.java:64-65, EmptyChunk.java:25-26); called after a chunk is read from disk (ChunkLoader.java:173), so its call site needs nothing |
+| `Chunk.func_4143_d` | — (not ported) | Empty in `Chunk` and `EmptyChunk` (Chunk.java:133-134, EmptyChunk.java:34-35); called right after a chunk enters the cache (ChunkProvider.java:48, ChunkProviderLoadOrGenerate.java:71) |
 
 ## Real names changed for Rust
 
