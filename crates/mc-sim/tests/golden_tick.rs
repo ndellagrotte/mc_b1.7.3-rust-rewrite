@@ -71,6 +71,14 @@ fixtures! {
     tick_fire_rain_spread => "tick" / "fire-rain-spread";
     tick_fire_spread_planks => "tick" / "fire-spread-planks";
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
+    #[ignore = "needs BlockFire (fire task of WP-1.6): first diff line 20 (t=9 scheduled_ticks: the oracle has BlockFire.onBlockAdded's tick for the fire still lava set at (-1,62,-5)); lines 1-19 (BlockStationary.updateTick's draws, setNotStationary) match"]
+    tick_flat_lava_fire => "tick" / "flat-lava-fire";
+    tick_flat_lava_flow => "tick" / "flat-lava-flow";
+    tick_flat_lava_flow_nether => "tick" / "flat-lava-flow-nether";
+    tick_flat_water_drain => "tick" / "flat-water-drain";
+    tick_flat_water_item_push => "tick" / "flat-water-item-push";
+    tick_flat_water_lava_mix => "tick" / "flat-water-lava-mix";
+    tick_flat_water_spread_holes => "tick" / "flat-water-spread-holes";
     tick_flat_sand_falls => "tick" / "flat-sand-falls";
     tick_flat_torch_light => "tick" / "flat-torch-light";
     tick_flat_water_flow => "tick" / "flat-water-flow";
@@ -84,7 +92,7 @@ fixtures! {
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4: blocks, data, light, height map all differ); then the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3). BlockSapling/BlockGrass random ticks are in (WP-1.6)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     tick_snow_ice => "tick" / "snow-ice";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 7 (t=4 scheduled_ticks, 2557 expected: populated liquids schedule ticks); then BlockFlowing (fluids task of WP-1.6)"]
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=4 block -26,68,-58: expected air, the port has falling water); lines 1-3 match. The oracle's population schedules thousands of liquid ticks (2557 pending at t=4) ahead of the source's, and TickUpdates runs at most 1000 a tick, so the source has not flowed yet; BlockFlowing/BlockStationary are in (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
     tick_weather_time => "tick" / "weather-time";
     tick_weather_snow => "tick" / "weather-snow";

@@ -1,0 +1,13 @@
+{"name":"flat-water-item-push","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","mob_spawning":"none","ticks":100,
+ "comment":"Water from a source at (0,61,0) flows into a yellow flower on dirt at (2,61,0): BlockFlowing.flowIntoBlock drops it as an item (Block.dropBlockAsItem, BlockFlowing.java:116-130: World.rand and Math.random() draws), and the EntityItem is pushed by the flow (World.handleMaterialAcceleration -> BlockFluid.velocityToAddToEntity / getFlowVector, BlockFluid.java:98-185). entity_state and rng_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"set_block_silent","x":2,"y":60,"z":0,"id":3},
+        {"t":0,"op":"set_block_silent","x":2,"y":61,"z":0,"id":37},
+        {"t":0,"op":"set_block","x":0,"y":61,"z":0,"id":8,"meta":0}],
+ "dumps":[{"every":10,"what":"block_box","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":62,"z1":8},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"every":1,"what":"rng_state"}]}
