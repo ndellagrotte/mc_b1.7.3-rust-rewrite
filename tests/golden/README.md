@@ -1131,6 +1131,8 @@ animals' 8-block look range and out of reach of the drops (its look-at target ne
   shakes for 40 ticks, standing still (`isMovementCeased`), with the shake sound and splash
   draws; `weather` every tick.
 - `entity/wolf-bone-refused` (player): two bones refused (smoke draws), then stone (false).
+  The interact ticks are chosen so that the taming rolls fail with seed 123 and with the
+  flipped seed of `check-sensitivity.sh`: a taming would stop the oracle run (below).
 - `entity/wolf-begs-bone` (player 5 blocks away; ignored until WP-2.5's
   `EntityPlayer.getEyeHeight`): the wolf picks the player as its look target and, seeing a
   bone in hand, keeps facing it (`looksWithInterest`, `numTicksToChaseTarget = 10`).

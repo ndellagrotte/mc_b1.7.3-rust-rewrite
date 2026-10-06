@@ -1,5 +1,5 @@
 {"name": "wolf-bone-refused", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 300, "mob_spawning": "none",
- "comment": "WP-2.3 task 1. A wolf (id 1) in the fenced stone pen of entity/sheep-shear; the player (id 0) on a stone pad at (7.5, 61, -10.5), out of the wolf's 8-block look range (EntityLiving's look-at reads EntityPlayer.getEyeHeight, WP-2.5: entity/wolf-begs-bone). t=5 interact with 5 bones (352): EntityWolf.interact (EntityWolf.java:326-378) eats one and rolls rand.nextInt(3); with seed 123 the roll fails: showHeartsOrSmokeFX(false), seven smoke particles of three nextGaussian and three nextFloat draws each, and true. t=11 the 4 remaining bones, refused again. t=30 two stone: false. The oracle's HarnessPlayer has a null username (EntityPlayer.username, set only by EntityPlayerSP from the session), so a successful taming throws NullPointerException in setWolfOwner (DataWatcher.updateObject); the ticks were chosen so that both rolls fail (t = 6, 9, 10, 15, 16 would tame). The tamed wolf (following, sitting, feeding, the owner checks) is therefore not pinned. rng_state and entity_state every tick.",
+ "comment": "WP-2.3 task 1. A wolf (id 1) in the fenced stone pen of entity/sheep-shear; the player (id 0) on a stone pad at (7.5, 61, -10.5), out of the wolf's 8-block look range (EntityLiving's look-at reads EntityPlayer.getEyeHeight, WP-2.5: entity/wolf-begs-bone). t=8 interact with 5 bones (352): EntityWolf.interact (EntityWolf.java:326-378) eats one and rolls rand.nextInt(3); with seed 123 the roll fails: showHeartsOrSmokeFX(false), seven smoke particles of three nextGaussian and three nextFloat draws each, and true. t=14 the 4 remaining bones, refused again. t=30 two stone: false. The oracle's HarnessPlayer has a null username (EntityPlayer.username, set only by EntityPlayerSP from the session), so a successful taming throws NullPointerException in setWolfOwner (DataWatcher.updateObject); the ticks were chosen so that both rolls fail with seed 123 and with the seed check-sensitivity.sh flips to (122), where a taming would stop the oracle run. The tamed wolf (following, sitting, feeding, the owner checks) is therefore not pinned. rng_state and entity_state every tick.",
  "ops":[{"t": 0, "op": "fill", "x0": 0, "y0": 60, "z0": 0, "x1": 15, "y1": 60, "z1": 15, "id": 1},
         {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 0, "x1": 15, "y1": 61, "z1": 0, "id": 85},
         {"t": 0, "op": "fill", "x0": 0, "y0": 61, "z0": 15, "x1": 15, "y1": 61, "z1": 15, "id": 85},
@@ -8,8 +8,8 @@
         {"t": 0, "op": "fill", "x0": 6, "y0": 60, "z0": -12, "x1": 9, "y1": 60, "z1": -10, "id": 1},
         {"t": 0, "op": "player", "x": "0x401e000000000000", "y": 61, "z": "0xc025000000000000"},
         {"t": 0, "op": "spawn", "kind": "Wolf", "pos": ["0x401e000000000000", 61, "0x4004000000000000"], "id": 1},
-        {"t": 5, "op": "interact", "id": 1, "item_id": 352, "count": 5},
-        {"t": 11, "op": "interact", "id": 1},
+        {"t": 8, "op": "interact", "id": 1, "item_id": 352, "count": 5},
+        {"t": 14, "op": "interact", "id": 1},
         {"t": 30, "op": "interact", "id": 1, "item_id": 1, "count": 2}],
  "dumps":[{"every": 1, "what": "rng_state"},
           {"every": 1, "what": "entity_state", "which": "all"}]}
