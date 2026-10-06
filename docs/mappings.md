@@ -173,7 +173,10 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `ColorizerGrass.getGrassColor`, `ColorizerFoliage.getFoliageColor` | `block::grass::colormap_index` (+ a lookup that has no colormap) | the colormaps are client textures (D8); the index formula is the shared part |
 | `World.entityJoinedWorld` | `World::spawn_entity_in_world` | the b1.7.3 name of later versions' `spawnEntityInWorld`; the doc comment keeps the Java name |
 | `World.worldAccesses` | `World::events` | the listener list becomes an event queue (PLAN_v4 §3.2) |
-| `Entity.mountEntity(null)` | `entity::base::dismount` | only the null case is ported so far |
+| `Entity.mountEntity(entity)` | `entity::base::mount_entity(e, world, Option<&mut Entity>)`, `mount_entity_in_world(e, world, id)`; the `null` case also as `dismount` / `dismount_from` (mount in hand) | the target is passed in hand (out of its slot) or by id; the other entities the Java reaches through `ridingEntity` / `riddenByEntity` are found in the world by id (WP-2.1) |
+| `Entity.updateRiderPosition()` | `entity::dispatch::update_rider_position(mount, rider, world)` | Java positions `this.riddenByEntity`; the rider is usually out of its slot, so the caller passes it |
+| `Entity.getLookVec()`, `getEntityTexture()`, `getBoundingBox()`, `getCollisionBox(e)` returning `null` | `Option<…>` returning `None` | |
+| `new EntityWeatherEffect(world)` (abstract class, no members) | `entity::base::new_weather_effect(world) -> EntityBase` | `EntityKindData::LightningBolt` carries the empty `WeatherEffectData` level |
 | `Entity.nextEntityID` (static) | `World::next_entity_id` | per-world, reset per scenario (PLAN_v4 §4.2) |
 | `NextTickListEntry.nextTickEntryID` (static) | `World::next_tick_entry_id` | as above |
 | `World.lightingUpdatesScheduled` (static) | `World::lighting_updates_scheduled` | as above |

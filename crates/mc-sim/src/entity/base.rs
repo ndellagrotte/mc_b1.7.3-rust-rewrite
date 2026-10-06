@@ -5,14 +5,79 @@
 //! are `impl EntityBase`. Methods that touch the world or call an overridable
 //! method are free functions over `(e: &mut Entity, world: &mut World)`, and
 //! make every virtual call through [`super::dispatch`] (module docs of
-//! [`crate::entity`]).
+//! [`crate::entity`]). A method a subclass overrides is called through its
+//! [`super::dispatch`] entry point; the function here is `Entity`'s body,
+//! which the entry point runs for the kinds that inherit it.
 //!
-//! Not ported here: NBT (`writeToNBT`/`readFromNBT`, WP-1.9/Phase 2),
-//! client-only code (`setAngles`, `getEntityBrightness`, `isInRangeToRender*`,
-//! `setPositionAndRotation2`, `getShadowSize`, `getLookVec`, `performHurtAnimation`,
-//! `handleHealthUpdate`, `updateCloak`, `outfitWithItem`), and
-//! `mountEntity(non-null)`, `preparePlayerToSpawn`, `onStruckByLightning`,
-//! `applyEntityCollision`, `isEntityInsideOpaqueBlock` (WP-2.1).
+//! # Audit of Entity.java (WP-2.1)
+//!
+//! Every method of Entity.java, against this module, [`super::dispatch`],
+//! [`super::nbt`] and the driver in `world/entities.rs`
+//! (`updateEntityWithOptionalForce` and the chunk bookkeeping, World.java:1178-1355,
+//! checked line by line: no gap). "WP-0.5" bodies were re-read line by line
+//! in WP-2.1 against the Java and pinned by the `entity/item-*` and
+//! `entity/falling-sand-on-cactus` fixtures where a transcribed kind reaches
+//! them. No method is left a stub.
+//!
+//! | Entity.java | Method | Status | Port |
+//! |---|---|---|---|
+//! | 75-113 | constructor | transcribed (WP-0.5); `rand` seeded per PLAN_v4 §4.2 | [`EntityBase::new`] |
+//! | 115 | `entityInit` (abstract) | per leaf class | the leaf constructors |
+//! | 117-119 | `getDataWatcher` | field | `EntityBase::data_watcher` |
+//! | 121-131 | `equals`, `hashCode` | identity is the entity id | [`Entity::id`] |
+//! | 133-147 | `preparePlayerToSpawn` | transcribed (WP-2.1) | [`prepare_player_to_spawn`], dispatched |
+//! | 149-151 | `setEntityDead` | transcribed | [`EntityBase::set_entity_dead`], dispatched |
+//! | 153-161 | `setSize`, `setRotation` | transcribed | [`EntityBase::set_size`], [`EntityBase::set_rotation`] |
+//! | 163-170 | `setPosition` | transcribed | [`EntityBase::set_position`] |
+//! | 172-187 | `setAngles` | transcribed (WP-2.1) | [`EntityBase::set_angles`] |
+//! | 189-191 | `onUpdate` | transcribed | [`on_update`], dispatched |
+//! | 193-269 | `onEntityUpdate` | transcribed, verified (WP-2.1) | [`on_entity_update`], dispatched |
+//! | 271-281 | `setOnFireFromLava`, `kill` | transcribed | [`set_on_fire_from_lava`], [`kill`] (dispatched) |
+//! | 283-291 | `isOffsetPositionInLiquid` | transcribed | [`is_offset_position_in_liquid`] |
+//! | 293-540 | `moveEntity` | transcribed, verified (WP-2.1) | [`move_entity`], dispatched |
+//! | 542-556 | `canTriggerWalking`, `updateFallState` | transcribed | dispatched; [`update_fall_state`] |
+//! | 558-574 | `getBoundingBox`, `dealFireDamage`, `fall` | transcribed | dispatched; [`deal_fire_damage`], [`fall`] |
+//! | 576-586 | `isWet`, `isInWater`, `handleWaterMovement` | transcribed | [`is_wet`], [`EntityBase::is_in_water`] and [`handle_water_movement`] (both dispatched) |
+//! | 588-609 | `isInsideOfMaterial`, `getEyeHeight`, `handleLavaMovement` | transcribed | [`is_inside_of_material`], dispatched, [`handle_lava_movement`] |
+//! | 611-626 | `moveFlying` | transcribed | [`move_flying`] |
+//! | 628-643 | `getEntityBrightness` | transcribed (WP-2.1) | [`get_entity_brightness`] |
+//! | 645-647 | `setWorld` | no port: an entity belongs to the world that runs it | — |
+//! | 649-676 | `setPositionAndRotation`, `setLocationAndAngles` | transcribed | [`EntityBase`] methods |
+//! | 678-704 | `getDistanceToEntity`, `getDistanceSq`, `getDistance`, `getDistanceSqToEntity` | transcribed | [`EntityBase`] methods |
+//! | 706-707 | `onCollideWithPlayer` | empty body | [`on_collide_with_player`], dispatched |
+//! | 709-734 | `applyEntityCollision` | transcribed (WP-2.1) | [`apply_entity_collision`], dispatched |
+//! | 736-744 | `addVelocity`, `setBeenAttacked` | transcribed | [`EntityBase::add_velocity`] (dispatched), [`EntityBase::set_been_attacked`] |
+//! | 746-757 | `attackEntityFrom`, `canBeCollidedWith`, `canBePushed` | transcribed | [`attack_entity_from`], dispatched |
+//! | 759-760 | `addToPlayerScore` | empty body | dispatched |
+//! | 762-774 | `isInRangeToRenderVec3D`, `isInRangeToRenderDist` | transcribed (WP-2.1, render data) | [`is_in_range_to_render_vec3d`], [`is_in_range_to_render_dist`], dispatched |
+//! | 776-778 | `getEntityTexture` | base `null` | dispatched |
+//! | 780-841 | `addEntityID`, `writeToNBT`, `readFromNBT`, `getEntityString`, the abstract NBT pair | transcribed (WP-1.9b) | [`super::nbt`] |
+//! | 843-867 | `newDoubleNBTList`, `newFloatNBTList` | transcribed, verified (WP-2.1) | [`super::nbt`] |
+//! | 869-871 | `getShadowSize` | transcribed (WP-2.1, render data) | [`get_shadow_size`], dispatched |
+//! | 873-886 | `dropItem`, `dropItemWithOffset`, `entityDropItem` | transcribed | [`drop_item`], [`drop_item_with_offset`], [`entity_drop_item`] |
+//! | 888-890 | `isEntityAlive` | transcribed | dispatched |
+//! | 892-906 | `isEntityInsideOpaqueBlock` | transcribed (WP-2.1) | [`is_entity_inside_opaque_block`], dispatched |
+//! | 908-914 | `interact`, `getCollisionBox` | base `false` / `null` | dispatched |
+//! | 916-968 | `updateRidden` | transcribed, verified (WP-2.1) | [`update_ridden`], dispatched |
+//! | 970-980 | `updateRiderPosition`, `getYOffset`, `getMountedYOffset` | transcribed | [`update_rider_position`] (WP-2.1), [`EntityBase::get_y_offset`], [`get_mounted_y_offset`]; all dispatched |
+//! | 982-1008 | `mountEntity` | transcribed: `null` (WP-0.5), general case (WP-2.1) | [`mount_entity`], [`mount_entity_in_world`], [`dismount`], [`dismount_from`] |
+//! | 1010-1028 | `setPositionAndRotation2` | transcribed (WP-2.1) | [`set_position_and_rotation2`], dispatched |
+//! | 1030-1036 | `getCollisionBorderSize`, `getLookVec` | transcribed (WP-2.1): 0.1, `null` | dispatched |
+//! | 1038-1045 | `setInPortal`, `setVelocity` | empty body; transcribed | dispatched; [`EntityBase::set_velocity`] (dispatched) |
+//! | 1047-1051 | `handleHealthUpdate`, `performHurtAnimation` | empty bodies | dispatched |
+//! | 1053-1054 | `updateCloak` | empty body; `EntityPlayer`'s override builds an online cloak URL (out of scope, D2) | no port |
+//! | 1056-1057 | `outfitWithItem` | empty body; only `EntityOtherPlayerMP` overrides it (multiplayer, D3) | no port |
+//! | 1059-1083 | `isBurning`, `isRiding`, `isSneaking`, `getEntityFlag`, `setEntityFlag` | transcribed | [`EntityBase`] methods; `isSneaking` dispatched |
+//! | 1085-1092 | `onStruckByLightning` | transcribed (WP-2.1) | [`on_struck_by_lightning`], dispatched |
+//! | 1094-1095 | `onKillEntity` | empty body | dispatched |
+//! | 1097-1170 | `pushOutOfBlocks` | transcribed | [`push_out_of_blocks`], dispatched |
+//!
+//! `EntityWeatherEffect` (EntityWeatherEffect.java) declares nothing but its
+//! constructor: [`new_weather_effect`]. Client-only bodies above
+//! (`setAngles`, `getEntityBrightness`, the render-distance and shadow data,
+//! `setPositionAndRotation2`) are transcribed as data over the world for
+//! `mc-client`; `getEntityBrightness` is also gameplay (EntityMob.java:12,
+//! EntitySpider.java:20, :42, EntityZombie.java:13, EntitySkeleton.java:25).
 
 use mc_core::Aabb;
 use mc_core::java_random::JavaRandom;
@@ -266,6 +331,26 @@ impl EntityBase {
     pub fn set_rotation(&mut self, yaw: f32, pitch: f32) {
         self.rotation_yaw = yaw % 360.0;
         self.rotation_pitch = pitch % 360.0;
+    }
+
+    /// `setAngles(yaw, pitch)`: the mouse-look turn (EntityRenderer.java:354
+    /// passes the mouse deltas), pitch clamped to ±90, `prevRotation*`
+    /// shifted by the same amount so the turn is not interpolated.
+    // src: Entity.java:172-187
+    #[allow(clippy::manual_clamp)] // Java's two ifs, kept
+    pub fn set_angles(&mut self, var1: f32, var2: f32) {
+        let var3 = self.rotation_pitch;
+        let var4 = self.rotation_yaw;
+        self.rotation_yaw = (self.rotation_yaw as f64 + var1 as f64 * 0.15) as f32;
+        self.rotation_pitch = (self.rotation_pitch as f64 - var2 as f64 * 0.15) as f32;
+        if self.rotation_pitch < -90.0 {
+            self.rotation_pitch = -90.0;
+        }
+        if self.rotation_pitch > 90.0 {
+            self.rotation_pitch = 90.0;
+        }
+        self.prev_rotation_pitch += self.rotation_pitch - var3;
+        self.prev_rotation_yaw += self.rotation_yaw - var4;
     }
 
     /// `setPosition(x, y, z)`: moves the bounding box with it.
@@ -1005,10 +1090,13 @@ pub fn update_ridden(e: &mut Entity, world: &mut World) {
     e.base.motion_z = 0.0;
     dispatch::on_update(e, world);
     if let Some(mount_id) = e.base.riding_entity {
-        update_rider_position_of(world, mount_id, e);
+        // `this.ridingEntity.updateRiderPosition()` (virtual): the mount
+        // positions its `riddenByEntity`, the rider in hand.
         let Some(m) = world.entity(mount_id) else {
+            world.note_unimplemented("Entity.updateRidden: mount out of its slot");
             return;
         };
+        dispatch::update_rider_position(m, e, world);
         let (dyaw, dpitch) = (
             (m.base.rotation_yaw - m.base.prev_rotation_yaw) as f64,
             (m.base.rotation_pitch - m.base.prev_rotation_pitch) as f64,
@@ -1050,25 +1138,17 @@ pub fn update_ridden(e: &mut Entity, world: &mut World) {
     }
 }
 
-/// `mount.updateRiderPosition()` with the rider in hand (the rider is out of
-/// its slot while it updates). `EntityBoat` overrides it. Java positions
-/// `mount.riddenByEntity` (Entity.java:970-972); this positions the rider in
-/// hand, which is the same object unless the links are inconsistent.
+/// `Entity.updateRiderPosition()`: puts the rider on top of the mount.
+/// Java positions `mount.riddenByEntity`; the caller passes that rider, which
+/// is usually out of its slot (the rider in hand in [`update_ridden`]).
 // src: Entity.java:970-972
-fn update_rider_position_of(world: &mut World, mount_id: i32, rider: &mut Entity) {
-    let Some(m) = world.entity(mount_id) else {
-        return;
-    };
-    if matches!(m.kind, super::EntityKindData::Boat(..)) {
-        world.note_unimplemented("EntityBoat.updateRiderPosition");
-    }
-    let (x, y, z) = (
-        m.base.pos_x,
-        m.base.pos_y + dispatch::get_mounted_y_offset(m, world),
-        m.base.pos_z,
-    );
-    let ry = dispatch::get_y_offset(rider, world);
-    rider.base.set_position(x, y + ry, z);
+pub fn update_rider_position(mount: &Entity, rider: &mut Entity, world: &World) {
+    let y = mount.base.pos_y
+        + dispatch::get_mounted_y_offset(mount, world)
+        + dispatch::get_y_offset(rider, world);
+    rider
+        .base
+        .set_position(mount.base.pos_x, y, mount.base.pos_z);
 }
 
 /// `getMountedYOffset()` (Entity's body).
@@ -1077,7 +1157,79 @@ pub fn get_mounted_y_offset(e: &Entity) -> f64 {
     e.base.height as f64 * 0.75
 }
 
-/// `mountEntity(null)`: dismount. The general `mountEntity(entity)` is WP-2.1.
+/// `mountEntity(entity)`: with `None`, [`dismount`]; with the entity
+/// already ridden by `e`, dismount from it onto its top; otherwise unlink
+/// `e` from its old mount and `target` from its old rider, then link the two.
+///
+/// `target` is in hand (out of its slot: vanilla's callers are the mount's
+/// own `interact` or `onUpdate`, EntityBoat.java:71, :341,
+/// EntityMinecart.java:81, :650, :770, EntityPig.java:40, and the spider
+/// jockey of SpawnerAnimals.java:166, whose two entities have not joined
+/// yet). The other entities the Java touches through fields (`e`'s old
+/// mount, `target`'s old rider) are found in the world by id; one that is
+/// out of its slot further up the stack is recorded and left as is.
+// src: Entity.java:982-1008
+pub fn mount_entity(e: &mut Entity, world: &mut World, target: Option<&mut Entity>) {
+    let Some(var1) = target else {
+        // src: Entity.java:983-991
+        dismount(e, world);
+        return;
+    };
+    e.base.entity_rider_pitch_delta = 0.0;
+    e.base.entity_rider_yaw_delta = 0.0;
+    let id = e.base.entity_id;
+    if e.base.riding_entity == Some(var1.base.entity_id) {
+        // src: Entity.java:992-995
+        var1.base.ridden_by_entity = None;
+        e.base.riding_entity = None;
+        let (yaw, pitch) = (e.base.rotation_yaw, e.base.rotation_pitch);
+        e.base.set_location_and_angles(
+            var1.base.pos_x,
+            var1.base.bounding_box.min_y + var1.base.height as f64,
+            var1.base.pos_z,
+            yaw,
+            pitch,
+        );
+    } else {
+        // src: Entity.java:996-1007
+        if let Some(old) = e.base.riding_entity {
+            match world.entity_mut(old) {
+                Some(m) => m.base.ridden_by_entity = None,
+                None => world.note_unimplemented("Entity.mountEntity: old mount out of its slot"),
+            }
+        }
+        if let Some(r) = var1.base.ridden_by_entity {
+            if r == id {
+                // `var1.riddenByEntity` is `e` itself (links out of step).
+                e.base.riding_entity = None;
+            } else {
+                match world.entity_mut(r) {
+                    Some(rider) => rider.base.riding_entity = None,
+                    None => {
+                        world.note_unimplemented("Entity.mountEntity: old rider out of its slot")
+                    }
+                }
+            }
+        }
+        e.base.riding_entity = Some(var1.base.entity_id);
+        var1.base.ridden_by_entity = Some(id);
+    }
+}
+
+/// `mountEntity(entity)` for a `target` that is in the world (in its slot):
+/// takes it out for [`mount_entity`] and puts it back. Recorded, and nothing
+/// done, if `target` is absent or out of its slot.
+// src: Entity.java:982-1008
+pub fn mount_entity_in_world(e: &mut Entity, world: &mut World, target: i32) {
+    if world
+        .with_entity_mut(target, |w, t| mount_entity(e, w, Some(t)))
+        .is_none()
+    {
+        world.note_unimplemented("Entity.mountEntity: target not in its slot");
+    }
+}
+
+/// `mountEntity(null)`: dismount (the `null` branch of [`mount_entity`]).
 // src: Entity.java:982-991
 pub fn dismount(e: &mut Entity, world: &mut World) {
     e.base.entity_rider_pitch_delta = 0.0;
@@ -1178,6 +1330,188 @@ pub fn push_out_of_blocks(
         }
     }
     false
+}
+
+/// `preparePlayerToSpawn()`: raises the entity a block at a time until its
+/// box is free (or `posY` reaches 0), then stops it and levels the pitch.
+// src: Entity.java:133-147
+pub fn prepare_player_to_spawn(e: &mut Entity, world: &mut World) {
+    // `if (this.worldObj != null)`: always set here.
+    while e.base.pos_y > 0.0 {
+        let (x, y, z) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
+        e.base.set_position(x, y, z);
+        let bb = e.base.bounding_box;
+        if world.get_colliding_bounding_boxes(e, &bb).is_empty() {
+            break;
+        }
+        e.base.pos_y += 1.0;
+    }
+    e.base.motion_x = 0.0;
+    e.base.motion_y = 0.0;
+    e.base.motion_z = 0.0;
+    e.base.rotation_pitch = 0.0;
+}
+
+/// `getEntityBrightness(partialTick)`: the light brightness at 0.66 of the
+/// box height above the feet, at least `entityBrightness`; just
+/// `entityBrightness` when a chunk under the box is missing. `partialTick`
+/// is unused by `Entity`'s body (and no simulation class overrides it).
+// src: Entity.java:628-643
+pub fn get_entity_brightness(e: &Entity, world: &mut World, _partial_tick: f32) -> f32 {
+    let b = &e.base;
+    let var2 = floor_double(b.pos_x);
+    let var3 = (b.bounding_box.max_y - b.bounding_box.min_y) * 0.66;
+    let var5 = floor_double(b.pos_y - b.y_offset as f64 + var3);
+    let var6 = floor_double(b.pos_z);
+    if world.check_chunks_exist(
+        floor_double(b.bounding_box.min_x),
+        floor_double(b.bounding_box.min_y),
+        floor_double(b.bounding_box.min_z),
+        floor_double(b.bounding_box.max_x),
+        floor_double(b.bounding_box.max_y),
+        floor_double(b.bounding_box.max_z),
+    ) {
+        let mut var7 = world.get_light_brightness(var2, var5, var6);
+        if var7 < b.entity_brightness {
+            var7 = b.entity_brightness;
+        }
+        var7
+    } else {
+        b.entity_brightness
+    }
+}
+
+/// `Entity.applyEntityCollision(other)`: pushes the two apart, 0.05 per tick
+/// scaled by the horizontal distance (`abs_max`, not Euclidean), unless one
+/// rides the other. Both pushes go through the virtual `addVelocity`.
+// src: Entity.java:709-734
+pub fn apply_entity_collision(e: &mut Entity, world: &mut World, other: &mut Entity) {
+    let id = e.base.entity_id;
+    if other.base.ridden_by_entity != Some(id) && other.base.riding_entity != Some(id) {
+        let mut var2 = other.base.pos_x - e.base.pos_x;
+        let mut var4 = other.base.pos_z - e.base.pos_z;
+        let mut var6 = math::abs_max(var2, var4);
+        if var6 >= 0.009999999776482582 {
+            var6 = math::sqrt_double(var6) as f64;
+            var2 /= var6;
+            var4 /= var6;
+            let mut var8 = 1.0 / var6;
+            if var8 > 1.0 {
+                var8 = 1.0;
+            }
+            var2 *= var8;
+            var4 *= var8;
+            var2 *= 0.05000000074505806;
+            var4 *= 0.05000000074505806;
+            var2 *= (1.0f32 - e.base.entity_collision_reduction) as f64;
+            var4 *= (1.0f32 - e.base.entity_collision_reduction) as f64;
+            dispatch::add_velocity(e, world, -var2, 0.0, -var4);
+            dispatch::add_velocity(other, world, var2, 0.0, var4);
+        }
+    }
+}
+
+/// `isInRangeToRenderVec3D(v)`: the squared distance to `v` against the
+/// virtual `isInRangeToRenderDist`.
+// src: Entity.java:762-768
+pub fn is_in_range_to_render_vec3d(e: &Entity, world: &World, v: &mc_core::Vec3D) -> bool {
+    let var2 = e.base.pos_x - v.x_coord;
+    let var4 = e.base.pos_y - v.y_coord;
+    let var6 = e.base.pos_z - v.z_coord;
+    let var8 = var2 * var2 + var4 * var4 + var6 * var6;
+    dispatch::is_in_range_to_render_dist(e, world, var8)
+}
+
+/// `Entity.isInRangeToRenderDist(distSq)`: within 64 × the box's average edge
+/// × `renderDistanceWeight`.
+// src: Entity.java:770-774
+pub fn is_in_range_to_render_dist(e: &Entity, var1: f64) -> bool {
+    let mut var3 = e.base.bounding_box.get_average_edge_length();
+    var3 *= 64.0 * e.base.render_distance_weight;
+    var1 < var3 * var3
+}
+
+/// `Entity.getShadowSize()`: half the height.
+// src: Entity.java:869-871
+pub fn get_shadow_size(e: &Entity) -> f32 {
+    e.base.height / 2.0
+}
+
+/// `Entity.isEntityInsideOpaqueBlock()`: any of eight points around the eye
+/// (±0.45 width, ±0.05 height) in a normal cube.
+// src: Entity.java:892-906
+#[allow(clippy::identity_op)] // `(var1 >> 0) % 2`, as the Java
+pub fn is_entity_inside_opaque_block(e: &Entity, world: &mut World) -> bool {
+    for var1 in 0..8i32 {
+        let var2 = (((var1 >> 0) % 2) as f32 - 0.5) * e.base.width * 0.9;
+        let var3 = (((var1 >> 1) % 2) as f32 - 0.5) * 0.1;
+        let var4 = (((var1 >> 2) % 2) as f32 - 0.5) * e.base.width * 0.9;
+        let var5 = floor_double(e.base.pos_x + var2 as f64);
+        let var6 =
+            floor_double(e.base.pos_y + dispatch::get_eye_height(e, world) as f64 + var3 as f64);
+        let var7 = floor_double(e.base.pos_z + var4 as f64);
+        if world.is_block_normal_cube(var5, var6, var7) {
+            return true;
+        }
+    }
+    false
+}
+
+/// `Entity.setPositionAndRotation2(x, y, z, yaw, pitch, increments)` (the
+/// multiplayer position update; `increments` is unused here): placed, then
+/// lifted onto the highest box it overlaps after a 1/32 horizontal shrink.
+// src: Entity.java:1010-1028
+#[allow(clippy::too_many_arguments)]
+pub fn set_position_and_rotation2(
+    e: &mut Entity,
+    world: &mut World,
+    var1: f64,
+    mut var3: f64,
+    var5: f64,
+    var7: f32,
+    var8: f32,
+    _var9: i32,
+) {
+    e.base.set_position(var1, var3, var5);
+    e.base.set_rotation(var7, var8);
+    let bb = e.base.bounding_box.contract(0.03125, 0.0, 0.03125);
+    let var10 = world.get_colliding_bounding_boxes(e, &bb);
+    if !var10.is_empty() {
+        let mut var11 = 0.0;
+        for var14 in &var10 {
+            if var14.max_y > var11 {
+                var11 = var14.max_y;
+            }
+        }
+        var3 += var11 - e.base.bounding_box.min_y;
+        e.base.set_position(var1, var3, var5);
+    }
+}
+
+/// `Entity.getCollisionBorderSize()`: the margin the pick ray adds to the
+/// box (EntityRenderer.java:111).
+// src: Entity.java:1030-1032
+pub fn get_collision_border_size() -> f32 {
+    0.1
+}
+
+/// `Entity.onStruckByLightning(bolt)`: 5 fire damage (virtual) and the fire
+/// counter's step (`++fire`, 0 becomes 300), as `moveEntity`'s fire contact.
+// src: Entity.java:1085-1092
+pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World, _bolt: &Entity) {
+    dispatch::deal_fire_damage(e, world, 5);
+    e.base.fire += 1;
+    if e.base.fire == 0 {
+        e.base.fire = 300;
+    }
+}
+
+/// `new EntityWeatherEffect(world)`: the abstract base of the lightning bolt
+/// declares no field and no method, so its constructor is `Entity(World)`'s
+/// (the bolt's own data and `entityInit` are `EntityLightningBolt`'s).
+// src: EntityWeatherEffect.java:3-7
+pub fn new_weather_effect(world: &mut World) -> EntityBase {
+    EntityBase::new(world)
 }
 
 /// `Math.random()` through the world's single `MathRandom` stream
