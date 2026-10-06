@@ -1,14 +1,27 @@
 //! Saves: the [`Storage`] trait (D9) and the save-handler/chunk-loader
 //! interfaces in the shape of `ISaveHandler` and `IChunkLoader`.
 //!
-//! Implementations come with WP-1.9 (`SaveOldDir`, `SaveFormatOld`,
-//! `McRegionChunkLoader`, `RegionFile`, `ChunkLoader` chunk NBT, `WorldInfo`
-//! NBT via `mc-nbt`, the D5 id validation for import). Until then the only
-//! save handler is [`NoSave`], the port of `SaveHandlerMP`, which is what the
-//! oracle's Tier B/C worlds use.
+//! | Module | Vanilla | |
+//! |---|---|---|
+//! | [`storage`] | — | [`Storage`] (D9), [`MemoryStorage`] |
+//! | [`region`] | `RegionFile`, `RegionFileChunkBuffer` | McRegion container, whole file held in memory, written back through [`Storage`] on every change (WP-1.9a) |
+//! | [`region_cache`] | `RegionFileCache` | open region files by path, owned by the save handler instead of static (WP-1.9a) |
+//!
+//! Still to come with WP-1.9b: `SaveOldDir`, `SaveFormatOld`,
+//! `McRegionChunkLoader` (over [`RegionFileCache::get_chunk_input_stream`],
+//! [`RegionFileCache::write_chunk`] and [`RegionFileCache::get_size_delta`]),
+//! `ChunkLoader` chunk NBT, `WorldInfo` NBT via `mc-nbt`, the D5 id validation
+//! for import. Until then the only save handler is [`NoSave`], the port of
+//! `SaveHandlerMP`, which is what the oracle's Tier B/C worlds use.
 
+pub mod region;
+pub mod region_cache;
 pub mod storage;
 
+pub use region::{
+    ChunkDataOutputStream, RegionError, RegionFile, RegionFileChunkBuffer, RegionWrite,
+};
+pub use region_cache::{RegionFileCache, region_file_path};
 pub use storage::{MemoryStorage, Storage, StorageError};
 
 use crate::world::chunk::Chunk;

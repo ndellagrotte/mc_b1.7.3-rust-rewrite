@@ -47,6 +47,15 @@ mixed-case originals).
 | `WorldChunkManagerHell.field_4201_e` | `ChunkManagerKind::Hell::biome` | Returned by `getBiomeGenAt` and filled into the biome array (WorldChunkManagerHell.java:20-22, :52) |
 | `WorldChunkManagerHell.field_4200_f` | `ChunkManagerKind::Hell::temperature` | Returned by `getTemperature`, filled into `temperature` (WorldChunkManagerHell.java:24-26, :54); `WorldProviderHell` passes 1.0 |
 | `WorldChunkManagerHell.field_4199_g` | `ChunkManagerKind::Hell::humidity` | Filled into `humidity` (WorldChunkManagerHell.java:53); `WorldProviderHell` passes 0.0 |
+| `RegionFile.field_22217_e` | `RegionFile::chunk_timestamps` | `int[1024]` read from the second header sector (RegionFile.java:77-80); `func_22208_b` sets entry `x + z * 32` and the int at `4096 + (x + z * 32) * 4` (:265-269), called by `write` with `(int)(System.currentTimeMillis() / 1000L)` (:232) |
+| `RegionFile.func_22209_a` | `RegionFile::take_size_delta` | Returns `sizeDelta` and resets it to 0 (RegionFile.java:87-91); `RegionFileCache.getSizeDelta` returns it (RegionFileCache.java:63-66) and `saveChunk` adds it to `sizeOnDisk` (McRegionChunkLoader.java:54) |
+| `RegionFile.func_22202_c` | `RegionFile::has_chunk` | `getOffset(x, z) != 0` (RegionFile.java:255-257); `SaveConverterMcRegion` skips chunks for which it is true (SaveConverterMcRegion.java:131) |
+| `RegionFile.func_22208_b` | `RegionFile::set_chunk_timestamp` (private) | Writes `field_22217_e[x + z * 32]` and its header int (RegionFile.java:265-269), the timestamp counterpart of `setOffset` (:259-263) |
+| `RegionFile.func_22196_b` | `RegionFile::close` | `dataFile.close()` (RegionFile.java:271-273); called by `RegionFileCache.func_22192_a` on every cached file (RegionFileCache.java:53) |
+| `RegionFileCache.func_22193_a` | `RegionFileCache::create_or_load_region_file` | Returns the cached `RegionFile` for `region/r.<x>.<z>.mcr` or constructs and caches a new one (RegionFileCache.java:19-42); every accessor goes through it (:64, :69, :74) |
+| `RegionFileCache.func_22192_a` | `RegionFileCache::clear_region_file_references` | Closes every cached file and clears the map (RegionFileCache.java:44-61); called at 256 entries (:35-37) and around world conversion (SaveConverterMcRegion.java:50, :154) |
+| `RegionFileChunkBuffer.field_22283_b`, `field_22285_c` | `RegionFileChunkBuffer::chunk_x`, `chunk_z` | The constructor's second and third arguments (RegionFileChunkBuffer.java:11-16), passed back as the chunk coordinates of `RegionFile.write(x, z, buf, count)` on `close` (:18-20); `getChunkDataOutputStream(x, z)` creates it (RegionFile.java:162) |
+| `RegionFileChunkBuffer.field_22284_a` | the `region` argument of `RegionFileChunkBuffer::close` | The synthetic outer `RegionFile` (RegionFileChunkBuffer.java:9, :13), only used to call `write` on close (:19); a Rust value cannot hold it, so `close` takes it |
 
 ## Kept (meaning documented)
 
@@ -90,6 +99,8 @@ mixed-case originals).
 | `ChunkProviderHell.field_4163_o`, `field_4162_p`, `field_4160_r`, `field_4175_c`, `field_4174_d`, `field_4173_e`, `field_4172_f`, `field_4171_g` | same, snake_case | Scratch arrays: density grid, soul-sand noise, depth noise, and the five density noises (ChunkProviderHell.java:15-24) |
 | `ChunkProviderHell.func_4058_b` | `ChunkProviderHell::func_4058_b` | The nether's `replaceBlocksForBiome`: bedrock top and bottom, soul sand, gravel (ChunkProviderHell.java:103-174) |
 | `ChunkProviderHell.func_4057_a` | `ChunkProviderHell::func_4057_a` | The nether's density grid (ChunkProviderHell.java:190-296) |
+| `RegionFile.field_22214_h` | not ported | `fileName.lastModified()` at construction (RegionFile.java:22, :30-32), never read; file metadata and clocks stay out of the simulation (D9) |
+| `RegionFile.func_22211_a`, `func_22199_a`, `func_22197_a`, `debugln` | not ported | `func_22211_a` has an empty body (RegionFile.java:93-94); the other three only build messages for it (:96-110). The write path's message names ("rewrite", "reuse", "grow") are returned as `RegionWrite` |
 
 ## Real names changed for Rust
 
@@ -127,3 +138,8 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `WorldChunkManagerHell` (class) | `ChunkManagerKind::Hell` | one struct for both classes |
 | `MapGenBase`, `MapGenCaves`, `MapGenCavesHell` (classes) | `worldgen::caves::MapGenCaves` + `CaveKind` | one struct; per-class constants selected by kind |
 | `ChunkProviderHell.hellRNG` | `ChunkProviderHell::hell_rng` | snake_case |
+| `RegionFile.getChunkDataInputStream(x, z)` | `RegionFile::get_chunk_data_input_stream(x, z) -> Result<Option<Vec<u8>>, _>` | returns the decompressed bytes instead of a lazy `DataInputStream` (`save/region.rs`, "Errors") |
+| `RegionFile.getChunkDataOutputStream(x, z)` | `RegionFile::get_chunk_data_output_stream(x, z) -> Option<ChunkDataOutputStream>` | the `DataOutputStream(DeflaterOutputStream(RegionFileChunkBuffer))` chain is one `io::Write` value; its `close` takes the region, storage and time |
+| `RegionFile.write(x, z, buf, count)` (protected) | `RegionFile::write(storage, x, z, data, now_millis) -> Result<RegionWrite, _>` | public for tests and the cache; storage and `System.currentTimeMillis()` passed in (D9) |
+| `RegionFileCache` (static class) | `save::RegionFileCache` (a value) | owned by the save handler; no soft references (`save/region_cache.rs` docs) |
+| `RegionFileCache.getChunkInputStream`/`getChunkOutputStream`/`getSizeDelta` | `RegionFileCache::get_chunk_input_stream`/`get_chunk_output_stream`/`get_size_delta` (+ `close_chunk_output_stream`, `write_chunk`) | snake_case; storage passed in, world directory a storage path |
