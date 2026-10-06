@@ -1,0 +1,4 @@
+# Golden fixtures are byte-exact oracle output (PLAN_v4 §4.3); never let a checkout rewrite them.
+tests/golden/** -text
+*.jsonl text eol=lf
+*.bin binary

@@ -1,0 +1,12 @@
+{
+  "name": "nether-seed-8675309",
+  "tier": "A",
+  "kind": "terrain",
+  "seed": 8675309,
+  "dimension": "nether",
+  "chunks": [
+    {"x":0,"z":0,"full":true},
+    {"x":-3,"z":7},
+    {"x":100,"z":-50}
+  ]
+}

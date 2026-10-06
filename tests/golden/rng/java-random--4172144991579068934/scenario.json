@@ -1,0 +1,15 @@
+{
+  "name": "java-random--4172144991579068934",
+  "tier": "A",
+  "kind": "java_random",
+  "seed": -4172144991579068934,
+  "draws": [
+    {"call":"nextInt","n":64},
+    {"call":"nextInt","bound":10,"n":64},
+    {"call":"nextLong","n":64},
+    {"call":"nextFloat","n":64},
+    {"call":"nextDouble","n":64},
+    {"call":"nextGaussian","n":64},
+    {"call":"nextBoolean","n":64}
+  ]
+}

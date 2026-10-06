@@ -1,0 +1,12 @@
+{
+  "name": "overworld-seed--4172144991579068934",
+  "tier": "A",
+  "kind": "terrain",
+  "seed": -4172144991579068934,
+  "dimension": "overworld",
+  "chunks": [
+    {"x":0,"z":0,"full":true},
+    {"x":-3,"z":7},
+    {"x":100,"z":-50}
+  ]
+}
