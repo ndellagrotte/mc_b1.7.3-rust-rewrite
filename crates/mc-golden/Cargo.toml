@@ -8,6 +8,7 @@ description = "Golden-fixture harness: runs mc-sim scenarios and compares them w
 
 [dependencies]
 mc-sim = { path = "../mc-sim" }
+blake3.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
