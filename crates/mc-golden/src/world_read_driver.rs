@@ -318,12 +318,18 @@ pub fn emit_tier_s(
     };
     let mut loader = McRegionChunkLoader::new(store.clone(), dir);
     for c in chunks {
-        let Some(tree) = loader.read_chunk_nbt(c.x, c.z).map_err(err)? else {
+        let Some((name, tree)) = loader.read_chunk_nbt_named(c.x, c.z).map_err(err)? else {
             w.push(TraceLine::chunk_absent(t, c.x, c.z));
             continue;
         };
-        // CompressedStreamTools.read keeps the root name; McRegion writes "".
-        w.push(TraceLine::chunk_nbt(t, c.x, c.z, canonical_root("", &tree)));
+        // CompressedStreamTools.read keeps the root name (TierS.java:156-160,
+        // Nbt.canonicalRoot); McRegion writes "".
+        w.push(TraceLine::chunk_nbt(
+            t,
+            c.x,
+            c.z,
+            canonical_root(&name, &tree),
+        ));
         if !mask {
             let loaded = loader
                 .load_chunk(world, c.x, c.z)

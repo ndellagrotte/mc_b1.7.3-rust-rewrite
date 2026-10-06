@@ -17,7 +17,7 @@
 //! | [`spawner`] | `SpawnerAnimals`, `EnumCreatureType` | free functions over `&mut World` |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer` | layout only (WP-2.5) |
-//! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | traits + `NoSave`; McRegion container in progress (WP-1.9) |
+//! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | McRegion saves: `SaveOldDir`/`SaveHandler`, `McRegionChunkLoader`, chunk NBT, `EntityList`, import validation (WP-1.9a/b) |
 //! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4), trees (WP-1.6b), population ([`worldgen::populate`], [`worldgen::features`]) done (WP-1.7) |
 //! | [`golden`] | — | read-only views in the golden-trace shapes |
 //!

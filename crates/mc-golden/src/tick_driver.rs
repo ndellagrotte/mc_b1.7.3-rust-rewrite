@@ -75,8 +75,9 @@
 //! `kind` in `spawn` lines and `entity` lines is the Java class simple name
 //! ([`EntityKindData::java_class`](mc_sim::entity::EntityKindData::java_class)).
 //! The oracle's player is its own subclass `HarnessPlayer` of
-//! `EntityPlayerSP`, so the port's `EntityPlayerSP` is reported as
-//! `HarnessPlayer` ([`trace_kind`]).
+//! `EntityPlayer` (tools/oracle/java/harness/HarnessPlayer.java:27); the
+//! port's player is `EntityPlayerSP`, reported as `HarnessPlayer`
+//! ([`trace_kind`]).
 //!
 //! # The `save` op (Tier S)
 //!

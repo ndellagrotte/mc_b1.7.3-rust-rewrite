@@ -219,11 +219,20 @@ pub fn load_chunk_into_world_from_compound(
 
     // src: ChunkLoader.java:188-197
     let var10 = n::get_tag_list(var1, "TileEntities")?;
-    for t in var10 {
+    let loaded: Result<(), SaveError> = var10.iter().try_for_each(|t| {
         if let Some(var9) = tile_entity::create_and_load_entity(t, world)? {
             let r = world.new_tile_entity(var9);
             add_tile_entity_detached(&mut var4, world, r)?;
         }
+        Ok(())
+    });
+    if let Err(e) = loaded {
+        // The Java chunk (and its tile entities) becomes garbage; the port's
+        // tile entities live in `World::tile_entities`, so free them.
+        for r in var4.chunk_tile_entity_map.values() {
+            world.tile_entities.remove(r);
+        }
+        return Err(e);
     }
     Ok(LoadedChunk {
         chunk: var4,
@@ -274,7 +283,11 @@ fn add_tile_entity_detached(
         if let Some(t) = world.tile_entities.get_mut(&r) {
             t.validate();
         }
-        c.chunk_tile_entity_map.insert(var5, r);
+        // `chunkTileEntityMap.put` replaces: the old tile entity becomes
+        // garbage in Java, so the port frees it from `World::tile_entities`.
+        if let Some(old) = c.chunk_tile_entity_map.insert(var5, r) {
+            world.tile_entities.remove(&old);
+        }
     } else {
         // stdout only; the tile entity is dropped.
         world.tile_entities.remove(&r);

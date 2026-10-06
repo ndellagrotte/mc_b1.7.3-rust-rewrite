@@ -57,8 +57,14 @@ impl World {
         // src: World.java:1761
         let (hostile, peaceful) = (self.spawn_hostile_mobs, self.spawn_peaceful_mobs);
         spawner::perform_spawning(self, hostile, peaceful);
-        // src: World.java:1762
-        self.unload_100_oldest_chunks();
+        // src: World.java:1762. A MinecraftException (the session lock)
+        // leaves World.tick here and in saveWorld below, before
+        // setWorldTime and the block ticks (Minecraft.java:540-544 catches
+        // it); kept in `session_lock_error` for the client.
+        if let Err(e) = self.try_unload_100_oldest_chunks() {
+            self.session_lock_error = Some(e);
+            return;
+        }
         // src: World.java:1763-1770
         let var4 = self.calculate_skylight_subtracted(1.0);
         if var4 != self.skylight_subtracted {
@@ -68,8 +74,11 @@ impl World {
 
         // src: World.java:1772-1777
         let var2 = self.world_info.world_time + 1;
-        if var2 % self.autosave_period as i64 == 0 {
-            self.save_world(false);
+        if var2 % self.autosave_period as i64 == 0
+            && let Err(e) = self.try_save_world(false)
+        {
+            self.session_lock_error = Some(e);
+            return;
         }
         self.world_info.world_time = var2;
         // src: World.java:1778-1779

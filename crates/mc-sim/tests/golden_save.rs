@@ -240,6 +240,29 @@ fn testworld_chunk_digest_and_chest() {
     assert_eq!(w.chunk_load_errors(), 0);
 }
 
+/// `World.spawnPlayerWithLoadedChunks` restores the player from testWorld's
+/// `level.dat` once (World.java:256-276).
+#[test]
+fn testworld_player_restored_from_level_dat() {
+    let store = testworld_store();
+    let mut w = open_world(&store).unwrap();
+    let Some(Tag::Compound(tag)) = w.world_info.player_tag.clone() else {
+        panic!("testWorld's level.dat has a Player");
+    };
+    let Tag::List { items: pos, .. } = &tag["Pos"] else {
+        panic!("Pos");
+    };
+    let p = new_entity_player_sp(&mut w);
+    assert!(w.spawn_player_with_loaded_chunks(p));
+    assert_eq!(w.world_info.player_tag, None, "applied once");
+    let pid = *w.player_entities.first().unwrap();
+    let e = w.entity(pid).unwrap();
+    assert_eq!(Tag::Double(e.base.pos_x), pos[0]);
+    assert_eq!(Tag::Double(e.base.pos_z), pos[2]);
+    assert_eq!(e.base.fire, -20);
+    assert!(e.base.on_ground);
+}
+
 // ---- 3. write / re-read ------------------------------------------------------------------
 
 /// A world on an empty generator with a `SaveOldDir` on `dir` of `store`:
@@ -737,6 +760,54 @@ fn import_refuses_a_bad_player_item_and_a_missing_level_dat() {
     ));
 }
 
+/// `level.dat` present but unreadable: the scan uses `level.dat_old`, as
+/// `SaveHandler.loadWorldInfo` does (SaveHandler.java:81-107).
+#[test]
+fn import_falls_back_to_level_dat_old() {
+    let mut s = testworld_storage();
+    let good = s.read("world/level.dat").unwrap().unwrap();
+    s.write("world/level.dat_old", &good).unwrap();
+    s.write("world/level.dat", b"not gzip").unwrap();
+    assert_eq!(validate(&mut s.clone(), WORLD_DIR), Ok(()));
+    // The fallback file's player is the one checked.
+    let (name, mut root) = mc_nbt::read_gzip(&good).unwrap();
+    let data = root.as_compound_mut().unwrap().get_mut("Data").unwrap();
+    let player = data.as_compound_mut().unwrap().get_mut("Player").unwrap();
+    let mut st = BTreeMap::new();
+    st.insert("Slot".to_string(), Tag::Byte(0));
+    st.insert("id".to_string(), Tag::Short(3000));
+    st.insert("Count".to_string(), Tag::Byte(1));
+    st.insert("Damage".to_string(), Tag::Short(0));
+    player.as_compound_mut().unwrap().insert(
+        "Inventory".into(),
+        Tag::List {
+            elem: TagType::Compound,
+            items: vec![Tag::Compound(st)],
+        },
+    );
+    let mut bad_old = s.clone();
+    bad_old
+        .write(
+            "world/level.dat_old",
+            &mc_nbt::write_gzip(&name, &root).unwrap(),
+        )
+        .unwrap();
+    assert!(matches!(
+        validate(&mut bad_old, WORLD_DIR),
+        Err(ImportRefusal::UnknownItem {
+            id: 3000,
+            location: Location::LevelDat,
+            ..
+        })
+    ));
+    // Neither file reads: unreadable.
+    s.delete("world/level.dat_old").unwrap();
+    assert!(matches!(
+        validate(&mut s, WORLD_DIR),
+        Err(ImportRefusal::Unreadable { .. })
+    ));
+}
+
 // ---- 6. level.dat shapes -------------------------------------------------------------------
 
 fn tree_from_line(line: &Value) -> Value {
@@ -941,6 +1012,90 @@ fn save_stops_at_a_stolen_lock() {
             .is_none()
     );
     assert!(!a.quick_save_world(0));
+}
+
+/// The stolen lock in `World.tick`: the `MinecraftException` leaves the tick
+/// at the autosave, before `setWorldTime` and the block ticks
+/// (World.java:1772-1779), and reaches the client through
+/// `session_lock_error` (Minecraft.java:540-544).
+#[test]
+fn tick_stops_at_a_stolen_lock() {
+    let store = store_over(MemoryStorage::default());
+    let mut held = build_saved_world(&store, "held");
+    held.set_world_time(119); // 120 % autosavePeriod (40) == 0
+    held.tick();
+    assert_eq!(held.session_lock_error, None);
+    assert_eq!(held.world_info.world_time, 120);
+
+    let mut a = build_saved_world(&store, "w");
+    store.borrow_mut().clock = Box::new(FixedClock(5));
+    let _thief = SaveOldDir::new(store.clone(), "", "w").unwrap();
+    a.set_world_time(119);
+    a.tick();
+    assert!(matches!(
+        a.session_lock_error,
+        Some(SaveError::Minecraft(_))
+    ));
+    assert_eq!(a.world_info.world_time, 119, "setWorldTime is skipped");
+
+    let mut b = build_saved_world(&store, "w");
+    store.borrow_mut().clock = Box::new(FixedClock(6));
+    let _thief = SaveOldDir::new(store.clone(), "", "w").unwrap();
+    b.save_world(true);
+    assert!(matches!(
+        b.session_lock_error,
+        Some(SaveError::Minecraft(_))
+    ));
+}
+
+/// `chunkTileEntityMap.put` replaces (Chunk.java:434-446) and a chunk that
+/// fails to load is dropped: neither leaves a tile entity in
+/// `World::tile_entities`.
+#[test]
+fn replaced_and_abandoned_tile_entities_leave_the_world() {
+    use mc_sim::save::chunk_loader::{discard, load_chunk_into_world_from_compound};
+    let store = store_over(MemoryStorage::default());
+    let mut a = build_saved_world(&store, "w");
+    a.try_save_world(true).unwrap();
+    let tree = stored_chunk(&store, "w", 0, 0);
+    let mut level = tree.as_compound().unwrap()["Level"]
+        .as_compound()
+        .unwrap()
+        .clone();
+    let Some(Tag::List { items, .. }) = level.get_mut("TileEntities") else {
+        panic!("no TileEntities");
+    };
+    assert_eq!(items.len(), 3);
+    let chest = items
+        .iter()
+        .find(|t| t.as_compound().unwrap()["id"] == Tag::String("Chest".into()))
+        .unwrap()
+        .clone();
+    items.push(chest.clone());
+    let before = a.tile_entities.len();
+    let l = load_chunk_into_world_from_compound(&mut a, &level).unwrap();
+    assert_eq!(l.chunk.chunk_tile_entity_map.len(), 3);
+    assert_eq!(
+        a.tile_entities.len(),
+        before + 3,
+        "the replaced chest is freed"
+    );
+    discard(&mut a, l);
+    assert_eq!(a.tile_entities.len(), before);
+
+    // A later tile entity outside the arrays: ArrayIndexOutOfBoundsException.
+    let mut far = chest.as_compound().unwrap().clone();
+    far.insert("x".into(), Tag::Int(1000));
+    let Some(Tag::List { items, .. }) = level.get_mut("TileEntities") else {
+        unreachable!()
+    };
+    items.push(Tag::Compound(far));
+    assert!(load_chunk_into_world_from_compound(&mut a, &level).is_err());
+    assert_eq!(
+        a.tile_entities.len(),
+        before,
+        "the dropped chunk's are freed"
+    );
 }
 
 #[test]

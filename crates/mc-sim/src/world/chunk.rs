@@ -33,8 +33,8 @@
 //!
 //! - `setChunkData` (Chunk.java:552-596): fills the arrays from a network
 //!   packet (`Packet51MapChunk`); multiplayer, deferred (PLAN_v4 D3).
-//! - `removeUnknownBlocks` (Chunk.java:606-608, `ChunkBlockMap`): chunk
-//!   loading, WP-1.9.
+//! - `removeUnknownBlocks` (Chunk.java:606-608, `ChunkBlockMap`): with the
+//!   chunk loading, [`crate::save::chunk_loader::remove_unknown_blocks`].
 //! - `getEntitiesOfTypeWithinAAAB` (Chunk.java:512-534): the class-filtered
 //!   query belongs with the entity queries (`world/entities.rs`), not yet needed.
 //! - `func_1014_a` (Chunk.java:64-65) and `func_4143_d` (Chunk.java:133-134):

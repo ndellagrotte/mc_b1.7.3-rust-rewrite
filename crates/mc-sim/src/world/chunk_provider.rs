@@ -384,10 +384,16 @@ impl World {
 
     /// `ChunkProvider.saveChunks(all, progress)`; see
     /// [`World::try_save_chunks`]. A session-lock failure (an exception in
-    /// Java) returns false.
+    /// Java) returns false and is kept in [`World::session_lock_error`].
     // src: ChunkProvider.java:130-158
     pub fn save_chunks(&mut self, all: bool) -> bool {
-        self.try_save_chunks(all).unwrap_or(false)
+        match self.try_save_chunks(all) {
+            Ok(b) => b,
+            Err(e) => {
+                self.session_lock_error = Some(e);
+                false
+            }
+        }
     }
 
     /// `ChunkProvider.saveChunks(all, progress)`: every chunk in load order
@@ -458,9 +464,30 @@ impl World {
         Ok(true)
     }
 
-    /// `ChunkProvider.unload100OldestChunks()`.
+    /// `ChunkProvider.unload100OldestChunks()`; see
+    /// [`World::try_unload_100_oldest_chunks`]. A session-lock failure (an
+    /// exception in Java) returns false and is kept in
+    /// [`World::session_lock_error`].
     // src: ChunkProvider.java:159-178
     pub fn unload_100_oldest_chunks(&mut self) -> bool {
+        match self.try_unload_100_oldest_chunks() {
+            Ok(b) => b,
+            Err(e) => {
+                self.session_lock_error = Some(e);
+                false
+            }
+        }
+    }
+
+    /// `ChunkProvider.unload100OldestChunks()`: up to 100 dropped chunks
+    /// unloaded and saved, then the loader's `chunkTick` and the generator's
+    /// own `unload100OldestChunks`. `Err` for the loader's
+    /// `MinecraftException` (the session lock), which leaves the Java method
+    /// (`unloadAndSaveChunk` catches only `IOException`,
+    /// ChunkProvider.java:111-113): the chunk stays in `droppedChunksSet`,
+    /// `chunkMap` and `chunkList`, already `onChunkUnload`ed.
+    // src: ChunkProvider.java:159-178
+    pub fn try_unload_100_oldest_chunks(&mut self) -> Result<bool, SaveError> {
         for _ in 0..100 {
             let next = self
                 .chunk_provider
@@ -483,12 +510,16 @@ impl World {
                         let r = self.with_loader_and_chunk(&mut l, var2, |l, w, c| {
                             c.last_save_time = w.world_info.world_time;
                             let r = l.save_chunk(w, c);
-                            let _ = l.save_extra_chunk_data(w, c);
+                            // The exception skips unloadAndSaveChunkData
+                            // (ChunkProvider.java:166-167).
+                            if r.is_ok() {
+                                let _ = l.save_extra_chunk_data(w, c);
+                            }
                             r
                         });
                         self.chunk_provider.chunk_loader = Some(l);
-                        if let Some(Err(_)) = r {
-                            return false;
+                        if let Some(Err(e)) = r {
+                            return Err(e);
                         }
                     }
                 }
@@ -508,10 +539,10 @@ impl World {
         if let Some(l) = self.chunk_provider.chunk_loader.as_mut() {
             l.chunk_tick();
         }
-        match self.chunk_provider.generator.as_mut() {
+        Ok(match self.chunk_provider.generator.as_mut() {
             Some(g) => g.as_provider().unload_100_oldest_chunks(),
             None => false,
-        }
+        })
     }
 
     /// `ChunkProvider.canSave()`: always true.

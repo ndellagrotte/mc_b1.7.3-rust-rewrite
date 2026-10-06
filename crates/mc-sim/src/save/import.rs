@@ -11,7 +11,8 @@
 //!
 //! # Order (the "first" offending id)
 //!
-//! 1. `level.dat` (`level.dat_old` if it is missing): the player's
+//! 1. `level.dat` (`level.dat_old` if it is missing or does not read, as
+//!    `SaveHandler.loadWorldInfo` falls back, SaveHandler.java:81-107): the player's
 //!    `Inventory` item ids (InventoryPlayer.java:223-241).
 //! 2. The overworld's `region/*.mcr`, then the nether's `DIM-1/region/*.mcr`,
 //!    each in file-name order; in a file, the present chunks in index order
@@ -34,8 +35,8 @@
 //!
 //! # Unreadable data
 //!
-//! A world whose `level.dat` (and `level.dat_old`) is missing or does not
-//! decode, a region file vanilla's `RegionFile` cannot open, or a present
+//! A world where neither `level.dat` nor `level.dat_old` is present and
+//! decodes into a `WorldInfo`, a region file vanilla's `RegionFile` cannot open, or a present
 //! chunk whose stored bytes do not decode as NBT, is refused as
 //! [`ImportRefusal::Unreadable`]: the scan cannot vouch for ids it cannot
 //! read. (Vanilla would regenerate such a chunk.) A chunk without `Level` or
@@ -48,6 +49,7 @@ use mc_nbt::Tag;
 
 use super::nbt::{self as n, Compound};
 use super::region::REGION_ENTRIES;
+use super::save_handler::world_info_from_level_dat;
 use super::{MemoryStorage, RegionFile, Storage, StorageError, path_join};
 use crate::block;
 use crate::item;
@@ -172,29 +174,42 @@ pub fn validate(storage: &mut dyn Storage, dir: &str) -> Result<(), ImportRefusa
     Ok(())
 }
 
+/// The file `SaveHandler.loadWorldInfo` would use: `level.dat`, or
+/// `level.dat_old` when `level.dat` is missing or fails to read (decoded
+/// with [`world_info_from_level_dat`], as the port's loader does); refused as
+/// unreadable only when neither yields a `WorldInfo`. The player compound
+/// checked is that file's (`WorldInfo.playerTag`, WorldInfo.java:36-39).
+// src: SaveHandler.java:81-107
 fn validate_level_dat(storage: &mut dyn Storage, dir: &str) -> Result<(), ImportRefusal> {
-    let mut path = path_join(dir, "level.dat");
-    let mut bytes = storage.read(&path).map_err(|e| unreadable(&path, e))?;
-    if bytes.is_none() {
-        path = path_join(dir, "level.dat_old");
-        bytes = storage.read(&path).map_err(|e| unreadable(&path, e))?;
+    let mut first_failure: Option<ImportRefusal> = None;
+    for name in ["level.dat", "level.dat_old"] {
+        let path = path_join(dir, name);
+        let bytes = match storage.read(&path) {
+            Ok(Some(b)) => b,
+            Ok(None) => continue, // `var1.exists()` false
+            Err(e) => {
+                first_failure.get_or_insert_with(|| unreadable(&path, e));
+                continue;
+            }
+        };
+        match world_info_from_level_dat(&bytes) {
+            Ok(info) => {
+                if let Some(Tag::Compound(player)) = &info.player_tag {
+                    check_items(
+                        player.get("Inventory"),
+                        &Location::LevelDat,
+                        "Player Inventory",
+                    )?;
+                }
+                return Ok(());
+            }
+            // Printed in Java; the next file is tried.
+            Err(e) => {
+                first_failure.get_or_insert_with(|| unreadable(&path, e));
+            }
+        }
     }
-    let Some(bytes) = bytes else {
-        return Err(unreadable(&path_join(dir, "level.dat"), "missing"));
-    };
-    let (_, root) = mc_nbt::read_gzip(&bytes).map_err(|e| unreadable(&path, format!("{e:?}")))?;
-    let data = root
-        .get("Data")
-        .and_then(Tag::as_compound)
-        .ok_or_else(|| unreadable(&path, "no Data compound"))?;
-    if let Some(Tag::Compound(player)) = data.get("Player") {
-        check_items(
-            player.get("Inventory"),
-            &Location::LevelDat,
-            "Player Inventory",
-        )?;
-    }
-    Ok(())
+    Err(first_failure.unwrap_or_else(|| unreadable(&path_join(dir, "level.dat"), "missing")))
 }
 
 /// Parses a region file read-only (on a scratch copy: opening may pad or

@@ -19,10 +19,10 @@
 //! | Java | State |
 //! |---|---|
 //! | `saveLevel` (:293-297) | `MapStorage.saveAllData` WP-2.6 |
-//! | `spawnPlayerWithLoadedChunks` (:256-276) | `EntityPlayer.readFromNBT` exists (`entity::nbt::read_from_nbt`, WP-1.9b) but is not called here yet (recorded) |
+//! | `spawnPlayerWithLoadedChunks` (:256-276) | the sleeping branch of `EntityPlayer.readEntityFromNBT` (`wakeUpPlayer`) WP-2.5 (recorded) |
 //! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
 //! | `wakeUpAllPlayers` (:2395-2407) | `EntityPlayer.wakeUpPlayer` WP-2.5 (recorded) |
-//! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded) |
+//! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
 //! | `updateBlocksAndPlayCaveSounds` (:1868-1965) | the `EntityLightningBolt` constructor WP-2.4 (recorded; the draws before it are made) |
 //! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
@@ -197,6 +197,15 @@ pub struct World {
     /// `saveHandler`.
     // src: World.java:42
     pub(crate) save_handler: Box<dyn SaveHandler>,
+    /// The `MinecraftException` (the session lock) a save path threw, which
+    /// vanilla lets out of `World.tick` for `Minecraft.run` to catch: it drops
+    /// the world and shows `GuiConflictWarning` (Minecraft.java:540-544,
+    /// :615-618). Not Java state: the port's way to hand the exception to the
+    /// client. Set by [`World::tick`] (which returns there, as the throw
+    /// does), [`World::save_world`], [`World::save_chunks`],
+    /// [`World::quick_save_world`] and [`World::unload_100_oldest_chunks`];
+    /// once set, the client should discard the world.
+    pub session_lock_error: Option<SaveError>,
     /// `worldInfo`.
     // src: World.java:43
     pub world_info: WorldInfo,
@@ -420,6 +429,7 @@ impl World {
             events: EventQueue::default(),
             chunk_provider: ChunkProviderCache::new(loader, generator),
             save_handler,
+            session_lock_error: None,
             world_info,
             finding_spawn_point: false,
             all_players_sleeping: false,
@@ -1706,12 +1716,14 @@ impl World {
 
     /// `saveWorld(all, progress)`; see [`World::try_save_world`]. A
     /// `MinecraftException` (the session lock) ends the save, as the Java
-    /// exception does; it is dropped here (vanilla's client catches it
-    /// around the game loop and shows the conflict screen; a caller that
-    /// needs it uses `try_save_world`).
+    /// exception does, and is kept in [`World::session_lock_error`] for the
+    /// client (vanilla's catches it around the game loop and shows the
+    /// conflict screen, Minecraft.java:540-544).
     // src: World.java:278-291
     pub fn save_world(&mut self, all: bool) {
-        let _ = self.try_save_world(all);
+        if let Err(e) = self.try_save_world(all) {
+            self.session_lock_error = Some(e);
+        }
     }
 
     /// `saveWorld(all, progress)`: `saveLevel` (session lock, `level.dat`
@@ -1756,13 +1768,17 @@ impl World {
 
 impl World {
     /// `quickSaveWorld(i)`: the level (when `i == 0`) and up to 24 chunks.
-    /// A session-lock failure returns false (an exception in Java).
+    /// A session-lock failure returns false (an exception in Java) and is
+    /// kept in [`World::session_lock_error`].
     // src: World.java:299-309
     pub fn quick_save_world(&mut self, var1: i32) -> bool {
         if !self.chunk_provider_can_save() {
             true
         } else {
-            if var1 == 0 && self.save_level().is_err() {
+            if var1 == 0
+                && let Err(e) = self.save_level()
+            {
+                self.session_lock_error = Some(e);
                 return false;
             }
             self.save_chunks(false)

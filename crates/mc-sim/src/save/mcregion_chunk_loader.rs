@@ -63,6 +63,18 @@ impl McRegionChunkLoader {
     /// there.
     // src: McRegionChunkLoader.java:16-18
     pub fn read_chunk_nbt(&mut self, x: i32, z: i32) -> Result<Option<Tag>, SaveError> {
+        Ok(self.read_chunk_nbt_named(x, z)?.map(|(_, t)| t))
+    }
+
+    /// [`McRegionChunkLoader::read_chunk_nbt`] with the root's name, which
+    /// `CompressedStreamTools.read` keeps as the compound's key
+    /// (CompressedStreamTools.java:38-45, `NBTBase.readTag`).
+    // src: McRegionChunkLoader.java:16-18
+    pub fn read_chunk_nbt_named(
+        &mut self,
+        x: i32,
+        z: i32,
+    ) -> Result<Option<(String, Tag)>, SaveError> {
         let bytes = {
             let mut s = self.store.borrow_mut();
             let s = &mut *s;
@@ -71,7 +83,7 @@ impl McRegionChunkLoader {
         };
         match bytes {
             None => Ok(None),
-            Some(b) => Ok(Some(mc_nbt::read_named(&b)?.1)),
+            Some(b) => Ok(Some(mc_nbt::read_named(&b)?)),
         }
     }
 

@@ -784,14 +784,18 @@ impl World {
     }
 
     /// `spawnPlayerWithLoadedChunks(player)`: applies the player NBT saved in
-    /// `level.dat` (once), then `entityJoinedWorld`. Reading the NBT is
-    /// `EntityPlayer.readFromNBT` (WP-2.5), recorded here; the
-    /// `ChunkProviderLoadOrGenerate` branch (World.java:264-269) never runs,
-    /// because no world in the game builds that provider.
+    /// `level.dat` (once, [`crate::entity::nbt::read_from_nbt`]), then
+    /// `entityJoinedWorld`. The `ChunkProviderLoadOrGenerate` branch
+    /// (World.java:264-269) never runs, because no world in the game builds
+    /// that provider. The Java body is one `try`: an exception from
+    /// `readFromNBT` is printed, the tag is kept and the player does not
+    /// join (false here).
     // src: World.java:256-276
-    pub fn spawn_player_with_loaded_chunks(&mut self, player: Entity) -> bool {
-        if self.world_info.player_tag.is_some() {
-            self.skip("EntityPlayer.readFromNBT (World.spawnPlayerWithLoadedChunks)");
+    pub fn spawn_player_with_loaded_chunks(&mut self, mut player: Entity) -> bool {
+        if let Some(mc_nbt::Tag::Compound(var2)) = self.world_info.player_tag.clone() {
+            if crate::entity::nbt::read_from_nbt(&mut player, &var2, self).is_err() {
+                return false;
+            }
             self.world_info.player_tag = None;
         }
         self.spawn_entity_in_world(player)

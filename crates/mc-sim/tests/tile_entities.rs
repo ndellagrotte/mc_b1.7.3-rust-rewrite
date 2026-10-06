@@ -12,7 +12,8 @@
 //! 3. Behaviour no fixture reaches (no op can fill an inventory): furnace
 //!    smelting with the idle/lit block swap, the dispenser's random slot,
 //!    the `IInventory` methods, chest/furnace/dispenser drops on removal.
-//! 4. The Tier S fixture itself, ignored until the Rust save path exists.
+//!
+//! The Tier S fixture itself runs in `golden_save.rs`.
 
 use std::collections::BTreeMap;
 
@@ -682,17 +683,4 @@ fn chest_placement_rule() {
     // No air check of its own: the target cell is not read.
     w.set_block(9, 61, 9, 1);
     assert!(can_place_block_at(&mut w, 54, 9, 61, 9));
-}
-
-// ---- 4. the Tier S fixture ---------------------------------------------------------
-
-#[test]
-#[ignore = "needs McRegionChunkLoader and the save op in the tick driver (WP-1.9b): the driver refuses \"save_format\": \"mcregion\" before line 1; the tile-entity NBT it pins is checked by tile_entities_write_the_oracles_compounds_in_map_order"]
-fn save_tile_entities() {
-    if let Err(e) = mc_golden::run(
-        fixture_dir("save", "tile-entities"),
-        mc_golden::tick_driver::drive,
-    ) {
-        panic!("save/tile-entities: {e}");
-    }
 }
