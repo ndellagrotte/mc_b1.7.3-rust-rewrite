@@ -1,0 +1,10 @@
+{"name":"tnt-by-fire","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":170,
+ "mob_spawning":"none",
+ "comment":"WP-1.6g. TNT at (0, 61, 0) on a stone platform at y = 60, fire set at (1, 61, 0). BlockFire.tryToCatchBlockOnFire reaches the TNT (abilityToCatchFire 100, BlockFire.java:21) and calls Block.tnt.onBlockDestroyedByPlayer(world, x, y, z, 1) (BlockFire.java:118-131), which spawns an EntityTNTPrimed with fuse 80 and plays random.fuse (BlockTNT.java:45-56); the primed TNT (lit at t = 79) then explodes at about t = 159 (Explosion). Needs BlockFire (WP-1.6b), EntityTNTPrimed (WP-2.4) and Explosion (WP-1.8).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"set_block","x":0,"y":61,"z":0,"id":46},
+        {"t":0,"op":"set_block","x":1,"y":61,"z":0,"id":51}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"scheduled_ticks","full":true},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"every":10,"what":"block_box","x0":-3,"y0":59,"z0":-3,"x1":3,"y1":63,"z1":3}]}

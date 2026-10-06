@@ -88,7 +88,11 @@ fixtures! {
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
     tick_ray_trace_platform => "tick" / "ray-trace-platform";
     tick_sapling_grow => "tick" / "sapling-grow";
+    tick_soul_sand_web_item => "tick" / "soul-sand-web-item";
     tick_spawning_draws => "tick" / "spawning-draws";
+    tick_sponge_removal_notifies => "tick" / "sponge-removal-notifies";
+    #[ignore = "needs BlockFire (WP-1.6b): first diff line 6 (t=0 scheduled_ticks blake3: BlockFire.onBlockAdded schedules the first fire tick); lines 1-5 match. Then EntityTNTPrimed (WP-2.4: BlockTNT records EntityTNTPrimed.<init> at the spawn) and Explosion (WP-1.8)"]
+    tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4: blocks, data, light, height map all differ); then the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3). BlockSapling/BlockGrass random ticks are in (WP-1.6)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
