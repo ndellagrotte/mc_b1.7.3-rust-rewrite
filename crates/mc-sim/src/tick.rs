@@ -8,7 +8,7 @@
 //!
 //! Fully transcribed: `tick`, `updateWeather`, `isAllPlayersFullyAsleep`,
 //! `wakeUpAllPlayers` (except `EntityPlayer.wakeUpPlayer`, below),
-//! `SpawnerAnimals.performSpawning` up to the mob constructors
+//! `SpawnerAnimals.performSleepSpawning` and `performSpawning`
 //! ([`crate::spawner`]), the chunk-cache `unload100OldestChunks`,
 //! `saveWorld`, `TickUpdates`, `updateBlocksAndPlayCaveSounds` (cave sounds,
 //! the lightning and snow/ice rolls with their biome tests, the strike itself
@@ -16,10 +16,9 @@
 //! `randomDisplayUpdates`.
 //!
 //! Recorded gaps ([`World::skipped_systems`] / [`World::unimplemented_hits`]),
-//! each where its Java code runs: `SpawnerAnimals.performSleepSpawning`
-//! (WP-2.3, needs the `Pathfinder`), `EntityPlayer.wakeUpPlayer` (WP-2.5),
-//! the mob constructors of `performSpawning` ([`crate::spawner`] module
-//! docs).
+//! each where its Java code runs: `EntityPlayer.wakeUpPlayer` (WP-2.5),
+//! the mob constructors the port does not have yet ([`crate::spawner`]
+//! module docs).
 
 use mc_core::java_hash::ChunkCoordIntPair;
 use mc_core::math::floor_double;
@@ -41,10 +40,9 @@ impl World {
             // src: World.java:1748-1759 (sleep check)
             let mut var1 = false;
             if self.spawn_hostile_mobs && self.difficulty_setting >= 1 {
-                // SpawnerAnimals.performSleepSpawning (SpawnerAnimals.java:173-251):
-                // Pathfinder and beds, WP-2.3. Recorded; answers false.
-                self.skip("SpawnerAnimals.performSleepSpawning");
-                var1 = false;
+                // src: World.java:1750-1752 (SpawnerAnimals.java:173-251)
+                let players = self.player_entities.clone();
+                var1 = spawner::perform_sleep_spawning(self, &players);
             }
             if !var1 {
                 let var2 = self.world_info.world_time + 24000;
