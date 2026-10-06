@@ -86,7 +86,7 @@ impl WorldGen {
 
     /// `func_517_a(a, b, c)`: the scale hook; empty in `WorldGenerator`,
     /// only `WorldGenBigTree` overrides it (population calls it with
-    /// `(1.0, 1.0, 1.0)` before `generate`, ChunkProviderGenerate.java:424).
+    /// `(1.0, 1.0, 1.0)` before `generate`, ChunkProviderGenerate.java:450).
     // src: WorldGenerator.java:8-9
     pub fn func_517_a(&mut self, var1: f64, var3: f64, var5: f64) {
         if let WorldGen::BigTree(t) = self {

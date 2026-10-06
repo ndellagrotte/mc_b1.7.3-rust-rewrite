@@ -107,6 +107,31 @@ mixed-case originals).
 | `ChunkProviderHell.func_4057_a` | `ChunkProviderHell::func_4057_a` | The nether's density grid (ChunkProviderHell.java:190-296) |
 | `RegionFile.field_22214_h` | not ported | `fileName.lastModified()` at construction (RegionFile.java:22, :30-32), never read; file metadata and clocks stay out of the simulation (D9) |
 | `RegionFile.func_22211_a`, `func_22199_a`, `func_22197_a`, `debugln` | not ported | `func_22211_a` has an empty body (RegionFile.java:93-94); the other three only build messages for it (:96-110). The write path's message names ("rewrite", "reuse", "grow") are returned as `RegionWrite` |
+| `WorldGenBigTree.field_882_a` | `worldgen::trees::FIELD_882_A` (private) | Static `{2, 0, 0, 1, 2, 1}`: for a main axis `a`, the two other axes are `[a]` and `[a + 3]` (WorldGenBigTree.java:6, :92-93, :180-181, :273-274) |
+| `WorldGenBigTree.field_881_b` | `WorldGenBigTree::field_881_b` | The tree's own `Random`, reseeded with `rand.nextLong()` at every `generate` (WorldGenBigTree.java:7, :333-334); draws the height limit and the branch directions |
+| `WorldGenBigTree.field_878_e` | `WorldGenBigTree::field_878_e` | Height limit: `5 + nextInt(field_870_m)` when 0 (:338-340), lowered to the first obstruction by `func_519_e` (:315); every size derives from it |
+| `WorldGenBigTree.field_876_g` | `WorldGenBigTree::field_876_g` | 0.618, trunk height = `(int)(field_878_e * field_876_g)` (:12, :23) |
+| `WorldGenBigTree.field_875_h` | `WorldGenBigTree::field_875_h` | 1.0, never read (:13) |
+| `WorldGenBigTree.field_874_i` | `WorldGenBigTree::field_874_i` | 0.381, how far below a node its branch meets the trunk, per block of horizontal distance (:14, :62) |
+| `WorldGenBigTree.field_873_j` | `WorldGenBigTree::field_873_j` | Branch length scale (1.0; `func_517_a`'s second argument) (:15, :53, :327) |
+| `WorldGenBigTree.field_872_k` | `WorldGenBigTree::field_872_k` | Leaf-node count scale (1.0; `func_517_a`'s third argument): nodes per layer `(int)(1.382 + (k * e / 13)^2)` (:16, :28, :328) |
+| `WorldGenBigTree.field_871_l` | `WorldGenBigTree::field_871_l` | Trunk width, 1; 2 makes `func_529_c` draw a 2×2 trunk (:17, :228-238); never set to 2 in this tree |
+| `WorldGenBigTree.field_870_m` | `WorldGenBigTree::field_870_m` | Bound of the height-limit draw, 12, or `(int)(a * 12)` from `func_517_a` (:18, :322, :339) |
+| `WorldGenBigTree.field_869_n` | `WorldGenBigTree::field_869_n` | Height of a leaf cluster, 4 (5 when `func_517_a`'s first argument is above 0.5) (:19, :150-151, :160, :323-325) |
+| `WorldGenBigTree.field_868_o` | `WorldGenBigTree::field_868_o` (`Vec<[i32; 4]>`) | Leaf nodes `[x, y, z, branch base y]` built by `func_521_a` (:20, :70-73, :84-85) |
+| `WorldGenBigTree.func_521_a` | `WorldGenBigTree::func_521_a` | Builds the leaf nodes layer by layer from the top (:22-88) |
+| `WorldGenBigTree.func_523_a` | `WorldGenBigTree::func_523_a` | Fills a disc of a block id perpendicular to an axis, replacing only air and leaves (:90-127) |
+| `WorldGenBigTree.func_528_a` | `WorldGenBigTree::func_528_a` | Branch spread of a layer: negative below 30 % of the height limit, else half a circle chord (:129-147) |
+| `WorldGenBigTree.func_526_b` | `WorldGenBigTree::func_526_b` | Leaf-cluster disc radius by layer: 2, 3, …, 3, 2, -1 outside (:149-155) |
+| `WorldGenBigTree.func_520_a` | `WorldGenBigTree::func_520_a` | One leaf cluster at a node (:157-165) |
+| `WorldGenBigTree.func_522_a` | `WorldGenBigTree::func_522_a` | Places a line of a block id between two points (trunk, branches) (:167-202) |
+| `WorldGenBigTree.func_518_b` | `WorldGenBigTree::func_518_b` | All leaf clusters (:204-214) |
+| `WorldGenBigTree.func_527_c` | `WorldGenBigTree::func_527_c` | Whether a branch base is high enough for a branch (20 % of the height limit) (:216-218) |
+| `WorldGenBigTree.func_529_c` | `WorldGenBigTree::func_529_c` | The trunk (:220-240) |
+| `WorldGenBigTree.func_525_d` | `WorldGenBigTree::func_525_d` | The branches (:242-256) |
+| `WorldGenBigTree.func_524_a` | `WorldGenBigTree::func_524_a` | Walks a line: -1 if it is clear (air and leaves), else the distance to the first obstruction (:258-300) |
+| `WorldGenBigTree.func_519_e` | `WorldGenBigTree::func_519_e` | Site check: grass or dirt below, at least 6 clear blocks up (:302-319) |
+| `WorldGenerator.func_517_a`, `WorldGenBigTree.func_517_a` | `WorldGen::func_517_a`, `WorldGenBigTree::func_517_a` | Scale hook, empty except in the big tree (height-limit bound, branch length, node count); population calls it with `(1, 1, 1)` (WorldGenerator.java:8-9, WorldGenBigTree.java:321-329, ChunkProviderGenerate.java:450) |
 
 ## Real names changed for Rust
 
@@ -115,6 +140,9 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | Java | Rust | Why |
 |---|---|---|
 | `World.TickUpdates` | `World::tick_updates` | snake_case |
+| `WorldGenerator` (abstract class) and its tree subclasses | `worldgen::trees::WorldGen` (enum; `WorldGenBigTree` as a struct in its variant) | a closed enum like `BlockKind`; `generate` takes a `RandomSource` (`block::dispatch` convention) and the world as a parameter instead of `WorldGenBigTree.worldObj` |
+| `BlockFlower.canThisPlantGrowOnThisBlockID` and its overrides (`BlockCrops`, `BlockDeadBush`, `BlockMushroom`) | `block::flower::can_this_plant_grow_on_this_block_id(kind, id)` | one function matching on the kind |
+| `ColorizerGrass.getGrassColor`, `ColorizerFoliage.getFoliageColor` | `block::grass::colormap_index` (+ a lookup that has no colormap) | the colormaps are client textures (D8); the index formula is the shared part |
 | `World.entityJoinedWorld` | `World::spawn_entity_in_world` | the b1.7.3 name of later versions' `spawnEntityInWorld`; the doc comment keeps the Java name |
 | `World.worldAccesses` | `World::events` | the listener list becomes an event queue (PLAN_v4 §3.2) |
 | `Entity.mountEntity(null)` | `entity::base::dismount` | only the null case is ported so far |
