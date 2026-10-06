@@ -1,0 +1,27 @@
+[package]
+name = "mc-app"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Binary entry point: window, icon and canvas setup around mc-client"
+
+[[bin]]
+name = "mc_b173"
+path = "src/main.rs"
+
+[features]
+dev = ["bevy/dynamic_linking"]
+
+[dependencies]
+mc-client = { path = "../mc-client" }
+bevy.workspace = true
+winit.workspace = true
+image.workspace = true
+log.workspace = true
+
+[build-dependencies]
+embed-resource = "1"
+
+[lints]
+workspace = true

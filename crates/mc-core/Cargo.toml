@@ -1,0 +1,12 @@
+[package]
+name = "mc-core"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Deterministic primitives for the Beta 1.7.3 rewrite: Java RNG, math, AABB, Java-order collections"
+
+[dependencies]
+
+[lints]
+workspace = true

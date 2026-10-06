@@ -1,14 +1,34 @@
-[package]
-name = "bevy_game" # ToDo
-version = "0.1.0"
-publish = false
-authors = ["Niklas Eicker <git@nikl.me>"] # ToDo: you are the author ;)
-edition = "2024"
-exclude = ["dist", "build", "assets", "credits"]
-
 [workspace]
-members = ["mobile"]
+resolver = "3"
+members = ["crates/*"]
 
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "CC0-1.0" # the template's LICENSE; the owner may change it later
+
+[workspace.dependencies]
+bevy = { version = "0.19.0", default-features = false, features = ["2d", "3d", "ui"] }
+bevy_kira_audio = "0.26"
+bevy_asset_loader = "0.27.0"
+flate2 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# keep the following in sync with Bevy's dependencies (template note)
+winit = { version = "0.30", default-features = false }
+image = { version = "0.25", default-features = false }
+## This greatly improves WGPU's performance due to its heavy use of trace! calls
+log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
+
+[workspace.lints.clippy]
+excessive_precision = "allow" # transcribed Java float literals keep their digits (PLAN_v4 D4)
+approx_constant = "allow"
+disallowed_types = "deny"
+disallowed_methods = "deny"
+
+# Profiles must live at the workspace root; cargo ignores them in member crates.
 [profile.dev.package."*"]
 opt-level = 3
 
@@ -16,7 +36,6 @@ opt-level = 3
 opt-level = 1
 
 # This is used by trunk as it doesn't support custom profiles: https://github.com/trunk-rs/trunk/issues/605
-# xbuild also uses this profile for building android AABs because I couldn't find a configuration for it
 [profile.release]
 opt-level = "s"
 lto = true
@@ -30,35 +49,3 @@ opt-level = 3
 lto = true
 codegen-units = 1
 strip = true
-
-[features]
-dev = [
-    "bevy/dynamic_linking",
-]
-
-# Bevy's default features are `2d`, `3d`, `ui` and `audio`. We take all of them except for `audio`, since it clashes with bevy_kira_audio.
-# If your game doesn't need 3d (or 2d), dropping that collection here will cut down on compile times.
-[dependencies]
-bevy = { version = "0.19.0", default-features = false, features = [
-    "2d",
-    "3d",
-    "ui",
-] }
-bevy_kira_audio = { version = "0.26" }
-bevy_asset_loader = { version = "0.27.0" }
-rand = { version = "0.9" }
-webbrowser = { version = "1", features = ["hardened"] }
-
-# keep the following in sync with Bevy's dependencies
-winit = { version = "0.30", default-features = false }
-image = { version = "0.25", default-features = false }
-## This greatly improves WGPU's performance due to its heavy use of trace! calls
-log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
-
-# Required to make `rand`/`getrandom` work on wasm.
-# Backend is selected via `.cargo/config.toml` rustflags for the wasm32-unknown-unknown target.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.3", features = ["wasm_js"] }
-
-[build-dependencies]
-embed-resource = "1"

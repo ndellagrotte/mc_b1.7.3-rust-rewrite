@@ -1,0 +1,19 @@
+[package]
+name = "mc-client"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Bevy client for the Beta 1.7.3 rewrite: window, input, rendering, UI, audio, assets"
+
+[dependencies]
+mc-sim = { path = "../mc-sim" }
+bevy.workspace = true
+bevy_kira_audio.workspace = true
+bevy_asset_loader.workspace = true
+image.workspace = true
+log.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

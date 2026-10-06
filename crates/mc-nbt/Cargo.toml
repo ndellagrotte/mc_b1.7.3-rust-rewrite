@@ -1,0 +1,13 @@
+[package]
+name = "mc-nbt"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "NBT (tags 0-10) reader and writer for Beta 1.7.3 saves"
+
+[dependencies]
+flate2.workspace = true
+
+[lints]
+workspace = true
