@@ -4,20 +4,23 @@
 //! Replays `tests/golden/math/math-sweep/scenario.json` (edge cases per
 //! function, then `count` inputs from one `JavaRandom(seed)` drawing
 //! `nextDouble() * 2000 - 1000`, `x` then `y`, README `math_sweep`) and
-//! compares three candidates with the oracle's `java.lang.Math` results:
+//! compares candidates with the oracle's `java.lang.Math` results (which,
+//! with the oracle's intrinsics disabled, are `StrictMath`'s):
 //!
 //! - `std`: Rust `f64::sin`, `cos`, `atan2`, `atan`, `powf`, `sqrt` (on Linux,
 //!   glibc);
 //! - `libm`: the `libm` crate (pure Rust, from FreeBSD msun / fdlibm);
+//! - `jmath`: `mc_core::jmath`, the port's implementation (the fdlibm 5.3
+//!   transcription in `mc_core::strict_math`);
 //! - `strict`: the oracle's `StrictMath` results from
-//!   `tests/golden/math/math-sweep-strict/expected.jsonl`, when present (what
-//!   an exact fdlibm transcription would give).
+//!   `tests/golden/math/math-sweep-strict/expected.jsonl`, when present.
 //!
-//! `math_sweep_report` only reports (run with `--nocapture` to see the table)
-//! and fails only if `std`'s `sqrt` (correctly rounded by IEEE-754) or the
-//! input generation disagrees with the oracle. `golden_math_sweep_strict_eq`
-//! is the strict fixture check of `mc_core::jmath`, ignored until the
-//! implementation is decided.
+//! `math_sweep_report` reports (run with `--nocapture` to see the table) and
+//! fails if `std`'s `sqrt` (correctly rounded by IEEE-754), the input
+//! generation or `jmath` disagrees with the oracle.
+//! `golden_math_sweep_strict_eq` / `golden_math_sweep_strict_fixture_eq` are
+//! the strict fixture checks of `mc_core::jmath` through `mc_golden::run`
+//! (PLAN_v4 §3.4 rule 5, decided in WP-0.3).
 
 use std::collections::BTreeMap;
 
@@ -114,7 +117,7 @@ fn inputs(scenario: &Scenario) -> Result<Vec<Input>, GoldenError> {
 
 type Impl = fn(&str, f64, f64) -> f64;
 
-/// `mc_core::jmath`, the port's shim (currently std plus Java special cases).
+/// `mc_core::jmath`, the port's implementation (fdlibm 5.3 / `StrictMath`).
 fn eval_jmath(function: &str, x: f64, y: f64) -> f64 {
     match function {
         "sin" => jmath::sin(x),
@@ -297,7 +300,7 @@ fn math_sweep_report() {
     };
     println!("\n§3.4 rule 5 sweep: mismatching inputs / total, against oracle java.lang.Math");
     println!("({strict_note}; libm~strict = libm crate vs StrictMath)\n");
-    println!("(jmath = mc_core::jmath: std plus Java's pow special cases)\n");
+    println!("(jmath = mc_core::jmath: the fdlibm 5.3 transcription, mc_core::strict_math)\n");
     let names = ["std", "libm", "jmath", "strict", "libm~strict"];
     print!("| {:<6} |", "fn");
     for name in names {
@@ -340,14 +343,20 @@ fn math_sweep_report() {
         "std sqrt must be exact: {:?}",
         sqrt.first
     );
+    for function in &functions {
+        let jmath = &tallies[function][2];
+        assert_eq!(
+            jmath.mismatches, 0,
+            "jmath::{function} differs from the oracle: {:?}",
+            jmath.first
+        );
+    }
 }
 
-/// The strict fixture check for `mc_core::jmath`. Enable once §3.4 rule 5's
-/// implementation is chosen.
-#[test]
-#[ignore = "enable once the §3.4 rule 5 implementation is decided (WP-0.3 sweep)"]
-fn golden_math_sweep_strict_eq() {
-    run(mc_golden::fixture_dir("math", SWEEP), |scenario, out| {
+/// Replays a `math_sweep` fixture through `mc_core::jmath` and compares the
+/// whole trace bit for bit (`mc_golden::run`).
+fn replay_jmath(name: &str) {
+    run(mc_golden::fixture_dir("math", name), |scenario, out| {
         for input in inputs(scenario)? {
             let v = eval_jmath(input.function, input.x, input.y.unwrap_or(0.0));
             out.push(TraceLine::math(
@@ -360,5 +369,18 @@ fn golden_math_sweep_strict_eq() {
         }
         Ok(())
     })
-    .unwrap_or_else(|e| panic!("{e}"));
+    .unwrap_or_else(|e| panic!("{name}: {e}"));
+}
+
+/// The strict fixture check for `mc_core::jmath` against the oracle's
+/// `java.lang.Math` (intrinsics disabled, PLAN_v4 §3.4 rule 5).
+#[test]
+fn golden_math_sweep_strict_eq() {
+    replay_jmath(SWEEP);
+}
+
+/// The same against the oracle's `java.lang.StrictMath` (`"strict": true`).
+#[test]
+fn golden_math_sweep_strict_fixture_eq() {
+    replay_jmath(STRICT);
 }

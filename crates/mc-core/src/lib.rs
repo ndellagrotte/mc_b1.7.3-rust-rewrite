@@ -6,10 +6,10 @@
 //!   it (§3.4 rule 3).
 //! - [`math`] — `MathHelper` (the 65536-entry sine table and its lookups,
 //!   floors, `bucketInt`, …) and [`math::jmath`], the one place the port calls
-//!   `java.lang.Math.sin/cos/atan2/atan/pow/sqrt` (§3.4 rule 5).
-//! - [`strict_math`] — `java.lang.StrictMath` functions transcribed from
-//!   fdlibm 5.3 where bit-exactness is required (`log`, for
-//!   [`JavaRandom::next_gaussian`]).
+//!   `java.lang.Math.sin/cos/atan2/atan/pow/sqrt/log` (§3.4 rule 5).
+//! - [`strict_math`] — `java.lang.StrictMath` `sin`, `cos`, `atan`, `atan2`,
+//!   `pow`, `log` transcribed from fdlibm 5.3, bit-exact on every target;
+//!   [`math::jmath`] and [`JavaRandom::next_gaussian`] use them.
 //! - [`aabb`] — [`Aabb`], `AxisAlignedBB` as a value type.
 //! - [`vec3d`] — [`Vec3D`], vanilla's double vector, as a value type (needed by
 //!   [`Aabb::is_vec_inside`] and [`Aabb::calculate_intercept`]).

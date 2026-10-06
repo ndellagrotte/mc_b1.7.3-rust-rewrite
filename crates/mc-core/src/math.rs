@@ -10,67 +10,67 @@ use std::sync::OnceLock;
 // src: MathHelper.java:4
 pub const SIN_TABLE_LEN: usize = 65536;
 
-/// The `java.lang.Math` functions vanilla calls whose results are not
-/// specified bit-exactly by Java (§3.4 rule 5): `sin`, `cos`, `atan2`, `atan`,
-/// `pow`, plus `sqrt` (exact everywhere, kept here so every call site looks
-/// the same).
+/// The `java.lang.Math` replacements for the port (§3.4 rule 5, decided in
+/// WP-0.3): `sin`, `cos`, `atan2`, `atan`, `pow`, `log` are `StrictMath`,
+/// i.e. the fdlibm 5.3 transcriptions in [`crate::strict_math`], and `sqrt`
+/// is IEEE-754 `f64::sqrt` (correctly rounded, identical everywhere).
 ///
-/// **Every** port of a `Math.sin/cos/atan2/atan/pow/sqrt` call goes through
-/// this module, never through `f64::sin` & co. directly, so the
-/// implementation can be swapped in one place.
+/// **Every** port of a `Math.sin/cos/atan2/atan/pow/sqrt/log` call goes
+/// through this module, never through `f64::sin` & co. (glibc natively, the
+/// `libm` crate on wasm, both differing from fdlibm 5.3 in the last bit).
 ///
-/// Status: the implementation is **not decided yet**; WP-0.3's sweep
-/// (`crates/mc-core/tests/math_sweep_report.rs`, against
-/// `tests/golden/math/math-sweep`) decides it. These currently delegate to
-/// Rust `std` (plus Java's `pow` special cases), which on native targets
-/// calls the platform libm (glibc on Linux) and on `wasm32-unknown-unknown`
-/// the `libm` crate, so results may differ between the native and browser
-/// builds. First sweep result (1040 inputs per function, oracle JDK 25 on
-/// x86_64): `std` misses `sin` 4, `cos` 2, `atan2` 170, `atan` 7; the `libm`
-/// crate (fdlibm) matches `atan2`/`atan`/`sqrt` exactly but misses `sin` 38,
-/// `cos` 24, `pow` 10. HotSpot evaluates `atan2`/`atan` with fdlibm and
-/// `sin`/`cos`/`pow` with its own intrinsics.
+/// Why `StrictMath`: the WP-0.3 sweep (`tests/math_sweep_report.rs`) showed
+/// HotSpot's x86-64 `sin`/`cos`/`pow` intrinsics match no available Rust
+/// implementation, so the oracle runs with those intrinsics disabled
+/// (`tools/oracle/env.sh`), which makes its `java.lang.Math` bit-identical to
+/// `StrictMath` on every JDK and CPU. These functions reproduce
+/// `tests/golden/math/math-sweep` (and `math-sweep-strict`) bit for bit,
+/// NaN bit patterns included, on native and wasm targets alike. Accepted
+/// cost: the real client, with intrinsics on, differs by 1 ulp on a few
+/// percent of `sin`/`cos`/`pow` inputs.
 ///
 /// Vanilla also calls `Math.abs`, `Math.round`, `Math.ceil`, `Math.max`, which
 /// are exact and need no shim.
 pub mod jmath {
-    /// `Math.sin(a)`.
+    use crate::strict_math;
+
+    /// `Math.sin(a)` = `StrictMath.sin(a)` (fdlibm 5.3).
     #[inline]
     pub fn sin(a: f64) -> f64 {
-        a.sin()
+        strict_math::sin(a)
     }
 
-    /// `Math.cos(a)`.
+    /// `Math.cos(a)` = `StrictMath.cos(a)` (fdlibm 5.3).
     #[inline]
     pub fn cos(a: f64) -> f64 {
-        a.cos()
+        strict_math::cos(a)
     }
 
-    /// `Math.atan2(y, x)`, Java argument order (first argument is `y`).
+    /// `Math.atan2(y, x)` = `StrictMath.atan2(y, x)` (fdlibm 5.3), Java
+    /// argument order (first argument is `y`).
     #[inline]
     pub fn atan2(y: f64, x: f64) -> f64 {
-        y.atan2(x)
+        strict_math::atan2(y, x)
     }
 
-    /// `Math.atan(a)`.
+    /// `Math.atan(a)` = `StrictMath.atan(a)` (fdlibm 5.3).
     #[inline]
     pub fn atan(a: f64) -> f64 {
-        a.atan()
+        strict_math::atan(a)
     }
 
-    /// `Math.pow(a, b)`.
-    ///
-    /// Java's special cases differ from C99 `pow` (which `powf` follows) in
-    /// two places, applied here before delegating: a NaN exponent always
-    /// gives NaN (C: `pow(1, NaN) == 1`), and `|a| == 1` with an infinite
-    /// exponent gives NaN (C: 1). Both are in the `java.lang.Math.pow`
-    /// specification and the oracle sweep's edge cases.
+    /// `Math.pow(a, b)` = `StrictMath.pow(a, b)` (fdlibm 5.3), with Java's
+    /// special cases (a NaN exponent gives NaN, `(+-1)**(+-inf)` is NaN),
+    /// which fdlibm 5.3 shares and C99 `pow` does not.
     #[inline]
     pub fn pow(a: f64, b: f64) -> f64 {
-        if b.is_nan() || (b.is_infinite() && (a == 1.0 || a == -1.0)) {
-            return f64::NAN;
-        }
-        a.powf(b)
+        strict_math::pow(a, b)
+    }
+
+    /// `Math.log(a)` = `StrictMath.log(a)` (fdlibm 5.3).
+    #[inline]
+    pub fn log(a: f64) -> f64 {
+        strict_math::log(a)
     }
 
     /// `Math.sqrt(a)`: correctly rounded by IEEE-754, identical everywhere.
@@ -98,15 +98,15 @@ pub fn compute_sin_table(sin: fn(f64) -> f64) -> Box<[f32; SIN_TABLE_LEN]> {
 
 /// `MathHelper.SIN_TABLE`, built once on first use.
 ///
-/// Computed, not loaded: `std`'s `f64::sin` (glibc natively, the `libm`
-/// crate on wasm) and `libm::sin` both reproduce all 65536 entries of the
-/// oracle's table (`tests/golden/math/sine-table`), since the `(float)` cast
-/// absorbs their last-bit differences. Unverified on other native libms
-/// (macOS, Windows); the golden test catches a difference there.
+/// Computed, not loaded, with [`jmath::sin`] like vanilla's `Math.sin`, so
+/// the table is the same on every target; it reproduces all 65536 entries of
+/// the oracle's table (`tests/golden/math/sine-table`). (`std`'s `f64::sin`
+/// and `libm::sin` happen to as well, since the `(float)` cast absorbs their
+/// last-bit differences.)
 // src: MathHelper.java:56-61 (static initialiser)
 pub fn sin_table() -> &'static [f32; SIN_TABLE_LEN] {
     static TABLE: OnceLock<Box<[f32; SIN_TABLE_LEN]>> = OnceLock::new();
-    TABLE.get_or_init(|| compute_sin_table(f64::sin))
+    TABLE.get_or_init(|| compute_sin_table(jmath::sin))
 }
 
 /// `MathHelper.sin(f)`: table lookup, 65536 steps per turn.

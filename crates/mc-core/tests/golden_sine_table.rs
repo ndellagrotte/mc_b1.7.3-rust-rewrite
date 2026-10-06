@@ -72,6 +72,7 @@ fn sine_table_candidates_report() {
     for (name, f) in [
         ("std f64::sin", f64::sin as fn(f64) -> f64),
         ("libm::sin", libm::sin),
+        ("jmath::sin", mc_core::jmath::sin),
     ] {
         match diff(&compute_sin_table(f)) {
             (0, _) => println!("sine table: {name}: all {SIN_TABLE_LEN} entries match"),
