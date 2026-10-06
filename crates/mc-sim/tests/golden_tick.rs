@@ -70,7 +70,6 @@ fixtures! {
     tick_fire_farmland_rain => "tick" / "fire-farmland-rain";
     tick_fire_rain_spread => "tick" / "fire-rain-spread";
     tick_fire_spread_planks => "tick" / "fire-spread-planks";
-    #[ignore = "BlockFlowing.onBlockAdded/updateTick (fluids task of WP-1.6): first diff line 9 (t=4 scheduled_ticks count 0, expected 5). Lighting (WP-1.3) is in"]
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
     tick_flat_sand_falls => "tick" / "flat-sand-falls";
     tick_flat_torch_light => "tick" / "flat-torch-light";
