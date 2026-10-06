@@ -5,6 +5,7 @@
 
 use mc_core::Vec3D;
 use mc_core::math;
+use mc_sim::block::Material;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::{Entity, base, dispatch};
 use mc_sim::item::ItemStack;
@@ -298,4 +299,38 @@ fn render_data_bodies() {
     assert_eq!(base::get_collision_border_size(), 0.1);
     assert_eq!(dispatch::get_look_vec(&e, &w), None);
     assert_eq!(dispatch::get_entity_texture(&e, &w), None);
+}
+
+// src: Entity.java:588-601, BlockFluid.java:18-25
+#[test]
+fn is_inside_of_material_compares_the_eye_with_the_fluid_surface() {
+    let mut w = empty_world();
+    // A full still-water cell (meta 0): surface at 62 - (1/9 - 0.11111111).
+    w.set_block_and_metadata(1, 61, 1, 9, 0);
+    // A thin flowing-water cell (meta 7): surface at 62 - (8/9 - 0.11111111),
+    // about 61.2222.
+    w.set_block_and_metadata(2, 61, 2, 8, 7);
+    w.set_block_and_metadata(3, 61, 3, 11, 0);
+
+    // An EntityItem's eye height is Entity's 0, so the eye is posY.
+    let e = item_at(&mut w, 1.5, 61.5, 1.5);
+    assert!(base::is_inside_of_material(&e, &mut w, Material::Water));
+    assert!(!base::is_inside_of_material(&e, &mut w, Material::Lava));
+    let e = item_at(&mut w, 1.5, 61.999, 1.5);
+    assert!(base::is_inside_of_material(&e, &mut w, Material::Water));
+
+    let e = item_at(&mut w, 2.5, 61.2, 2.5);
+    assert!(base::is_inside_of_material(&e, &mut w, Material::Water));
+    let e = item_at(&mut w, 2.5, 61.25, 2.5);
+    assert!(!base::is_inside_of_material(&e, &mut w, Material::Water));
+
+    let e = item_at(&mut w, 3.5, 61.5, 3.5);
+    assert!(base::is_inside_of_material(&e, &mut w, Material::Lava));
+    assert!(!base::is_inside_of_material(&e, &mut w, Material::Water));
+
+    // Air (id 0) and stone (not water) are never inside.
+    let e = item_at(&mut w, 0.5, 61.5, 0.5);
+    assert!(!base::is_inside_of_material(&e, &mut w, Material::Water));
+    let e = item_at(&mut w, 0.5, 60.5, 0.5);
+    assert!(!base::is_inside_of_material(&e, &mut w, Material::Water));
 }

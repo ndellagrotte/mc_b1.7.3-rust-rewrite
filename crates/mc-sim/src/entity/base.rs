@@ -1162,10 +1162,10 @@ pub fn get_mounted_y_offset(e: &Entity) -> f64 {
 /// `e` from its old mount and `target` from its old rider, then link the two.
 ///
 /// `target` is in hand (out of its slot: vanilla's callers are the mount's
-/// own `interact` or `onUpdate`, EntityBoat.java:71, :341,
-/// EntityMinecart.java:81, :650, :770, EntityPig.java:40, and the spider
-/// jockey of SpawnerAnimals.java:166, whose two entities have not joined
-/// yet). The other entities the Java touches through fields (`e`'s old
+/// own `interact`, `attackEntityFrom`, `applyEntityCollision` or
+/// `onUpdate` (EntityBoat.java:71, :341, EntityMinecart.java:81, :650,
+/// :770, EntityPig.java:40), and the spider jockey of
+/// SpawnerAnimals.java:166, whose two entities have not joined yet). The other entities the Java touches through fields (`e`'s old
 /// mount, `target`'s old rider) are found in the world by id; one that is
 /// out of its slot further up the stack is recorded and left as is.
 // src: Entity.java:982-1008
