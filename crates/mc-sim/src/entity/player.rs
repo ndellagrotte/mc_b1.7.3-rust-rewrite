@@ -7,6 +7,10 @@
 //! (`playerEntities`, random ticks around it, mob spawning,
 //! `joinEntityInSurroundings`, `randomDisplayUpdates`) come from the world.
 //!
+//! Also here, because block behaviour and the `use_item` op reach them
+//! (WP-1.6 prep): `canHarvestBlock`, `getCurrentPlayerStrVsBlock`
+//! (`Block.blockStrength`) and `swingItem` (`Minecraft.clickMouse`).
+//!
 //! Not transcribed here (WP-2.5): `inventorySlots` / `craftingInventory`
 //! (`new ContainerPlayer(inventory, !multiplayerWorld)`,
 //! EntityPlayer.java:42-43); EntityPlayerSP's `mc`, `movementInput`,
@@ -18,7 +22,47 @@
 
 use super::data_watcher::WatchValue;
 use super::{Entity, EntityKindData, LivingData, PlayerData, PlayerSpData, base};
+use crate::block::{BlockDef, Material};
 use crate::world::World;
+
+/// The `EntityPlayer` level of `e`; panics where Java's cast to
+/// `EntityPlayer` would throw (a caller passed a non-player).
+fn player(e: &Entity) -> &PlayerData {
+    e.kind
+        .player()
+        .expect("EntityPlayer method on a non-player (Java ClassCastException)")
+}
+
+/// `canHarvestBlock(block)`: `inventory.canHarvestBlock(block)`.
+// src: EntityPlayer.java:304-306
+pub fn can_harvest_block(e: &Entity, block: &BlockDef) -> bool {
+    player(e).inventory.can_harvest_block(block)
+}
+
+/// `getCurrentPlayerStrVsBlock(block)`: the held item's speed on `block`,
+/// divided by 5 with the eyes in water and again by 5 off the ground.
+// src: EntityPlayer.java:291-302
+pub fn get_current_player_str_vs_block(e: &Entity, world: &mut World, block: &BlockDef) -> f32 {
+    let mut var2 = player(e).inventory.get_str_vs_block(block);
+    if base::is_inside_of_material(e, world, Material::Water) {
+        var2 /= 5.0;
+    }
+    if !e.base.on_ground {
+        var2 /= 5.0;
+    }
+    var2
+}
+
+/// `swingItem()`: starts the arm swing (EntityPlayerSP does not override it).
+// src: EntityPlayer.java:483-486
+pub fn swing_item(e: &mut Entity) {
+    let p = e
+        .kind
+        .player_mut()
+        .expect("EntityPlayer method on a non-player (Java ClassCastException)");
+    p.swing_progress_int = -1;
+    p.is_swinging = true;
+}
 
 /// `new EntityPlayerSP(world)` without the client half (module docs): the
 /// constructor chain `Entity(World)` → `EntityPlayer.entityInit` →

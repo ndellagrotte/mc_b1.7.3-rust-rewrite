@@ -205,6 +205,11 @@ pub struct PlayerData {
     /// `sleepTimer` (EntityPlayer.java:27, private): `isPlayerFullyAsleep()`
     /// needs 100.
     pub sleep_timer: i32,
+    /// `isSwinging` (EntityPlayer.java:14): set by `swingItem`, advanced by
+    /// `updatePlayerActionState` (EntityPlayer.java:158-170, WP-2.5).
+    pub is_swinging: bool,
+    /// `swingProgressInt` (EntityPlayer.java:15).
+    pub swing_progress_int: i32,
 }
 
 impl PlayerData {
@@ -375,6 +380,14 @@ impl EntityKindData {
 
     /// The `EntityPlayer` level (`instanceof EntityPlayer`).
     pub fn player(&self) -> Option<&PlayerData> {
+        match self {
+            EntityKindData::PlayerSp(_, p, _) => Some(p),
+            _ => None,
+        }
+    }
+
+    /// The `EntityPlayer` level, mutably.
+    pub fn player_mut(&mut self) -> Option<&mut PlayerData> {
         match self {
             EntityKindData::PlayerSp(_, p, _) => Some(p),
             _ => None,
