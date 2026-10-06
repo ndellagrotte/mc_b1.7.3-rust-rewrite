@@ -1373,7 +1373,10 @@ spot), natural spawning off, 6000 ticks; every 500 ticks the four chunks around 
 `rng_state`, `world_time` and the player. The port cannot run it yet: the region's 24
 saved mobs (cows, skeletons, zombies, creepers, squid, sheep, a spider) have no port
 constructor (WP-2.3), so they are missing from its world (the test is ignored with the
-first differing line).
+first differing line). Only region `r.0.-1` is committed, and the player at the spawn
+chunk (1,-4) random-ticks a 19x19 chunk square around it (World.java:1868-1965), chunks x
+-8..10, z -13..5: the ones outside that region are generated and populated on both sides,
+so the fixture also covers generating chunks missing from a loaded save.
 
 Vanilla behaviour these fixtures pin down:
 

@@ -15,7 +15,7 @@
 //! `EntityPlayerSP` overrides that need no client: `updatePlayerActionState`
 //! applying a [`MovementInput`] (EntityPlayerSP.java:27-32) and
 //! `isSneaking` (:144-146). The port has both always. `EntityPlayerSP`'s
-//! `onLivingUpdate` body (:34-87: the portal timer and `Minecraft.usePortal`,
+//! `onLivingUpdate` body (:34-88: the portal timer and `Minecraft.usePortal`,
 //! the sneak `ySize`, `pushOutOfBlocks` at the four corners) runs only with
 //! [`PlayerSpData::client_additions`] set; the golden driver leaves it off,
 //! which is `HarnessPlayer` (tools/oracle/README.md, "`HarnessPlayer`").
@@ -43,7 +43,7 @@
 //! | 340-355 | `displayGUIChest`, `displayWorkbenchGUI`, `onItemPickup` (empty), `getEyeHeight`, `resetHeight` | GUI: client; [`EYE_HEIGHT`], [`reset_height`] |
 //! | 357-437 | `attackEntityFrom`, `isPVPEnabled`, `alertWolves` | [`attack_entity_from`], [`alert_wolves`] |
 //! | 439-446 | `damageEntity` | [`damage_entity`] |
-//! | 448-486 | `displayGUI*` (empty), `useCurrentItemOnEntity`, `getCurrentEquippedItem`, `destroyCurrentEquippedItem`, `getYOffset`, `swingItem` | the `interact` op of mc-golden; [`destroy_current_equipped_item`]; [`get_y_offset`]; [`swing_item`] |
+//! | 448-486 | `displayGUI*` (empty), `useCurrentItemOnEntity`, `getCurrentEquippedItem`, `destroyCurrentEquippedItem`, `getYOffset`, `swingItem` | [`use_current_item_on_entity`]; [`get_current_equipped_item`]; [`destroy_current_equipped_item`]; [`get_y_offset`]; [`swing_item`] |
 //! | 488-514 | `attackTargetEntityWithCurrentItem` | [`attack_target_entity_with_current_item`] |
 //! | 516-535 | `respawnPlayer` (empty), `func_6420_o` (abstract), `onItemStackChanged` (empty), `setEntityDead`, `isEntityInsideOpaqueBlock` | [`set_entity_dead`], [`is_entity_inside_opaque_block`] |
 //! | 537-651 | `sleepInBedAt`, `setRenderOffsetForSleep`, `wakeUpPlayer`, `isInBed` | [`sleep_in_bed_at`], [`wake_up_player`] |
@@ -67,6 +67,12 @@
 //!   [`item_stack_on_destroy_block`] because the tool damage they apply is
 //!   in the player's `inventory` digest that every `entity_state` dump
 //!   carries.
+//! - `ItemStack.useItem` / `useItemRightClick` / `useItemOnEntity`, the
+//!   item calls of `PlayerController.sendPlaceBlock` / `sendUseItem` and of
+//!   `useCurrentItemOnEntity`: [`item_stack_use_item`],
+//!   [`item_stack_use_item_right_click`] and
+//!   [`item_stack_use_item_on_entity`], whose `Item` calls (`onItemUse`,
+//!   `onItemRightClick`, `saddleEntity`) are recorded gaps (WP-2.6).
 //! - `InventoryPlayer.addItemStackToInventory` (item pick-up) is not here:
 //!   [`super::item::on_collide_with_player`] records it (WP-2.5b).
 
@@ -759,16 +765,42 @@ pub fn alert_wolves(e: &Entity, world: &mut World, var1: &EntityKindData, var2: 
 /// `EntityPlayer.damageEntity(amount)`: armour absorbs
 /// `getTotalArmorValue()` 25ths of the damage, the fraction carried over in
 /// `damageRemainder`; every armour piece takes the full damage as wear.
+/// `_world` keeps the `dispatch::damage_entity` entry-point signature;
+/// `damageEntity` itself never reads the world.
 // src: EntityPlayer.java:439-446
-pub fn damage_entity(e: &mut Entity, world: &mut World, mut var1: i32) {
+pub fn damage_entity(e: &mut Entity, _world: &mut World, mut var1: i32) {
     let var2 = 25 - inventory_get_total_armor_value(&player(e).inventory);
     let var3 = var1
         .wrapping_mul(var2)
         .wrapping_add(player(e).damage_remainder);
-    inventory_damage_armor(e, world, var1);
+    inventory_damage_armor(e, var1);
     var1 = var3 / 25;
     player_mut(e).damage_remainder = var3 % 25;
     living::damage_entity(e, var1);
+}
+
+/// `useCurrentItemOnEntity(target)`: the target's `interact(this)`
+/// ([`dispatch::interact`]); when that is false, the held stack's
+/// `useItemOnEntity` on a living target ([`item_stack_use_item_on_entity`]),
+/// and a stack left at size 0 or less leaves the hotbar. Java returns
+/// `void`; the port returns `target.interact(this)` so that a caller (the
+/// golden `interact` op, which reports it) need not inline the method.
+// src: EntityPlayer.java:457-469
+pub fn use_current_item_on_entity(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
+    let result = dispatch::interact(var1, world, e);
+    if !result {
+        // var2 = getCurrentEquippedItem(): the stack in hotbar slot currentItem.
+        if let Some(slot) = current_item_slot(e)
+            && var1.kind.living().is_some()
+        {
+            item_stack_use_item_on_entity(e, world, slot, var1);
+            if player(e).inventory.main_inventory[slot].is_some_and(|s| s.stack_size <= 0) {
+                // var2.onItemDestroyedByUse(this): empty (ItemStack.java:167-168)
+                destroy_current_equipped_item(e);
+            }
+        }
+    }
+    result
 }
 
 /// `getCurrentEquippedItem()`: `inventory.getCurrentItem()`.
@@ -1452,16 +1484,14 @@ pub fn inventory_get_total_armor_value(inv: &InventoryPlayer) -> i32 {
 /// `InventoryPlayer.damageArmor(amount)`: every armour piece wears by
 /// `amount` (`damageItem`); a broken one leaves its slot.
 // src: InventoryPlayer.java:308-319
-pub fn inventory_damage_armor(e: &mut Entity, world: &mut World, var1: i32) {
-    let _ = world;
+pub fn inventory_damage_armor(e: &mut Entity, var1: i32) {
     for var2 in 0..4 {
         let is_armor = player(e).inventory.armor_inventory[var2]
             .is_some_and(|s| matches!(s.get_item().map(|i| &i.kind), Some(ItemKind::Armor { .. })));
         if !is_armor {
             continue;
         }
-        let broke = item_stack_damage_item(e, ArmorOrMain::Armor(var2), var1);
-        let _ = broke;
+        item_stack_damage_item(e, ArmorOrMain::Armor(var2), var1);
         if player(e).inventory.armor_inventory[var2].is_some_and(|s| s.stack_size == 0) {
             // onItemDestroyedByUse(player): empty (ItemStack.java:167-168)
             player_mut(e).inventory.armor_inventory[var2] = None;
@@ -1584,6 +1614,69 @@ pub fn item_stack_hit_entity(e: &mut Entity, world: &mut World, slot: usize) {
     if var3 {
         add_stat(e, "StatList.objectUseStats[itemID]", 1);
     }
+}
+
+/// `ItemStack.useItemOnEntity(target)` for the held stack in main slot
+/// `slot`: `Item.saddleEntity(stack, target)`, empty in `Item` and
+/// overridden by `ItemSaddle`. Item behaviour (WP-2.6): recorded and taken
+/// as doing nothing, so the stack keeps its size.
+// src: ItemStack.java:170-172, Item.java:213-214
+pub fn item_stack_use_item_on_entity(
+    e: &mut Entity,
+    world: &mut World,
+    slot: usize,
+    target: &mut Entity,
+) {
+    let _ = (e, slot, target);
+    world.note_unimplemented("Item.saddleEntity");
+}
+
+/// `ItemStack.useItem(player, world, x, y, z, side)`:
+/// `getItem().onItemUse(...)`, and on success
+/// `player.addStat(StatList.objectUseStats[itemID], 1)`. `Item.onItemUse` is
+/// item behaviour (WP-2.6): recorded and treated as false, so no stat is
+/// added. While it runs, `stack` is out of the player's inventory (the slot
+/// is empty; [`crate::player_controller::send_place_block`]); WP-2.6
+/// transcribes `onItemUse` against this signature (`&mut ItemStack`, the
+/// slot's own stack), never on a copy.
+// src: ItemStack.java:58-65
+pub fn item_stack_use_item(
+    stack: &mut ItemStack,
+    world: &mut World,
+    p: &mut Entity,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let _ = (stack, p, x, y, z, side);
+    world.note_unimplemented("Item.onItemUse");
+    false
+}
+
+/// What `ItemStack.useItemRightClick` returned, standing in for Java's
+/// identity test `var5 != var3` in `PlayerController.sendUseItem`.
+pub enum RightClickResult {
+    /// `var3` itself (possibly mutated in place, in the slot).
+    Same,
+    /// Another object (`ItemBucket`, `ItemSoup`, ...). Never `null` in
+    /// b1.7.3: no `onItemRightClick` override returns `null`.
+    Replaced(ItemStack),
+}
+
+/// `ItemStack.useItemRightClick(world, player)`:
+/// `getItem().onItemRightClick(this, world, player)`. Item behaviour
+/// (WP-2.6): recorded and taken to return `this` unchanged
+/// ([`RightClickResult::Same`]).
+// src: ItemStack.java:71-73
+pub fn item_stack_use_item_right_click(
+    stack: &mut ItemStack,
+    world: &mut World,
+    p: &mut Entity,
+) -> RightClickResult {
+    let _ = (stack, p);
+    world.note_unimplemented("Item.onItemRightClick");
+    RightClickResult::Same
 }
 
 /// `ItemStack.onDestroyBlock(blockId, x, y, z, player)` for the held stack

@@ -8,7 +8,7 @@ import net.minecraft.src.World;
 /**
  * A client-free player (PLAN_v4 §4.2). {@code EntityPlayerSP} needs a {@code Minecraft}
  * (EntityPlayerSP.java:12-21, and its onLivingUpdate reads mc.statFileWriter, mc.currentScreen
- * and movementInput, :34-87), so the harness subclasses {@code EntityPlayer} directly. In
+ * and movementInput, :34-88), so the harness subclasses {@code EntityPlayer} directly. In
  * b1.7.3 its only abstract method is {@code func_6420_o} (EntityPlayer.java:519), a no-op in
  * EntityPlayerSP (:169-170).
  *
@@ -24,7 +24,7 @@ import net.minecraft.src.World;
  * discards it, BlockBed.java:70-80).
  *
  * <p>Not reproduced (client only, documented in tools/oracle/README.md): the rest of
- * {@code EntityPlayerSP.onLivingUpdate} (EntityPlayerSP.java:34-86: portal timing and travel,
+ * {@code EntityPlayerSP.onLivingUpdate} (EntityPlayerSP.java:34-88: portal timing and travel,
  * the sneak {@code ySize} dip, {@code pushOutOfBlocks}), statistics and achievements
  * ({@code addStat} is EntityPlayer's no-op, EntityPlayer.java:718), pickup effects.
  *

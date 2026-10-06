@@ -19,9 +19,9 @@
 //! | :21-32 | `sendBlockRemoved` | [`player_controller_send_block_removed`], called by the override |
 //! | :34-38 | `sendBlockRemoving`, `resetBlockRemoving` (empty) | overridden |
 //! | :43-45 | `getBlockReachDistance` (5) | overridden (4) |
-//! | :47-61, :75-82 | `sendUseItem`, `sendPlaceBlock` | mc-golden's `use_item` / `interact` ops (their `Item` calls are WP-2.6) |
+//! | :47-61, :75-82 | `sendUseItem`, `sendPlaceBlock` | [`send_use_item`], [`send_place_block`] (their `Item` calls are WP-2.6: [`player::item_stack_use_item_right_click`], [`player::item_stack_use_item`]) |
 //! | :84-86 | `createPlayer` | [`crate::entity::player::new_entity_player_sp`] (client: the session) |
-//! | :88-94 | `interactWithEntity`, `attackEntity` | [`attack_entity`]; `interactWithEntity` is mc-golden's `interact` op |
+//! | :88-94 | `interactWithEntity`, `attackEntity` | [`interact_with_entity`], [`attack_entity`] |
 //! | :96-103 | `handleMouseClick`, `onCraftGuiClosed` | containers, WP-2.5b |
 //! | PlayerControllerSP.java:110-116 | fields | [`PlayerControllerSp`] |
 //! | :122-124 | `flipPlayer` | [`flip_player`] |
@@ -39,6 +39,7 @@
 
 use crate::block::{self, dispatch as block_dispatch};
 use crate::entity::{Entity, player};
+use crate::inventory::InventoryPlayer;
 use crate::world::World;
 
 /// A sound the controller asks the client to play
@@ -109,6 +110,91 @@ impl Default for PlayerControllerSp {
 // src: PlayerControllerSP.java:122-124
 pub fn flip_player(p: &mut Entity) {
     p.base.rotation_yaw = -180.0;
+}
+
+/// `PlayerController.sendUseItem(player, world, stack)` (not overridden):
+/// `useItemRightClick`; a changed stack (another object, or another size)
+/// replaces hotbar slot `currentItem` (cleared at size 0) and counts as
+/// used. Java passes the `ItemStack` object; stacks are values here, so
+/// `stack` is the `mainInventory` slot holding Java's `var3` (the caller's
+/// `getCurrentItem()`), and the stack is moved out of it while the item
+/// runs so that whatever `onItemRightClick` does to it lands in the slot.
+/// Java's identity test `var5 != var3` is [`player::RightClickResult`].
+// src: PlayerController.java:47-61
+pub fn send_use_item(world: &mut World, p: &mut Entity, stack: usize) -> bool {
+    let mut var3 = player_inventory(p).main_inventory[stack]
+        .take()
+        .expect("sendUseItem's stack is the slot's stack");
+    let var4 = var3.stack_size;
+    let r = player::item_stack_use_item_right_click(&mut var3, world, p);
+    let inv = player_inventory(p);
+    // var3 goes back into its slot first: Java's var3 never left it.
+    inv.main_inventory[stack] = Some(var3);
+    let var5 = match r {
+        player::RightClickResult::Same if var3.stack_size == var4 => return false,
+        player::RightClickResult::Same => var3,
+        player::RightClickResult::Replaced(s) => s,
+    };
+    let cur = inv.current_item as usize;
+    inv.main_inventory[cur] = Some(var5);
+    if var5.stack_size == 0 {
+        inv.main_inventory[cur] = None;
+    }
+    true
+}
+
+/// `PlayerController.sendPlaceBlock(player, world, stack, x, y, z, side)`
+/// (not overridden): the block's `blockActivated`, else
+/// `stack.useItem(...)`. `stack` is the `mainInventory` slot holding Java's
+/// `var3` (`None` for `null`; see [`send_use_item`]); no b1.7.3
+/// `blockActivated` or `onItemUse` stores another stack into that slot, so
+/// the slot keeps standing for the object.
+// src: PlayerController.java:75-82
+pub fn send_place_block(
+    world: &mut World,
+    p: &mut Entity,
+    stack: Option<usize>,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let var8 = world.get_block_id(x, y, z);
+    if var8 > 0 && block_dispatch::block_activated(world, var8, x, y, z, p) {
+        true
+    } else {
+        match stack {
+            None => false,
+            Some(slot) => {
+                // The stack is moved out of its slot while the item runs, so
+                // that it and the player can both be borrowed mutably, and
+                // put back afterwards: whatever onItemUse does to it lands
+                // in the slot, as on Java's shared object.
+                let mut s = player_inventory(p).main_inventory[slot]
+                    .take()
+                    .expect("sendPlaceBlock's stack is the slot's stack");
+                let r = player::item_stack_use_item(&mut s, world, p, x, y, z, side);
+                player_inventory(p).main_inventory[slot] = Some(s);
+                r
+            }
+        }
+    }
+}
+
+/// `PlayerController.interactWithEntity(player, target)` (not overridden):
+/// `player.useCurrentItemOnEntity(target)`.
+// src: PlayerController.java:88-90
+pub fn interact_with_entity(world: &mut World, p: &mut Entity, target: &mut Entity) {
+    player::use_current_item_on_entity(p, world, target);
+}
+
+/// The player's `inventory`.
+fn player_inventory(p: &mut Entity) -> &mut InventoryPlayer {
+    &mut p
+        .kind
+        .player_mut()
+        .expect("the controller's player is an EntityPlayer")
+        .inventory
 }
 
 /// `PlayerController.attackEntity(player, target)` (not overridden):
