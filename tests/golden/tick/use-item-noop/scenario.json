@@ -1,0 +1,10 @@
+{"name":"use-item-noop","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":3,
+ "mob_spawning":"none",
+ "comment":"use_item that does nothing: a right click on the top of a stone platform block (Block has no blockActivated override, Block.java:506-508) with an empty hand (placed false, used false, stack null), then holding a stick (item 280; Item.onItemUse returns false and Item.onItemRightClick returns the stack, Item.java:155-165, Item.java:298), so the slot keeps {280,1,0}. Pins the op line and that the op draws nothing from world.rand.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x3fe0000000000000"},
+        {"t":1,"op":"use_item","x":2,"y":60,"z":2,"side":1},
+        {"t":2,"op":"use_item","item_id":280,"x":2,"y":60,"z":2,"side":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"t":2,"what":"block","x":2,"y":61,"z":2},
+          {"t":2,"what":"block","x":2,"y":60,"z":2}]}

@@ -49,6 +49,7 @@
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `spawn` `Item` | [`new_entity_item`], `delayBeforeCanPickup = pickup_delay` (10), [`World::spawn_entity_in_world`] → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
+//! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
 //! | `block` / `block_box` | [`World::block_dump`] |
 //! | `scheduled_ticks` | [`World::scheduled_ticks`] |
@@ -60,8 +61,11 @@
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
 //! `spawn` of any kind but `Item` (the `Entity<kind>(World)` constructors),
-//! `use_item` (`PlayerController`, items), `attack` (`attackEntityFrom` of
-//! living entities, the player), `save` (Tier S, WP-1.9).
+//! `attack` (`attackEntityFrom` of living entities, the player), `save`
+//! (Tier S, WP-1.9). `use_item` runs, but every item's `onItemUse` /
+//! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
+//! item does something diverges at the first block or inventory dump after
+//! the op.
 //!
 //! # Entity kind names
 //!
@@ -71,8 +75,9 @@
 //! `EntityPlayerSP`, so the port's `EntityPlayerSP` is reported as
 //! `HarnessPlayer` ([`trace_kind`]).
 
+use mc_sim::block::dispatch as block_dispatch;
 use mc_sim::entity::item::new_entity_item;
-use mc_sim::entity::player::new_entity_player_sp;
+use mc_sim::entity::player::{new_entity_player_sp, swing_item};
 use mc_sim::golden::{StateValue, entity_state_fields};
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
@@ -537,13 +542,35 @@ fn apply(
             e.base.rotation_pitch = pitch;
             line("set_rotation").with("id", id)
         }
-        OpKind::UseItem { .. } => {
-            return Err(unsupported(
-                t,
-                "use_item",
-                "needs the player and PlayerController.sendPlaceBlock / sendUseItem, \
-                 Item.onItemUse (WP-2.5, item table WP-1.2)",
-            ));
+        OpKind::UseItem {
+            item_id,
+            count,
+            meta,
+            x,
+            y,
+            z,
+            side,
+        } => {
+            let Some(pid) = h.player else {
+                return Err(GoldenError::other(format!(
+                    "t={t}: use_item needs a player op first"
+                )));
+            };
+            let r = world.with_entity_mut(pid, |world, p| {
+                use_item(world, p, item_id.map(|id| (id, count, meta)), x, y, z, side)
+            });
+            let Some((placed, used, stack)) = r else {
+                return Err(unsupported(
+                    t,
+                    "use_item",
+                    "the player is no longer in loadedEntityList (the oracle keeps using its \
+                     HarnessPlayer object)",
+                ));
+            };
+            line("use_item")
+                .with("placed", placed)
+                .with("used", used)
+                .with("stack", stack_json(stack))
         }
         OpKind::Attack { .. } => {
             return Err(unsupported(
@@ -564,6 +591,153 @@ fn apply(
     };
     w.push(out);
     Ok(())
+}
+
+/// `TickScenario.useItem`: a right click on face `side` of block `(x, y, z)`
+/// as the player, with the hit given instead of a ray trace (the TILE branch
+/// of `Minecraft.clickMouse(1)`, Minecraft.java:819-850, as the oracle
+/// performs it). Returns `(placed, used, stack in slot currentItem)`.
+///
+/// Order, as the oracle's:
+/// 1. `stack` (item id, count default 1, damage default 0) replaces hotbar
+///    slot `inventory.currentItem`.
+/// 2. `placed = PlayerController.sendPlaceBlock` ([`send_place_block`]) with
+///    the slot's stack (`getCurrentItem`); if placed, `swingItem`
+///    ([`swing_item`], EntityPlayer.java:483-486).
+/// 3. With a stack: a stack left at size 0 is removed from the slot; if
+///    nothing was placed, `used = sendUseItem` ([`send_use_item`]) on the
+///    slot's stack, if any.
+///
+/// Recorded gaps (WP-2.6, item behaviour): `Item.onItemUse` (treated as
+/// returning false, so `ItemStack.useItem` returns false and adds no stat)
+/// and `Item.onItemRightClick` (treated as returning the stack unchanged, so
+/// `sendUseItem` returns false). `blockActivated` goes through the block
+/// dispatch, whose untranscribed overrides record themselves.
+fn use_item(
+    world: &mut World,
+    p: &mut mc_sim::entity::Entity,
+    stack: Option<(i32, Option<i32>, Option<i32>)>,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> (bool, bool, Option<ItemStack>) {
+    /// `inventory.mainInventory[inventory.currentItem]`.
+    fn inv_cur(p: &mut mc_sim::entity::Entity) -> &mut Option<ItemStack> {
+        let inv = &mut p
+            .kind
+            .player_mut()
+            .expect("the player op's entity is an EntityPlayer")
+            .inventory;
+        &mut inv.main_inventory[inv.current_item as usize]
+    }
+    /// `inventory.getCurrentItem()` (InventoryPlayer.java:15-17).
+    fn current_item(p: &mc_sim::entity::Entity) -> Option<ItemStack> {
+        p.kind
+            .player()
+            .expect("the player op's entity is an EntityPlayer")
+            .inventory
+            .get_current_item()
+            .copied()
+    }
+    if let Some((id, count, meta)) = stack {
+        // src: ItemStack.java:33-38 (new ItemStack(id, count, damage))
+        *inv_cur(p) = Some(ItemStack::new(id, count.unwrap_or(1), meta.unwrap_or(0)));
+    }
+    // `new PlayerControllerSP(null)`: its constructor only stores `mc`
+    // (PlayerControllerSP.java), and sendPlaceBlock / sendUseItem are
+    // PlayerController's (not overridden), which never read it.
+    let mut not_placed = true;
+    let held = current_item(p);
+    let placed = send_place_block(world, p, held, x, y, z, side);
+    if placed {
+        not_placed = false;
+        swing_item(p);
+    }
+    let mut used = false;
+    if held.is_some() {
+        // Java tests the `held` object, which is the slot's stack (stacks are
+        // values here; nothing has replaced the slot since `held` was read).
+        if inv_cur(p).is_some_and(|s| s.stack_size == 0) {
+            *inv_cur(p) = None;
+        }
+        if not_placed {
+            let again = current_item(p);
+            used = again.is_some_and(|s| send_use_item(world, p, s));
+        }
+    }
+    (placed, used, current_item(p))
+}
+
+/// `PlayerController.sendPlaceBlock(player, world, stack, x, y, z, side)`:
+/// the block's `blockActivated`, else `stack.useItem(...)`.
+// src: PlayerController.java:75-82
+fn send_place_block(
+    world: &mut World,
+    p: &mut mc_sim::entity::Entity,
+    stack: Option<ItemStack>,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let var8 = world.get_block_id(x, y, z);
+    if var8 > 0 && block_dispatch::block_activated(world, var8, x, y, z, p) {
+        true
+    } else {
+        match stack {
+            None => false,
+            Some(s) => item_stack_use_item(world, p, s, x, y, z, side),
+        }
+    }
+}
+
+/// `ItemStack.useItem(player, world, x, y, z, side)`:
+/// `getItem().onItemUse(...)`, and on success
+/// `player.addStat(StatList.objectUseStats[itemID], 1)`. `Item.onItemUse` is
+/// item behaviour (WP-2.6): recorded and treated as false (module docs of
+/// [`use_item`]), so no stat is added.
+// src: ItemStack.java:58-65
+fn item_stack_use_item(
+    world: &mut World,
+    p: &mut mc_sim::entity::Entity,
+    stack: ItemStack,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let _ = (p, stack, x, y, z, side);
+    world.note_unimplemented("Item.onItemUse");
+    false
+}
+
+/// `PlayerController.sendUseItem(player, world, stack)`: `useItemRightClick`;
+/// a changed stack (another object, or another size) replaces the slot and
+/// counts as used. `ItemStack.useItemRightClick` →
+/// `Item.onItemRightClick` is item behaviour (WP-2.6): recorded and treated
+/// as returning the same stack, so nothing changes and the result is false.
+// src: PlayerController.java:47-61, ItemStack.java:71-73
+fn send_use_item(world: &mut World, p: &mut mc_sim::entity::Entity, stack: ItemStack) -> bool {
+    let _ = (p, stack);
+    // var4 = var3.stackSize; var5 = var3.useItemRightClick(world, player):
+    // Item.onItemRightClick (WP-2.6) is recorded and taken to return var3
+    // itself, so `var5 != var3 || var5 != null && var5.stackSize != var4` is
+    // false and the slot is left alone.
+    world.note_unimplemented("Item.onItemRightClick");
+    false
+}
+
+/// `Dumps.stack`: `{id, count, damage}` or `null`.
+fn stack_json(s: Option<ItemStack>) -> Value {
+    match s {
+        None => Value::Null,
+        Some(s) => serde_json::json!({
+            "id": s.item_id,
+            "count": s.stack_size,
+            "damage": s.item_damage,
+        }),
+    }
 }
 
 /// The entity `id` in `loadedEntityList` (`TickScenario.entity`).
@@ -862,12 +1036,7 @@ fn state_value(v: StateValue) -> Result<Value, GoldenError> {
         StateValue::Bool(b) => b.into(),
         StateValue::Int(i) => i.into(),
         StateValue::Str(s) => s.into(),
-        StateValue::Stack(None) => Value::Null,
-        StateValue::Stack(Some(s)) => serde_json::json!({
-            "id": s.item_id,
-            "count": s.stack_size,
-            "damage": s.item_damage,
-        }),
+        StateValue::Stack(s) => stack_json(s),
         StateValue::Bytes(b) => blake3_hex(&b).into(),
         StateValue::Object(o) => state_object(o)?,
     })

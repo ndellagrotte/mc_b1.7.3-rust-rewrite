@@ -60,7 +60,7 @@ fixtures! {
     light_skylight_column => "light" / "skylight-column";
 
     // ---- tests/golden/tick -------------------------------------------------------
-    #[ignore = "use_item (PlayerController.sendPlaceBlock, ItemDye.onItemUse; WP-2.5, WP-2.6): the driver stops at line 7 (t=1 op use_item); lines 1-6 match. Then BlockSapling.growTree (WP-1.6, WP-1.7), population (WP-1.7)"]
+    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then BlockSapling.growTree (WP-1.6, WP-1.7), population (WP-1.7)"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
@@ -72,6 +72,7 @@ fixtures! {
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
     tick_ray_trace_platform => "tick" / "ray-trace-platform";
     tick_spawning_draws => "tick" / "spawning-draws";
+    tick_use_item_noop => "tick" / "use-item-noop";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4, field blocks); then BlockSapling/BlockGrass random ticks (WP-1.6), the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 7 (t=4 scheduled_ticks, 2557 expected: populated liquids schedule ticks); then BlockFlowing (fluids task of WP-1.6)"]

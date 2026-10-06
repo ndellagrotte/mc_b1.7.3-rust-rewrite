@@ -1,0 +1,10 @@
+{"t":0,"e":"preload","implicit":true,"loaded":34}
+{"t":0,"e":"op","op":"fill","changed":289}
+{"t":0,"e":"op","op":"player","id":0,"joined":true}
+{"t":0,"e":"rng_state","world_rand":27596659585210,"lcg":-1507025098,"math_random":72868670617886}
+{"t":1,"e":"op","op":"use_item","placed":false,"used":false,"stack":null}
+{"t":1,"e":"rng_state","world_rand":174965438726980,"lcg":936015634,"math_random":72868670617886}
+{"t":2,"e":"op","op":"use_item","placed":false,"used":false,"stack":{"id":280,"count":1,"damage":0}}
+{"t":2,"e":"rng_state","world_rand":185469427727326,"lcg":99577673,"math_random":72868670617886}
+{"t":2,"e":"block","x":2,"y":61,"z":2,"id":0,"meta":0,"skylight":15,"blocklight":0}
+{"t":2,"e":"block","x":2,"y":60,"z":2,"id":1,"meta":0,"skylight":0,"blocklight":0}

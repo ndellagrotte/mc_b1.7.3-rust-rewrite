@@ -737,6 +737,14 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   `BlockSnow.canPlaceBlockAt` is not transcribed); the snow roll freezes water on Taiga
   columns only. `weather` every 10, `rng_state` every tick, `block_box` at t = 299 and the
   end.
+- `tick/use-item-noop` (`"mob_spawning": "none"`, WP-1.6 prep): the stone platform and a
+  player; `use_item` on the top face of a platform block at t = 1 with an empty hand and at
+  t = 2 holding a stick (item 280, a plain `Item`: `onItemUse` false, `onItemRightClick`
+  returns the stack, Item.java:155-165). Both lines are `placed` false, `used` false, `stack`
+  `null` / `{280,1,0}`; `rng_state` every tick shows the op draws nothing. The Rust driver
+  records `Item.onItemUse` / `Item.onItemRightClick` as gaps (item behaviour, WP-2.6) and
+  takes the base results, which are what a plain item does
+  (`crates/mc-golden/src/tick_driver.rs`, op table).
 
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
