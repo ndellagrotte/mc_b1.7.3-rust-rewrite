@@ -14,10 +14,16 @@ import java.util.Map;
 import java.util.Random;
 import net.minecraft.src.AxisAlignedBB;
 import net.minecraft.src.Entity;
+import net.minecraft.src.EntityEgg;
+import net.minecraft.src.EntityFireball;
+import net.minecraft.src.EntityFish;
 import net.minecraft.src.EntityItem;
+import net.minecraft.src.EntityLightningBolt;
 import net.minecraft.src.EntityList;
+import net.minecraft.src.EntityPainting;
 import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EntitySlime;
+import net.minecraft.src.EnumArt;
 import net.minecraft.src.Explosion;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
@@ -235,12 +241,14 @@ final class TickScenario {
                 break;
             }
             case "spawn": {
-                Entity e = construct(w, op, hw.seed);
-                if (!str(op, "kind").equals("Item")) place(e, op);
+                Entity e = construct(hw, op, hw.seed);
+                if (placedByOp(op)) place(e, op);
                 if (op.containsKey("id") && num(op, "id") != e.entityId) {
                     throw new IllegalStateException("spawn: entity got id " + e.entityId + ", scenario says " + num(op, "id"));
                 }
-                boolean joined = w.entityJoinedWorld(e); // src: World.java:896-918
+                boolean joined = str(op, "kind").equals("LightningBolt")
+                        ? w.addWeatherEffect(e) // src: World.java:891-894
+                        : w.entityJoinedWorld(e); // src: World.java:896-918
                 l.put("id", e.entityId).put("kind", e.getClass().getSimpleName()).put("joined", joined);
                 break;
             }
@@ -322,15 +330,47 @@ final class TickScenario {
     }
 
     /**
+     * Whether {@code place} runs after construction: not for the kinds whose constructor takes
+     * the position ({@code Item}, {@code LightningBolt}, {@code FishingHook}, a {@code Painting}
+     * with a {@code direction}).
+     */
+    private static boolean placedByOp(Map<String, Object> op) {
+        switch (str(op, "kind")) {
+            case "Item": case "LightningBolt": case "FishingHook": return false;
+            case "Painting": return !op.containsKey("direction");
+            default: return true;
+        }
+    }
+
+    /**
      * Constructs {@code kind} with its {@code (World)} constructor, the class taken from
      * EntityList's name table (EntityList.java:7, filled at :82-107). {@code "Item"} uses
      * {@code EntityItem(World, x, y, z, ItemStack)} (EntityItem.java:11-21, as block drops do,
      * Block.java:355-364) with {@code delayBeforeCanPickup = pickup_delay} (default 10, Block.java:362).
+     * {@code "Painting"} with {@code direction} uses {@code EntityPainting(World, floor(x),
+     * floor(y), floor(z), direction)} (EntityPainting.java:22-45, as ItemPainting.java:27 does).
+     * Harness-defined kinds, not in EntityList's table: {@code "Egg"} ({@code EntityEgg(World)},
+     * EntityEgg.java:16-19), {@code "Fireball"} ({@code EntityFireball(World)},
+     * EntityFireball.java:19-22), {@code "LightningBolt"} ({@code EntityLightningBolt(World, x, y,
+     * z)}, EntityLightningBolt.java:10-34, joined with {@code addWeatherEffect} as World.java:1927
+     * does) and {@code "FishingHook"} ({@code EntityFish(World, player)}, EntityFish.java:48-74,
+     * as ItemFishingRod.java:26 does; sets {@code player.fishEntity}).
      */
-    private static Entity construct(World w, Map<String, Object> op, long seed) throws Exception {
+    private static Entity construct(HarnessWorld hw, Map<String, Object> op, long seed) throws Exception {
+        World w = hw.world;
         String kind = str(op, "kind");
         Entity e;
-        if (kind.equals("Item")) {
+        if (kind.equals("Egg")) {
+            e = new EntityEgg(w);
+        } else if (kind.equals("Fireball")) {
+            e = new EntityFireball(w);
+        } else if (kind.equals("LightningBolt")) {
+            return lightningBolt(hw, op, seed);
+        } else if (kind.equals("FishingHook")) {
+            return fishingHook(hw, seed);
+        } else if (kind.equals("Painting") && op.containsKey("direction")) {
+            return painting(w, op, seed);
+        } else if (kind.equals("Item")) {
             Map<String, Object> it = Dumps.map(op.get("item"), "spawn Item \"item\"");
             double[] p = Num.vec3(op.get("pos"));
             ItemStack stack = new ItemStack(i(it, "id"), i(it, "count"), it.containsKey("damage") ? i(it, "damage") : 0);
@@ -364,6 +404,72 @@ final class TickScenario {
             Reflect.set(EntitySlime.class, "slimeJumpDelay", e, r.nextInt(20) + 10);
             ((EntitySlime) e).setSlimeSize(size);
         }
+    }
+
+    /**
+     * {@code new EntityLightningBolt(world, x, y, z)}. Its constructor draws {@code boltVertex =
+     * rand.nextLong()} and {@code boltLivingTime = rand.nextInt(3) + 1} (EntityLightningBolt.java:14-15)
+     * from the unseeded {@code new Random()} (Entity.java:96), and a weather effect never passes
+     * the join hook (census §3): both are replayed on the seeded stream, as the slime's size is.
+     * At difficulty 2 and more the constructor also places fire at rand-jittered blocks
+     * (:16-32), which no replay can undo: refused.
+     */
+    private static Entity lightningBolt(HarnessWorld hw, Map<String, Object> op, long seed) {
+        if (hw.difficulty >= 2) {
+            throw new IllegalArgumentException("spawn LightningBolt needs difficulty < 2 (its constructor places "
+                    + "fire with the unseeded rand, census §3)");
+        }
+        double[] p = Num.vec3(op.get("pos"));
+        EntityLightningBolt b = new EntityLightningBolt(hw.world, p[0], p[1], p[2]);
+        seedAfterConstruction(b, seed);
+        Random r = HarnessWorld.entityRand(b);
+        b.boltVertex = r.nextLong();
+        Reflect.set(EntityLightningBolt.class, "boltLivingTime", b, r.nextInt(3) + 1);
+        return b;
+    }
+
+    /**
+     * {@code new EntityFish(world, player)} (the player op's player): its constructor ends with
+     * {@code calculateVelocity}, three {@code nextGaussian} draws on the unseeded rand
+     * (EntityFish.java:73, :90-92, census §3). Replayed on the seeded stream: lines 69-73 again
+     * from the angler's yaw and pitch, which the constructor's {@code setLocationAndAngles}
+     * copied unchanged (:63); the draws only reach motion and rotation, so the replay leaves
+     * the entity as a constructor with a seeded rand would.
+     */
+    private static Entity fishingHook(HarnessWorld hw, long seed) {
+        if (hw.player == null) throw new IllegalArgumentException("spawn FishingHook needs a player op first");
+        EntityFish f = new EntityFish(hw.world, hw.player);
+        seedAfterConstruction(f, seed);
+        float yaw = hw.player.rotationYaw, pitch = hw.player.rotationPitch, s = 0.4F;
+        double mx = (double)(-MathHelper.sin(yaw / 180.0F * 3.1415927F) * MathHelper.cos(pitch / 180.0F * 3.1415927F) * s);
+        double mz = (double)(MathHelper.cos(yaw / 180.0F * 3.1415927F) * MathHelper.cos(pitch / 180.0F * 3.1415927F) * s);
+        double my = (double)(-MathHelper.sin(pitch / 180.0F * 3.1415927F) * s);
+        f.calculateVelocity(mx, my, mz, 1.5F, 1.0F);
+        return f;
+    }
+
+    /**
+     * {@code new EntityPainting(world, floor(x), floor(y), floor(z), direction)}: its art choice
+     * draws {@code rand.nextInt(fits)} on the unseeded rand (EntityPainting.java:41, census §3).
+     * Replayed on the seeded stream: the constructor's loop (:27-44) again with the public
+     * {@code art}, {@code setDirection} and {@code onValidSurface}; the painting is not in the
+     * world yet, as during the constructor.
+     */
+    private static Entity painting(World w, Map<String, Object> op, long seed) {
+        double[] p = Num.vec3(op.get("pos"));
+        int x = MathHelper.floor_double(p[0]), y = MathHelper.floor_double(p[1]), z = MathHelper.floor_double(p[2]);
+        int dir = i(op, "direction");
+        EntityPainting e = new EntityPainting(w, x, y, z, dir);
+        seedAfterConstruction(e, seed);
+        List<EnumArt> fit = new ArrayList<>();
+        for (EnumArt a : EnumArt.values()) {
+            e.art = a;
+            e.setDirection(dir);
+            if (e.onValidSurface()) fit.add(a);
+        }
+        if (fit.size() > 0) e.art = fit.get(HarnessWorld.entityRand(e).nextInt(fit.size()));
+        e.setDirection(dir);
+        return e;
     }
 
     @SuppressWarnings("unchecked")

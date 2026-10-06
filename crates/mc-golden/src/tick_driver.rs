@@ -49,7 +49,7 @@
 //! | `set_weather` | the given fields of [`World::world_info`] (`rain_time`, `raining`, `thunder_time`, `thundering`) |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
-//! | `spawn` `Item` | [`new_entity_item`], `delayBeforeCanPickup = pickup_delay` (10), [`World::spawn_entity_in_world`] → `id`, `kind`, `joined` |
+//! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook` and a `Painting` with `direction`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
@@ -64,7 +64,7 @@
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
-//! `spawn` of any kind but `Item` (the `Entity<kind>(World)` constructors),
+//! `spawn` of the mobs, `Minecart` and `Boat` (their `(World)` constructors),
 //! `attack` (`attackEntityFrom` of living entities, the player). `use_item` runs, but every item's `onItemUse` /
 //! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
 //! item does something diverges at the first block or inventory dump after
@@ -530,43 +530,21 @@ fn apply(
         OpKind::Spawn {
             ref kind,
             pos,
+            yaw,
+            pitch,
             id,
             item,
             pickup_delay,
-            ..
+            direction,
         } => {
-            if kind != "Item" {
-                let class = ENTITY_LIST
-                    .iter()
-                    .find(|(name, _)| name == kind)
-                    .map(|(_, class)| *class)
-                    .ok_or_else(|| {
-                        GoldenError::other(format!(
-                            "t={t}: unknown entity kind {kind} (EntityList names)"
-                        ))
-                    })?;
-                return Err(unsupported(
-                    t,
-                    "spawn",
-                    &format!("kind {kind}: the {class}(World) constructor is not transcribed"),
-                ));
-            }
-            let Some(item) = item else {
-                return Err(GoldenError::other(format!(
-                    "t={t}: spawn Item needs \"item\""
-                )));
-            };
-            // src: EntityItem.java:11-21 (as Block.java:355-364 drops it);
-            // no setLocationAndAngles for Item (TickScenario.apply).
-            let mut e = new_entity_item(
-                world,
-                pos[0],
-                pos[1],
-                pos[2],
-                ItemStack::new(item.id, item.count, item.damage),
-            );
-            if let Some(d) = e.kind.item_mut() {
-                d.delay_before_can_pickup = pickup_delay.unwrap_or(10);
+            let mut e = construct(world, h, t, kind, pos, item, pickup_delay, direction)?;
+            if placed_by_op(kind, direction) {
+                // `place`: setLocationAndAngles (Entity.java:669-676), yaw/pitch
+                // defaulting to the constructor's.
+                let yaw = yaw.unwrap_or(e.base.rotation_yaw);
+                let pitch = pitch.unwrap_or(e.base.rotation_pitch);
+                e.base
+                    .set_location_and_angles(pos[0], pos[1], pos[2], yaw, pitch);
             }
             let eid = e.id();
             if let Some(want) = id
@@ -577,7 +555,11 @@ fn apply(
                 )));
             }
             let kind_name = trace_kind(e.kind.java_class());
-            let joined = world.spawn_entity_in_world(e); // src: World.java:896-918
+            let joined = if kind == "LightningBolt" {
+                world.add_weather_effect(e) // src: World.java:891-894
+            } else {
+                world.spawn_entity_in_world(e) // src: World.java:896-918
+            };
             line("spawn")
                 .with("id", eid)
                 .with("kind", kind_name)
@@ -679,6 +661,133 @@ fn apply(
     };
     w.push(out);
     Ok(())
+}
+
+/// Whether the `spawn` op places the entity with `setLocationAndAngles`
+/// (`TickScenario.placedByOp`): every kind but `Item`, `LightningBolt`,
+/// `FishingHook` and a `Painting` with a `direction`, whose constructors
+/// take the position.
+fn placed_by_op(kind: &str, direction: Option<i32>) -> bool {
+    match kind {
+        "Item" | "LightningBolt" | "FishingHook" => false,
+        "Painting" => direction.is_none(),
+        _ => true,
+    }
+}
+
+/// `TickScenario.construct`: the entity a `spawn` op makes, its `rand`
+/// seeded with `mix(seed, id)` at construction (`seedAfterConstruction`;
+/// the port's `EntityBase::new` does it, so the oracle's replays of
+/// constructor draws are the port's constructor draws).
+///
+/// - `Item`: `EntityItem(world, x, y, z, stack)` (EntityItem.java:11-21, as
+///   Block.java:355-364 drops it), `delayBeforeCanPickup = pickup_delay`.
+/// - `Painting` with `direction`: `EntityPainting(world, floor(x), floor(y),
+///   floor(z), direction)` (EntityPainting.java:22-45, its art draw on the
+///   seeded `rand`).
+/// - Harness-defined names (not in `EntityList`): `Egg` (`EntityEgg(World)`),
+///   `Fireball` (`EntityFireball(World)`), `LightningBolt`
+///   (`EntityLightningBolt(world, x, y, z)`, joined with `addWeatherEffect`;
+///   refused at difficulty 2 and more, where its constructor places fire
+///   with the oracle's unseeded `rand`), `FishingHook` (`EntityFish(world,
+///   player)`, needs the `player` op; sets the player's `fishEntity`).
+/// - Any other `EntityList` name: its `(World)` constructor; the mobs, the
+///   minecart and the boat are not transcribed yet (an error naming the
+///   class).
+#[allow(clippy::too_many_arguments)]
+fn construct(
+    world: &mut World,
+    h: &Harness,
+    t: u32,
+    kind: &str,
+    pos: [f64; 3],
+    item: Option<crate::scenario::ItemSpec>,
+    pickup_delay: Option<i32>,
+    direction: Option<i32>,
+) -> Result<mc_sim::entity::Entity, GoldenError> {
+    use mc_sim::entity::{
+        arrow, egg, falling_sand, fireball, fish, lightning_bolt, painting, snowball, tnt_primed,
+    };
+    let e = match kind {
+        "Item" => {
+            let Some(item) = item else {
+                return Err(GoldenError::other(format!(
+                    "t={t}: spawn Item needs \"item\""
+                )));
+            };
+            let mut e = new_entity_item(
+                world,
+                pos[0],
+                pos[1],
+                pos[2],
+                ItemStack::new(item.id, item.count, item.damage),
+            );
+            if let Some(d) = e.kind.item_mut() {
+                d.delay_before_can_pickup = pickup_delay.unwrap_or(10);
+            }
+            e
+        }
+        "Egg" => egg::new_entity_egg_empty(world),
+        "Fireball" => fireball::new_entity_fireball_empty(world),
+        "LightningBolt" => {
+            if h.difficulty >= 2 {
+                return Err(GoldenError::other(format!(
+                    "t={t}: spawn LightningBolt needs difficulty < 2 (its constructor places \
+                     fire with the oracle's unseeded rand, tools/oracle/census.md §3)"
+                )));
+            }
+            lightning_bolt::new_entity_lightning_bolt(world, pos[0], pos[1], pos[2])
+        }
+        "FishingHook" => {
+            let Some(pid) = h.player else {
+                return Err(GoldenError::other(format!(
+                    "t={t}: spawn FishingHook needs a player op first"
+                )));
+            };
+            world
+                .with_entity_mut(pid, fish::new_entity_fish)
+                .ok_or_else(|| {
+                    unsupported(
+                        t,
+                        "spawn",
+                        "FishingHook: the player is no longer in loadedEntityList",
+                    )
+                })?
+        }
+        "Painting" if direction.is_some() => painting::new_entity_painting(
+            world,
+            floor_double(pos[0]),
+            floor_double(pos[1]),
+            floor_double(pos[2]),
+            direction.unwrap_or(0),
+        ),
+        _ => {
+            let class = ENTITY_LIST
+                .iter()
+                .find(|(name, _)| *name == kind)
+                .map(|(_, class)| *class)
+                .ok_or_else(|| {
+                    GoldenError::other(format!(
+                        "t={t}: unknown entity kind {kind} (EntityList names)"
+                    ))
+                })?;
+            match class {
+                "EntityArrow" => arrow::new_entity_arrow_empty(world),
+                "EntitySnowball" => snowball::new_entity_snowball_empty(world),
+                "EntityPainting" => painting::new_entity_painting_empty(world),
+                "EntityTNTPrimed" => tnt_primed::new_entity_tnt_primed_empty(world),
+                "EntityFallingSand" => falling_sand::new_entity_falling_sand_empty(world),
+                _ => {
+                    return Err(unsupported(
+                        t,
+                        "spawn",
+                        &format!("kind {kind}: the {class}(World) constructor is not transcribed"),
+                    ));
+                }
+            }
+        }
+    };
+    Ok(e)
 }
 
 /// `TickScenario.useItem`: a right click on face `side` of block `(x, y, z)`

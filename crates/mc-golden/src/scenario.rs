@@ -438,6 +438,11 @@ pub enum OpKind {
         /// For `Item`: `delayBeforeCanPickup` (default 10).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pickup_delay: Option<i32>,
+        /// For `Painting`: the wall direction (0-3) of the position
+        /// constructor `EntityPainting(world, x, y, z, direction)`, with the
+        /// wall block `floor(pos)`; absent, the `(World)` constructor.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        direction: Option<i32>,
     },
     /// Assign `motionX/Y/Z`.
     SetMotion {
