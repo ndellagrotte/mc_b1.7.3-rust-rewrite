@@ -2146,24 +2146,21 @@ pub fn can_provide_power(world: &World, id: i32) -> bool {
 pub fn set_block_bounds_for_item_render(world: &mut World, id: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockPistonBase.java:203-205
-        K::PistonBase { .. } => {
-            return super::piston_base::set_block_bounds_for_item_render(world, id);
-        }
+        K::PistonBase { .. } => super::piston_base::set_block_bounds_for_item_render(world, id),
         // src: BlockPressurePlate.java:149-154
         K::PressurePlate { .. } => {
-            return super::pressure_plate::set_block_bounds_for_item_render(world, id);
+            super::pressure_plate::set_block_bounds_for_item_render(world, id)
         }
         // src: BlockButton.java:250-255
-        K::Button => return super::button::set_block_bounds_for_item_render(world, id),
+        K::Button => super::button::set_block_bounds_for_item_render(world, id),
         // src: BlockCake.java:19-23
-        K::Cake => return super::cake::set_block_bounds_for_item_render(world, id),
+        K::Cake => super::cake::set_block_bounds_for_item_render(world, id),
         // src: BlockTrapDoor.java:42-45
-        K::TrapDoor => return super::trap_door::set_block_bounds_for_item_render(world, id),
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::TrapDoor => super::trap_door::set_block_bounds_for_item_render(world, id),
+        _ => {}
+    }
 }
 
 /// `harvestBlock(world, player, x, y, z, meta)`: a player broke the block
