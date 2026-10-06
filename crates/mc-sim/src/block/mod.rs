@@ -1008,11 +1008,21 @@ pub const fn damage_dropped(def: &BlockDef, meta: i32) -> i32 {
     }
 }
 
-/// Block ids the data methods compare against or return (`Block.<field>.blockID`).
-mod ids {
+/// Block ids (`Block.<field>.blockID`): the single public id surface, used by
+/// the data methods here and by the generators ([`crate::worldgen::ids`]).
+pub mod ids {
     // src: Block.java:593-688 (the id argument of each constructor)
     pub const COBBLESTONE: i32 = 4;
+    pub const STONE: i32 = 1; // Block.java:593
+    pub const GRASS: i32 = 2; // Block.java:594
     pub const DIRT: i32 = 3;
+    pub const BEDROCK: i32 = 7; // Block.java:599
+    pub const WATER_MOVING: i32 = 8; // Block.java:600
+    pub const WATER_STILL: i32 = 9; // Block.java:601
+    pub const LAVA_MOVING: i32 = 10; // Block.java:602
+    pub const LAVA_STILL: i32 = 11; // Block.java:603
+    pub const SAND: i32 = 12; // Block.java:604
+    pub const GRAVEL: i32 = 13; // Block.java:605
     pub const PLANKS: i32 = 5;
     pub const LEAVES: i32 = 18;
     pub const SAPLING: i32 = 6;
@@ -1020,9 +1030,13 @@ mod ids {
     pub const WOOD: i32 = 17;
     pub const ORE_LAPIS: i32 = 21;
     pub const DISPENSER: i32 = 23;
+    pub const SAND_STONE: i32 = 24; // Block.java:616
     pub const RAIL_POWERED: i32 = 27;
     pub const STAIR_SINGLE: i32 = 44;
     pub const OBSIDIAN: i32 = 49;
+    pub const ICE: i32 = 79; // Block.java:671
+    pub const NETHERRACK: i32 = 87; // Block.java:679
+    pub const SLOW_SAND: i32 = 88; // soul sand, Block.java:680
     pub const REDSTONE_WIRE: i32 = 55;
     pub const ORE_DIAMOND: i32 = 56;
     pub const STONE_OVEN_IDLE: i32 = 61;

@@ -31,34 +31,70 @@ pub mod perlin;
 pub mod simplex;
 
 /// The block ids the generators write or test, as the `byte`s Java stores
-/// (`(byte)Block.x.blockID`).
+/// (`(byte)Block.x.blockID`). Values come from [`crate::block::ids`], the
+/// single source (Block.java:593-688); only the narrowing cast is here.
 pub mod ids {
-    /// `Block.stone` (Block.java:593).
-    pub const STONE: u8 = 1;
-    /// `Block.grass` (Block.java:594).
-    pub const GRASS: u8 = 2;
-    /// `Block.dirt` (Block.java:595).
-    pub const DIRT: u8 = 3;
-    /// `Block.bedrock` (Block.java:599).
-    pub const BEDROCK: u8 = 7;
-    /// `Block.waterMoving` (Block.java:600).
-    pub const WATER_MOVING: u8 = 8;
-    /// `Block.waterStill` (Block.java:601).
-    pub const WATER_STILL: u8 = 9;
-    /// `Block.lavaMoving` (Block.java:602).
-    pub const LAVA_MOVING: u8 = 10;
-    /// `Block.lavaStill` (Block.java:603).
-    pub const LAVA_STILL: u8 = 11;
-    /// `Block.sand` (Block.java:604).
-    pub const SAND: u8 = 12;
-    /// `Block.gravel` (Block.java:605).
-    pub const GRAVEL: u8 = 13;
-    /// `Block.sandStone` (Block.java:616).
-    pub const SAND_STONE: u8 = 24;
-    /// `Block.ice` (Block.java:671).
-    pub const ICE: u8 = 79;
-    /// `Block.netherrack` (Block.java:679).
-    pub const NETHERRACK: u8 = 87;
-    /// `Block.slowSand` (soul sand, Block.java:680).
-    pub const SLOW_SAND: u8 = 88;
+    use crate::block::ids as b;
+
+    /// `(byte)` of [`b::STONE`].
+    pub const STONE: u8 = b::STONE as u8;
+    /// `(byte)` of [`b::GRASS`].
+    pub const GRASS: u8 = b::GRASS as u8;
+    /// `(byte)` of [`b::DIRT`].
+    pub const DIRT: u8 = b::DIRT as u8;
+    /// `(byte)` of [`b::BEDROCK`].
+    pub const BEDROCK: u8 = b::BEDROCK as u8;
+    /// `(byte)` of [`b::WATER_MOVING`].
+    pub const WATER_MOVING: u8 = b::WATER_MOVING as u8;
+    /// `(byte)` of [`b::WATER_STILL`].
+    pub const WATER_STILL: u8 = b::WATER_STILL as u8;
+    /// `(byte)` of [`b::LAVA_MOVING`].
+    pub const LAVA_MOVING: u8 = b::LAVA_MOVING as u8;
+    /// `(byte)` of [`b::LAVA_STILL`].
+    pub const LAVA_STILL: u8 = b::LAVA_STILL as u8;
+    /// `(byte)` of [`b::SAND`].
+    pub const SAND: u8 = b::SAND as u8;
+    /// `(byte)` of [`b::GRAVEL`].
+    pub const GRAVEL: u8 = b::GRAVEL as u8;
+    /// `(byte)` of [`b::SAND_STONE`].
+    pub const SAND_STONE: u8 = b::SAND_STONE as u8;
+    /// `(byte)` of [`b::ICE`].
+    pub const ICE: u8 = b::ICE as u8;
+    /// `(byte)` of [`b::NETHERRACK`].
+    pub const NETHERRACK: u8 = b::NETHERRACK as u8;
+    /// `(byte)` of [`b::SLOW_SAND`].
+    pub const SLOW_SAND: u8 = b::SLOW_SAND as u8;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ids;
+
+    /// The byte ids keep their old literal values and name rows of the block
+    /// table; the worldgen golden fixtures
+    /// (`cargo test -p mc-sim --test golden_worldgen`) prove the generators
+    /// are unchanged.
+    #[test]
+    fn ids_unchanged_and_in_block_table() {
+        let expected: [(u8, u8); 14] = [
+            (ids::STONE, 1),
+            (ids::GRASS, 2),
+            (ids::DIRT, 3),
+            (ids::BEDROCK, 7),
+            (ids::WATER_MOVING, 8),
+            (ids::WATER_STILL, 9),
+            (ids::LAVA_MOVING, 10),
+            (ids::LAVA_STILL, 11),
+            (ids::SAND, 12),
+            (ids::GRAVEL, 13),
+            (ids::SAND_STONE, 24),
+            (ids::ICE, 79),
+            (ids::NETHERRACK, 87),
+            (ids::SLOW_SAND, 88),
+        ];
+        for (id, value) in expected {
+            assert_eq!(id, value);
+            assert!(crate::block::block(i32::from(id)).is_some());
+        }
+    }
 }
