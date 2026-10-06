@@ -712,8 +712,8 @@ pen and `rng_state` every tick:
   tick.
 - `tick/flat-lava-fire`: still lava filling the pen, planks above part of it and a player
   beside it (random ticks); `BlockStationary.updateTick` climbs and sets fire next to the
-  planks (BlockStationary.java:32-56). Ignored in the Rust runner until `BlockFire` lands:
-  the first difference is line 20 (BlockFire.onBlockAdded's scheduled tick).
+  planks (BlockStationary.java:32-56), and `BlockFire` takes it from there
+  (`onBlockAdded`'s scheduled tick, then `updateTick`).
 
 Lighting (WP-1.3), empty world, seed 123, only blocks that are inert here (stone, glass,
 glowstone; ice, leaves and still water placed silently and without a player). They use the

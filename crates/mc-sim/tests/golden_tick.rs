@@ -71,7 +71,6 @@ fixtures! {
     tick_fire_rain_spread => "tick" / "fire-rain-spread";
     tick_fire_spread_planks => "tick" / "fire-spread-planks";
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
-    #[ignore = "needs BlockFire (fire task of WP-1.6): first diff line 20 (t=9 scheduled_ticks: the oracle has BlockFire.onBlockAdded's tick for the fire still lava set at (-1,62,-5)); lines 1-19 (BlockStationary.updateTick's draws, setNotStationary) match"]
     tick_flat_lava_fire => "tick" / "flat-lava-fire";
     tick_flat_lava_flow => "tick" / "flat-lava-flow";
     tick_flat_lava_flow_nether => "tick" / "flat-lava-flow-nether";
