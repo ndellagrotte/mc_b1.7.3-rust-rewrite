@@ -44,7 +44,7 @@
 //! | 645-647 | `setWorld` | no port: an entity belongs to the world that runs it | — |
 //! | 649-676 | `setPositionAndRotation`, `setLocationAndAngles` | transcribed | [`EntityBase`] methods |
 //! | 678-704 | `getDistanceToEntity`, `getDistanceSq`, `getDistance`, `getDistanceSqToEntity` | transcribed | [`EntityBase`] methods |
-//! | 706-707 | `onCollideWithPlayer` | empty body | [`on_collide_with_player`], dispatched |
+//! | 706-707 | `onCollideWithPlayer` | empty body | [`dispatch::on_collide_with_player`] (the Item, Arrow, Snowball and Egg arms: WP-2.4a) |
 //! | 709-734 | `applyEntityCollision` | transcribed (WP-2.1) | [`apply_entity_collision`], dispatched |
 //! | 736-744 | `addVelocity`, `setBeenAttacked` | transcribed | [`EntityBase::add_velocity`] (dispatched), [`EntityBase::set_been_attacked`] |
 //! | 746-757 | `attackEntityFrom`, `canBeCollidedWith`, `canBePushed` | transcribed | [`attack_entity_from`], dispatched |
@@ -1497,6 +1497,9 @@ pub fn get_collision_border_size() -> f32 {
 
 /// `Entity.onStruckByLightning(bolt)`: 5 fire damage (virtual) and the fire
 /// counter's step (`++fire`, 0 becomes 300), as `moveEntity`'s fire contact.
+/// Its one caller is `EntityLightningBolt.onUpdate` (the entities within 3
+/// blocks, [`super::lightning_bolt::on_update`]), through
+/// [`dispatch::on_struck_by_lightning`].
 // src: Entity.java:1085-1092
 pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World, _bolt: &Entity) {
     dispatch::deal_fire_damage(e, world, 5);

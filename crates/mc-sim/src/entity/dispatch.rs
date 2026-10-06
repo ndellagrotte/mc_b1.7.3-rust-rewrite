@@ -36,14 +36,27 @@ use crate::world::World;
 /// transcriber adds to its class's row (or adds the row) in the same change
 /// that replaces the recorded arm.
 pub const TRANSCRIBED: &[(&str, &[&str])] = &[
+    // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup's
+    // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
+    ("EntityArrow", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityBoat.java:29-31
     ("EntityBoat", &["canTriggerWalking"]),
+    // src: EntityEgg.java:87-215, :235-242 (super::egg, super::snowball)
+    ("EntityEgg", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityFallingSand.java:26-28, :33-71 (super::falling_sand)
     (
         "EntityFallingSand",
         &["canBeCollidedWith", "canTriggerWalking", "onUpdate"],
     ),
-    // src: EntityItem.java:23-25, :36-95 (super::item)
+    // src: EntityFireball.java:61-174, :194-196, :202-219 (super::fireball)
+    (
+        "EntityFireball",
+        &["attackEntityFrom", "canBeCollidedWith", "onUpdate"],
+    ),
+    // src: EntityFish.java:123-322 (super::fish)
+    ("EntityFish", &["onUpdate"]),
+    // src: EntityItem.java:23-25, :36-95, :110-130 (super::item; the pickup's
+    // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
     (
         "EntityItem",
         &[
@@ -51,9 +64,12 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "canTriggerWalking",
             "dealFireDamage",
             "handleWaterMovement",
+            "onCollideWithPlayer",
             "onUpdate",
         ],
     ),
+    // src: EntityLightningBolt.java:36-74 (super::lightning_bolt)
+    ("EntityLightningBolt", &["onUpdate"]),
     // src: EntityLiving.java:81-91, :187-191, :440-452, :575-577, :785-787
     // (super::living). `onUpdate` and `onEntityUpdate` are partial and record
     // themselves.
@@ -71,10 +87,26 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ),
     // src: EntityMinecart.java:38-40
     ("EntityMinecart", &["canTriggerWalking"]),
+    // src: EntityPainting.java:134-143, :200-212, :245-259 (super::painting)
+    (
+        "EntityPainting",
+        &[
+            "addVelocity",
+            "attackEntityFrom",
+            "canBeCollidedWith",
+            "moveEntity",
+            "onUpdate",
+        ],
+    ),
+    // src: EntitySnowball.java:87-202, :222-229 (super::snowball)
+    ("EntitySnowball", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntitySpider.java:15-17
     ("EntitySpider", &["canTriggerWalking"]),
-    // src: EntityTNTPrimed.java:30-32
-    ("EntityTNTPrimed", &["canTriggerWalking"]),
+    // src: EntityTNTPrimed.java:30-36, :38-64 (super::tnt_primed)
+    (
+        "EntityTNTPrimed",
+        &["canBeCollidedWith", "canTriggerWalking", "onUpdate"],
+    ),
     // src: EntityWolf.java:30-32
     ("EntityWolf", &["canTriggerWalking"]),
 ];
