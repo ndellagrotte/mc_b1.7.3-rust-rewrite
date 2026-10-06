@@ -28,10 +28,10 @@ pub mod math;
 pub mod strict_math;
 pub mod vec3d;
 
-// WP-0.3b: java_hash — `JavaHashMap`/`JavaHashSet` reproducing Java bucket
-// iteration order (§3.4 rule 4), assigned once its fixtures exist.
+pub mod java_hash;
 
 pub use aabb::{Aabb, AabbIntercept};
+pub use java_hash::{JavaHash, JavaHashMap, JavaHashSet};
 pub use java_random::JavaRandom;
 pub use math::jmath;
 pub use vec3d::Vec3D;
