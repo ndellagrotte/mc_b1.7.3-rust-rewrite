@@ -1,0 +1,39 @@
+{
+  "name": "nan-payloads",
+  "tier": "A",
+  "kind": "nbt_write",
+  "root": {
+    "type": "compound",
+    "name": "NaN",
+    "value": {
+      "float_qnan_payload": {
+        "type": "float",
+        "value": "0x7fc00001"
+      },
+      "float_neg_qnan": {
+        "type": "float",
+        "value": "0xffc00000"
+      },
+      "float_snan": {
+        "type": "float",
+        "value": "0x7f800001"
+      },
+      "double_qnan_payload": {
+        "type": "double",
+        "value": "0x7ff8000000000001"
+      },
+      "double_neg_qnan": {
+        "type": "double",
+        "value": "0xfff8000000000000"
+      },
+      "double_snan": {
+        "type": "double",
+        "value": "0x7ff0000000000001"
+      },
+      "float_canonical": {
+        "type": "float",
+        "value": "0x7fc00000"
+      }
+    }
+  }
+}

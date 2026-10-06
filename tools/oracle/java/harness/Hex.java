@@ -31,6 +31,26 @@ final class Hex {
         return Double.longBitsToDouble(Long.parseUnsignedLong(s.substring(2), 16));
     }
 
+    /** Parses a {@code "0x…"} f32 bit-pattern string (8 hex digits); the bits are kept exactly. */
+    static float parseF32(String s) {
+        if (!s.startsWith("0x") || s.length() != 10) throw new IllegalArgumentException("not an f32 bit pattern: " + s);
+        return Float.intBitsToFloat(Integer.parseUnsignedInt(s.substring(2), 16));
+    }
+
+    /** Parses a lower-case hex string (even length, no prefix) into bytes. */
+    static byte[] parse(String s) {
+        if (s.length() % 2 != 0) throw new IllegalArgumentException("odd-length hex string");
+        byte[] b = new byte[s.length() / 2];
+        for (int i = 0; i < b.length; i++) {
+            int hi = Character.digit(s.charAt(2 * i), 16), lo = Character.digit(s.charAt(2 * i + 1), 16);
+            if (hi < 0 || lo < 0 || Character.isUpperCase(s.charAt(2 * i)) || Character.isUpperCase(s.charAt(2 * i + 1))) {
+                throw new IllegalArgumentException("not lower-case hex: " + s);
+            }
+            b[i] = (byte) (hi << 4 | lo);
+        }
+        return b;
+    }
+
     private static String pad(String s, int width) {
         StringBuilder b = new StringBuilder(width);
         for (int i = s.length(); i < width; i++) b.append('0');

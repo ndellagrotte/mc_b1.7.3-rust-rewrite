@@ -1,0 +1,7 @@
+{
+  "name": "testworld-level-dat",
+  "tier": "A",
+  "kind": "nbt_read",
+  "file": "level.dat",
+  "compressed": "gzip"
+}

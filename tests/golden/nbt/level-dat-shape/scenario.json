@@ -1,0 +1,227 @@
+{
+  "name": "level-dat-shape",
+  "tier": "A",
+  "kind": "nbt_write",
+  "root": {
+    "type": "compound",
+    "name": "",
+    "value": {
+      "Data": {
+        "type": "compound",
+        "value": {
+          "RandomSeed": {
+            "type": "long",
+            "value": -4172144991579068934
+          },
+          "SpawnX": {
+            "type": "int",
+            "value": 21
+          },
+          "SpawnY": {
+            "type": "int",
+            "value": 64
+          },
+          "SpawnZ": {
+            "type": "int",
+            "value": -64
+          },
+          "Time": {
+            "type": "long",
+            "value": 1751
+          },
+          "SizeOnDisk": {
+            "type": "long",
+            "value": 3661824
+          },
+          "LastPlayed": {
+            "type": "long",
+            "value": 1791256427467
+          },
+          "LevelName": {
+            "type": "string",
+            "value": "New World"
+          },
+          "version": {
+            "type": "int",
+            "value": 19132
+          },
+          "rainTime": {
+            "type": "int",
+            "value": 101694
+          },
+          "raining": {
+            "type": "byte",
+            "value": 0
+          },
+          "thunderTime": {
+            "type": "int",
+            "value": 98029
+          },
+          "thundering": {
+            "type": "byte",
+            "value": 0
+          },
+          "Player": {
+            "type": "compound",
+            "value": {
+              "Pos": {
+                "type": "list",
+                "value": {
+                  "elem": "double",
+                  "items": [
+                    "0x40210bd35fd9e7f7",
+                    "0x4050a7ae14800000",
+                    "0xc04e4283ea6060c2"
+                  ]
+                }
+              },
+              "Motion": {
+                "type": "list",
+                "value": {
+                  "elem": "double",
+                  "items": [
+                    "0x0000000000000000",
+                    "0xbfb3b7a0c4db2f4c",
+                    "0x8000000000000000"
+                  ]
+                }
+              },
+              "Rotation": {
+                "type": "list",
+                "value": {
+                  "elem": "float",
+                  "items": [
+                    "0xc41c1277",
+                    "0x42b0b334"
+                  ]
+                }
+              },
+              "FallDistance": {
+                "type": "float",
+                "value": "0x00000000"
+              },
+              "Fire": {
+                "type": "short",
+                "value": -20
+              },
+              "Air": {
+                "type": "short",
+                "value": 300
+              },
+              "OnGround": {
+                "type": "byte",
+                "value": 1
+              },
+              "Health": {
+                "type": "short",
+                "value": 20
+              },
+              "HurtTime": {
+                "type": "short",
+                "value": 0
+              },
+              "DeathTime": {
+                "type": "short",
+                "value": 0
+              },
+              "AttackTime": {
+                "type": "short",
+                "value": 0
+              },
+              "Inventory": {
+                "type": "list",
+                "value": {
+                  "elem": "compound",
+                  "items": [
+                    {
+                      "Slot": {
+                        "type": "byte",
+                        "value": 0
+                      },
+                      "id": {
+                        "type": "short",
+                        "value": 278
+                      },
+                      "Count": {
+                        "type": "byte",
+                        "value": 1
+                      },
+                      "Damage": {
+                        "type": "short",
+                        "value": 17
+                      }
+                    },
+                    {
+                      "Slot": {
+                        "type": "byte",
+                        "value": 1
+                      },
+                      "id": {
+                        "type": "short",
+                        "value": 4
+                      },
+                      "Count": {
+                        "type": "byte",
+                        "value": 64
+                      },
+                      "Damage": {
+                        "type": "short",
+                        "value": 0
+                      }
+                    },
+                    {
+                      "Slot": {
+                        "type": "byte",
+                        "value": 103
+                      },
+                      "id": {
+                        "type": "short",
+                        "value": 298
+                      },
+                      "Count": {
+                        "type": "byte",
+                        "value": 1
+                      },
+                      "Damage": {
+                        "type": "short",
+                        "value": 5
+                      }
+                    }
+                  ]
+                }
+              },
+              "Dimension": {
+                "type": "int",
+                "value": 0
+              },
+              "Sleeping": {
+                "type": "byte",
+                "value": 0
+              },
+              "SleepTimer": {
+                "type": "short",
+                "value": 0
+              },
+              "SpawnX": {
+                "type": "int",
+                "value": 12
+              },
+              "SpawnY": {
+                "type": "int",
+                "value": 65
+              },
+              "SpawnZ": {
+                "type": "int",
+                "value": -40
+              },
+              "Score": {
+                "type": "int",
+                "value": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

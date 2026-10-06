@@ -60,7 +60,7 @@ public final class Main {
             if (!only.isEmpty() && !only.contains(id)) continue;
             try {
                 Map<String, Object> sc = Scenario.load(file, rel.getFileName().toString());
-                Trace t = TierA.run(sc);
+                Trace t = TierA.run(sc, file.getParent());
                 t.write(out.resolve(rel));
                 System.out.println("harness: " + id + " (" + t.lines.size() + " lines)");
                 ran++;

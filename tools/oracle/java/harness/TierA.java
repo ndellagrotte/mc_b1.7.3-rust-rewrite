@@ -10,6 +10,7 @@ import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -27,7 +28,8 @@ import net.minecraft.src.WorldProviderSurface;
 final class TierA {
     private TierA() {}
 
-    static Trace run(Map<String, Object> sc) throws Exception {
+    /** {@code dir} is the scenario directory (input sidecars, e.g. {@code nbt_read}'s file). */
+    static Trace run(Map<String, Object> sc, Path dir) throws Exception {
         String kind = str(sc, "kind");
         // Every vanilla Math.random() call draws from HarnessMath; reseed it per
         // scenario so a scenario's output never depends on the ones before it.
@@ -37,6 +39,9 @@ final class TierA {
             case "sine_table": return sineTable();
             case "math_sweep": return mathSweep(sc);
             case "terrain": return terrain(sc);
+            case "nbt_write": return Nbt.write(sc);
+            case "nbt_read": return Nbt.read(sc, dir);
+            case "java_hash_order": return HashOrder.run(sc);
             default: throw new IllegalArgumentException("unknown kind " + kind);
         }
     }
@@ -105,11 +110,12 @@ final class TierA {
         Trace t = new Trace();
         Random r = new Random(seed(sc));
         long count = num(sc, "count");
+        boolean strict = flag(sc, "strict");
         Map<String, Object> edges = (Map<String, Object>) sc.get("edge_cases");
         if (edges == null) throw new IllegalArgumentException("missing \"edge_cases\"");
         for (Object fo : list(sc, "functions")) {
             String fn = (String) fo;
-            boolean two = fn.equals("atan2") || fn.equals("pow");
+            boolean two = TWO_ARG.contains(fn);
             long i = 0;
             for (Object e : list(edges, fn)) {
                 double x, y = 0;
@@ -121,27 +127,36 @@ final class TierA {
                 } else {
                     x = Hex.parseF64((String) e);
                 }
-                t.add(mathLine(fn, i++, two, x, y));
+                t.add(mathLine(fn, i++, two, x, y, strict));
             }
             for (long k = 0; k < count; k++) {
                 double x = r.nextDouble() * 2000.0D - 1000.0D;
                 double y = two ? r.nextDouble() * 2000.0D - 1000.0D : 0;
-                t.add(mathLine(fn, i++, two, x, y));
+                t.add(mathLine(fn, i++, two, x, y, strict));
             }
         }
         return t;
     }
 
-    /** java.lang.Math (not StrictMath): that is what vanilla calls. Arguments in (x, y) order. */
-    private static Json.Line mathLine(String fn, long i, boolean two, double x, double y) {
+    private static final List<String> TWO_ARG = List.of("atan2", "pow");
+
+    /**
+     * java.lang.Math (what vanilla calls), or java.lang.StrictMath when the scenario sets
+     * {@code "strict": true}. Arguments in (x, y) order.
+     */
+    private static Json.Line mathLine(String fn, long i, boolean two, double x, double y, boolean strict) {
         double v;
         switch (fn) {
-            case "sin": v = Math.sin(x); break;
-            case "cos": v = Math.cos(x); break;
-            case "atan": v = Math.atan(x); break;
-            case "sqrt": v = Math.sqrt(x); break;
-            case "atan2": v = Math.atan2(x, y); break;
-            case "pow": v = Math.pow(x, y); break;
+            case "sin": v = strict ? StrictMath.sin(x) : Math.sin(x); break;
+            case "cos": v = strict ? StrictMath.cos(x) : Math.cos(x); break;
+            case "tan": v = strict ? StrictMath.tan(x) : Math.tan(x); break;
+            case "atan": v = strict ? StrictMath.atan(x) : Math.atan(x); break;
+            case "sqrt": v = strict ? StrictMath.sqrt(x) : Math.sqrt(x); break;
+            case "exp": v = strict ? StrictMath.exp(x) : Math.exp(x); break;
+            case "log": v = strict ? StrictMath.log(x) : Math.log(x); break;
+            case "log10": v = strict ? StrictMath.log10(x) : Math.log10(x); break;
+            case "atan2": v = strict ? StrictMath.atan2(x, y) : Math.atan2(x, y); break;
+            case "pow": v = strict ? StrictMath.pow(x, y) : Math.pow(x, y); break;
             default: throw new IllegalArgumentException("unknown math function " + fn);
         }
         Json.Line l = new Json.Line().put("t", 0).put("e", "math").put("fn", fn).put("i", i).f64("x", x);

@@ -138,13 +138,29 @@ final class Json {
         return new IllegalArgumentException("JSON: " + msg + " at offset " + p);
     }
 
-    /** One trace line: a flat JSON object, keys in insertion order. */
+    /**
+     * Appends {@code v} as a JSON string: {@code "} and {@code \\} escaped, other
+     * characters below U+0020 as {@code \\u00XX}, everything else verbatim (the
+     * file is UTF-8).
+     */
+    static void quote(StringBuilder b, String v) {
+        b.append('"');
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            if (c == '"' || c == '\\') b.append('\\').append(c);
+            else if (c < 0x20) b.append(String.format("\\u%04x", (int) c));
+            else b.append(c);
+        }
+        b.append('"');
+    }
+
+    /** One trace line: a JSON object, keys in insertion order (nested values via {@link #raw}). */
     static final class Line {
         private final StringBuilder b = new StringBuilder("{");
 
         private Line key(String k) {
             if (b.length() > 1) b.append(',');
-            quote(k);
+            quote(b, k);
             b.append(':');
             return this;
         }
@@ -160,7 +176,14 @@ final class Json {
         }
 
         Line put(String k, String v) {
-            key(k).quote(v);
+            key(k);
+            quote(b, v);
+            return this;
+        }
+
+        /** Appends {@code json}, an already serialised JSON value (array or object), verbatim. */
+        Line raw(String k, String json) {
+            key(k).b.append(json);
             return this;
         }
 
@@ -170,17 +193,6 @@ final class Json {
 
         Line f64(String k, double v) {
             return put(k, Hex.f64(v));
-        }
-
-        private void quote(String v) {
-            b.append('"');
-            for (int i = 0; i < v.length(); i++) {
-                char c = v.charAt(i);
-                if (c == '"' || c == '\\') b.append('\\').append(c);
-                else if (c < 0x20) b.append(String.format("\\u%04x", (int) c));
-                else b.append(c);
-            }
-            b.append('"');
         }
 
         @Override

@@ -1,0 +1,4 @@
+{"t":0,"e":"nbt_bytes","len":4,"blake3":"cabb163ea8b383114bab0450f2ea4bdf6f97d50dc22e57b50903db81e30bce47","bytes":"0a000000"}
+{"t":0,"e":"nbt_tree","root":{"type":"compound","name":"","value":{}}}
+{"t":0,"e":"nbt_roundtrip","equal":true}
+{"t":0,"e":"nbt_gzip","blake3_of_uncompressed_after_gunzip":"cabb163ea8b383114bab0450f2ea4bdf6f97d50dc22e57b50903db81e30bce47","len":4}

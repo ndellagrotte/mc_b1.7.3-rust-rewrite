@@ -1,0 +1,10 @@
+{
+  "name": "empty-root",
+  "tier": "A",
+  "kind": "nbt_write",
+  "root": {
+    "type": "compound",
+    "name": "",
+    "value": {}
+  }
+}
