@@ -60,6 +60,24 @@ fixtures! {
     light_skylight_column => "light" / "skylight-column";
 
     // ---- tests/golden/tick -------------------------------------------------------
+    tick_activate_workbench_stairs => "tick" / "activate-workbench-stairs";
+    #[ignore = "needs Explosion (World.newExplosion, WP-1.8): first diff line 9 (t=1 blocks_full, field ids: the crater); lines 1-8 match, both bed halves are removed as in the oracle"]
+    tick_bed_nether => "tick" / "bed-nether";
+    tick_bed_place_and_break => "tick" / "bed-place-and-break";
+    #[ignore = "needs ItemBlock / ItemReed / ItemDoor / ItemBed / ItemSlab.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match"]
+    tick_block_item_placement => "tick" / "block-item-placement";
+    tick_cake_eat => "tick" / "cake-eat";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 12 (t=2 blocks_full, field metas: the torch is no power source yet, so neither door opens); lines 1-11 match"]
+    tick_door_iron_powered => "tick" / "door-iron-powered";
+    tick_door_support_removed => "tick" / "door-support-removed";
+    tick_door_toggle => "tick" / "door-toggle";
+    tick_fence_stairs_step_bounds => "tick" / "fence-stairs-step-bounds";
+    tick_ladder_placement => "tick" / "ladder-placement";
+    tick_locked_chest_vanishes => "tick" / "locked-chest-vanishes";
+    tick_portal_frame => "tick" / "portal-frame";
+    #[ignore = "needs BlockFire (WP-1.6b): first diff line 12 (t=2 blocks_full, field blocklight: BlockFire.onBlockAdded does not call BlockPortal.tryToCreatePortal yet, the fire stays); lines 1-11 match"]
+    tick_portal_ignite => "tick" / "portal-ignite";
+    tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
     #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then population (WP-1.7); BlockSapling.growTree is in (WP-1.6)"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     tick_cactus_reed_growth => "tick" / "cactus-reed-growth";

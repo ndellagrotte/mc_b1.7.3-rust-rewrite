@@ -1,0 +1,11 @@
+{"name":"door-iron-powered","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":10,
+ "comment":"BlockDoor.onNeighborBlockChange / onPoweredBlockChange: an iron door at x=2 and a wooden door at x=4 (lower half meta 0, upper meta 8); a lit redstone torch (id 76) set between them at t=2 (a power source: Block.canProvidePower) opens both through isBlockIndirectlyGettingPowered, removing it at t=6 closes them. Needs BlockRedstoneTorch (redstone task of WP-1.6).",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"set_block","x":2,"y":61,"z":2,"id":71},
+        {"t":0,"op":"set_block","x":2,"y":62,"z":2,"id":71,"meta":8},
+        {"t":0,"op":"set_block","x":4,"y":61,"z":2,"id":64},
+        {"t":0,"op":"set_block","x":4,"y":62,"z":2,"id":64,"meta":8},
+        {"t":2,"op":"set_block","x":3,"y":61,"z":2,"id":76},
+        {"t":6,"op":"set_block","x":3,"y":61,"z":2,"id":0}],
+ "dumps":[{"every":1,"what":"block_box","x0":2,"y0":61,"z0":2,"x1":4,"y1":62,"z1":2},
+          {"every":1,"what":"rng_state"}]}

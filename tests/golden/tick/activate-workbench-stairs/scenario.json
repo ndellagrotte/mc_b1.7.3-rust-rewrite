@@ -1,0 +1,12 @@
+{"name":"activate-workbench-stairs","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":4,"mob_spawning":"none",
+ "comment":"blockActivated of the workbench (BlockWorkbench: opens the crafting GUI on the client, returns true: placed true) and of both stairs (BlockStairs forwards to the model block, planks / cobblestone, whose Block.blockActivated is false: placed false, and with a stick in hand sendUseItem runs: used false). rng_state every tick, block_box at the end.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0xc016000000000000","y":61,"z":"0xc016000000000000"},
+        {"t":0,"op":"set_block","x":2,"y":61,"z":2,"id":58},
+        {"t":0,"op":"set_block","x":4,"y":61,"z":2,"id":53,"meta":1},
+        {"t":0,"op":"set_block","x":6,"y":61,"z":2,"id":67,"meta":3},
+        {"t":1,"op":"use_item","x":2,"y":61,"z":2,"side":1},
+        {"t":2,"op":"use_item","x":4,"y":61,"z":2,"side":1},
+        {"t":3,"op":"use_item","item_id":280,"x":6,"y":61,"z":2,"side":2}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"block_box","x0":2,"y0":61,"z0":2,"x1":6,"y1":61,"z1":2}]}

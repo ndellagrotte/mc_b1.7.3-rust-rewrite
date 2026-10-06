@@ -1,0 +1,7 @@
+{"name":"locked-chest-vanishes","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":100,"mob_spawning":"none",
+ "comment":"BlockLockedChest: 64 locked chests (id 95, tickOnLoad, light 15) on the platform next to a player, so random ticks reach them; updateTick removes the chest (setBlockWithNotify 0). block_box every 10 ticks, rng_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0xc016000000000000","y":61,"z":"0xc016000000000000"},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":0,"x1":7,"y1":61,"z1":7,"id":95}],
+ "dumps":[{"every":10,"what":"block_box","x0":0,"y0":61,"z0":0,"x1":7,"y1":61,"z1":7},
+          {"every":1,"what":"rng_state"}]}

@@ -886,6 +886,29 @@ another task), and none dumps the player's `entity_state` (WP-2.5):
   and a cane without water break (drops in `entity_state`); every growth step's
   `setBlockMetadataWithNotify` schedules the sand below (`scheduled_ticks`).
 
+Doors, beds, ladders, cake, portal, fences, stairs, slabs, workbench and locked chest
+(WP-1.6 task f), empty world, seed 123, the stone platform at y = 60; the scenario
+`comment`s give the details. A player only where `use_item` or random ticks need one, and
+then `entity_state` lists the drops' ids (the port's player does not update yet):
+
+- `tick/door-toggle`, `tick/trapdoor-toggle`, `tick/bed-place-and-break`, `tick/cake-eat`,
+  `tick/activate-workbench-stairs`: `blockActivated` through `use_item` (door halves,
+  trapdoor bit 2, the bed's redirect and stale occupied bit, the cake at full health, the
+  workbench's `true` and the stairs' model-block `false`), plus `ray_trace` through doors
+  and trapdoors (`collisionRayTrace` with the bounds from the metadata).
+- `tick/door-support-removed`, `tick/ladder-placement`, the support removals in
+  `trapdoor-toggle`, `bed-place-and-break` and `cake-eat`: `onNeighborBlockChange` drops.
+- `tick/portal-frame` (Tier C): portal blocks filled silently into obsidian frames, an
+  item falling through them (null collision box), the frames broken.
+- `tick/fence-stairs-step-bounds` (Tier C): falling sand and items on fences, both stairs
+  orientations, slabs, a cake, a trapdoor and past a ladder (the collision boxes), and the
+  slab merge of `BlockStep.onBlockAdded`.
+- `tick/locked-chest-vanishes`: random ticks remove locked chests.
+- Ignored on the Rust side until their dependencies land: `tick/door-iron-powered`
+  (redstone torch), `tick/portal-ignite` (`BlockFire.onBlockAdded` →
+  `tryToCreatePortal`), `tick/bed-nether` (`Explosion`), `tick/block-item-placement`
+  (`ItemBlock` and the other placing items, WP-2.6).
+
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
 would need the one-in-100000 roll on a platform column of a rainy biome, and
