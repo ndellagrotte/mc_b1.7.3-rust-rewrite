@@ -92,14 +92,27 @@ fn notify_pushes_events_and_records_untranscribed_overrides() {
     let mut w = empty_world(1);
     preload(&mut w, 0, 0);
     w.events.drain();
-    // Sand: BlockSand.onBlockAdded is not transcribed yet (WP-1.6).
-    assert!(w.set_block_with_notify(0, 61, 0, 12));
+    // Sponge: BlockSponge.onBlockAdded is not transcribed yet.
+    assert!(w.set_block_with_notify(0, 61, 0, 19));
     let ev = w.events.drain();
     assert!(ev.contains(&WorldEvent::MarkBlockAndNeighborsNeedsUpdate { x: 0, y: 61, z: 0 }));
     assert!(w.events.is_empty());
     assert_eq!(
-        w.unimplemented_hits.borrow().get("BlockSand.onBlockAdded"),
+        w.unimplemented_hits
+            .borrow()
+            .get("BlockSponge.onBlockAdded"),
         Some(&1)
+    );
+    // Sand is transcribed: it schedules its fall check instead (BlockSand.java:12-14).
+    assert!(w.set_block_with_notify(2, 61, 0, 12));
+    assert!(
+        !w.unimplemented_hits
+            .borrow()
+            .contains_key("BlockSand.onBlockAdded")
+    );
+    assert!(
+        w.scheduled_ticks()
+            .any(|t| (t.x_coord, t.y_coord, t.block_id) == (2, 61, 12))
     );
 }
 

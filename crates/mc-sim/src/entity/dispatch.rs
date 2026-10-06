@@ -8,7 +8,7 @@
 
 use mc_core::Aabb;
 
-use super::{Entity, EntityKindData as K, base, item, living};
+use super::{Entity, EntityKindData as K, base, falling_sand, item, living};
 use crate::world::World;
 
 /// `onUpdate()`.
@@ -16,6 +16,8 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
     match e.kind {
         // src: EntityItem.java:36-77
         K::Item(..) => item::on_update(e, world),
+        // src: EntityFallingSand.java:37-71
+        K::FallingSand(..) => falling_sand::on_update(e, world),
         // EntityLiving.onUpdate (EntityLiving.java:203-290) for the kinds that
         // do not override it further.
         K::Pig(..) | K::Sheep(..) | K::Cow(..) | K::Chicken(..) | K::Squid(..) => {
@@ -55,7 +57,6 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
         K::Fireball(..) => untranscribed_base_update(e, world, "EntityFireball.onUpdate"),
         K::Fish(..) => untranscribed_base_update(e, world, "EntityFish.onUpdate"),
         K::Painting(..) => untranscribed_base_update(e, world, "EntityPainting.onUpdate"),
-        K::FallingSand(..) => untranscribed_base_update(e, world, "EntityFallingSand.onUpdate"),
         K::TntPrimed(..) => untranscribed_base_update(e, world, "EntityTNTPrimed.onUpdate"),
         K::Minecart(..) => untranscribed_base_update(e, world, "EntityMinecart.onUpdate"),
         K::Boat(..) => untranscribed_base_update(e, world, "EntityBoat.onUpdate"),
@@ -240,7 +241,8 @@ pub fn can_be_collided_with(e: &Entity, world: &World) -> bool {
         _ if e.kind.living().is_some() => return !e.base.is_dead,
         K::Fireball(..) => "EntityFireball.canBeCollidedWith",
         K::Painting(..) => "EntityPainting.canBeCollidedWith",
-        K::FallingSand(..) => "EntityFallingSand.canBeCollidedWith",
+        // src: EntityFallingSand.java:33-35
+        K::FallingSand(..) => return falling_sand::can_be_collided_with(e),
         K::TntPrimed(..) => "EntityTNTPrimed.canBeCollidedWith",
         K::Minecart(..) => "EntityMinecart.canBeCollidedWith",
         K::Boat(..) => "EntityBoat.canBeCollidedWith",

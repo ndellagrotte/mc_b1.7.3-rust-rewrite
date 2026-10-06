@@ -26,7 +26,7 @@
 //!
 //! A Java method `Foo.bar` becomes a function `bar` in the module of class
 //! `Foo` ([`base`] for `Entity`, [`living`] for `EntityLiving`, [`item`] for
-//! `EntityItem`, …), taking `(e: &mut Entity, world: &mut World, …)`.
+//! `EntityItem`, [`falling_sand`] for `EntityFallingSand`, …), taking `(e: &mut Entity, world: &mut World, …)`.
 //!
 //! - `super.bar()` in Java is a direct call to the parent level's function
 //!   (`living::on_update` calls `base::on_update`).
@@ -66,10 +66,12 @@
 pub mod base;
 pub mod data_watcher;
 pub mod dispatch;
+pub mod falling_sand;
 pub mod item;
 pub mod living;
 
 pub use base::EntityBase;
+pub use falling_sand::FallingSandData;
 pub use item::ItemData;
 pub use living::LivingData;
 
@@ -136,8 +138,6 @@ empty_level!(
     FishData,
     /// `EntityPainting` (EntityPainting.java).
     PaintingData,
-    /// `EntityFallingSand` (EntityFallingSand.java).
-    FallingSandData,
     /// `EntityTNTPrimed` (EntityTNTPrimed.java).
     TntPrimedData,
     /// `EntityMinecart` (EntityMinecart.java).
@@ -374,6 +374,22 @@ impl EntityKindData {
     pub fn item_mut(&mut self) -> Option<&mut ItemData> {
         match self {
             EntityKindData::Item(d) => Some(d),
+            _ => None,
+        }
+    }
+
+    /// The `EntityFallingSand` level.
+    pub fn falling_sand(&self) -> Option<&FallingSandData> {
+        match self {
+            EntityKindData::FallingSand(d) => Some(d),
+            _ => None,
+        }
+    }
+
+    /// The `EntityFallingSand` level, mutably.
+    pub fn falling_sand_mut(&mut self) -> Option<&mut FallingSandData> {
+        match self {
+            EntityKindData::FallingSand(d) => Some(d),
             _ => None,
         }
     }

@@ -27,8 +27,9 @@
 //!   pass the generator's `Random`; WP-1.7 adds that source.
 //!
 //! Fully transcribed here already: `isOpaqueCube`, `renderAsNormalBlock`,
-//! `tickRate` (constants and field reads, in [`crate::block`]), and the base
-//! `Block` implementations of everything below.
+//! `tickRate` (constants and field reads, in [`crate::block`]), the base
+//! `Block` implementations of everything below, and the overrides of
+//! `BlockSand` (and `BlockGravel`, which inherits them; [`super::sand`]).
 
 use mc_core::{Aabb, Vec3D};
 
@@ -70,15 +71,16 @@ pub fn render_as_normal_block(id: i32) -> bool {
 /// `updateTick(world, x, y, z, rand)`. Base: nothing.
 // src: Block.java:297-298
 pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: RandomSource) {
-    let _ = (x, y, z, rand);
+    let _ = rand;
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockSand.java:20-22 (`rand` unused)
+        K::Sand | K::Gravel => return super::sand::update_tick(world, id, x, y, z),
         K::Grass => "BlockGrass.updateTick",
         K::Sapling => "BlockSapling.updateTick",
         K::Flowing => "BlockFlowing.updateTick",
         K::Stationary => "BlockStationary.updateTick",
-        K::Sand | K::Gravel => "BlockSand.updateTick",
         K::Leaves => "BlockLeaves.updateTick",
         K::Dispenser => "BlockDispenser.updateTick",
         K::DetectorRail => "BlockDetectorRail.updateTick",
@@ -108,13 +110,13 @@ pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: Ran
 /// `onBlockAdded(world, x, y, z)`. Base: nothing.
 // src: Block.java:313-314
 pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
-    let _ = (x, y, z);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockSand.java:12-14
+        K::Sand | K::Gravel => return super::sand::on_block_added(world, id, x, y, z),
         K::Flowing => "BlockFlowing.onBlockAdded",
         K::Stationary => "BlockFluid.onBlockAdded",
-        K::Sand | K::Gravel => "BlockSand.onBlockAdded",
         K::Sponge => "BlockSponge.onBlockAdded",
         K::Dispenser => "BlockDispenser.onBlockAdded",
         K::Note | K::MobSpawner | K::Chest | K::Sign { .. } | K::JukeBox => {
@@ -177,16 +179,19 @@ pub fn on_neighbor_block_change(
     z: i32,
     neighbor_id: i32,
 ) {
-    let _ = (x, y, z, neighbor_id);
+    let _ = neighbor_id;
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockSand.java:16-18
+        K::Sand | K::Gravel => {
+            return super::sand::on_neighbor_block_change(world, id, x, y, z);
+        }
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Mushroom | K::Crops => {
             "BlockFlower.onNeighborBlockChange"
         }
         K::Flowing => "BlockFluid.onNeighborBlockChange",
         K::Stationary => "BlockStationary.onNeighborBlockChange",
-        K::Sand | K::Gravel => "BlockSand.onNeighborBlockChange",
         K::Dispenser => "BlockDispenser.onNeighborBlockChange",
         K::Note => "BlockNote.onNeighborBlockChange",
         K::Bed => "BlockBed.onNeighborBlockChange",
@@ -345,6 +350,33 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
     }
     let var5 = world.get_block_id(x, y, z);
     var5 == 0 || super::material_of(var5).get_is_ground_cover()
+}
+
+/// `canPlaceBlockOnSide(world, x, y, z, side)`. Base: `canPlaceBlockAt`.
+// src: Block.java:497-499
+pub fn can_place_block_on_side(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let _ = side;
+    let Some(b) = block(id) else { return false };
+    use BlockKind as K;
+    let what = match b.kind {
+        K::PistonExtension => Some("BlockPistonExtension.canPlaceBlockOnSide"),
+        K::PistonMoving => Some("BlockPistonMoving.canPlaceBlockOnSide"),
+        K::Lever => Some("BlockLever.canPlaceBlockOnSide"),
+        K::Button => Some("BlockButton.canPlaceBlockOnSide"),
+        K::TrapDoor => Some("BlockTrapDoor.canPlaceBlockOnSide"),
+        _ => None,
+    };
+    if let Some(what) = what {
+        untranscribed(world, what);
+    }
+    can_place_block_at(world, id, x, y, z)
 }
 
 /// `blockActivated(world, x, y, z, player)`: right-click. Base: false.

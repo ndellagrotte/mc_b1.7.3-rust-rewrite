@@ -47,6 +47,7 @@
 pub mod dispatch;
 pub mod fluid;
 pub mod material;
+pub mod sand;
 mod table;
 
 pub use material::{MapColor, Material};
@@ -823,7 +824,7 @@ pub const fn tick_rate(def: &BlockDef) -> i32 {
 /// on the last write, this is world state.
 ///
 /// Fields still to add as their behaviour is transcribed (Phase 1), each a
-/// Java static or a mutable singleton field: `BlockSand.fallInstantly`,
+/// Java static or a mutable singleton field:
 /// `BlockFurnace.keepFurnaceInventory`, `BlockRedstoneTorch.torchUpdates`,
 /// `BlockRedstoneWire.wiresProvidePower` / `blocksNeedingUpdate`,
 /// `BlockPistonBase.ignoreUpdates`, `BlockFlowing`'s scratch fields, and the
@@ -839,6 +840,12 @@ pub struct BlockStatics {
     /// `BlockLeavesBase` instance). Set by the client's fancy-graphics option
     /// (RenderGlobal); false in the oracle, which has no renderer.
     pub graphics_level: bool,
+    /// `BlockSand.fallInstantly` (a static): sand and gravel move down at
+    /// once instead of spawning an `EntityFallingSand`. The terrain
+    /// generators set it during population (ChunkProviderGenerate.java:311,
+    /// :602); false otherwise.
+    // src: BlockSand.java:6
+    pub fall_instantly: bool,
 }
 
 impl Default for BlockStatics {
@@ -852,6 +859,7 @@ impl Default for BlockStatics {
         BlockStatics {
             bounds,
             graphics_level: false,
+            fall_instantly: false,
         }
     }
 }
