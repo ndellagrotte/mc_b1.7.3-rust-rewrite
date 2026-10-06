@@ -8,5 +8,12 @@ description = "Deterministic primitives for the Beta 1.7.3 rewrite: Java RNG, ma
 
 [dependencies]
 
+[dev-dependencies]
+# Golden-fixture runner. Dev-only cycle (mc-golden -> mc-sim -> mc-core) is
+# allowed by cargo: the test build links a second copy of mc-core's lib.
+mc-golden = { path = "../mc-golden" }
+# Candidate implementation in the §3.4 rule 5 sweep (tests/math_sweep_report.rs).
+libm.workspace = true
+
 [lints]
 workspace = true

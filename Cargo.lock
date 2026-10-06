@@ -3511,6 +3511,10 @@ dependencies = [
 [[package]]
 name = "mc-core"
 version = "0.1.0"
+dependencies = [
+ "libm",
+ "mc-golden",
+]
 
 [[package]]
 name = "mc-golden"
