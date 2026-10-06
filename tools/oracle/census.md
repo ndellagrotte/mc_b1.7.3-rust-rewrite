@@ -167,7 +167,11 @@ reseeded; `BlockSand.fallInstantly` (BlockSand.java:6, set and cleared by every
 `ChunkProvider*.populate`), `BlockFurnace.keepFurnaceInventory` (BlockFurnace.java:8),
 `BlockRedstoneTorch.torchUpdates` (BlockRedstoneTorch.java:9, burnout history keyed by world
 time), `TileEntityPiston.field_31018_m` (TileEntityPiston.java:15) and
-`World.lightingUpdatesScheduled` (World.java:52) go back to their initial values. Other mutable
+`World.lightingUpdatesScheduled` (World.java:52) go back to their initial values. The
+`Block.redstoneWire` singleton gets `wiresProvidePower = true` (BlockRedstoneWire.java:9) and a
+new `blocksNeedingUpdate` HashSet (BlockRedstoneWire.java:10): `clear()` (:48) keeps the grown
+table, and the iteration order of `new ArrayList(set)` (:47) depends on its capacity, so a set
+grown by one scenario would reorder the wire notifications of every later one. Other mutable
 statics are caches or pools with no observable effect (`AxisAlignedBB`/`Vec3D` pools, cleared
 at every frame start as Minecraft.java:519-520 does; `SpawnerAnimals.eligibleChunksForSpawning`,
 cleared on use; `BiomeGenBase.biomeLookupTable`, a pure function) or client-only.

@@ -1746,12 +1746,17 @@ pub struct BlockStatics {
     /// (`setHeadTexture`/`clearHeadTexture`, BlockPistonExtension.java:15-21).
     // src: BlockPistonExtension.java:7
     pub piston_extension_head_texture: i32,
-    /// `BlockRedstoneWire.wiresProvidePower` of `Block.redstoneWire`.
+    /// `BlockRedstoneWire.wiresProvidePower` of `Block.redstoneWire`. Per
+    /// world here, starting `true`; the oracle replaces it per scenario
+    /// (census §6).
     // src: BlockRedstoneWire.java:9
     pub redstone_wire_wires_provide_power: bool,
     /// `BlockRedstoneWire.blocksNeedingUpdate` of `Block.redstoneWire`, a
     /// `HashSet` vanilla iterates (BlockRedstoneWire.java:47), hence
-    /// [`JavaHashSet`].
+    /// [`JavaHashSet`]. `clear()` keeps the grown table (as `HashSet.clear`
+    /// does, :48), so the capacity, which fixes the iteration order, only
+    /// grows within a world. Per world here, starting at capacity 16; the
+    /// oracle replaces the set per scenario (census §6).
     // src: BlockRedstoneWire.java:10
     pub redstone_wire_blocks_needing_update: JavaHashSet<ChunkPosition>,
     /// `BlockRedstoneTorch.torchUpdates` (a static `ArrayList` of

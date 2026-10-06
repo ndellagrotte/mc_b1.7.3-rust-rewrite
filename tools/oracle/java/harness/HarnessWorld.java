@@ -11,6 +11,7 @@ import net.minecraft.src.BlockChest;
 import net.minecraft.src.BlockDispenser;
 import net.minecraft.src.BlockFurnace;
 import net.minecraft.src.BlockRedstoneTorch;
+import net.minecraft.src.BlockRedstoneWire;
 import net.minecraft.src.BlockSand;
 import net.minecraft.src.ChunkProvider;
 import net.minecraft.src.Entity;
@@ -185,7 +186,12 @@ final class HarnessWorld {
      * (BlockSand.java:6), {@code BlockFurnace.keepFurnaceInventory} (BlockFurnace.java:8),
      * {@code BlockRedstoneTorch.torchUpdates} (BlockRedstoneTorch.java:9, burnout history keyed by
      * world time), {@code TileEntityPiston.field_31018_m} (TileEntityPiston.java:15),
-     * {@code World.lightingUpdatesScheduled} (World.java:52).
+     * {@code World.lightingUpdatesScheduled} (World.java:52). The instance state of the
+     * {@code Block.redstoneWire} singleton is replaced: {@code wiresProvidePower = true}
+     * (BlockRedstoneWire.java:9) and a fresh {@code blocksNeedingUpdate} HashSet
+     * (BlockRedstoneWire.java:10), since HashSet.clear() (:48) keeps the grown table and its
+     * iteration order (:47) depends on the capacity, so a set grown by an earlier scenario would
+     * change the notification order of later ones.
      */
     static void resetStatics(long seed) throws Exception {
         Reflect.set(Entity.class, "nextEntityID", null, 0);
@@ -203,6 +209,8 @@ final class HarnessWorld {
         ((java.util.List<?>) Reflect.get(BlockRedstoneTorch.class, "torchUpdates", null)).clear();
         ((java.util.List<?>) Reflect.get(TileEntityPiston.class, "field_31018_m", null)).clear();
         Reflect.set(World.class, "lightingUpdatesScheduled", null, 0);
+        Reflect.set(BlockRedstoneWire.class, "wiresProvidePower", Block.redstoneWire, Boolean.TRUE);
+        Reflect.set(BlockRedstoneWire.class, "blocksNeedingUpdate", Block.redstoneWire, new java.util.HashSet());
     }
 
     /**
