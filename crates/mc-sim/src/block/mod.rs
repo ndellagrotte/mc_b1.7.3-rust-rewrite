@@ -56,8 +56,15 @@
 
 pub mod block_texture;
 pub mod button;
+pub mod cactus;
+pub mod crops;
 pub mod dispatch;
+pub mod farmland;
+pub mod fire;
+pub mod flower;
 pub mod fluid;
+pub mod grass;
+pub mod leaves;
 pub mod lever;
 pub mod material;
 pub mod pressure_plate;
@@ -66,6 +73,8 @@ pub mod redstone_torch;
 pub mod redstone_wire;
 pub mod repeater;
 pub mod sand;
+pub mod sapling;
+pub mod snow;
 mod table;
 pub mod torch;
 

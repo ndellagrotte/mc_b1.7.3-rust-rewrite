@@ -103,8 +103,80 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateTick",
         ],
     ),
+    // src: BlockCactus.java:11-89
+    (
+        "BlockCactus",
+        &[
+            "canBlockStay",
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "getSelectedBoundingBoxFromPool",
+            "onEntityCollidedWithBlock",
+            "onNeighborBlockChange",
+            "updateTick",
+        ],
+    ),
+    // src: BlockCrops.java:18-31, :89-105
+    ("BlockCrops", &["dropBlockAsItemWithChance", "updateTick"]),
+    // src: BlockFarmland.java:14-92
+    (
+        "BlockFarmland",
+        &[
+            "getCollisionBoundingBoxFromPool",
+            "onEntityWalking",
+            "onNeighborBlockChange",
+            "updateTick",
+        ],
+    ),
+    // src: BlockFire.java:31-264
+    (
+        "BlockFire",
+        &[
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "onBlockAdded",
+            "onNeighborBlockChange",
+            "randomDisplayTick",
+            "updateTick",
+        ],
+    ),
+    // src: BlockFlower.java:14-45
+    (
+        "BlockFlower",
+        &[
+            "canBlockStay",
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "onNeighborBlockChange",
+            "updateTick",
+        ],
+    ),
     // src: BlockFluid.java:56-58
     ("BlockFluid", &["canCollideCheck"]),
+    // src: BlockGrass.java:12-49
+    (
+        "BlockGrass",
+        &["colorMultiplier", "getBlockTexture", "updateTick"],
+    ),
+    // src: BlockIce.java:16-39
+    (
+        "BlockIce",
+        &["harvestBlock", "shouldSideBeRendered", "updateTick"],
+    ),
+    // src: BlockLeaves.java:15-192
+    (
+        "BlockLeaves",
+        &[
+            "colorMultiplier",
+            "getRenderColor",
+            "harvestBlock",
+            "onBlockRemoval",
+            "onEntityWalking",
+            "updateTick",
+        ],
+    ),
+    // src: BlockLeavesBase.java:15-18
+    ("BlockLeavesBase", &["shouldSideBeRendered"]),
     // src: BlockLever.java (super::lever)
     (
         "BlockLever",
@@ -123,6 +195,10 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "setBlockBoundsBasedOnState",
         ],
     ),
+    // src: BlockLog.java:19-42
+    ("BlockLog", &["harvestBlock", "onBlockRemoval"]),
+    // src: BlockMushroom.java:13-39
+    ("BlockMushroom", &["canBlockStay", "updateTick"]),
     // src: BlockPressurePlate.java (super::pressure_plate)
     (
         "BlockPressurePlate",
@@ -200,11 +276,39 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "randomDisplayTick",
         ],
     ),
+    // src: BlockReed.java:14-68
+    (
+        "BlockReed",
+        &[
+            "canBlockStay",
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "onNeighborBlockChange",
+            "updateTick",
+        ],
+    ),
     // src: BlockSand.java:12-22
     (
         "BlockSand",
         &["onBlockAdded", "onNeighborBlockChange", "updateTick"],
     ),
+    // src: BlockSapling.java:12-25
+    ("BlockSapling", &["updateTick"]),
+    // src: BlockSnow.java:12-81
+    (
+        "BlockSnow",
+        &[
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "harvestBlock",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+            "shouldSideBeRendered",
+            "updateTick",
+        ],
+    ),
+    // src: BlockSnowBlock.java:19-25
+    ("BlockSnowBlock", &["updateTick"]),
     // src: BlockStairs.java:18-20, :69-71, :129-131
     (
         "BlockStairs",
@@ -214,6 +318,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "setBlockBoundsBasedOnState",
         ],
     ),
+    // src: BlockTallGrass.java:22-37
+    ("BlockTallGrass", &["colorMultiplier"]),
     // src: BlockTorch.java (super::torch)
     (
         "BlockTorch",
@@ -284,21 +390,31 @@ pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: Ran
     let what = match b.kind {
         // src: BlockSand.java:20-22 (`rand` unused)
         K::Sand | K::Gravel => return super::sand::update_tick(world, id, x, y, z),
-        K::Grass => "BlockGrass.updateTick",
-        K::Sapling => "BlockSapling.updateTick",
+        // src: BlockGrass.java:30-49
+        K::Grass => return super::grass::update_tick(world, x, y, z, rand),
+        // src: BlockSapling.java:12-25
+        K::Sapling => return super::sapling::update_tick(world, id, x, y, z, rand),
         K::Flowing => "BlockFlowing.updateTick",
         K::Stationary => "BlockStationary.updateTick",
-        K::Leaves => "BlockLeaves.updateTick",
+        // src: BlockLeaves.java:56-148 (`rand` unused)
+        K::Leaves => return super::leaves::update_tick(world, id, x, y, z),
         K::Dispenser => "BlockDispenser.updateTick",
         K::DetectorRail => "BlockDetectorRail.updateTick",
-        K::TallGrass | K::DeadBush | K::Flower => "BlockFlower.updateTick",
-        K::Mushroom => "BlockMushroom.updateTick",
+        // src: BlockFlower.java:27-29 (`rand` unused)
+        K::TallGrass | K::DeadBush | K::Flower => {
+            return super::flower::update_tick(world, id, x, y, z);
+        }
+        // src: BlockMushroom.java:13-27
+        K::Mushroom => return super::flower::mushroom_update_tick(world, id, x, y, z, rand),
         // src: BlockTorch.java:70-76 (`rand` unused)
         K::Torch => return super::torch::update_tick(world, id, x, y, z),
-        K::Fire => "BlockFire.updateTick",
+        // src: BlockFire.java:55-113
+        K::Fire => return super::fire::update_tick(world, id, x, y, z, rand),
         K::Stairs { .. } => "BlockStairs.updateTick",
-        K::Crops => "BlockCrops.updateTick",
-        K::Farmland => "BlockFarmland.updateTick",
+        // src: BlockCrops.java:18-31
+        K::Crops => return super::crops::update_tick(world, id, x, y, z, rand),
+        // src: BlockFarmland.java:34-48
+        K::Farmland => return super::farmland::update_tick(world, x, y, z, rand),
         // src: BlockPressurePlate.java:53-59 (`rand` unused)
         K::PressurePlate { trigger_mob_type } => {
             return super::pressure_plate::update_tick(world, id, x, y, z, trigger_mob_type);
@@ -311,11 +427,12 @@ pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: Ran
         }
         // src: BlockButton.java:225-248 (`rand` unused)
         K::Button => return super::button::update_tick(world, id, x, y, z),
-        K::Snow => "BlockSnow.updateTick",
-        K::Ice => "BlockIce.updateTick",
-        K::SnowBlock => "BlockSnowBlock.updateTick",
-        K::Cactus => "BlockCactus.updateTick",
-        K::Reed => "BlockReed.updateTick",
+        // src: BlockSnow.java:71-77, BlockSnowBlock.java:19-25 (`rand` unused)
+        K::Snow | K::SnowBlock => return super::snow::update_tick(world, id, x, y, z),
+        // src: BlockIce.java:33-39 (`rand` unused)
+        K::Ice => return super::snow::ice_update_tick(world, id, x, y, z),
+        // src: BlockCactus.java:11-28, BlockReed.java:14-31 (`rand` unused)
+        K::Cactus | K::Reed => return super::cactus::update_tick(world, id, x, y, z),
         // src: BlockRedstoneRepeater.java:28-41 (`rand` unused)
         K::RedstoneRepeater {
             is_repeater_powered,
@@ -348,7 +465,8 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Tnt => "BlockTNT.onBlockAdded",
         // src: BlockTorch.java:78-92
         K::Torch => return super::torch::on_block_added(world, id, x, y, z),
-        K::Fire => "BlockFire.onBlockAdded",
+        // src: BlockFire.java:191-199
+        K::Fire => return super::fire::on_block_added(world, id, x, y, z),
         K::Stairs { .. } => "BlockStairs.onBlockAdded",
         // src: BlockRedstoneWire.java:185-220
         K::RedstoneWire => return super::redstone_wire::on_block_added(world, id, x, y, z),
@@ -373,8 +491,10 @@ pub fn on_block_removal(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::Log => "BlockLog.onBlockRemoval",
-        K::Leaves => "BlockLeaves.onBlockRemoval",
+        // src: BlockLog.java:23-42
+        K::Log => return super::leaves::log_on_block_removal(world, x, y, z),
+        // src: BlockLeaves.java:37-54
+        K::Leaves => return super::leaves::on_block_removal(world, x, y, z),
         K::Sponge => "BlockSponge.onBlockRemoval",
         K::Dispenser => "BlockDispenser.onBlockRemoval",
         K::Note | K::MobSpawner | K::Sign { .. } => "BlockContainer.onBlockRemoval",
@@ -421,8 +541,9 @@ pub fn on_neighbor_block_change(
         K::Sand | K::Gravel => {
             return super::sand::on_neighbor_block_change(world, id, x, y, z);
         }
+        // src: BlockFlower.java:22-25
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Mushroom | K::Crops => {
-            "BlockFlower.onNeighborBlockChange"
+            return super::flower::on_neighbor_block_change(world, id, x, y, z);
         }
         K::Flowing => "BlockFluid.onNeighborBlockChange",
         K::Stationary => "BlockStationary.onNeighborBlockChange",
@@ -436,12 +557,14 @@ pub fn on_neighbor_block_change(
         K::Tnt => "BlockTNT.onNeighborBlockChange",
         // src: BlockTorch.java:94-124
         K::Torch => return super::torch::on_neighbor_block_change(world, id, x, y, z),
-        K::Fire => "BlockFire.onNeighborBlockChange",
+        // src: BlockFire.java:185-189
+        K::Fire => return super::fire::on_neighbor_block_change(world, x, y, z),
         // src: BlockRedstoneWire.java:268-281
         K::RedstoneWire => {
             return super::redstone_wire::on_neighbor_block_change(world, id, x, y, z);
         }
-        K::Farmland => "BlockFarmland.onNeighborBlockChange",
+        // src: BlockFarmland.java:85-92
+        K::Farmland => return super::farmland::on_neighbor_block_change(world, x, y, z),
         K::Sign { .. } => "BlockSign.onNeighborBlockChange",
         K::Door => "BlockDoor.onNeighborBlockChange",
         K::Ladder => "BlockLadder.onNeighborBlockChange",
@@ -457,9 +580,12 @@ pub fn on_neighbor_block_change(
         }
         // src: BlockButton.java:82-108
         K::Button => return super::button::on_neighbor_block_change(world, id, x, y, z),
-        K::Snow => "BlockSnow.onNeighborBlockChange",
-        K::Cactus => "BlockCactus.onNeighborBlockChange",
-        K::Reed => "BlockReed.onNeighborBlockChange",
+        // src: BlockSnow.java:36-38
+        K::Snow => return super::snow::on_neighbor_block_change(world, id, x, y, z),
+        // src: BlockCactus.java:64-70
+        K::Cactus => return super::cactus::on_neighbor_block_change(world, id, x, y, z),
+        // src: BlockReed.java:50-52
+        K::Reed => return super::cactus::reed_on_neighbor_block_change(world, id, x, y, z),
         K::Portal => "BlockPortal.onNeighborBlockChange",
         K::Cake => "BlockCake.onNeighborBlockChange",
         // src: BlockRedstoneRepeater.java:86-101
@@ -509,8 +635,9 @@ pub fn get_collision_bounding_box_from_pool(
     let b = block(id)?;
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockFlower.java:43-45
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Mushroom | K::Crops => {
-            "BlockFlower.getCollisionBoundingBoxFromPool"
+            return super::flower::get_collision_bounding_box_from_pool();
         }
         K::Flowing | K::Stationary => "BlockFluid.getCollisionBoundingBoxFromPool",
         K::Rail { .. } | K::DetectorRail => "BlockRail.getCollisionBoundingBoxFromPool",
@@ -518,19 +645,28 @@ pub fn get_collision_bounding_box_from_pool(
         K::PistonMoving => "BlockPistonMoving.getCollisionBoundingBoxFromPool",
         // src: BlockTorch.java:11-13
         K::Torch | K::RedstoneTorch { .. } => return None,
-        K::Fire => "BlockFire.getCollisionBoundingBoxFromPool",
+        // src: BlockFire.java:31-33
+        K::Fire => return super::fire::get_collision_bounding_box_from_pool(),
         K::Stairs { .. } => "BlockStairs.getCollisionBoundingBoxFromPool",
         // src: BlockRedstoneWire.java:21-23
         K::RedstoneWire => return None,
-        K::Farmland => "BlockFarmland.getCollisionBoundingBoxFromPool",
+        // src: BlockFarmland.java:14-16
+        K::Farmland => {
+            return Some(super::farmland::get_collision_bounding_box_from_pool(
+                x, y, z,
+            ));
+        }
         K::Sign { .. } => "BlockSign.getCollisionBoundingBoxFromPool",
         K::Door => "BlockDoor.getCollisionBoundingBoxFromPool",
         K::Ladder => "BlockLadder.getCollisionBoundingBoxFromPool",
         // src: BlockLever.java:8-10, BlockPressurePlate.java:21-23, BlockButton.java:11-13
         K::Lever | K::PressurePlate { .. } | K::Button => return None,
-        K::Snow => "BlockSnow.getCollisionBoundingBoxFromPool",
-        K::Cactus => "BlockCactus.getCollisionBoundingBoxFromPool",
-        K::Reed => "BlockReed.getCollisionBoundingBoxFromPool",
+        // src: BlockSnow.java:12-15
+        K::Snow => return super::snow::get_collision_bounding_box_from_pool(world, id, x, y, z),
+        // src: BlockCactus.java:30-33
+        K::Cactus => return Some(super::cactus::get_collision_bounding_box_from_pool(x, y, z)),
+        // src: BlockReed.java:66-68
+        K::Reed => return None,
         K::Fence => "BlockFence.getCollisionBoundingBoxFromPool",
         K::SoulSand => "BlockSoulSand.getCollisionBoundingBoxFromPool",
         K::Portal => "BlockPortal.getCollisionBoundingBoxFromPool",
@@ -578,8 +714,9 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockFlower.java:14-16
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Mushroom | K::Crops => {
-            Some("BlockFlower.canPlaceBlockAt")
+            return super::flower::can_place_block_at(world, id, x, y, z);
         }
         K::Rail { .. } | K::DetectorRail => Some("BlockRail.canPlaceBlockAt"),
         K::PistonExtension => Some("BlockPistonExtension.canPlaceBlockAt"),
@@ -588,7 +725,8 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         K::Torch | K::RedstoneTorch { .. } => {
             return super::torch::can_place_block_at(world, x, y, z);
         }
-        K::Fire => Some("BlockFire.canPlaceBlockAt"),
+        // src: BlockFire.java:181-183
+        K::Fire => return super::fire::can_place_block_at(world, x, y, z),
         K::Stairs { .. } => Some("BlockStairs.canPlaceBlockAt"),
         K::Chest => Some("BlockChest.canPlaceBlockAt"),
         // src: BlockRedstoneWire.java:41-43
@@ -603,9 +741,12 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         }
         // src: BlockButton.java:39-49
         K::Button => return super::button::can_place_block_at(world, x, y, z),
-        K::Snow => Some("BlockSnow.canPlaceBlockAt"),
-        K::Cactus => Some("BlockCactus.canPlaceBlockAt"),
-        K::Reed => Some("BlockReed.canPlaceBlockAt"),
+        // src: BlockSnow.java:31-34
+        K::Snow => return super::snow::can_place_block_at(world, x, y, z),
+        // src: BlockCactus.java:60-62
+        K::Cactus => return super::cactus::can_place_block_at(world, id, x, y, z),
+        // src: BlockReed.java:33-48
+        K::Reed => return super::cactus::reed_can_place_block_at(world, id, x, y, z),
         K::Fence => Some("BlockFence.canPlaceBlockAt"),
         K::Pumpkin { .. } => Some("BlockPumpkin.canPlaceBlockAt"),
         K::Cake => Some("BlockCake.canPlaceBlockAt"),
@@ -694,13 +835,14 @@ pub fn block_activated(
 /// `onEntityWalking(world, x, y, z, entity)`. Base: nothing.
 // src: Block.java:510-511
 pub fn on_entity_walking(world: &mut World, id: i32, x: i32, y: i32, z: i32, e: &mut Entity) {
-    let _ = (x, y, z, e);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::Leaves => "BlockLeaves.onEntityWalking",
+        // src: BlockLeaves.java:190-192 (only `super`)
+        K::Leaves => return super::leaves::on_entity_walking(),
         K::Stairs { .. } => "BlockStairs.onEntityWalking",
-        K::Farmland => "BlockFarmland.onEntityWalking",
+        // src: BlockFarmland.java:50-55
+        K::Farmland => return super::farmland::on_entity_walking(world, x, y, z, e),
         // src: BlockRedstoneOre.java:26-29
         K::RedstoneOre { .. } => {
             return super::redstone_ore::on_entity_walking(world, id, x, y, z);
@@ -737,7 +879,8 @@ pub fn on_entity_collided_with_block(
                 e,
             );
         }
-        K::Cactus => "BlockCactus.onEntityCollidedWithBlock",
+        // src: BlockCactus.java:87-89
+        K::Cactus => return super::cactus::on_entity_collided_with_block(world, e),
         K::SoulSand => "BlockSoulSand.onEntityCollidedWithBlock",
         K::Portal => "BlockPortal.onEntityCollidedWithBlock",
         _ => return,
@@ -805,7 +948,8 @@ pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i3
         K::Button => return super::button::set_block_bounds_based_on_state(world, id, x, y, z),
         K::Rail { .. } | K::DetectorRail => "BlockRail.setBlockBoundsBasedOnState",
         K::PistonBase { .. } => "BlockPistonBase.setBlockBoundsBasedOnState",
-        K::Snow => "BlockSnow.setBlockBoundsBasedOnState",
+        // src: BlockSnow.java:25-29
+        K::Snow => return super::snow::set_block_bounds_based_on_state(world, id, x, y, z),
         K::Door => "BlockDoor.setBlockBoundsBasedOnState",
         K::Cake => "BlockCake.setBlockBoundsBasedOnState",
         K::PistonExtension => "BlockPistonExtension.setBlockBoundsBasedOnState",
@@ -1061,7 +1205,8 @@ pub fn random_display_tick(
         K::RedstoneOre { field_468_a } => {
             return super::redstone_ore::random_display_tick(world, x, y, z, field_468_a);
         }
-        K::Fire => "BlockFire.randomDisplayTick",
+        // src: BlockFire.java:201-264
+        K::Fire => return super::fire::random_display_tick(world, x, y, z, rand),
         // src: BlockRedstoneWire.java:339-364
         K::RedstoneWire => {
             return super::redstone_wire::random_display_tick(world, x, y, z, rand);
@@ -1147,12 +1292,15 @@ pub fn should_side_be_rendered(
     use BlockKind as K;
     let what = match b.kind {
         K::Flowing | K::Stationary => "BlockFluid.shouldSideBeRendered",
-        K::Leaves => "BlockLeavesBase.shouldSideBeRendered",
+        // src: BlockLeavesBase.java:15-18
+        K::Leaves => return super::leaves::should_side_be_rendered(world, id, x, y, z, side),
         K::Glass { .. } => "BlockBreakable.shouldSideBeRendered",
         K::Step { .. } => "BlockStep.shouldSideBeRendered",
         K::Stairs { .. } => "BlockStairs.shouldSideBeRendered",
-        K::Snow => "BlockSnow.shouldSideBeRendered",
-        K::Ice => "BlockIce.shouldSideBeRendered",
+        // src: BlockSnow.java:79-81
+        K::Snow => return super::snow::should_side_be_rendered(world, id, x, y, z, side),
+        // src: BlockIce.java:16-18
+        K::Ice => return super::snow::ice_should_side_be_rendered(world, id, x, y, z, side),
         K::Portal => "BlockPortal.shouldSideBeRendered",
         // src: BlockRedstoneRepeater.java:53-55
         K::RedstoneRepeater { .. } => return super::repeater::should_side_be_rendered(side),
@@ -1224,7 +1372,8 @@ pub fn get_block_texture(
     };
     use BlockKind as K;
     let what = match b.kind {
-        K::Grass => "BlockGrass.getBlockTexture",
+        // src: BlockGrass.java:12-21
+        K::Grass => return Some(super::grass::get_block_texture(world, x, y, z, side)),
         K::Dispenser => "BlockDispenser.getBlockTexture",
         K::Stairs { .. } => "BlockStairs.getBlockTexture",
         K::Chest => "BlockChest.getBlockTexture",
@@ -1256,7 +1405,8 @@ pub fn get_selected_bounding_box_from_pool(
         K::Sign { .. } => "BlockSign.getSelectedBoundingBoxFromPool",
         K::Door => "BlockDoor.getSelectedBoundingBoxFromPool",
         K::Ladder => "BlockLadder.getSelectedBoundingBoxFromPool",
-        K::Cactus => "BlockCactus.getSelectedBoundingBoxFromPool",
+        // src: BlockCactus.java:35-38
+        K::Cactus => return super::cactus::get_selected_bounding_box_from_pool(x, y, z),
         K::Cake => "BlockCake.getSelectedBoundingBoxFromPool",
         K::TrapDoor => "BlockTrapDoor.getSelectedBoundingBoxFromPool",
         // src: Block.java:269-271 (the same expression as Block.java:281-283)
@@ -1311,7 +1461,10 @@ pub fn drop_block_as_item_with_chance(
         K::Bed => Some("BlockBed.dropBlockAsItemWithChance"),
         K::PistonMoving => Some("BlockPistonMoving.dropBlockAsItemWithChance"),
         K::Stairs { .. } => Some("BlockStairs.dropBlockAsItemWithChance"),
-        K::Crops => Some("BlockCrops.dropBlockAsItemWithChance"),
+        // src: BlockCrops.java:89-105
+        K::Crops => {
+            return super::crops::drop_block_as_item_with_chance(world, id, x, y, z, meta, chance);
+        }
         K::JukeBox => Some("BlockJukeBox.dropBlockAsItemWithChance"),
         _ => None,
     };
@@ -1467,17 +1620,16 @@ pub fn on_block_clicked(world: &mut World, id: i32, x: i32, y: i32, z: i32, play
 /// Base: white. `world` only records untranscribed overrides.
 // src: Block.java:525-527
 pub fn get_render_color(world: &World, id: i32, meta: i32) -> i32 {
-    let _ = meta;
+    let _ = world;
     // src: Block.java:526
     const BASE: i32 = 16777215;
     let Some(b) = block(id) else { return BASE };
     use BlockKind as K;
-    let what = match b.kind {
-        K::Leaves => "BlockLeaves.getRenderColor",
-        _ => return BASE,
-    };
-    untranscribed(world, what);
-    BASE
+    match b.kind {
+        // src: BlockLeaves.java:15-21
+        K::Leaves => super::leaves::get_render_color(meta),
+        _ => BASE,
+    }
 }
 
 /// `colorMultiplier(blockAccess, x, y, z)`: the in-world tint (`0xRRGGBB`;
@@ -1485,16 +1637,18 @@ pub fn get_render_color(world: &World, id: i32, meta: i32) -> i32 {
 /// only (RenderBlocks.java:1310, EntityDiggingFX.java:21). Base: white.
 // src: Block.java:529-531
 pub fn color_multiplier(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> i32 {
-    let _ = (x, y, z);
     // src: Block.java:530
     const BASE: i32 = 16777215;
     let Some(b) = block(id) else { return BASE };
     use BlockKind as K;
     let what = match b.kind {
-        K::Grass => "BlockGrass.colorMultiplier",
+        // src: BlockGrass.java:23-28
+        K::Grass => return super::grass::color_multiplier(world, x, z),
         K::Flowing | K::Stationary => "BlockFluid.colorMultiplier",
-        K::Leaves => "BlockLeaves.colorMultiplier",
-        K::TallGrass => "BlockTallGrass.colorMultiplier",
+        // src: BlockLeaves.java:23-35
+        K::Leaves => return super::leaves::color_multiplier(world, x, y, z),
+        // src: BlockTallGrass.java:22-37
+        K::TallGrass => return super::flower::tall_grass_color_multiplier(world, x, y, z),
         // src: BlockRedstoneWire.java:37-39
         K::RedstoneWire => return super::redstone_wire::color_multiplier(),
         _ => return BASE,
@@ -1568,18 +1722,19 @@ pub fn harvest_block(
     player: &mut Entity,
     meta: i32,
 ) {
-    let _ = player;
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
-        K::Log => "BlockLog.harvestBlock",
-        K::Leaves => "BlockLeaves.harvestBlock",
-        K::Snow => "BlockSnow.harvestBlock",
-        K::Ice => "BlockIce.harvestBlock",
-        _ => return base_harvest_block(world, id, x, y, z, meta),
-    };
-    untranscribed(world, what);
-    base_harvest_block(world, id, x, y, z, meta);
+    match b.kind {
+        // src: BlockLog.java:19-21
+        K::Log => super::leaves::log_harvest_block(world, id, x, y, z, meta),
+        // src: BlockLeaves.java:163-171
+        K::Leaves => super::leaves::harvest_block(world, id, x, y, z, player, meta),
+        // src: BlockSnow.java:50-61
+        K::Snow => super::snow::harvest_block(world, x, y, z, player),
+        // src: BlockIce.java:20-27
+        K::Ice => super::snow::ice_harvest_block(world, id, x, y, z, meta),
+        _ => base_harvest_block(world, id, x, y, z, meta),
+    }
 }
 
 /// The base `harvestBlock` body (see [`harvest_block`]).
@@ -1598,16 +1753,19 @@ fn base_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: 
 /// Base: true.
 // src: Block.java:556-558
 pub fn can_block_stay(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
-    let _ = (x, y, z);
     let Some(b) = block(id) else { return true };
     use BlockKind as K;
     let what = match b.kind {
+        // src: BlockFlower.java:39-41
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Crops => {
-            "BlockFlower.canBlockStay"
+            return super::flower::can_block_stay(world, id, x, y, z);
         }
-        K::Mushroom => "BlockMushroom.canBlockStay",
-        K::Cactus => "BlockCactus.canBlockStay",
-        K::Reed => "BlockReed.canBlockStay",
+        // src: BlockMushroom.java:33-39
+        K::Mushroom => return super::flower::mushroom_can_block_stay(world, id, x, y, z),
+        // src: BlockCactus.java:72-85
+        K::Cactus => return super::cactus::can_block_stay(world, id, x, y, z),
+        // src: BlockReed.java:62-64
+        K::Reed => return super::cactus::reed_can_block_stay(world, id, x, y, z),
         K::Cake => "BlockCake.canBlockStay",
         // src: BlockRedstoneRepeater.java:24-26
         K::RedstoneRepeater { .. } => return super::repeater::can_block_stay(world, x, y, z),

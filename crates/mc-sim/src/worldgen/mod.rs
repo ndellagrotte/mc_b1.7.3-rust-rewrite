@@ -29,6 +29,7 @@ pub mod hell;
 pub mod octaves;
 pub mod perlin;
 pub mod simplex;
+pub mod trees;
 
 /// The block ids the generators write or test, as the `byte`s Java stores
 /// (`(byte)Block.x.blockID`). Values come from [`crate::block::ids`], the
