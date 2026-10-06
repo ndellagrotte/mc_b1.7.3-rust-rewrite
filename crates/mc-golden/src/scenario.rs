@@ -134,6 +134,10 @@ pub enum ScenarioKind {
         #[serde(default)]
         dump_after: Vec<usize>,
     },
+    /// `Block`, `Material` and `MapColor` data after Block.java's static
+    /// initialiser (WP-1.1; tests/golden/README.md, `kind: "block_table"`). No fields; the
+    /// Rust side is `crates/mc-sim/tests/golden_block_table.rs`.
+    BlockTable,
     /// A vanilla world ticked under a script (tiers B, C and S; README
     /// "`kind: \"tick\"`").
     Tick(TickScenario),
@@ -710,7 +714,7 @@ impl Scenario {
 
 impl ScenarioKind {
     /// Kinds that deserialize into a typed variant.
-    const KNOWN: [&'static str; 9] = [
+    const KNOWN: [&'static str; 10] = [
         "java_random",
         "sine_table",
         "math_sweep",
@@ -718,6 +722,7 @@ impl ScenarioKind {
         "nbt_write",
         "nbt_read",
         "java_hash_order",
+        "block_table",
         "tick",
         "world_read",
     ];
