@@ -1,0 +1,13 @@
+{"name":"player-walk-jump","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":175,"mob_spawning":"none",
+ "comment":"WP-2.5a. The input op (MovementInput as MovementInputFromOptions computes it; HarnessPlayer applies it where EntityPlayerSP.updatePlayerActionState does). A stone platform (y 60, x -8..8, z -4..16) with a raised part (y 61, z 8..16). The player (id 0) walks forward (+z, yaw 0) from t 2, presses jump from t 28 to climb the step, strafes left (+x) from t 50, then sneak-strafes toward the east edge from t 75: Entity.moveEntity's sneak guard (onGround && isSneaking, the HarnessPlayer/EntityPlayerSP override) stops it at the edge. Released at t 165.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-4,"x1":8,"y1":60,"z1":16,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":16,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x3fe0000000000000","yaw":0,"pitch":0},
+        {"t":2,"op":"input","forward":1},
+        {"t":28,"op":"input","forward":1,"jump":true},
+        {"t":50,"op":"input","strafe":1},
+        {"t":75,"op":"input","strafe":1,"sneak":true},
+        {"t":165,"op":"input"}],
+ "dumps":[{"every":1,"what":"entity_state","which":[0]},
+          {"every":1,"what":"player_state"},
+          {"every":1,"what":"rng_state"}]}

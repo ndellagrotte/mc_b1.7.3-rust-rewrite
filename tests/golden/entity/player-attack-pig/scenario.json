@@ -1,0 +1,13 @@
+{"name":"player-attack-pig","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":70,"mob_spawning":"none",
+ "comment":"WP-2.5a. The attack op with the player as the attacker (Minecraft.clickMouse(0), ENTITY branch: swingItem, PlayerController.attackEntity = EntityPlayer.attackTargetEntityWithCurrentItem). The player (id 0) holds a wooden sword (slot 0); a pig (id 1) stands 3 blocks ahead on the stone floor. Damage: ItemSword.getDamageVsEntity 4 (+1 because motionY < 0: standing on the ground still has the gravity step), the pig's EntityLiving.attackEntityFrom knocks it back from the player; ItemSword.hitEntity wears the sword by 1. t 10 and t 15 (inside the pig's hurt window: only damage above the window's first hit counts), t 30 kills it (EntityLiving.onDeath: addToPlayerScore with scoreValue 0, the pig's drops); the porkchops land beyond the player's pick-up reach. t 50: a punch at a corpse (health <= 0: no effect).",
+ "ops":[{"t":0,"op":"fill","x0":-6,"y0":60,"z0":-6,"x1":6,"y1":60,"z1":10,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x3fe0000000000000","yaw":0,"pitch":0,
+         "inventory":[{"slot":0,"id":268,"count":1}]},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",61,"0x400c000000000000"],"yaw":180,"pitch":0,"id":1},
+        {"t":10,"op":"attack","attacker_id":0,"target_id":1},
+        {"t":15,"op":"attack","attacker_id":0,"target_id":1},
+        {"t":30,"op":"attack","attacker_id":0,"target_id":1},
+        {"t":50,"op":"attack","attacker_id":0,"target_id":1}],
+ "dumps":[{"every":1,"what":"entity_state","which":"all"},
+          {"every":1,"what":"player_state"},
+          {"every":1,"what":"rng_state"}]}

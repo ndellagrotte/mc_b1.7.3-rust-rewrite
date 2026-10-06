@@ -1,0 +1,10 @@
+{"name":"testworld-6000","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"load","dir":"../../save/testworld/world","ticks":6000,"mob_spawning":"none",
+ "comment":"WP-2.5a, Gate 2's long run (PLAN_v4 §5 Phase 2). The owner's testWorld (tests/golden/save/testworld/world: level.dat and region/r.0.-1.mcr only) opened with the loading constructor through a temp copy (\"world\": \"load\"), the player (id 0) where the EntityPlayer constructor puts it, the world's spawn point (21, 64, -64) + (0.5, 1, 0.5), on the sand there. 6000 ticks with natural spawning off: the player's 19 x 19 chunks of random ticks (World.updateBlocksAndPlayCaveSounds), scheduled ticks, entity updates (the saved entities of the loaded chunks), weather, autosaves every 40 ticks into the copy, and randomDisplayUpdates' 6000 world.rand draws per tick. The chunks of the player's square outside r.0.-1 (x < 0 or z >= 0) are not in the save and are generated and populated, as vanilla does for a missing chunk. Every 500 ticks: the four chunks around the spawn point, rng_state, world_time and the player.",
+ "ops":[{"t":0,"op":"player","x":"0x4035800000000000","y":65,"z":"0xc04fc00000000000"}],
+ "dumps":[{"every":500,"what":"chunk_digest","x":0,"z":-4},
+          {"every":500,"what":"chunk_digest","x":1,"z":-4},
+          {"every":500,"what":"chunk_digest","x":0,"z":-5},
+          {"every":500,"what":"chunk_digest","x":1,"z":-5},
+          {"every":500,"what":"rng_state"},
+          {"every":500,"what":"world_time"},
+          {"every":500,"what":"entity_state","which":[0]}]}

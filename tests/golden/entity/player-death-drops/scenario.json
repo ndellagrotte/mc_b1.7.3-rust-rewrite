@@ -1,0 +1,8 @@
+{"name":"player-death-drops","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":56,"mob_spawning":"none",
+ "comment":"WP-2.5a. The player (id 0) falls 39 blocks onto stone and dies on landing (fall damage 36 through damageEntity). EntityPlayer.onDeath: EntityLiving's, the 0.2 box, motionY 0.1, InventoryPlayer.dropAllItems (main slots in order, then armour) through dropPlayerItemWithRandomChoice(stack, true): an EntityItem at the eyes (posY - 0.3 + getEyeHeight() 0.12, three Math.random() draws in its constructor), pick-up delay 40, two rand draws each for the scatter; no attacker: motionX/Z 0; yOffset 0.1. The run ends at t 55, the last tick before deathTime passes 20 (t 56: EntityPlayer.setEntityDead, no cursor stack to drop, and World.updateEntities drops it from loadedEntityList). Vanilla keeps the dead player in World.playerEntities (only World.setEntityDead removes it, World.java:945; the client's respawn does that), so random ticks and randomDisplayUpdates go on around it; the port's World cannot hold an entity outside loadedEntityList yet (reported, WP-2.5a), and its trace would differ from t 56 on.",
+ "ops":[{"t":0,"op":"fill","x0":-4,"y0":60,"z0":-4,"x1":4,"y1":60,"z1":4,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":100,"z":"0x3fe0000000000000","yaw":0,"pitch":0,
+         "inventory":[{"slot":0,"id":276,"count":1,"damage":7},{"slot":1,"id":4,"count":64},{"slot":5,"id":263,"count":3},
+                      {"slot":20,"id":50,"count":16},{"slot":35,"id":332,"count":5},{"slot":38,"id":299,"count":1,"damage":12}]}],
+ "dumps":[{"every":1,"what":"entity_state","which":"all"},
+          {"every":1,"what":"rng_state"}]}
