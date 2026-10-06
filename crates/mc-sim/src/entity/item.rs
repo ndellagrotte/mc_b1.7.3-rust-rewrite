@@ -1,5 +1,6 @@
 //! `EntityItem` (EntityItem.java): a dropped item stack. Fully transcribed
-//! except `onCollideWithPlayer` (needs the player inventory, WP-2.5) and NBT.
+//! except `onCollideWithPlayer` (needs the player inventory, WP-2.5). The NBT
+//! bodies are in [`super::nbt`].
 
 use mc_core::math::floor_double;
 
@@ -54,6 +55,31 @@ pub fn new_entity_item(world: &mut World, x: f64, y: f64, z: f64, stack: ItemSta
     b.motion_y = 0.20000000298023224;
     b.motion_z =
         (base::math_random(world) * 0.20000000298023224 - 0.10000000149011612) as f32 as f64;
+    Entity {
+        base: b,
+        kind: EntityKindData::Item(d),
+    }
+}
+
+/// `new EntityItem(world)`: the `EntityList` / NBT-load constructor. The
+/// field initialisers run (the `hoverStart` `Math.random()` draw, :9), then
+/// the size; `item` stays null until `readEntityFromNBT`.
+// src: EntityItem.java:3-9, :27-31
+pub fn new_entity_item_empty(world: &mut World) -> Entity {
+    let mut b = base::EntityBase::new(world);
+    // entityInit() is empty (EntityItem.java:33-34).
+    let hover_start = (base::math_random(world) * 3.141592653589793 * 2.0) as f32;
+    let d = ItemData {
+        item: None,
+        field_803_e: 0,
+        age: 0,
+        delay_before_can_pickup: 0,
+        health: 5,
+        hover_start,
+    };
+    // src: EntityItem.java:29-30
+    b.set_size(0.25, 0.25);
+    b.y_offset = b.height / 2.0;
     Entity {
         base: b,
         kind: EntityKindData::Item(d),

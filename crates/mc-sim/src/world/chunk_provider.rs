@@ -43,7 +43,8 @@ use mc_core::java_hash::{ChunkCoordIntPair, JavaHashSet};
 
 use super::World;
 use super::chunk::{self, CHUNK_VOLUME, Chunk};
-use crate::save::ChunkLoader;
+use crate::entity::EntitySlot;
+use crate::save::{ChunkLoader, LoadedChunk, SaveError};
 use crate::worldgen::generate::ChunkProviderGenerate;
 use crate::worldgen::hell::ChunkProviderHell;
 use crate::worldgen::populate;
@@ -157,6 +158,9 @@ pub struct ChunkProviderCache {
     pub chunk_map: BTreeMap<i32, Chunk>,
     /// `chunkList`: load order, used by `saveChunks`. Holds chunk keys.
     pub chunk_list: Vec<i32>,
+    /// How many `loadChunkFromFile` calls failed (Java prints the exception
+    /// and generates the chunk, ChunkProvider.java:88-91).
+    pub load_errors: u64,
 }
 
 impl std::fmt::Debug for dyn ChunkLoader {
@@ -193,6 +197,7 @@ impl ChunkProviderCache {
             chunk_loader,
             chunk_map: BTreeMap::new(),
             chunk_list: Vec::new(),
+            load_errors: 0,
         }
     }
 }
@@ -207,6 +212,12 @@ impl World {
     // src: ChunkProvider.java:27-29
     pub fn chunk_exists(&self, x: i32, z: i32) -> bool {
         self.chunk_provider.chunk_map.contains_key(&chunk_key(x, z))
+    }
+
+    /// How many chunk loads failed and fell back to the generator
+    /// ([`ChunkProviderCache::load_errors`]).
+    pub fn chunk_load_errors(&self) -> u64 {
+        self.chunk_provider.load_errors
     }
 
     /// The loaded chunk at `(x, z)` (by cache key, so aliasing applies), or
@@ -250,8 +261,8 @@ impl World {
         if self.chunk_provider.chunk_map.contains_key(&var3) {
             return;
         }
-        let var4 = match self.load_chunk_from_file(x, z) {
-            Some(c) => c,
+        let (var4, loaded_entities) = match self.load_chunk_from_file(x, z) {
+            Some(l) => (l.chunk, l.entities),
             None => {
                 let mut generator = self
                     .chunk_provider
@@ -260,12 +271,25 @@ impl World {
                     .expect("provide_chunk re-entered while the generator is lent out");
                 let c = generator.as_provider().provide_chunk(self, x, z);
                 self.chunk_provider.generator = Some(generator);
-                c
+                (c, Vec::new())
             }
         };
         self.chunk_provider.chunk_map.insert(var3, var4);
         self.chunk_provider.chunk_list.push(var3);
         // var4.func_4143_d() is empty (Chunk.java:133-134).
+        // The entities read with the chunk join `loadedEntityList` here, in
+        // the chunk's section order: this is the `loadedEntityList.addAll`
+        // half of `World.addLoadedEntities` (World.java:2077-2084), which
+        // `onChunkLoad` reaches after `addTileEntity` (Chunk.java:459-467);
+        // the port's entities have to be owned by the list before
+        // `add_loaded_entities` (the `obtainEntitySkin` half) sees their ids.
+        // The two lists are separate, so doing it first is not observable.
+        for e in loaded_entities {
+            self.loaded_entity_list.push(EntitySlot {
+                entity_id: e.base.entity_id,
+                entity: Some(Box::new(e)),
+            });
+        }
         chunk::on_chunk_load(self, x, z);
 
         if !self.chunk_mut(x, z).is_terrain_populated
@@ -307,14 +331,43 @@ impl World {
         }
     }
 
-    /// `ChunkProvider.loadChunkFromFile(x, z)`.
+    /// `ChunkProvider.loadChunkFromFile(x, z)`: the loader's chunk (with
+    /// its entities), `lastSaveTime` set to the world time. The loader is
+    /// taken out of the provider for the call (it gets the whole world,
+    /// [`ChunkLoader`]); a loader error is printed in Java and means "no
+    /// chunk".
     // src: ChunkProvider.java:77-93
-    fn load_chunk_from_file(&mut self, x: i32, z: i32) -> Option<Chunk> {
-        let loader = self.chunk_provider.chunk_loader.as_mut()?;
-        // Vanilla prints the exception and returns null on failure.
-        let mut c = loader.load_chunk(x, z).ok().flatten()?;
-        c.last_save_time = self.world_info.world_time;
-        Some(c)
+    fn load_chunk_from_file(&mut self, x: i32, z: i32) -> Option<LoadedChunk> {
+        let mut loader = self.chunk_provider.chunk_loader.take()?;
+        let r = loader.load_chunk(self, x, z);
+        self.chunk_provider.chunk_loader = Some(loader);
+        match r {
+            Ok(Some(mut l)) => {
+                l.chunk.last_save_time = self.world_info.world_time;
+                Some(l)
+            }
+            Ok(None) => None,
+            Err(_) => {
+                // src: ChunkProvider.java:88-91 (printStackTrace, null)
+                self.chunk_provider.load_errors += 1;
+                None
+            }
+        }
+    }
+
+    /// Runs `f` with the chunk at `key` taken out of the chunk map and the
+    /// loader taken out of the provider (both put back after), so the loader
+    /// gets `&mut World` and `&mut Chunk` at once ([`ChunkLoader`]).
+    fn with_loader_and_chunk<R>(
+        &mut self,
+        loader: &mut Box<dyn ChunkLoader>,
+        key: i32,
+        f: impl FnOnce(&mut Box<dyn ChunkLoader>, &mut World, &mut Chunk) -> R,
+    ) -> Option<R> {
+        let mut c = self.chunk_provider.chunk_map.remove(&key)?;
+        let r = f(loader, self, &mut c);
+        self.chunk_provider.chunk_map.insert(key, c);
+        Some(r)
     }
 
     /// `ChunkProvider.populate(provider, x, z)`: marks the chunk populated, then
@@ -329,41 +382,80 @@ impl World {
         }
     }
 
-    /// `ChunkProvider.saveChunks(all, progress)`.
-    // src: ChunkProvider.java:130-157
+    /// `ChunkProvider.saveChunks(all, progress)`; see
+    /// [`World::try_save_chunks`]. A session-lock failure (an exception in
+    /// Java) returns false.
+    // src: ChunkProvider.java:130-158
     pub fn save_chunks(&mut self, all: bool) -> bool {
+        self.try_save_chunks(all).unwrap_or(false)
+    }
+
+    /// `ChunkProvider.saveChunks(all, progress)`: every chunk in load order
+    /// whose `needsSaving(all)` holds (at most 24 unless `all`), through the
+    /// loader (`unloadAndSaveChunk`; `unloadAndSaveChunkData` first when
+    /// `all`). `Err` for the loader's `MinecraftException` (the session
+    /// lock), which leaves the Java method too (only `IOException` is caught,
+    /// ChunkProvider.java:111-113).
+    // src: ChunkProvider.java:95-116, :130-158
+    pub fn try_save_chunks(&mut self, all: bool) -> Result<bool, SaveError> {
+        let mut loader = self.chunk_provider.chunk_loader.take();
+        let r = self.save_chunks_with(&mut loader, all);
+        self.chunk_provider.chunk_loader = loader;
+        r
+    }
+
+    fn save_chunks_with(
+        &mut self,
+        loader: &mut Option<Box<dyn ChunkLoader>>,
+        all: bool,
+    ) -> Result<bool, SaveError> {
         let mut var3 = 0;
         let keys = self.chunk_provider.chunk_list.clone();
-        let world_time = self.world_info.world_time;
         for key in keys {
-            let Some(c) = self.chunk_provider.chunk_map.get_mut(&key) else {
+            let Some(c) = self.chunk_provider.chunk_map.get(&key) else {
                 continue;
             };
+            let never_save = c.never_save;
+            // src: ChunkProvider.java:135-137, :95-104 (exceptions printed)
             if all
-                && !c.never_save
-                && let Some(l) = self.chunk_provider.chunk_loader.as_mut()
+                && !never_save
+                && let Some(l) = loader.as_mut()
             {
-                let _ = l.save_extra_chunk_data(c);
+                let _ = self.with_loader_and_chunk(l, key, |l, w, c| l.save_extra_chunk_data(w, c));
             }
-            if c.needs_saving(all, world_time) {
-                if let Some(l) = self.chunk_provider.chunk_loader.as_mut() {
-                    c.last_save_time = world_time;
-                    let _ = l.save_chunk(c);
+            let world_time = self.world_info.world_time;
+            let needs = self
+                .chunk_provider
+                .chunk_map
+                .get(&key)
+                .is_some_and(|c| c.needs_saving(all, world_time));
+            if needs {
+                // src: ChunkProvider.java:139-140, :106-116
+                if let Some(l) = loader.as_mut() {
+                    let r = self.with_loader_and_chunk(l, key, |l, w, c| {
+                        c.last_save_time = w.world_info.world_time;
+                        l.save_chunk(w, c)
+                    });
+                    if let Some(Err(e)) = r {
+                        return Err(e);
+                    }
                 }
-                c.is_modified = false;
+                if let Some(c) = self.chunk_provider.chunk_map.get_mut(&key) {
+                    c.is_modified = false; // src: ChunkProvider.java:141
+                }
                 var3 += 1;
                 if var3 == 24 && !all {
-                    return false;
+                    return Ok(false);
                 }
             }
         }
         if all {
-            match self.chunk_provider.chunk_loader.as_mut() {
-                None => return true,
+            match loader.as_mut() {
+                None => return Ok(true),
                 Some(l) => l.save_extra_data(),
             }
         }
-        true
+        Ok(true)
     }
 
     /// `ChunkProvider.unload100OldestChunks()`.
@@ -384,13 +476,20 @@ impl World {
                     .map(|c| (c.x_position, c.z_position))
                 {
                     chunk::on_chunk_unload(self, cx, cz);
-                    let world_time = self.world_info.world_time;
-                    if let Some(c) = self.chunk_provider.chunk_map.get_mut(&var2)
-                        && let Some(l) = self.chunk_provider.chunk_loader.as_mut()
-                    {
-                        c.last_save_time = world_time;
-                        let _ = l.save_chunk(c);
-                        let _ = l.save_extra_chunk_data(c);
+                    // src: ChunkProvider.java:166-167 (unloadAndSaveChunk,
+                    // unloadAndSaveChunkData; their exceptions are printed,
+                    // a MinecraftException leaves the method: the port stops)
+                    if let Some(mut l) = self.chunk_provider.chunk_loader.take() {
+                        let r = self.with_loader_and_chunk(&mut l, var2, |l, w, c| {
+                            c.last_save_time = w.world_info.world_time;
+                            let r = l.save_chunk(w, c);
+                            let _ = l.save_extra_chunk_data(w, c);
+                            r
+                        });
+                        self.chunk_provider.chunk_loader = Some(l);
+                        if let Some(Err(_)) = r {
+                            return false;
+                        }
                     }
                 }
                 self.chunk_provider.dropped_chunks_set.remove(&var2);

@@ -69,6 +69,7 @@ pub mod dispatch;
 pub mod falling_sand;
 pub mod item;
 pub mod living;
+pub mod nbt;
 pub mod player;
 
 pub use base::EntityBase;
@@ -210,6 +211,16 @@ pub struct PlayerData {
     pub is_swinging: bool,
     /// `swingProgressInt` (EntityPlayer.java:15).
     pub swing_progress_int: i32,
+    /// `score` (EntityPlayer.java:11): saved by `EntityPlayerSP` only
+    /// (EntityPlayerSP.java:98-106, [`nbt`]).
+    pub score: i32,
+    /// `dimension` (EntityPlayer.java:17): saved as `Dimension`
+    /// (EntityPlayer.java:312, :329, [`nbt`]).
+    pub dimension: i32,
+    /// `playerSpawnCoordinate` (EntityPlayer.java:31, private): the bed
+    /// spawn, saved as `SpawnX/Y/Z` when set (EntityPlayer.java:320-322,
+    /// :332-336, [`nbt`]).
+    pub player_spawn_coordinate: Option<mc_core::java_hash::ChunkCoordinates>,
 }
 
 impl PlayerData {

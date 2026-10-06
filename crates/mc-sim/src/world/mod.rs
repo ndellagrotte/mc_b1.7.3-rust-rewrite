@@ -18,9 +18,9 @@
 //!
 //! | Java | State |
 //! |---|---|
-//! | `saveLevel` (:293-297) | the player NBT for `level.dat` is WP-2.5 (recorded when a player exists); `MapStorage.saveAllData` WP-2.6 |
-//! | `spawnPlayerWithLoadedChunks` (:256-276) | `EntityPlayer.readFromNBT` WP-2.5 (recorded) |
-//! | `addLoadedEntities` (:2077-2084) | entities read with a chunk arrive with the chunk loader, WP-1.9 (recorded) |
+//! | `saveLevel` (:293-297) | `MapStorage.saveAllData` WP-2.6 |
+//! | `spawnPlayerWithLoadedChunks` (:256-276) | `EntityPlayer.readFromNBT` exists (`entity::nbt::read_from_nbt`, WP-1.9b) but is not called here yet (recorded) |
+//! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
 //! | `wakeUpAllPlayers` (:2395-2407) | `EntityPlayer.wakeUpPlayer` WP-2.5 (recorded) |
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded) |
 //! | `updateBlocksAndPlayCaveSounds` (:1868-1965) | the `EntityLightningBolt` constructor WP-2.4 (recorded; the draws before it are made) |
@@ -75,7 +75,7 @@ use mc_core::{Aabb, Vec3D};
 
 use crate::block::{self, BlockStatics, Material, dispatch as block_dispatch};
 use crate::entity::{Entity, EntityBase, EntitySlot};
-use crate::save::SaveHandler;
+use crate::save::{SaveError, SaveHandler};
 
 use self::chunk_provider::{ChunkGenerator, ChunkProviderCache};
 use self::events::{EventQueue, WorldEvent};
@@ -332,8 +332,9 @@ impl World {
     /// World.java:184-190); the generator is the provider's for the world's
     /// seed (`getChunkProvider`, World.java:201, :210-213).
     ///
-    /// Reading `level.dat` is the save handler's (WP-1.9); with
-    /// [`crate::save::NoSave`] this is always the new-world path.
+    /// Reading `level.dat` is the save handler's
+    /// ([`crate::save::SaveOldDir`]); with [`crate::save::NoSave`] this is
+    /// always the new-world path.
     // src: World.java:149-208
     pub fn new_from_save(
         mut save_handler: Box<dyn SaveHandler>,
@@ -1703,38 +1704,66 @@ impl World {
 
     // ---- saving ----------------------------------------------------------------------------
 
-    /// `saveWorld(all, progress)`.
+    /// `saveWorld(all, progress)`; see [`World::try_save_world`]. A
+    /// `MinecraftException` (the session lock) ends the save, as the Java
+    /// exception does; it is dropped here (vanilla's client catches it
+    /// around the game loop and shows the conflict screen; a caller that
+    /// needs it uses `try_save_world`).
     // src: World.java:278-291
     pub fn save_world(&mut self, all: bool) {
-        if self.chunk_provider_can_save() {
-            self.save_level();
-            self.save_chunks(all);
-        }
+        let _ = self.try_save_world(all);
     }
 
-    /// `saveLevel()`. The player NBT is not built yet (Phase 2); with
-    /// [`crate::save::NoSave`] that is unobservable.
-    // src: World.java:293-297
-    fn save_level(&mut self) {
-        let _ = self.save_handler.check_session_lock();
-        if !self.player_entities.is_empty() {
-            self.skip("EntityPlayer.writeToNBT (World.saveLevel)");
+    /// `saveWorld(all, progress)`: `saveLevel` (session lock, `level.dat`
+    /// with the first player), then the chunk provider's `saveChunks(all)`.
+    /// `Err` where the Java throws `MinecraftException`.
+    // src: World.java:278-291
+    pub fn try_save_world(&mut self, all: bool) -> Result<(), SaveError> {
+        if self.chunk_provider_can_save() {
+            self.save_level()?;
+            self.try_save_chunks(all)?;
         }
-        let info = self.world_info.clone();
-        self.save_handler.save_world_info_and_player(&info, None);
+        Ok(())
+    }
+
+    /// `saveLevel()`: `checkSessionLock`, then
+    /// `saveHandler.saveWorldInfoAndPlayer(worldInfo, playerEntities)` (the
+    /// first player's `writeToNBT`, WorldInfo.java:72-87; failures are
+    /// printed in Java, ignored here). `MapStorage.saveAllData` is WP-2.6.
+    // src: World.java:293-297
+    fn save_level(&mut self) -> Result<(), SaveError> {
+        self.check_session_lock()?;
+        let player = match self.player_entities.first() {
+            None => None,
+            Some(&pid) => match self.entity(pid) {
+                Some(p) => Some(mc_nbt::Tag::Compound(crate::entity::nbt::write_to_nbt(
+                    p, self,
+                ))),
+                None => {
+                    // Taken out for its own update: nothing saves then.
+                    self.note_unimplemented("World.saveLevel with the player taken out");
+                    None
+                }
+            },
+        };
+        let _ = self
+            .save_handler
+            .save_world_info_and_player(&mut self.world_info, player);
         // field_28108_z.saveAllData() (MapStorage): WP-2.6, nothing to save yet.
+        Ok(())
     }
 }
 
 impl World {
     /// `quickSaveWorld(i)`: the level (when `i == 0`) and up to 24 chunks.
+    /// A session-lock failure returns false (an exception in Java).
     // src: World.java:299-309
     pub fn quick_save_world(&mut self, var1: i32) -> bool {
         if !self.chunk_provider_can_save() {
             true
         } else {
-            if var1 == 0 {
-                self.save_level();
+            if var1 == 0 && self.save_level().is_err() {
+                return false;
             }
             self.save_chunks(false)
         }
@@ -1749,7 +1778,7 @@ impl World {
     /// `checkSessionLock()`. Vanilla throws `MinecraftException`; the error is
     /// returned.
     // src: World.java:2270-2272
-    pub fn check_session_lock(&mut self) -> Result<(), crate::save::StorageError> {
+    pub fn check_session_lock(&mut self) -> Result<(), SaveError> {
         self.save_handler.check_session_lock()
     }
 
