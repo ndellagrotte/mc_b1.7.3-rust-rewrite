@@ -54,6 +54,10 @@ pub struct NoiseGenerator2 {
 
 impl NoiseGenerator2 {
     /// `new NoiseGenerator2(rand)`: the same draws as `NoiseGeneratorPerlin`.
+    ///
+    /// The no-argument constructor `this(new Random())`
+    /// (NoiseGenerator2.java:14-16) is not ported: its seed comes from the
+    /// clock (D9), and no simulation code calls it.
     // src: NoiseGenerator2.java:18-36
     pub fn new(var1: &mut JavaRandom) -> Self {
         let mut permutations = [0i32; 512];

@@ -38,6 +38,10 @@ fn java_floor(v: f64) -> i32 {
 impl NoiseGeneratorPerlin {
     /// `new NoiseGeneratorPerlin(rand)`: three `nextDouble`s for the origin,
     /// then 256 `nextInt(256 - i)` for the Fisher-Yates shuffle.
+    ///
+    /// The no-argument constructor `this(new Random())`
+    /// (NoiseGeneratorPerlin.java:11-13) is not ported: its seed comes from
+    /// the clock (D9), and no simulation code calls it.
     // src: NoiseGeneratorPerlin.java:15-33
     pub fn new(var1: &mut JavaRandom) -> Self {
         let mut permutations = [0i32; 512];

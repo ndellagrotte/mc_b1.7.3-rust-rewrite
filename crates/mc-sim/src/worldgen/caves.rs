@@ -7,6 +7,11 @@
 //! chunk, and lets the subclass start tunnels there that may reach the
 //! target. The two subclasses differ in a handful of constants and in what
 //! they carve; [`CaveKind`] selects them, and each difference is cited.
+//!
+//! Chunk-to-block arithmetic (`chunk * 16 + …`) is Java `int` arithmetic and
+//! uses `wrapping_*`: `generate` visits chunks up to 8 beyond the target, so
+//! at the edge of the int range `var2 * 16` wraps in Java and must not panic
+//! in a debug build.
 
 use mc_core::JavaRandom;
 use mc_core::math::{self, floor_double};
@@ -60,8 +65,8 @@ impl MapGenCaves {
         self.rand.set_seed(random_seed);
         let var7 = self.rand.next_long() / 2 * 2 + 1;
         let var9 = self.rand.next_long() / 2 * 2 + 1;
-        for var11 in (var3 - var6)..=(var3 + var6) {
-            for var12 in (var4 - var6)..=(var4 + var6) {
+        for var11 in var3.wrapping_sub(var6)..=var3.wrapping_add(var6) {
+            for var12 in var4.wrapping_sub(var6)..=var4.wrapping_add(var6) {
                 self.rand.set_seed(
                     (var11 as i64)
                         .wrapping_mul(var7)
@@ -113,8 +118,8 @@ impl MapGenCaves {
         mut var14: i32,
         var15: f64,
     ) {
-        let var17 = (var1 * 16 + 8) as f64;
-        let var19 = (var2 * 16 + 8) as f64;
+        let var17 = var1.wrapping_mul(16).wrapping_add(8) as f64;
+        let var19 = var2.wrapping_mul(16).wrapping_add(8) as f64;
         let mut var21 = 0.0f32;
         let mut var22 = 0.0f32;
         let mut var23 = JavaRandom::new(self.rand.next_long());
@@ -197,12 +202,20 @@ impl MapGenCaves {
                     && var4 <= var17 + 16.0 + var27 * 2.0
                     && var8 <= var19 + 16.0 + var27 * 2.0
                 {
-                    let mut var53 = floor_double(var4 - var27) - var1 * 16 - 1;
-                    let mut var34 = floor_double(var4 + var27) - var1 * 16 + 1;
+                    let mut var53 = floor_double(var4 - var27)
+                        .wrapping_sub(var1.wrapping_mul(16))
+                        .wrapping_sub(1);
+                    let mut var34 = floor_double(var4 + var27)
+                        .wrapping_sub(var1.wrapping_mul(16))
+                        .wrapping_add(1);
                     let mut var54 = floor_double(var6 - var29) - 1;
                     let mut var36 = floor_double(var6 + var29) + 1;
-                    let mut var55 = floor_double(var8 - var27) - var2 * 16 - 1;
-                    let mut var38 = floor_double(var8 + var27) - var2 * 16 + 1;
+                    let mut var55 = floor_double(var8 - var27)
+                        .wrapping_sub(var2.wrapping_mul(16))
+                        .wrapping_sub(1);
+                    let mut var38 = floor_double(var8 + var27)
+                        .wrapping_sub(var2.wrapping_mul(16))
+                        .wrapping_add(1);
                     if var53 < 0 {
                         var53 = 0;
                     }
@@ -260,9 +273,13 @@ impl MapGenCaves {
 
                     if !var56 {
                         for var40 in var53..var34 {
-                            let var57 = ((var40 + var1 * 16) as f64 + 0.5 - var4) / var27;
+                            let var57 = (var40.wrapping_add(var1.wrapping_mul(16)) as f64 + 0.5
+                                - var4)
+                                / var27;
                             for var43 in var55..var38 {
-                                let var44 = ((var43 + var2 * 16) as f64 + 0.5 - var8) / var27;
+                                let var44 =
+                                    (var43.wrapping_add(var2.wrapping_mul(16)) as f64 + 0.5 - var8)
+                                        / var27;
                                 // vanilla bug: the index starts at y = var36
                                 // while the loop variable starts at var36 - 1,
                                 // so the block tested and carved is one above
@@ -360,7 +377,9 @@ impl MapGenCaves {
             var7 = 0;
         }
         for _var8 in 0..var7 {
-            let var9 = (var2 * 16 + self.rand.next_int_bounded(16)) as f64;
+            let var9 = var2
+                .wrapping_mul(16)
+                .wrapping_add(self.rand.next_int_bounded(16)) as f64;
             // src: MapGenCaves.java:195 (nextInt(nextInt(120) + 8)),
             // MapGenCavesHell.java:156 (nextInt(128))
             let var11 = if hell {
@@ -369,7 +388,9 @@ impl MapGenCaves {
                 let bound = self.rand.next_int_bounded(120) + 8;
                 self.rand.next_int_bounded(bound) as f64
             };
-            let var13 = (var3 * 16 + self.rand.next_int_bounded(16)) as f64;
+            let var13 = var3
+                .wrapping_mul(16)
+                .wrapping_add(self.rand.next_int_bounded(16)) as f64;
             let mut var15 = 1;
             if self.rand.next_int_bounded(4) == 0 {
                 self.generate_large_cave_node(var4, var5, var6, var9, var11, var13);
@@ -402,6 +423,24 @@ impl MapGenCaves {
                     );
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The last chunk whose blocks fit in an `int` (`2^27 - 1`): its
+    /// neighbours up to 8 chunks further out have `chunk * 16` past
+    /// `i32::MAX`, which Java wraps. Must not panic with overflow checks on.
+    #[test]
+    fn generate_at_int_edge_wraps_like_java() {
+        for kind in [CaveKind::Overworld, CaveKind::Hell] {
+            let mut blocks = Box::new([1u8; CHUNK_VOLUME]);
+            let mut caves = MapGenCaves::new(kind);
+            caves.generate(42, (1 << 27) - 1, 0, &mut blocks);
+            caves.generate(42, -(1 << 27), -(1 << 27), &mut blocks);
         }
     }
 }

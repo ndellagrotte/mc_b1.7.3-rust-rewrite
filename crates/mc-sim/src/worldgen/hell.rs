@@ -446,6 +446,24 @@ impl ChunkProviderHell {
     }
 }
 
+impl ChunkProviderHell {
+    /// `prepareChunk(x, z)`: the same as `provideChunk`. Vanilla never calls
+    /// a generator's `prepareChunk` (the cache wrapper's own `prepareChunk`
+    /// calls the generator's `provideChunk`), so this is not on the
+    /// [`ChunkProvider`] trait.
+    // src: ChunkProviderHell.java:176-178
+    pub fn prepare_chunk(&mut self, world: &mut World, x: i32, z: i32) -> Chunk {
+        self.provide_chunk(world, x, z)
+    }
+
+    /// `saveChunks(all, progress)`: a generator holds nothing to save. Never
+    /// called by vanilla (the cache wrapper does not forward it).
+    // src: ChunkProviderHell.java:361-363
+    pub fn save_chunks(&mut self, _all: bool) -> bool {
+        true
+    }
+}
+
 impl ChunkProvider for ChunkProviderHell {
     /// `provideChunk(x, z)`: reseed `hellRNG` from the coordinates, terrain,
     /// surface, caves, `new Chunk` (no sky light pass).
