@@ -90,8 +90,11 @@ pub fn block_activated(world: &mut World, x: i32, y: i32, z: i32, player: &mut E
 /// `dispenseItem(world, x, y, z, rand)` (private): one random stack's item
 /// out of the front face (metadata 2 -z, 3 +z, 5 +x, anything else -x).
 /// Empty: aux sound 1001 (click). An item: an `EntityItem` 0.3 below the
-/// face centre with `rand` velocity, aux 1000; arrows, eggs and snowballs
-/// are WP-2.4 (module docs), aux 1002. Then smoke, aux 2000. `rand` is the
+/// face centre with `rand` velocity, aux 1000; arrows
+/// (`doesArrowBelongToPlayer = true`), eggs and snowballs: the
+/// `(World, x, y, z)` constructor at the face, `set*Heading(var9, 0.1, var10,
+/// 1.1F, 6.0F)` on the projectile's own `rand`, `entityJoinedWorld`, aux 1002
+/// (BlockDispenser.java:107-121). Then smoke, aux 2000. `rand` is the
 /// `updateTick`'s, which the world passes as `World.rand` (World.java:1159,
 /// :1960) — vanilla, transcribed: not the dispenser's own `random`.
 // src: BlockDispenser.java:84-138
