@@ -27,6 +27,26 @@ mixed-case originals).
 | `MetadataChunkBlock.func_866_a(int×6)` | `MetadataChunkBlock::try_merge` | Called by `scheduleLightingUpdate_do` on the five newest queued updates of the same type (World.java:1708-1713): true when the new box is inside this one, or when this one could be grown to include it at a cost of at most 2 in `(max-min)` volume, in which case it is grown in place (MetadataChunkBlock.java:155-206) |
 | `BlockStep.field_22037_a` | `block::STEP_TYPE_NAMES` | Static `{"stone", "sand", "wood", "cobble"}` (BlockStep.java:6), indexed by slab metadata: `ItemSlab.getItemNameIS` returns `super.getItemName() + "." + field_22037_a[damage]` (ItemSlab.java:18-20), and the four entries match the four slab textures of `BlockStep.getBlockTextureFromSideAndMetadata` (BlockStep.java:19-33). Static, so not in the `block_table` dump |
 | `BlockRedstoneRepeater.field_22023_b` | `block::REPEATER_DELAYS` | Static `{1, 2, 3, 4}` (BlockRedstoneRepeater.java:7), indexed by the delay setting `(meta & 12) >> 2`; the scheduled tick delay is twice the entry (BlockRedstoneRepeater.java:36-37, :93-97); the redstone task of WP-1.6 reads it |
+| `NoiseGeneratorPerlin.func_4110_a` | `NoiseGeneratorPerlin::grad_2d` | `grad(hash, x, y, z)` with `y = 0`: same selector on `hash & 15`, only x and z inputs (NoiseGeneratorPerlin.java:76-81); the 2D branch of `func_805_a` calls it where the 3D branch calls `grad` (:141 vs :204) |
+| `NoiseGeneratorPerlin.func_801_a` | `NoiseGeneratorPerlin::generate_noise_2d` | Returns `generateNoise(x, y, 0.0)` (NoiseGeneratorPerlin.java:90-92) |
+| `NoiseGeneratorPerlin.func_805_a` | `NoiseGeneratorPerlin::populate_noise_array` | Adds `noise * (1 / amplitude)` for each grid sample into the passed array, index running x, z, y (NoiseGeneratorPerlin.java:94-220); `generateNoiseOctaves` calls it once per octave (NoiseGeneratorOctaves.java:43) |
+| `NoiseGeneratorOctaves.field_1191_b` | `NoiseGeneratorOctaves::octaves` | The constructor's octave count, bound of every octave loop (NoiseGeneratorOctaves.java:10-14, :23, :42) |
+| `NoiseGeneratorOctaves.func_806_a` | `NoiseGeneratorOctaves::noise_2d` | `sum(perlin_i.func_801_a(x*f, z*f) / f)`, `f` halving: a single 2D octave-noise sample (NoiseGeneratorOctaves.java:19-29); `populate` uses it as `mobSpawnerNoise` (ChunkProviderGenerate.java:411) |
+| `NoiseGeneratorOctaves.func_4109_a` | `NoiseGeneratorOctaves::generate_noise_octaves_2d` | `generateNoiseOctaves(array, x, 10.0, z, xSize, 1, zSize, xScale, 1.0, zScale)`: one y layer; its last parameter is never read (NoiseGeneratorOctaves.java:50-52) |
+| `NoiseGenerator2.field_4296_d` | `simplex::GRAD3` | The twelve `{±1, ±1, 0}`-style gradient vectors indexed by `perm % 12` (NoiseGenerator2.java:6, :78-80, :87) |
+| `NoiseGenerator2.field_4295_e` | `NoiseGenerator2::permutations` | Built and shuffled exactly like `NoiseGeneratorPerlin.permutations` (NoiseGenerator2.java:19-34) |
+| `NoiseGenerator2.field_4292_a`, `field_4291_b`, `field_4297_c` | `NoiseGenerator2::x_coord`, `y_coord`, `z_coord` | Drawn as `nextDouble() * 256` like Perlin's `xCoord`/`yCoord`/`zCoord` (NoiseGenerator2.java:20-22); the first two are added to the two input coordinates (:50, :53), the third is never read |
+| `NoiseGenerator2.field_4294_f` | `simplex::skew_f2()` | `0.5 * (sqrt(3) - 1)`, the 2D simplex skew factor applied to `x + y` (NoiseGenerator2.java:11, :54) |
+| `NoiseGenerator2.field_4293_g` | `simplex::unskew_g2()` | `(3 - sqrt(3)) / 6`, the 2D unskew factor (NoiseGenerator2.java:12, :57, :72-75) |
+| `NoiseGenerator2.func_4156_a` | `NoiseGenerator2::dot2` | `g[0] * x + g[1] * y` (NoiseGenerator2.java:42-44) |
+| `NoiseGenerator2.func_4157_a` | `NoiseGenerator2::add_noise` | Adds `70 * (n0 + n1 + n2) * amplitude` per grid sample into the passed array (NoiseGenerator2.java:46-113); called once per octave (NoiseGeneratorOctaves2.java:38) |
+| `NoiseGeneratorOctaves2.field_4234_a` | `NoiseGeneratorOctaves2::generators` | The octave array, one `NoiseGenerator2` per octave (NoiseGeneratorOctaves2.java:9-16) |
+| `NoiseGeneratorOctaves2.field_4233_b` | `NoiseGeneratorOctaves2::octaves` | The octave count (NoiseGeneratorOctaves2.java:10, :37) |
+| `WorldChunkManager.field_4194_e` | `ChunkManagerKind::Noise::temperature_noise` | Its output becomes `temperature` (WorldChunkManager.java:32, :46, :78) |
+| `WorldChunkManager.field_4193_f` | `ChunkManagerKind::Noise::humidity_noise` | Its output becomes `humidity` (WorldChunkManager.java:79) |
+| `WorldChunkManagerHell.field_4201_e` | `ChunkManagerKind::Hell::biome` | Returned by `getBiomeGenAt` and filled into the biome array (WorldChunkManagerHell.java:20-22, :52) |
+| `WorldChunkManagerHell.field_4200_f` | `ChunkManagerKind::Hell::temperature` | Returned by `getTemperature`, filled into `temperature` (WorldChunkManagerHell.java:24-26, :54); `WorldProviderHell` passes 1.0 |
+| `WorldChunkManagerHell.field_4199_g` | `ChunkManagerKind::Hell::humidity` | Filled into `humidity` (WorldChunkManagerHell.java:53); `WorldProviderHell` passes 0.0 |
 
 ## Kept (meaning documented)
 
@@ -52,6 +72,24 @@ mixed-case originals).
 | `MetadataChunkBlock.field_1299_a` | `MetadataChunkBlock::field_1299_a` | Which light (`EnumSkyBlock`) the update is for (MetadataChunkBlock.java:4, :13) |
 | `Chunk.func_1014_a` | — (not ported) | Empty in `Chunk` and `EmptyChunk` (Chunk.java:64-65, EmptyChunk.java:25-26); called after a chunk is read from disk (ChunkLoader.java:173), so its call site needs nothing |
 | `Chunk.func_4143_d` | — (not ported) | Empty in `Chunk` and `EmptyChunk` (Chunk.java:133-134, EmptyChunk.java:34-35); called right after a chunk enters the cache (ChunkProvider.java:48, ChunkProviderLoadOrGenerate.java:71) |
+| `NoiseGeneratorOctaves2.func_4112_a` | `NoiseGeneratorOctaves2::func_4112_a` | `func_4111_a(..., frequencyStep, 0.5)` (NoiseGeneratorOctaves2.java:19-21); the biome manager's only entry point |
+| `NoiseGeneratorOctaves2.func_4111_a` | `NoiseGeneratorOctaves2::func_4111_a` | Octave sum of `NoiseGenerator2`: scales divided by 1.5, octave i at `scale * frequencyStep^i` with amplitude `0.55 / amplitudeStep^i`; reuses the array (zeroing all of it) when long enough (NoiseGeneratorOctaves2.java:23-44) |
+| `WorldChunkManager.field_4192_g` | `ChunkManagerKind::Noise::field_4192_g` | 2-octave noise (seed × 543321) whose output, `field_4196_c`, is blended into temperature (weight 0.01) and humidity (0.002) (WorldChunkManager.java:20, :47, :80-91) |
+| `WorldChunkManager.field_4196_c` | `WorldChunkManager::field_4196_c` | The last `field_4192_g` array (WorldChunkManager.java:11, :47, :80); read only as `value * 1.1 + 0.5` in the blend |
+| `ChunkProviderGenerate.field_912_k`, `field_911_l`, `field_910_m` | `ChunkProviderGenerate::` same | 16-, 16- and 8-octave 3D noises: two density fields (`field_4184_e`, `field_4183_f`) and their blend factor (`field_4185_d`) (ChunkProviderGenerate.java:33-35, :217-219, :280-289) |
+| `ChunkProviderGenerate.field_909_n`, `field_908_o` | `ChunkProviderGenerate::` same | 4-octave noises: sand/gravel beaches and the surface-layer depth (ChunkProviderGenerate.java:36-37, :116-118) |
+| `ChunkProviderGenerate.field_922_a`, `field_921_b` | `ChunkProviderGenerate::` same | 10- and 16-octave 2D noises: density falloff scale (`field_4182_g`) and height offset (`field_4181_h`) (ChunkProviderGenerate.java:38-39, :215-216, :235-262) |
+| `ChunkProviderGenerate.field_4180_q` | `ChunkProviderGenerate::field_4180_q` | The 5×17×5 density grid `generateTerrain` interpolates (ChunkProviderGenerate.java:49-62) |
+| `ChunkProviderGenerate.field_4185_d`, `field_4184_e`, `field_4183_f`, `field_4182_g`, `field_4181_h` | same, snake_case | Scratch arrays of the five noises above (ChunkProviderGenerate.java:215-219) |
+| `ChunkProviderGenerate.field_902_u` | `ChunkProviderGenerate::field_902_u` | The `MapGenCaves` instance (ChunkProviderGenerate.java:20, :201) |
+| `ChunkProviderGenerate.field_914_i` | — (not ported) | `int[32][32]`, never read or written after construction (ChunkProviderGenerate.java:27) |
+| `ChunkProviderGenerate.func_4061_a` | `ChunkProviderGenerate::func_4061_a` | Fills the density grid from the noises and the biome temperature × humidity (ChunkProviderGenerate.java:206-304) |
+| `ChunkProviderHell.field_4169_i`, `field_4168_j`, `field_4167_k` | `ChunkProviderHell::` same | As `field_912_k`/`field_911_l`/`field_910_m` for the nether (ChunkProviderHell.java:29-31, :199-201) |
+| `ChunkProviderHell.field_4166_l`, `field_4165_m` | `ChunkProviderHell::` same | Soul-sand/gravel noise and surface-layer depth noise (ChunkProviderHell.java:32-33, :106-108) |
+| `ChunkProviderHell.field_4177_a`, `field_4176_b` | `ChunkProviderHell::` same | 2D noises whose values the nether density computes but never uses (ChunkProviderHell.java:34-35, :197-198, :222-252) |
+| `ChunkProviderHell.field_4163_o`, `field_4162_p`, `field_4160_r`, `field_4175_c`, `field_4174_d`, `field_4173_e`, `field_4172_f`, `field_4171_g` | same, snake_case | Scratch arrays: density grid, soul-sand noise, depth noise, and the five density noises (ChunkProviderHell.java:15-24) |
+| `ChunkProviderHell.func_4058_b` | `ChunkProviderHell::func_4058_b` | The nether's `replaceBlocksForBiome`: bedrock top and bottom, soul sand, gravel (ChunkProviderHell.java:103-174) |
+| `ChunkProviderHell.func_4057_a` | `ChunkProviderHell::func_4057_a` | The nether's density grid (ChunkProviderHell.java:190-296) |
 
 ## Real names changed for Rust
 
@@ -82,3 +120,10 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `BlockLeaves.baseIndexInPNG`, `BlockBreakable.localFlag`, `BlockRail.isPowered` (detector rail) | `BlockDef::base_index_in_png`, `BlockKind::breakable_local_flag`, `BlockKind::rail_is_powered` | constructor arguments that are constant per kind, derived instead of stored |
 | `Block.blockConstructorCalled` | `BlockDef::block_constructor_called` | snake_case; always true, never read |
 | `PistonBlockTextures.faceToSide`, `ModelBed.bedDirection` | `block::FACE_TO_SIDE`, `block::BED_DIRECTION` (private) | the two tables the block texture functions read; the rest of `PistonBlockTextures` is the pistons task's |
+| `World.getWorldChunkManager()` / `WorldProvider.worldChunkMgr` | `World::get_world_chunk_manager` / `WorldProvider::world_chunk_mgr` (`Option`) | built on first use for the surface, because `WorldProvider::new` runs before the world seed is known (`world/provider.rs` module docs) |
+| `WorldProvider.getChunkProvider()` | `WorldProvider::get_chunk_provider(seed)` | the world is not built yet when the generator is; the seed is passed |
+| `BiomeGenBase.rainforest`, … (static singletons) | `worldgen::biome::Biome` + `BIOMES` | identity enum + post-static-init data rows; `BiomeGenSky`/`sky` not ported (D3) |
+| `BiomeGenBase.biomeLookupTable` | `worldgen::biome::BIOME_LOOKUP_TABLE` | const-evaluated with the static initialiser's loop |
+| `WorldChunkManagerHell` (class) | `ChunkManagerKind::Hell` | one struct for both classes |
+| `MapGenBase`, `MapGenCaves`, `MapGenCavesHell` (classes) | `worldgen::caves::MapGenCaves` + `CaveKind` | one struct; per-class constants selected by kind |
+| `ChunkProviderHell.hellRNG` | `ChunkProviderHell::hell_rng` | snake_case |

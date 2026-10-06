@@ -1,12 +1,34 @@
 //! `WorldProvider` and its surface/nether subclasses (WorldProvider.java,
 //! WorldProviderSurface.java, WorldProviderHell.java), minus the parts that
-//! belong to other systems: `worldChunkMgr` (biomes, WP-1.4), `getChunkProvider`
-//! (the generator is passed to [`crate::world::World::new`]),
-//! `canCoordinateBeSpawn` and the sky colour helpers (client).
+//! belong to other systems: `canCoordinateBeSpawn` and the sky colour helpers
+//! (client).
+//!
+//! # The biome manager and the generator
+//!
+//! `registerWorld` (WorldProvider.java:13-17) runs inside the `World`
+//! constructor, when the world seed is known; [`WorldProvider::new`] runs
+//! before it. So:
+//!
+//! - `worldChunkMgr` ([`WorldProvider::world_chunk_mgr`]) is built for the
+//!   nether in [`WorldProvider::new`] (it needs no seed) and for the surface
+//!   on first use by [`World::get_world_chunk_manager`], from the world's
+//!   `getRandomSeed()`. Building it draws only from three fresh
+//!   `Random(seed * k)`s and leaves its arrays empty, so building it late is
+//!   indistinguishable from building it in `registerWorld`.
+//! - `getChunkProvider()` is [`WorldProvider::get_chunk_provider`], called by
+//!   whoever builds the world, whose result is passed to
+//!   [`crate::world::World::new`] (World.java:212).
 //!
 //! The sky dimension (`WorldProviderSky`) is out of scope (PLAN_v4 D3).
 
 use mc_core::math::jmath;
+
+use super::World;
+use super::chunk_provider::ChunkGenerator;
+use crate::worldgen::biome::Biome;
+use crate::worldgen::chunk_manager::WorldChunkManager;
+use crate::worldgen::generate::ChunkProviderGenerate;
+use crate::worldgen::hell::ChunkProviderHell;
 
 /// Which `WorldProvider` subclass.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -32,6 +54,9 @@ pub struct WorldProvider {
     pub light_brightness_table: [f32; 16],
     /// `worldType` (0 surface, -1 nether).
     pub world_type: i32,
+    /// `worldChunkMgr`; `None` for the surface until
+    /// [`World::get_world_chunk_manager`] builds it (module docs).
+    pub world_chunk_mgr: Option<WorldChunkManager>,
 }
 
 impl WorldProvider {
@@ -46,8 +71,11 @@ impl WorldProvider {
             has_no_sky: false,
             light_brightness_table: [0.0; 16],
             world_type: 0,
+            world_chunk_mgr: None,
         };
         if dimension == Dimension::Hell {
+            // src: WorldProviderHell.java:5
+            p.world_chunk_mgr = Some(WorldChunkManager::new_hell(Biome::Hell, 1.0, 0.0));
             // src: WorldProviderHell.java:6-9
             p.is_nether = true;
             p.is_hell_world = true;
@@ -72,6 +100,19 @@ impl WorldProvider {
         }
     }
 
+    /// `getChunkProvider()`: a new generator for the world seed
+    /// (`ChunkProviderGenerate` for the surface, `ChunkProviderHell` for the
+    /// nether).
+    // src: WorldProvider.java:33-35, WorldProviderHell.java:26-28
+    pub fn get_chunk_provider(&self, random_seed: i64) -> ChunkGenerator {
+        match self.dimension {
+            Dimension::Surface => {
+                ChunkGenerator::Generate(Box::new(ChunkProviderGenerate::new(random_seed)))
+            }
+            Dimension::Hell => ChunkGenerator::Hell(Box::new(ChunkProviderHell::new(random_seed))),
+        }
+    }
+
     /// `calculateCelestialAngle(worldTime, partialTick)`; the nether returns 0.5.
     // src: WorldProvider.java:43-58, WorldProviderHell.java:38-40
     pub fn calculate_celestial_angle(&self, world_time: i64, partial: f32) -> f32 {
@@ -90,5 +131,17 @@ impl WorldProvider {
         var5 = 1.0f32 - ((jmath::cos(var5 as f64 * 3.141592653589793) + 1.0) / 2.0) as f32;
         var5 = var6 + (var5 - var6) / 3.0f32;
         var5
+    }
+}
+
+impl World {
+    /// `getWorldChunkManager()` = `worldProvider.worldChunkMgr`, built on first
+    /// use for the surface (module docs).
+    // src: World.java:58-60, WorldProvider.java:29-31
+    pub fn get_world_chunk_manager(&mut self) -> &mut WorldChunkManager {
+        let seed = self.get_random_seed();
+        self.world_provider
+            .world_chunk_mgr
+            .get_or_insert_with(|| WorldChunkManager::new(seed))
     }
 }

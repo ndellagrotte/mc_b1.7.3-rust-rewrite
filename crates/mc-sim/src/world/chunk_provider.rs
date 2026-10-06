@@ -43,6 +43,8 @@ use mc_core::java_hash::{ChunkCoordIntPair, JavaHashSet};
 use super::World;
 use super::chunk::{self, CHUNK_VOLUME, Chunk};
 use crate::save::ChunkLoader;
+use crate::worldgen::generate::ChunkProviderGenerate;
+use crate::worldgen::hell::ChunkProviderHell;
 
 /// The generator half of `IChunkProvider` (IChunkProvider.java). The cache
 /// half (`provideChunk` with loading, `saveChunks`, …) is on [`World`].
@@ -96,27 +98,40 @@ impl ChunkProvider for EmptyChunkProvider {
     }
 }
 
-/// The generators a world can use. `ChunkProviderGenerate` and
-/// `ChunkProviderHell` join in Phase 1 (WP-1.4, WP-1.7).
+/// The generators a world can use (built by
+/// [`super::provider::WorldProvider::get_chunk_provider`] or, for the oracle's
+/// empty worlds, directly).
 #[derive(Debug)]
 pub enum ChunkGenerator {
     /// [`EmptyChunkProvider`].
     Empty(EmptyChunkProvider),
+    /// `ChunkProviderGenerate` (the overworld).
+    Generate(Box<ChunkProviderGenerate>),
+    /// `ChunkProviderHell` (the nether).
+    Hell(Box<ChunkProviderHell>),
 }
 
 impl ChunkGenerator {
     fn as_provider(&mut self) -> &mut dyn ChunkProvider {
         match self {
             ChunkGenerator::Empty(g) => g,
+            ChunkGenerator::Generate(g) => g.as_mut(),
+            ChunkGenerator::Hell(g) => g.as_mut(),
         }
     }
 
     /// `populate(provider, x, z)` of the generator. See the module docs for
     /// why this takes the world rather than `&mut self`.
+    ///
+    /// The two terrain generators' `populate` (ChunkProviderGenerate.java:310-603,
+    /// ChunkProviderHell.java:302-359) is WP-1.7; until then it is recorded in
+    /// [`World::skipped_systems`] and changes nothing.
     pub fn populate(world: &mut World, x: i32, z: i32) {
         let _ = (x, z);
         match world.chunk_provider.generator.as_ref() {
             Some(ChunkGenerator::Empty(_)) => {}
+            Some(ChunkGenerator::Generate(_)) => world.skip("ChunkProviderGenerate.populate"),
+            Some(ChunkGenerator::Hell(_)) => world.skip("ChunkProviderHell.populate"),
             None => panic!("ChunkGenerator::populate re-entered during provide_chunk"),
         }
     }

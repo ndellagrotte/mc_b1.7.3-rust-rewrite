@@ -39,6 +39,9 @@
 //!   oracle's per-tick sequence and emits the dumps. Ops and world types the
 //!   port cannot run yet fail with a [`GoldenError::Other`] naming the
 //!   missing Java code.
+//! - [`terrain_driver::drive`] — the drive closure for `kind: "terrain"`
+//!   scenarios: generates each chunk, its 3×3 neighbourhood and the biome
+//!   arrays as `TierA.terrain` does.
 //!
 //! ```no_run
 //! use mc_golden::{run, ScenarioKind, TraceLine};
@@ -63,6 +66,7 @@ pub mod error;
 mod io;
 pub mod runner;
 pub mod scenario;
+pub mod terrain_driver;
 pub mod tick_driver;
 pub mod trace;
 
