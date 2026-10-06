@@ -179,11 +179,13 @@ search (`getClosestPlayer`), item pickup, and the client's `World.randomDisplayU
 (6000 `world.rand` draws per tick), which the tick loop runs for it. A player therefore
 also loads (generates) the 19 × 19 chunks around it on the first tick.
 
-`use_item` and `attack` drive the vanilla controller code without a `Minecraft`:
-`new PlayerControllerSP(null)` (its constructor only stores `mc`; `sendPlaceBlock` and
-`sendUseItem` never touch it) and `EntityPlayer.attackTargetEntityWithCurrentItem`. The
+`use_item`, `interact` and `attack` drive the vanilla controller code without a
+`Minecraft`: `new PlayerControllerSP(null)` (its constructor only stores `mc`;
+`sendPlaceBlock` and `sendUseItem` never touch it), `EntityPlayer.useCurrentItemOnEntity`
+(what `PlayerController.interactWithEntity` calls, inlined in `TickScenario.interact` to
+report `entity.interact(player)`) and `EntityPlayer.attackTargetEntityWithCurrentItem`. The
 ray trace that picks the block or entity (`Minecraft.objectMouseOver`) is replaced by the
-op's coordinates; left-click block breaking (`PlayerControllerSP.clickBlock`, which reads
+op's coordinates or entity id; left-click block breaking (`PlayerControllerSP.clickBlock`, which reads
 `mc.theWorld`/`mc.thePlayer`) is not an op yet.
 
 ### `"world": "empty"`

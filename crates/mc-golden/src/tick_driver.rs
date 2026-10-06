@@ -49,9 +49,10 @@
 //! | `set_weather` | the given fields of [`World::world_info`] (`rain_time`, `raining`, `thunder_time`, `thundering`) |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
-//! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook` and a `Painting` with `direction`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
+//! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook`, a `Painting` with `direction` and a `Minecart` with `type`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
 //! | `attack` | `attack`: `target.attackEntityFrom(attacker or null, damage)` through [`mc_sim::entity::dispatch::attack_entity_from`] (target out of its slot, attacker a copy) → `target_id`, `via` `"direct"`, `result` |
+//! | `interact` | `TickScenario.interact` in `interact`: the stack into slot `currentItem`, `EntityPlayer.useCurrentItemOnEntity` ([`dispatch::interact`] with the player and the target both in hand; when false, `ItemStack.useItemOnEntity` on a living target is a recorded gap, WP-2.6), then `sendUseItem` ([`send_use_item`]) → `id`, `result`, `used`, `stack` |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
@@ -97,6 +98,7 @@
 //! removes `Score` from the player compound before `level.dat` is written.
 
 use mc_sim::block::dispatch as block_dispatch;
+use mc_sim::entity::dispatch;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::player::{new_entity_player_sp, swing_item};
 use mc_sim::golden::{StateValue, entity_state_fields};
@@ -538,9 +540,20 @@ fn apply(
             item,
             pickup_delay,
             direction,
+            minecart_type,
         } => {
-            let mut e = construct(world, h, t, kind, pos, item, pickup_delay, direction)?;
-            if placed_by_op(kind, direction) {
+            let mut e = construct(
+                world,
+                h,
+                t,
+                kind,
+                pos,
+                item,
+                pickup_delay,
+                direction,
+                minecart_type,
+            )?;
+            if placed_by_op(kind, direction, minecart_type) {
                 // `place`: setLocationAndAngles (Entity.java:669-676), yaw/pitch
                 // defaulting to the constructor's.
                 let yaw = yaw.unwrap_or(e.base.rotation_yaw);
@@ -620,6 +633,42 @@ fn apply(
             attacker_id,
             damage,
         } => attack(world, h, t, target_id, attacker_id, damage)?,
+        OpKind::Interact {
+            id,
+            item_id,
+            count,
+            meta,
+        } => {
+            let Some(pid) = h.player else {
+                return Err(GoldenError::other(format!(
+                    "t={t}: interact needs a player op first"
+                )));
+            };
+            loaded_entity(world, t, "interact", id)?;
+            if id == pid {
+                return Err(unsupported(
+                    t,
+                    "interact",
+                    "the target is the player itself (both would have to be in hand)",
+                ));
+            }
+            let r = world.with_entity_mut(pid, |world, p| {
+                interact(world, p, id, item_id.map(|i| (i, count, meta)))
+            });
+            let Some((result, used, stack)) = r else {
+                return Err(unsupported(
+                    t,
+                    "interact",
+                    "the player is no longer in loadedEntityList (the oracle keeps using its \
+                     HarnessPlayer object)",
+                ));
+            };
+            line("interact")
+                .with("id", id)
+                .with("result", result)
+                .with("used", used)
+                .with("stack", stack_json(stack))
+        }
         OpKind::Explode {
             x,
             y,
@@ -708,12 +757,13 @@ fn attack(
 
 /// Whether the `spawn` op places the entity with `setLocationAndAngles`
 /// (`TickScenario.placedByOp`): every kind but `Item`, `LightningBolt`,
-/// `FishingHook` and a `Painting` with a `direction`, whose constructors
-/// take the position.
-fn placed_by_op(kind: &str, direction: Option<i32>) -> bool {
+/// `FishingHook`, a `Painting` with a `direction` and a `Minecart` with a
+/// `type`, whose constructors take the position.
+fn placed_by_op(kind: &str, direction: Option<i32>, minecart_type: Option<i32>) -> bool {
     match kind {
         "Item" | "LightningBolt" | "FishingHook" => false,
         "Painting" => direction.is_none(),
+        "Minecart" => minecart_type.is_none(),
         _ => true,
     }
 }
@@ -734,9 +784,10 @@ fn placed_by_op(kind: &str, direction: Option<i32>) -> bool {
 ///   refused at difficulty 2 and more, where its constructor places fire
 ///   with the oracle's unseeded `rand`), `FishingHook` (`EntityFish(world,
 ///   player)`, needs the `player` op; sets the player's `fishEntity`).
-/// - Any other `EntityList` name: its `(World)` constructor; the mobs, the
-///   minecart and the boat are not transcribed yet (an error naming the
-///   class).
+/// - `Minecart` with `type`: `EntityMinecart(world, x, y, z, type)`
+///   (EntityMinecart.java:57-67, as ItemMinecart.java:16; no draws).
+/// - Any other `EntityList` name: its `(World)` constructor; the mobs are
+///   not transcribed yet (an error naming the class).
 #[allow(clippy::too_many_arguments)]
 fn construct(
     world: &mut World,
@@ -747,10 +798,11 @@ fn construct(
     item: Option<crate::scenario::ItemSpec>,
     pickup_delay: Option<i32>,
     direction: Option<i32>,
+    minecart_type: Option<i32>,
 ) -> Result<mc_sim::entity::Entity, GoldenError> {
     use mc_sim::entity::{
-        arrow, egg, falling_sand, fireball, fish, lightning_bolt, painting, pig, snowball,
-        tnt_primed,
+        arrow, boat, egg, falling_sand, fireball, fish, lightning_bolt, minecart, painting, pig,
+        snowball, tnt_primed,
     };
     let e = match kind {
         "Item" => {
@@ -805,6 +857,9 @@ fn construct(
             floor_double(pos[2]),
             direction.unwrap_or(0),
         ),
+        "Minecart" if minecart_type.is_some() => {
+            minecart::new_entity_minecart(world, pos[0], pos[1], pos[2], minecart_type.unwrap_or(0))
+        }
         _ => {
             let class = ENTITY_LIST
                 .iter()
@@ -822,6 +877,8 @@ fn construct(
                 "EntityTNTPrimed" => tnt_primed::new_entity_tnt_primed_empty(world),
                 "EntityFallingSand" => falling_sand::new_entity_falling_sand_empty(world),
                 "EntityPig" => pig::new_entity_pig(world),
+                "EntityMinecart" => minecart::new_entity_minecart_empty(world),
+                "EntityBoat" => boat::new_entity_boat_empty(world),
                 _ => {
                     return Err(unsupported(
                         t,
@@ -909,6 +966,49 @@ fn use_item(
     }
     let current = player_data(p).inventory.get_current_item().copied();
     (placed, used, current)
+}
+
+/// `TickScenario.interact`: a right click on entity `target` as the player
+/// `p` (in hand), the ENTITY branch of `Minecraft.clickMouse(1)`
+/// (Minecraft.java:800-817, :846-850). Returns `(result, used, stack in slot
+/// currentItem)`.
+///
+/// 1. `stack` (item id, count default 1, damage default 0) replaces hotbar
+///    slot `inventory.currentItem`.
+/// 2. `PlayerController.interactWithEntity` (PlayerController.java:88-90) =
+///    `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469):
+///    `result = target.interact(player)` ([`dispatch::interact`], the target
+///    taken out of its slot too); when false, the held stack's
+///    `useItemOnEntity` on a living target (`Item.saddleEntity`, item
+///    behaviour WP-2.6: recorded, taken as doing nothing, so no stack
+///    reaches size 0 there).
+/// 3. `used = sendUseItem` ([`send_use_item`]) on the slot's stack, if any:
+///    the entity branch leaves `clickMouse`'s `var2` true.
+fn interact(
+    world: &mut World,
+    p: &mut mc_sim::entity::Entity,
+    target: i32,
+    stack: Option<(i32, Option<i32>, Option<i32>)>,
+) -> (bool, bool, Option<ItemStack>) {
+    if let Some((id, count, meta)) = stack {
+        let inv = &mut player_data(p).inventory;
+        // src: ItemStack.java:33-38 (new ItemStack(id, count, damage))
+        inv.main_inventory[inv.current_item as usize] =
+            Some(ItemStack::new(id, count.unwrap_or(1), meta.unwrap_or(0)));
+    }
+    let result = world
+        .with_entity_mut(target, |w, e| {
+            let r = dispatch::interact(e, w, p);
+            if !r && current_item_slot(p).is_some() && e.kind.living().is_some() {
+                // src: EntityPlayer.java:459-466, ItemStack.java:170-172
+                w.note_unimplemented("Item.saddleEntity");
+            }
+            r
+        })
+        .expect("the interact target was found in its slot");
+    let used = current_item_slot(p).is_some_and(|again| send_use_item(world, p, again));
+    let current = player_data(p).inventory.get_current_item().copied();
+    (result, used, current)
 }
 
 /// The `EntityPlayer` level of the `use_item` player.

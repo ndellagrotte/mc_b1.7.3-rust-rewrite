@@ -443,6 +443,11 @@ pub enum OpKind {
         /// wall block `floor(pos)`; absent, the `(World)` constructor.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         direction: Option<i32>,
+        /// For `Minecart`: `minecartType` (0 plain, 1 chest, 2 furnace) of
+        /// the position constructor `EntityMinecart(world, x, y, z, type)`;
+        /// absent, the `(World)` constructor (type 0).
+        #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+        minecart_type: Option<i32>,
     },
     /// Assign `motionX/Y/Z`.
     SetMotion {
@@ -490,6 +495,20 @@ pub enum OpKind {
         z: i32,
         /// Hit face.
         side: i32,
+    },
+    /// Right-click an entity as the player.
+    Interact {
+        /// Target entity id.
+        id: i32,
+        /// Item id replacing hotbar slot `currentItem`, if given.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        item_id: Option<i32>,
+        /// Stack size (default 1).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        count: Option<i32>,
+        /// Damage (default 0).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        meta: Option<i32>,
     },
     /// Attack an entity.
     Attack {

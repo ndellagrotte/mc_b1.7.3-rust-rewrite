@@ -20,6 +20,8 @@ import net.minecraft.src.EntityFish;
 import net.minecraft.src.EntityItem;
 import net.minecraft.src.EntityLightningBolt;
 import net.minecraft.src.EntityList;
+import net.minecraft.src.EntityLiving;
+import net.minecraft.src.EntityMinecart;
 import net.minecraft.src.EntityPainting;
 import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EntitySlime;
@@ -41,7 +43,8 @@ final class TickScenario {
     private TickScenario() {}
 
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
-            "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode");
+            "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode",
+            "interact");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
             "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather");
 
@@ -281,6 +284,9 @@ final class TickScenario {
             case "attack":
                 attack(hw, op, l);
                 break;
+            case "interact":
+                interact(hw, op, l);
+                break;
             case "explode":
                 explode(hw, op, l);
                 break;
@@ -332,12 +338,13 @@ final class TickScenario {
     /**
      * Whether {@code place} runs after construction: not for the kinds whose constructor takes
      * the position ({@code Item}, {@code LightningBolt}, {@code FishingHook}, a {@code Painting}
-     * with a {@code direction}).
+     * with a {@code direction}, a {@code Minecart} with a {@code type}).
      */
     private static boolean placedByOp(Map<String, Object> op) {
         switch (str(op, "kind")) {
             case "Item": case "LightningBolt": case "FishingHook": return false;
             case "Painting": return !op.containsKey("direction");
+            case "Minecart": return !op.containsKey("type");
             default: return true;
         }
     }
@@ -354,7 +361,9 @@ final class TickScenario {
      * EntityFireball.java:19-22), {@code "LightningBolt"} ({@code EntityLightningBolt(World, x, y,
      * z)}, EntityLightningBolt.java:10-34, joined with {@code addWeatherEffect} as World.java:1927
      * does) and {@code "FishingHook"} ({@code EntityFish(World, player)}, EntityFish.java:48-74,
-     * as ItemFishingRod.java:26 does; sets {@code player.fishEntity}).
+     * as ItemFishingRod.java:26 does; sets {@code player.fishEntity}). {@code "Minecart"} with
+     * {@code type} (0 plain, 1 chest, 2 furnace) uses {@code EntityMinecart(World, x, y, z, type)}
+     * (EntityMinecart.java:57-67, as ItemMinecart.java:16 does; no draws).
      */
     private static Entity construct(HarnessWorld hw, Map<String, Object> op, long seed) throws Exception {
         World w = hw.world;
@@ -370,6 +379,9 @@ final class TickScenario {
             return fishingHook(hw, seed);
         } else if (kind.equals("Painting") && op.containsKey("direction")) {
             return painting(w, op, seed);
+        } else if (kind.equals("Minecart") && op.containsKey("type")) {
+            double[] p = Num.vec3(op.get("pos"));
+            e = new EntityMinecart(w, p[0], p[1], p[2], i(op, "type"));
         } else if (kind.equals("Item")) {
             Map<String, Object> it = Dumps.map(op.get("item"), "spawn Item \"item\"");
             double[] p = Num.vec3(op.get("pos"));
@@ -539,6 +551,43 @@ final class TickScenario {
         } else {
             l.put("via", "direct").put("result", target.attackEntityFrom(attacker, i(op, "damage")));
         }
+    }
+
+    /**
+     * Right click on an entity as the player: Minecraft.clickMouse(1), ENTITY branch
+     * (Minecraft.java:800-817), with the op's entity instead of the ray trace. The item stack (if
+     * {@code item_id} is given) goes into hotbar slot {@code inventory.currentItem} first.
+     * PlayerController.interactWithEntity (PlayerController.java:88-90) is
+     * EntityPlayer.useCurrentItemOnEntity (EntityPlayer.java:457-469), inlined here to report
+     * {@code target.interact(player)}: when that is false, the held stack's
+     * {@code useItemOnEntity} (ItemStack.java:170-172) on a living target, and its removal at size
+     * 0 or less. The entity branch leaves clickMouse's {@code var2} true, so
+     * {@code sendUseItem} with the held stack follows (Minecraft.java:846-850).
+     */
+    private static void interact(HarnessWorld hw, Map<String, Object> op, Json.Line l) {
+        EntityPlayer p = hw.player;
+        if (p == null) throw new IllegalArgumentException("interact needs a player op first");
+        Entity target = entity(hw.world, op);
+        InventoryPlayer inv = p.inventory;
+        if (op.containsKey("item_id")) {
+            inv.mainInventory[inv.currentItem] = new ItemStack(i(op, "item_id"),
+                    op.containsKey("count") ? i(op, "count") : 1, meta(op));
+        }
+        boolean result = target.interact(p);
+        if (!result) {
+            ItemStack s = p.getCurrentEquippedItem();
+            if (s != null && target instanceof EntityLiving) {
+                s.useItemOnEntity((EntityLiving) target);
+                if (s.stackSize <= 0) {
+                    s.onItemDestroyedByUse(p);
+                    p.destroyCurrentEquippedItem();
+                }
+            }
+        }
+        ItemStack again = inv.getCurrentItem();
+        boolean used = again != null && new PlayerControllerSP(null).sendUseItem(p, hw.world, again);
+        l.put("id", target.entityId).put("result", result).put("used", used)
+                .raw("stack", Dumps.stack(inv.getCurrentItem()));
     }
 
     /**

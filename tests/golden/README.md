@@ -573,11 +573,12 @@ were not loaded yet (population and moving entities may load more).
 | `set_weather` | `rain_time?`, `raining?`, `thunder_time?`, `thundering?` (int, bool, int, bool) | the `WorldInfo` setters `setRainTime`, `setRaining`, `setThunderTime`, `setThundering` (WorldInfo.java:195-221) for the fields given. A Tier B knob to reach `updateWeather`'s toggles (World.java:1792-1859) without waiting 12000+ ticks | — |
 | `preload` | `cx,cz,radius` | preload square (above) | `loaded` |
 | `player` | `x,y,z` (feet), `yaw?,pitch?` | `new HarnessPlayer(world)`, seeded, `setLocationAndAngles`, `entityJoinedWorld`. At most one | `id`, `joined` |
-| `spawn` | `kind`, `pos:[x,y,z]` (bounding-box bottom), `yaw?,pitch?`, `id?`; for `kind: "Item"`: `item:{id,count,damage?}`, `pickup_delay?` (10); for `kind: "Painting"`: `direction?` (0–3) | `new Entity<kind>(world)` with the class from EntityList's name table (EntityList.java:82-107: `Arrow`, `Snowball`, `Item`, `Painting`, `Mob`, `Monster`, `Creeper`, `Skeleton`, `Spider`, `Giant`, `Zombie`, `Slime`, `Ghast`, `PigZombie`, `Pig`, `Sheep`, `Cow`, `Chicken`, `Squid`, `Wolf`, `PrimedTnt`, `FallingSand`, `Minecart`, `Boat`); `rand.setSeed(mix(seed, id))` (Slime: size and jump delay redrawn); `setLocationAndAngles(x, y, z, yaw, pitch)` (Entity.java:669-676: `posY = y + yOffset`; yaw/pitch default to the constructor's, a `Math.random()` yaw for living entities); `entityJoinedWorld`. `Item` instead uses `new EntityItem(world, x, y, z, stack)` (EntityItem.java:11-21: `Math.random()` yaw and horizontal motion, `motionY` 0.2, position via `setPosition`) and `delayBeforeCanPickup = pickup_delay`, as block drops do (Block.java:355-364). Constructors that take the position (no `setLocationAndAngles` after them) and the harness-defined kinds (below). `id`, if given, must equal the entity id it gets | `id`, `kind` (class simple name), `joined` |
+| `spawn` | `kind`, `pos:[x,y,z]` (bounding-box bottom), `yaw?,pitch?`, `id?`; for `kind: "Item"`: `item:{id,count,damage?}`, `pickup_delay?` (10); for `kind: "Painting"`: `direction?` (0–3); for `kind: "Minecart"`: `type?` (0 plain, 1 chest, 2 furnace) | `new Entity<kind>(world)` with the class from EntityList's name table (EntityList.java:82-107: `Arrow`, `Snowball`, `Item`, `Painting`, `Mob`, `Monster`, `Creeper`, `Skeleton`, `Spider`, `Giant`, `Zombie`, `Slime`, `Ghast`, `PigZombie`, `Pig`, `Sheep`, `Cow`, `Chicken`, `Squid`, `Wolf`, `PrimedTnt`, `FallingSand`, `Minecart`, `Boat`); `rand.setSeed(mix(seed, id))` (Slime: size and jump delay redrawn); `setLocationAndAngles(x, y, z, yaw, pitch)` (Entity.java:669-676: `posY = y + yOffset`; yaw/pitch default to the constructor's, a `Math.random()` yaw for living entities); `entityJoinedWorld`. `Item` instead uses `new EntityItem(world, x, y, z, stack)` (EntityItem.java:11-21: `Math.random()` yaw and horizontal motion, `motionY` 0.2, position via `setPosition`) and `delayBeforeCanPickup = pickup_delay`, as block drops do (Block.java:355-364). Constructors that take the position (no `setLocationAndAngles` after them) and the harness-defined kinds (below). `id`, if given, must equal the entity id it gets | `id`, `kind` (class simple name), `joined` |
 | `set_motion` | `id`, `motion:[x,y,z]` | assigns `motionX/Y/Z` | `id` |
 | `set_pos` | `id`, `pos:[x,y,z]` | `Entity.setPosition` (Entity.java:163-170; `prevPos*` untouched) | `id` |
 | `set_rotation` | `id`, `yaw`, `pitch` | assigns `rotationYaw`/`rotationPitch` (no `% 360`) | `id` |
 | `use_item` | `item_id?`, `count?` (1), `meta?` (0), `x,y,z,side` | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-block branch of `Minecraft.clickMouse(1)` (Minecraft.java:819-850) with the op's hit instead of a ray trace: `PlayerController.sendPlaceBlock` (PlayerController.java:75-82: the block's `blockActivated`, else `ItemStack.useItem` → `Item.onItemUse`); on success `swingItem`; a stack left at size 0 is removed; if nothing was placed, `sendUseItem` (`useItemRightClick`, PlayerController.java:47-61) | `placed`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
+| `interact` | `id`, `item_id?`, `count?` (1), `meta?` (0) | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-entity branch of `Minecraft.clickMouse(1)` (Minecraft.java:800-817, :846-850) with the op's entity instead of the ray trace: `PlayerController.interactWithEntity` (PlayerController.java:88-90) = `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469), `result = entity.interact(player)` (a boat or an empty minecart takes the player on, or puts it off when it already rides it; a furnace minecart takes a coal; a chest minecart opens its GUI), and when that is false the held stack's `useItemOnEntity` on a living entity (ItemStack.java:170-172) and its removal at size ≤ 0; then, as `clickMouse` leaves `var2` true on this branch, `sendUseItem` with the held stack (PlayerController.java:47-61) | `id`, `result`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `attack` | `target_id`, `attacker_id?`, `damage` (unless the attacker is the player) | attacker = the player: `swingItem` then `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814, PlayerController.java:92-94). Otherwise `target.attackEntityFrom(attacker or null, damage)` (Entity.java:746, EntityLiving.java:307) | `target_id`, `via` (`player` \| `direct`), `result` (direct only) |
 | `explode` | `x,y,z` (f64: integer or bit pattern), `size` (f32), `flaming?` (false) | `World.createExplosion(null, x, y, z, size)` (World.java:1518-1520: `newExplosion(…, false)`, Explosion.java:29-164). With `flaming`: the body of `World.newExplosion(null, x, y, z, size, true)` (World.java:1522-1528) with the explosion's `ExplosionRNG` (a clock-seeded `new Random()`, Explosion.java:11, census §2) set to `mix(seed, -6)` before `doExplosionA`; only the fire roll draws it (Explosion.java:118). No exploder: no entity is excluded, the attacker is null. Not part of the implicit preload (WP-1.8) | `destroyed` (size of `destroyedBlockPositions`) |
 | `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` | — then the Tier S lines |
@@ -594,6 +595,7 @@ the same values:
 | `Egg` (harness-defined: EntityList has no egg) | `new EntityEgg(world)` (EntityEgg.java:16-19) | as an EntityList kind | none |
 | `Fireball` (harness-defined) | `new EntityFireball(world)` (EntityFireball.java:19-22): no acceleration | as an EntityList kind | none |
 | `LightningBolt` (harness-defined) | `new EntityLightningBolt(world, x, y, z)` (EntityLightningBolt.java:10-34) | no `setLocationAndAngles`; `world.addWeatherEffect` (World.java:891-894, as World.java:1927 does): it is in `weatherEffects`, never in `loadedEntityList`, so `entity_state` does not list it (its effects show in blocks, struck entities and `rng_state`). Refused at `difficulty` ≥ 2, where the constructor also places fire with the unseeded `rand` (:16-32) | `boltVertex = rand.nextLong()`, `boltLivingTime = rand.nextInt(3) + 1` (:14-15) |
+| `Minecart` with `type` | `new EntityMinecart(world, x, y, z, type)` (EntityMinecart.java:57-67, as ItemMinecart.java:16): `setPosition(x, y + yOffset, z)`, `prevPos` = `(x, y, z)`, still | no `setLocationAndAngles`; `entityJoinedWorld` | none |
 | `FishingHook` (harness-defined) | `new EntityFish(world, player)` (EntityFish.java:48-74, as ItemFishingRod.java:26): needs the `player` op; sets `player.fishEntity`; starts at the player's eyes along its look. `pos` is only used by the implicit preload | no `setLocationAndAngles`; `entityJoinedWorld` | `calculateVelocity`'s three `nextGaussian` (:69-73 rerun from the player's yaw and pitch) |
 
 A bobber dies on its first update unless the player holds a fishing rod (EntityFish.java:145-150):
@@ -1094,6 +1096,41 @@ dump has none of `EntityLiving`'s body yaw and walk state (`renderYawOffset`,
 `entityAge`, `livingSoundTime`, `heartsLife`, `field_9346_af`, `attackedAtYaw`, `air` or
 `fire`: those are pinned only through the `rand`/`Math.random()` streams, health and drops,
 and the body yaw and walk state by `crates/mc-sim/tests/living_entities.rs`.
+
+Minecart and boat (WP-2.4, task 2), empty world, seed 123, `"mob_spawning": "none"`, the
+stone platform unless stated, `rng_state` and `entity_state` every tick (of the vehicles and
+their drops only where a player is present: the player's own update is WP-2.5):
+
+- `entity/minecart-rail-loop` (400 ticks): a 5×5 rail loop with a hump (two slopes) and
+  three powered rails on one torch; the cart, spawned on a slope, runs five laps (the rail
+  matrix, slopes, curves, the 0.06 boost, the yaw reversal).
+- `entity/minecart-powered-brake` (player): an unpowered powered rail brakes a cart to a
+  stop; `use_item` on a lever powers it and the cart is pushed off the end wall (0.02) and
+  boosted.
+- `entity/minecart-detector-rail`: a cart crossing a detector rail powers the neighbouring
+  powered rail (scheduled tick 20 turns both off after it has left); `power` and
+  `scheduled_ticks` every tick.
+- `entity/minecart-derail-collide`: a cart leaves a raised track, hits a wall in the air and
+  lands; two carts meet head-on (`applyEntityCollision`); a cart runs past one parked 0.7 to
+  the side and is blocked by its box while the vanilla bug of the cart-to-cart test
+  (`dz * prevPosX`, EntityMinecart.java:676) skips every push.
+- `entity/minecart-break-drops`: direct `attack`s break a plain, a chest (`type` 1) and a
+  furnace (`type` 2) cart: minecart, chest and furnace items. A chest cart's cargo drop is
+  not pinned (no op fills its inventory).
+- `entity/minecart-furnace-push` (player): `interact` with coal fuels a furnace cart and
+  pushes it away from the player; it runs into a plain and a chest cart (the furnace branches
+  of `applyEntityCollision`) and jams them against a wall; `interact` on the chest cart is
+  the GUI gap.
+- `entity/minecart-player-ride` (player): `interact` puts the player in a cart on a slope; it
+  rides down (the rider's 0.75 move and 0.997 friction); a hit wobbles it, a second breaks it
+  and puts the rider off. Dismounting by `interact` is not pinned: the dismounted player then
+  pushes the cart through `EntityLiving.collideWithNearbyEntities` (WP-2.2, WP-2.5).
+- `entity/boat-on-water` (200 ticks): a 10×10 pool 3 deep, three boats float up (five-slice
+  buoyancy); one is sent diagonally into the rim and breaks (3 planks, 2 sticks), one drifts
+  into the third (boats are solid to each other; `Entity.applyEntityCollision`) and is broken
+  by two direct hits.
+- `entity/boat-player-ride` (player): `interact` puts the player in a boat, which is sent into
+  the rim and breaks with its rider; the run ends before the player could pick up the drops.
 
 Vanilla behaviour these fixtures pin down:
 
