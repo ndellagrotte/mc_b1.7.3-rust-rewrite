@@ -163,6 +163,15 @@ When the chunk has `"full": true`, each `chunk_digest` line is followed by
 
 Chunks are processed strictly in list order on one world, so a later chunk's
 neighbour loading may already have happened; this is part of the fixture.
+
+Committed terrain scenarios: three chunks × three seeds × both dimensions
+(`<dimension>-seed-<seed>`), plus `<dimension>-seed-42-spread` (WP-1.4): 14
+chunks at least four apart (so every `generated` stage is pure generator output
+and no two share a `chunkXZ2Int` key), up to ±1874999, including chunk
+`(784426, 0)`, where the density noise's `(int)` casts saturate (the Far
+Lands), dumped in full. Rust side: `crates/mc-golden/src/terrain_driver.rs`,
+run by `crates/mc-sim/tests/golden_worldgen.rs`, which leaves the `populated`
+lines out of the comparison until population lands (WP-1.7).
 Vanilla quirk this exposes: `ChunkProviderHell.populate` (ChunkProviderHell.java:302)
 never reseeds `hellRNG`; it continues from whatever the last `provideChunk`
 (seeded from chunk coordinates only, not the world seed) and the populations

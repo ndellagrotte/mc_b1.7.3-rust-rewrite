@@ -95,9 +95,11 @@ fixtures! {
     overworld_seed_123 => "overworld-seed-123";
     overworld_seed_neg_4172144991579068934 => "overworld-seed--4172144991579068934";
     overworld_seed_8675309 => "overworld-seed-8675309";
+    overworld_seed_42_spread => "overworld-seed-42-spread";
     nether_seed_123 => "nether-seed-123";
     nether_seed_neg_4172144991579068934 => "nether-seed--4172144991579068934";
     nether_seed_8675309 => "nether-seed-8675309";
+    nether_seed_42_spread => "nether-seed-42-spread";
 }
 
 /// Every `tests/golden/worldgen/<name>` with a `scenario.json` has a test.
