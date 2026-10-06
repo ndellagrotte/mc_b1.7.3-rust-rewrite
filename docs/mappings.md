@@ -57,6 +57,9 @@ mixed-case originals).
 | `RegionFileCache.func_22192_a` | `RegionFileCache::clear_region_file_references` | Closes every cached file and clears the map (RegionFileCache.java:44-61); called at 256 entries (:35-37) and around world conversion (SaveConverterMcRegion.java:50, :154) |
 | `RegionFileChunkBuffer.field_22283_b`, `field_22285_c` | `RegionFileChunkBuffer::chunk_x`, `chunk_z` | The constructor's second and third arguments (RegionFileChunkBuffer.java:11-16), passed back as the chunk coordinates of `RegionFile.write(x, z, buf, count)` on `close` (:18-20); `getChunkDataOutputStream(x, z)` creates it (RegionFile.java:162) |
 | `RegionFileChunkBuffer.field_22284_a` | the `region` argument of `RegionFileChunkBuffer::close` | The synthetic outer `RegionFile` (RegionFileChunkBuffer.java:9, :13), only used to call `write` on close (:19); a Rust value cannot hold it, so `close` takes it |
+| `RailLogic.func_785_b` | `RailLogic::refresh_connected_tracks` (private) | Walks `connectedTracks`, replacing each position by the position of the rail actually found there (same y, one up or one down, `getMinecartTrackLogic`) when that rail's own list contains this rail, and removing the entry otherwise (RailLogic.java:71-81); called on a neighbour's `RailLogic` before asking `handleKeyPress` (:229, :348). Later MCP: `refreshConnectedTracks` |
+| `RailLogic.func_788_d` | `RailLogic::connect_to_neighbor` (private) | Adds the argument's position to `connectedTracks` and writes the shape those connections make (straight, curve for a plain rail, slope toward a rail one up), keeping a powered rail's bit 3 (RailLogic.java:159-222); called on each neighbour that accepts the reshaped rail (:349-351). Later MCP: `connectToNeighbor` |
+| `RailLogic.func_786_c` | `RailLogic::can_connect_from` (private) | `getMinecartTrackLogic(x, y, z)`, then that rail's `func_785_b` and `handleKeyPress(this)`; false when no rail is there (RailLogic.java:224-232). `refreshTrackShape` asks it for the four horizontal neighbours (:235-238). Later MCP: `canConnectFrom` |
 
 ## Kept (meaning documented)
 
@@ -132,6 +135,7 @@ mixed-case originals).
 | `WorldGenBigTree.func_524_a` | `WorldGenBigTree::func_524_a` | Walks a line: -1 if it is clear (air and leaves), else the distance to the first obstruction (:258-300) |
 | `WorldGenBigTree.func_519_e` | `WorldGenBigTree::func_519_e` | Site check: grass or dirt below, at least 6 clear blocks up (:302-319) |
 | `WorldGenerator.func_517_a`, `WorldGenBigTree.func_517_a` | `WorldGen::func_517_a`, `WorldGenBigTree::func_517_a` | Scale hook, empty except in the big tree (height-limit bound, branch length, node count); population calls it with `(1, 1, 1)` (WorldGenerator.java:8-9, WorldGenBigTree.java:321-329, ChunkProviderGenerate.java:450) |
+| `RailLogic.handleKeyPress(RailLogic)` | `RailLogic::handle_key_press` | An MCP misnomer kept as the Java name (later MCP: `canConnectTo`): whether this rail can take the argument as a connection, i.e. already connected, or fewer than two connections (RailLogic.java:146-157; its last branch is `true` either way) |
 
 ## Real names changed for Rust
 
@@ -173,6 +177,9 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `super.shouldSideBeRendered` in `BlockFluid.shouldSideBeRendered` | a `base: fn(&mut World, id, x, y, z, side) -> bool` argument, passed by the dispatch | the base body is private to `block::dispatch` |
 | `BlockFire.chanceToEncourageFire` / `abilityToCatchFire` (instance fields of `Block.fire`) | `block::CHANCE_TO_ENCOURAGE_FIRE` / `block::ABILITY_TO_CATCH_FIRE` | written once by `initializeBlock` (BlockFire.java:14-24), so immutable data |
 | `BlockLeaves.baseIndexInPNG`, `BlockBreakable.localFlag`, `BlockRail.isPowered` (detector rail) | `BlockDef::base_index_in_png`, `BlockKind::breakable_local_flag`, `BlockKind::rail_is_powered` | constructor arguments that are constant per kind, derived instead of stored |
+| `RailLogic.worldObj`, `RailLogic.rail` (synthetic outer `BlockRail`) | the `world` argument of each `RailLogic` method; not ported | a Rust value cannot hold the world; `rail` is only passed on to the `RailLogic`s it builds and never read (RailLogic.java:14, :17, :95-99), whether a track is powered comes from the block at its position (:23-30) |
+| `BlockRail.isPoweredBlockRail(BlockRail)`, `RailLogic.getNAdjacentTracks(RailLogic)` (synthetic static accessors) | `BlockKind::rail_is_powered`, `RailLogic::get_adjacent_tracks` (public) | the compiler's accessors of the private `isPowered` / `getAdjacentTracks` (BlockRail.java:251-254, RailLogic.java:358-361) |
+| `((BlockRail) Block.blocksList[id]).getIsPowered()` | `block::rail::get_is_powered(id)` | a free function over the id; the cast's exception for a non-rail id becomes `false` (callers test `isRailBlock` first, EntityMinecart.java:213-224) |
 | `Block.blockConstructorCalled` | `BlockDef::block_constructor_called` | snake_case; always true, never read |
 | `PistonBlockTextures.faceToSide`, `ModelBed.bedDirection` | `block::FACE_TO_SIDE`, `block::BED_DIRECTION` (private) | the two tables the block texture functions read; the rest of `PistonBlockTextures` is the pistons task's |
 | `World.getWorldChunkManager()` / `WorldProvider.worldChunkMgr` | `World::get_world_chunk_manager` / `WorldProvider::world_chunk_mgr` (`Option`) | built on first use for the surface, because `WorldProvider::new` runs before the world seed is known (`world/provider.rs` module docs) |
