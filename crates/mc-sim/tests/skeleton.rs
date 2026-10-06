@@ -79,12 +79,8 @@ fn set_block_get_block_round_trip_and_height_map() {
     assert!(!w.set_block(0, 128, 0, 1));
     assert_eq!(w.get_block_id(0, -1, 0), 0);
     assert_eq!(w.get_block_id(32_000_000, 64, 0), 0);
-    // The light queue is a stub that records itself.
-    assert!(
-        w.skipped_systems
-            .borrow()
-            .contains_key("World.scheduleLightingUpdate")
-    );
+    // The block changes queued light updates (WP-1.3; Chunk.java:260-263).
+    assert!(!w.lighting_to_update().is_empty());
 }
 
 #[test]

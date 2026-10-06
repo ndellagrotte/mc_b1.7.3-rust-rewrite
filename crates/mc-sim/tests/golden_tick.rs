@@ -1,4 +1,5 @@
-//! Tier B/C golden fixtures (`tests/golden/tick/*`, `tests/golden/entity/*`)
+//! Tier B/C golden fixtures (`tests/golden/tick/*`, `tests/golden/entity/*`,
+//! `tests/golden/light/*`)
 //! run through `mc_golden::tick_driver::drive` and compared with the Java
 //! oracle's `expected.jsonl` (PLAN_v4 §4, tests/golden/README.md "Tier B/C/S").
 //!
@@ -51,26 +52,29 @@ fixtures! {
     #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then EntityPig and water physics, generated sand (BlockSand/EntityFallingSand)"]
     entity_pig_falls => "entity" / "pig-falls";
 
+    // ---- tests/golden/light (WP-1.3) -------------------------------------------------
+    light_blocklight_glowstone => "light" / "blocklight-glowstone";
+    light_chunk_border => "light" / "chunk-border";
+    light_occlusion => "light" / "occlusion";
+    light_skylight_column => "light" / "skylight-column";
+
     // ---- tests/golden/tick -------------------------------------------------------
     #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then use_item: HarnessPlayer, PlayerController.sendPlaceBlock, ItemDye.onItemUse, BlockSapling.growTree"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace)"]
     tick_empty_world_20 => "tick" / "empty-world-20";
-    #[ignore = "BlockFlowing.onBlockAdded/updateTick (WP-1.5): first diff line 9 (t=4 scheduled_ticks count 0, expected 5); then World.updatingLighting (WP-1.3)"]
+    #[ignore = "BlockFlowing.onBlockAdded/updateTick (fluids task of WP-1.6): first diff line 9 (t=4 scheduled_ticks count 0, expected 5). Lighting (WP-1.3) is in"]
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
-    #[ignore = "World.scheduleLightingUpdate/updatingLighting (WP-1.3): first diff line 8 (t=0 block 0,61,0 skylight 0, expected 14: the column under the sand is not lit sideways); with BlockSand/EntityFallingSand (in progress) the other 101 lines already match"]
     tick_flat_sand_falls => "tick" / "flat-sand-falls";
-    #[ignore = "World.scheduleLightingUpdate/updatingLighting (WP-1.3): first diff line 8 (t=0 blocks_full blocklight all 0, expected the torch's spread 6,5,4..)"]
     tick_flat_torch_light => "tick" / "flat-torch-light";
-    #[ignore = "World.scheduleLightingUpdate/updatingLighting (WP-1.3): first diff line 30 (t=79 chunk_digest 0,0 skylight; sky light does not spread sideways under the stone platform). Every block_box dump (lines 8-29, incl. skylight in y 60..62) already matches"]
     tick_flat_water_flow => "tick" / "flat-water-flow";
     #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then HarnessPlayer (WP-2.5), BlockSapling random ticks, SpawnerAnimals.performSpawning (WP-2.3)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then BlockFlowing (WP-1.5), lighting (WP-1.3)"]
+    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then BlockFlowing (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
 }
 
-/// Every `tests/golden/{tick,entity}/<name>` with a `scenario.json` has a test
+/// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test
 /// function above (and every test names an existing fixture).
 #[test]
 fn every_tick_and_entity_fixture_has_a_test() {
@@ -80,7 +84,7 @@ fn every_tick_and_entity_fixture_has_a_test() {
         .filter_map(|dir| {
             let name = dir.file_name()?.to_str()?.to_string();
             let area = dir.parent()?.file_name()?.to_str()?.to_string();
-            (area == "tick" || area == "entity").then_some((area, name))
+            matches!(area.as_str(), "tick" | "entity" | "light").then_some((area, name))
         })
         .collect();
     on_disk.sort();
@@ -91,11 +95,11 @@ fn every_tick_and_entity_fixture_has_a_test() {
     covered.sort();
     assert!(
         !on_disk.is_empty(),
-        "no tick/entity fixtures found under tests/golden"
+        "no tick/entity/light fixtures found under tests/golden"
     );
     assert_eq!(
         on_disk, covered,
-        "tests/golden/{{tick,entity}} fixtures and the fixtures! list in tests/golden_tick.rs differ"
+        "tests/golden/{{tick,entity,light}} fixtures and the fixtures! list in tests/golden_tick.rs differ"
     );
 }
 

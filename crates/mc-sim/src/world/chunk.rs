@@ -23,13 +23,27 @@
 //! # Lighting
 //!
 //! The chunk-local light code (`generateHeightMap`, `generateSkylightMap`,
-//! `relightBlock`, `propagateSkylightOcclusion`) is transcribed because
-//! `setBlockID` runs it and it decides the height map. What it calls into the
-//! world — `World.scheduleLightingUpdate` — is a recorded stub until WP-1.3
-//! ([`World::schedule_lighting_update`]), so sky light outside the column
-//! updates done here and all block light are not yet right.
+//! `relightBlock`, `propagateSkylightOcclusion`, `checkSkylightNeighborHeight`)
+//! sets sky light straight down a column and keeps the height map; everything
+//! sideways goes through the world's light queue
+//! ([`World::schedule_lighting_update`], [`super::lighting`]), which
+//! `setBlockID`/`setBlockIDWithMetadata` feed with one box per light type.
+//!
+//! # Not ported here
+//!
+//! - `setChunkData` (Chunk.java:552-596): fills the arrays from a network
+//!   packet (`Packet51MapChunk`); multiplayer, deferred (PLAN_v4 D3).
+//! - `removeUnknownBlocks` (Chunk.java:606-608, `ChunkBlockMap`): chunk
+//!   loading, WP-1.9.
+//! - `getEntitiesOfTypeWithinAAAB` (Chunk.java:512-534): the class-filtered
+//!   query belongs with the entity queries (`world/entities.rs`), not yet needed.
+//! - `func_1014_a` (Chunk.java:64-65) and `func_4143_d` (Chunk.java:133-134):
+//!   empty in `Chunk` (only `EmptyChunk` overrides them, also empty); their
+//!   call sites (ChunkLoader.java:173, ChunkProvider.java:48) need not call
+//!   anything.
 
 use mc_core::java_hash::{ChunkPosition, JavaHashMap};
+use mc_core::java_random::JavaRandom;
 use mc_core::math::floor_double;
 
 use super::World;
@@ -271,6 +285,24 @@ impl Chunk {
         self.is_modified
     }
 
+    /// `getRandomWithSeed(salt)`: a `Random` seeded from the world seed and
+    /// the chunk position (slime chunks, EntitySlime.java:136). The products
+    /// are `int` arithmetic widened afterwards, except `z * z`, which is
+    /// widened before the multiplication by `4392871L`; `^ salt` applies to
+    /// the whole sum (Java precedence).
+    // src: Chunk.java:598-600
+    pub fn get_random_with_seed(&self, world_seed: i64, var1: i64) -> JavaRandom {
+        let x = self.x_position;
+        let z = self.z_position;
+        let seed = world_seed
+            .wrapping_add(x.wrapping_mul(x).wrapping_mul(4987142) as i64)
+            .wrapping_add(x.wrapping_mul(5947611) as i64)
+            .wrapping_add((z.wrapping_mul(z) as i64).wrapping_mul(4392871))
+            .wrapping_add(z.wrapping_mul(389711) as i64)
+            ^ var1;
+        JavaRandom::new(seed)
+    }
+
     /// `isEmpty()`: false (only `EmptyChunk` overrides it).
     // src: Chunk.java:602-604
     pub fn is_empty(&self) -> bool {
@@ -427,6 +459,9 @@ fn relight_block(world: &mut World, cx: i32, cz: i32, x: i32, y: i32, z: i32) {
     if var5 == var4 {
         return;
     }
+    // vanilla bug: chunk-local x/z are passed where world coordinates are
+    // expected, so the render update marks a column in chunk (0, 0)'s area
+    // (Chunk.java:169). Only the client's render queue sees it.
     world.mark_blocks_dirty_vertical(x, z, var5, var4);
     let (var7, var8) = {
         let c = world.chunk_mut(cx, cz);
@@ -621,6 +656,30 @@ pub fn get_chunk_block_tile_entity(
             None
         }
         other => other,
+    }
+}
+
+/// `addTileEntity(tileEntity)`: files a tile entity by its world
+/// coordinates (chunk loading, ChunkLoader.java:196-204); also adds it to
+/// `loadedTileEntityList` when the chunk is loaded.
+// src: Chunk.java:423-432
+pub fn add_tile_entity(world: &mut World, cx: i32, cz: i32, te: TileEntityRef) {
+    let Some(t) = world.tile_entities.get(&te) else {
+        return;
+    };
+    let (tx, ty, tz) = (t.x_coord, t.y_coord, t.z_coord);
+    let (var2, var3, var4, loaded) = {
+        let c = world.chunk_mut(cx, cz);
+        (
+            tx - c.x_position * 16,
+            ty,
+            tz - c.z_position * 16,
+            c.is_chunk_loaded,
+        )
+    };
+    set_chunk_block_tile_entity(world, cx, cz, var2, var3, var4, te);
+    if loaded {
+        world.loaded_tile_entity_list.push(te);
     }
 }
 

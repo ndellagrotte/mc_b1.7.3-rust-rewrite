@@ -3,7 +3,7 @@
 //!
 //! Split by topic: this file has the struct, the constructor and block
 //! access; `world/entities.rs` the entity list and the take/put-back driver;
-//! [`chunk_provider`] chunk loading; [`lighting`] the light stubs;
+//! [`chunk_provider`] chunk loading; [`lighting`] the light-update queue;
 //! `crate::tick` the per-tick `World.tick`.
 //!
 //! # Conventions
@@ -70,7 +70,7 @@ pub struct World {
     /// `scheduledUpdatesAreImmediate`.
     // src: World.java:13
     pub scheduled_updates_are_immediate: bool,
-    /// `lightingToUpdate` (stays empty until WP-1.3, see [`lighting`]).
+    /// `lightingToUpdate`: the light-update queue, run newest first ([`lighting`]).
     // src: World.java:14
     pub(crate) lighting_to_update: Vec<MetadataChunkBlock>,
     /// `loadedEntityList`, in Java list order (module docs of [`crate::entity`]).
