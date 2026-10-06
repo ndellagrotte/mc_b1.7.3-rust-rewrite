@@ -1186,6 +1186,19 @@ their drops only where a player is present: the player's own update is WP-2.5):
   on a ledge (out of water it falls and tips over), one drops into the pool and is killed by a
   direct hit (1-3 ink sacs, `dropFewItems`). The constructor's `rotationVelocity` draw is the
   oracle join hook's redraw (census §3).
+- `entity/squid-flowing-water` (WP-2.3, 300 ticks, no player): a 1-wide stone channel whose
+  flowing-water source spreads along +x (metas 1-7, `block_box` at t = 49); two squids spawned
+  in the current at t = 50 get `EntitySquid.isInWater`'s `handleMaterialAcceleration` push (a
+  non-zero flow vector, 0.014 per call, twice a tick: the first call's push goes into
+  `moveEntityWithHeading`).
+- `tick/mob-spawner-spawn-grass` (WP-2.3, 120 ticks): `TileEntityMobSpawner`'s successful spawn
+  on a lit grass pad (two pigs join at t = 20: `entityJoinedWorld`, the 20 particle triples,
+  `spawnExplosionParticle`, `updateDelay`, the loop going on after a spawn). The player stands
+  12.5 blocks above the spawner, out of the pigs' 8-block look range (`faceEntity` would read
+  `EntityPlayer.getEyeHeight`, WP-2.5).
+- `tick/mob-spawner-cap` (WP-2.3, 30 ticks): six pigs spawned inside the spawner's box; at t = 20
+  the first try constructs a pig, counts 6 and takes `updateDelay` and `return` (no placement
+  draw).
 - `tick/natural-spawn-squid` (WP-2.3, player, difficulty 0): `SpawnerAnimals.performSpawning`
   with mobs that join: a pool more than 24 blocks from the player and the spawn point fills
   with squid packs (construction through `EntityList`'s table, `setLocationAndAngles`,

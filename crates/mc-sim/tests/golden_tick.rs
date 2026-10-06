@@ -70,6 +70,7 @@ fixtures! {
     entity_minecart_player_ride => "entity" / "minecart-player-ride";
     // WP-2.3 (squid, water mobs, spawn rules).
     entity_squid_swim => "entity" / "squid-swim";
+    entity_squid_flowing_water => "entity" / "squid-flowing-water";
     entity_minecart_furnace_push => "entity" / "minecart-furnace-push";
     entity_painting_art => "entity" / "painting-art";
     #[ignore = "EntityPlayer.attackTargetEntityWithCurrentItem (WP-2.5): lines 1-25 match (the pig's and the player's EntityLiving updates, t=0..9); the driver stops at line 26 (t=10 op attack, via player: the player punch). The t=20 direct hit (EntityLiving.attackEntityFrom) is transcribed and pinned by entity/pig-knockback"]
@@ -143,6 +144,8 @@ fixtures! {
     tick_furnace_idle => "tick" / "furnace-idle";
     tick_mob_spawner_delay => "tick" / "mob-spawner-delay";
     tick_mob_spawner_spawn => "tick" / "mob-spawner-spawn";
+    tick_mob_spawner_spawn_grass => "tick" / "mob-spawner-spawn-grass";
+    tick_mob_spawner_cap => "tick" / "mob-spawner-cap";
     tick_note_jukebox_activate => "tick" / "note-jukebox-activate";
     tick_sign_pops_off => "tick" / "sign-pops-off";
     tick_empty_world_20 => "tick" / "empty-world-20";

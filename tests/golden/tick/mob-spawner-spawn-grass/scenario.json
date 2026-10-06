@@ -1,0 +1,10 @@
+{"name":"mob-spawner-spawn-grass","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":120,
+ "mob_spawning":"none",
+ "comment":"WP-2.3 TileEntityMobSpawner's successful spawn (TileEntityMobSpawner.java:57-80): tick/mob-spawner-spawn on a grass pad (id 2, x, z in -8..8, y = 60) in daylight (world time 0: sky light 15 above the pad), so a Pig placed at y = 61 on the pad passes EntityAnimal.getCanSpawnHere. From t=20: each of the four tries constructs a Pig through EntityList, counts the pigs in the spawner's box, draws the placement and yaw; one that can spawn joins (entityJoinedWorld; its rand seeded by the join hook), then the 20 particle triples (nextFloat x 3 on World.rand), spawnExplosionParticle on the pig's own rand, and updateDelay (200 + nextInt(600)); the loop goes on with the remaining tries (no return after a spawn). The player stands on a stone block at (3, 73, 3), 12.5 blocks above the spawner's centre (within anyPlayerInRange's 16) and more than 8 from every pig, so no pig faces it (EntityLiving.updatePlayerActionState's getClosestPlayerToEntity(8): faceEntity would read EntityPlayer.getEyeHeight, WP-2.5). After the burst the delay counts down. The pigs then wander (EntityCreature AI). rng_state and entity_state of all every tick.",
+ "ops":[{"t":0,"op":"set_time","time":0},
+        {"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":2},
+        {"t":0,"op":"set_block_silent","x":3,"y":73,"z":3,"id":1},
+        {"t":0,"op":"player","x":"0x400c000000000000","y":74,"z":"0x400c000000000000"},
+        {"t":0,"op":"set_block","x":3,"y":61,"z":3,"id":52}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

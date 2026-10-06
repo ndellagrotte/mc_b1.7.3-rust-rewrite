@@ -1,0 +1,11 @@
+{"name":"squid-flowing-water","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":300,"mob_spawning":"none",
+ "comment":"WP-2.3 (squid in a current): EntitySquid.isInWater's handleMaterialAcceleration push (EntitySquid.java:67-69; a query with a side effect, transcribed vanilla bug) with a non-zero flow vector. A stone channel (floor y = 59, x -1..11, z -1..1; walls at y = 60 on z = -1, z = 1, x = -1, x = 11) gets a flowing-water source (id 8, meta 0) at (0, 60, 0) at t=0; it spreads along +x (metas 1..7 at x = 1..7) by about t=40. At t=50 two squids are spawned in the current (x = 3.5 and 5.5, y = 60, z = 0.5): every tick EntityLiving.onLivingUpdate's isInWater (EntityLiving.java:627) adds the 0.014 push along the flow before moveEntityWithHeading, and EntitySquid.onLivingUpdate's own call (EntitySquid.java:85) adds it again before the swim motion is assigned (in water) or kept (out of water). No player; chunks within 3 preloaded. block_box of the channel at t=49 (the current's metas), rng_state and entity_state of all every tick.",
+ "ops":[{"t": 0, "op": "preload", "cx": 0, "cz": 0, "radius": 3},
+        {"t": 0, "op": "fill", "x0": -1, "y0": 59, "z0": -1, "x1": 11, "y1": 60, "z1": 1, "id": 1},
+        {"t": 0, "op": "fill", "x0": 0, "y0": 60, "z0": 0, "x1": 10, "y1": 60, "z1": 0, "id": 0},
+        {"t": 0, "op": "set_block", "x": 0, "y": 60, "z": 0, "id": 8},
+        {"t": 50, "op": "spawn", "kind": "Squid", "pos": ["0x400c000000000000", 60, "0x3fe0000000000000"], "id": 0},
+        {"t": 50, "op": "spawn", "kind": "Squid", "pos": ["0x4016000000000000", 60, "0x3fe0000000000000"], "id": 1}],
+ "dumps":[{"t": 49, "what": "block_box", "x0": -1, "y0": 60, "z0": 0, "x1": 11, "y1": 60, "z1": 0},
+          {"every": 1, "what": "rng_state"},
+          {"every": 1, "what": "entity_state", "which": "all"}]}
