@@ -18,7 +18,7 @@
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer` | layout only (WP-2.5) |
 //! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | traits + `NoSave`; McRegion container in progress (WP-1.9) |
-//! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4); population (`WorldGen*`, `populate`) is WP-1.7 |
+//! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4), trees (WP-1.6b), population ([`worldgen::populate`], [`worldgen::features`]) done (WP-1.7) |
 //! | [`golden`] | — | read-only views in the golden-trace shapes |
 //!
 //! `worldgen` is the plan's `gen`, renamed because `gen` is a reserved keyword

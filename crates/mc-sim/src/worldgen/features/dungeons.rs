@@ -147,26 +147,36 @@ impl WorldGenDungeons {
                     }
                     if var15 == 1 {
                         world.set_block_with_notify(var12, y, var14, ids::CHEST);
-                        // Java casts to TileEntityChest (a ClassCastException
-                        // or NullPointerException if anything else is there).
-                        let var16 = world
-                            .get_block_tile_entity(var12, y, var14)
-                            .expect("WorldGenDungeons: the chest has no tile entity");
+                        // src: WorldGenDungeons.java:78 (the cast happens once,
+                        // before any loot is drawn: a null tile entity passes it,
+                        // anything but a TileEntityChest throws
+                        // ClassCastException). Unreachable either way: the survey
+                        // needs a solid floor and ceiling, so y is in 1..=123 and
+                        // setBlockWithNotify(chest) always creates the chest.
+                        let var16 = world.get_block_tile_entity(var12, y, var14);
+                        if let Some(r) = var16 {
+                            let t = world.tile_entities.get(&r).expect("tile entity in store");
+                            assert!(
+                                matches!(t.kind, TileEntityKindData::Chest(_)),
+                                "WorldGenDungeons: ClassCastException (not a TileEntityChest)"
+                            );
+                        }
                         for _var17 in 0..8 {
                             let var18 = pick_check_loot_item(world, rand);
                             if let Some(stack) = var18 {
-                                let size = {
-                                    let t = world
+                                // src: WorldGenDungeons.java:88 (a null var16 is a
+                                // NullPointerException here, only for a non-null item)
+                                let var16 = var16.expect(
+                                    "WorldGenDungeons: NullPointerException (no TileEntityChest)",
+                                );
+                                let size = tile_entity::get_size_inventory(
+                                    &world
                                         .tile_entities
                                         .get(&var16)
-                                        .expect("tile entity in store");
-                                    assert!(
-                                        matches!(t.kind, TileEntityKindData::Chest(_)),
-                                        "WorldGenDungeons: ClassCastException (not a TileEntityChest)"
-                                    );
-                                    tile_entity::get_size_inventory(&t.kind)
-                                        .expect("a chest is an IInventory")
-                                };
+                                        .expect("tile entity in store")
+                                        .kind,
+                                )
+                                .expect("a chest is an IInventory");
                                 // vanilla bug: the slot is drawn without checking
                                 // it is free, so a later item can replace an
                                 // earlier one.
