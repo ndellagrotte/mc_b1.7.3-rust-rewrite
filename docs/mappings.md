@@ -113,7 +113,7 @@ mixed-case originals).
 | `World.field_1012_M` | — (local `Vec`) | Scratch list returned by `getEntitiesWithinAABBExcludingEntity` (World.java:55, :2013-2029) |
 | `Entity.field_9293_aM` | `EntityBase::field_9293_a_m` | When false, a collision on any axis zeroes the whole move (Entity.java:348-377, :398-428); initialised true (:83) and never cleared in vanilla |
 | `EntityItem.field_803_e` | `ItemData::field_803_e` | Incremented every tick (EntityItem.java:71), never read |
-| `PathEntity.func_22328_c` | `PathEntity::func_22328_c` | Returns the last point, or `null` for an empty path (PathEntity.java:21-23); no caller in the client tree (the server tree uses it), so the meaning ("final point") is clear but unused |
+| `PathEntity.func_22328_c` | `PathEntity::func_22328_c` | Returns the last point, or `null` for an empty path (PathEntity.java:21-23); its one caller, `SpawnerAnimals.performSleepSpawning` (SpawnerAnimals.java:231, WP-2.3), tests whether a night monster's path ends next to the sleeping player: "final point". Name kept |
 | `BlockRedstoneOre.field_468_a` | `BlockKind::RedstoneOre { field_468_a }` | True for the glowing ore (id 74): the constructor enables random ticks only then (BlockRedstoneOre.java:8-15); pinned per block by `block/block-table` (`fields.field_468_a`) |
 | `TileEntity.field_31007_h` | `TileEntity::field_31007_h` | The "invalid" flag: `isInvalid()` returns it, `invalidate()`/`validate()` set it (TileEntity.java:88-98) |
 | `TileEntitySign.field_25062_c` | `TileEntitySign::field_25062_c` | Private, `true` when constructed, set to `false` at the start of `readFromNBT` (TileEntitySign.java:6, :17); nothing reads it, so it marks "came from a save" at most (WP-1.8) |
