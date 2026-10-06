@@ -16,9 +16,6 @@ use super::{Material, ids};
 use crate::entity::Entity;
 use crate::world::World;
 
-/// `Block.crops.blockID` (Block.java:651).
-const CROPS: i32 = 59;
-
 /// `getCollisionBoundingBoxFromPool(world, x, y, z)`: a full cube, although
 /// the block's bounds are 15/16 high.
 // src: BlockFarmland.java:14-16
@@ -69,7 +66,7 @@ fn is_crops_nearby(world: &mut World, x: i32, y: i32, z: i32) -> bool {
     let var5 = 0;
     for var6 in (x - var5)..=(x + var5) {
         for var7 in (z - var5)..=(z + var5) {
-            if world.get_block_id(var6, y + 1, var7) == CROPS {
+            if world.get_block_id(var6, y + 1, var7) == ids::CROPS {
                 return true;
             }
         }

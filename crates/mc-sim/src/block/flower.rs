@@ -21,9 +21,6 @@ use super::dispatch;
 use super::{BlockKind, ids};
 use crate::world::World;
 
-/// `Block.tilledField.blockID` (Block.java:652).
-const TILLED_FIELD: i32 = 60;
-
 /// The base `Block.canPlaceBlockAt`: the target is air or ground cover
 /// (`super.canPlaceBlockAt` of `BlockFlower` and `BlockCactus`; the
 /// dispatch's base arm is not reachable from here).
@@ -41,10 +38,10 @@ pub(super) fn base_can_place_block_at(world: &mut World, x: i32, y: i32, z: i32)
 // BlockMushroom.java:29-31
 pub fn can_this_plant_grow_on_this_block_id(kind: BlockKind, var1: i32) -> bool {
     match kind {
-        BlockKind::Crops => var1 == TILLED_FIELD,
+        BlockKind::Crops => var1 == ids::TILLED_FIELD,
         BlockKind::DeadBush => var1 == ids::SAND,
         BlockKind::Mushroom => super::opaque_cube_lookup(var1),
-        _ => var1 == ids::GRASS || var1 == ids::DIRT || var1 == TILLED_FIELD,
+        _ => var1 == ids::GRASS || var1 == ids::DIRT || var1 == ids::TILLED_FIELD,
     }
 }
 

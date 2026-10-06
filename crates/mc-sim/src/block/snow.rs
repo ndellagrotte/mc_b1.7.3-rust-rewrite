@@ -16,17 +16,13 @@
 use mc_core::Aabb;
 
 use super::dispatch;
+use super::ids::{WATER_MOVING, WATER_STILL};
 use super::leaves::{base_harvest_block, base_should_side_be_rendered};
 use crate::entity::Entity;
 use crate::entity::item::new_entity_item;
 use crate::item::{ItemStack, ids as items};
 use crate::world::World;
 use crate::world::lighting::EnumSkyBlock;
-
-/// `Block.waterMoving.blockID` (Block.java:600).
-const WATER_MOVING: i32 = 8;
-/// `Block.waterStill.blockID` (Block.java:601).
-const WATER_STILL: i32 = 9;
 
 /// `BlockSnow.getCollisionBoundingBoxFromPool(world, x, y, z)`: none below 3
 /// layers (`meta & 7 < 3`), else the block's current bounds in x and z and

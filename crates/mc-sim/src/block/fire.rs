@@ -26,15 +26,9 @@
 use mc_core::JavaRandom;
 
 use super::dispatch::{self, RandomSource};
+use super::ids::{NETHERRACK, OBSIDIAN, TNT};
 use super::{ABILITY_TO_CATCH_FIRE, CHANCE_TO_ENCOURAGE_FIRE};
 use crate::world::World;
-
-/// `Block.netherrack.blockID` (Block.java:679).
-const NETHERRACK: i32 = 87;
-/// `Block.tnt.blockID` (Block.java:638).
-const TNT: i32 = 46;
-/// `Block.obsidian.blockID` (Block.java:641).
-const OBSIDIAN: i32 = 49;
 
 /// `tickRate()`.
 // src: BlockFire.java:51-53

@@ -1050,7 +1050,11 @@ pub mod ids {
     pub const SAND_STONE: i32 = 24; // Block.java:616
     pub const RAIL_POWERED: i32 = 27;
     pub const STAIR_SINGLE: i32 = 44;
-    pub const OBSIDIAN: i32 = 49;
+    pub const TNT: i32 = 46; // Block.java:638
+    pub const OBSIDIAN: i32 = 49; // Block.java:641
+    pub const FIRE: i32 = 51; // Block.java:643
+    pub const CROPS: i32 = 59; // Block.java:651
+    pub const TILLED_FIELD: i32 = 60; // farmland, Block.java:652
     pub const ICE: i32 = 79; // Block.java:671
     pub const NETHERRACK: i32 = 87; // Block.java:679
     pub const SLOW_SAND: i32 = 88; // soul sand, Block.java:680

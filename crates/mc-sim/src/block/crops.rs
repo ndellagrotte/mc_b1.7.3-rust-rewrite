@@ -15,12 +15,10 @@ use mc_core::java_random::JavaRandom;
 
 use super::dispatch::{self, RandomSource};
 use super::flower;
+use super::ids::TILLED_FIELD;
 use crate::entity::item::new_entity_item;
 use crate::item::{ItemStack, ids as items};
 use crate::world::World;
-
-/// `Block.tilledField.blockID` (Block.java:652).
-const TILLED_FIELD: i32 = 60;
 
 /// `updateTick(world, x, y, z, rand)`: `BlockFlower.updateTick`, then in
 /// light 9 or more a one in `(int)(100 / growthRate)` chance to grow a stage.

@@ -733,9 +733,9 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   `block_box` of the platform and the layer above at t = 150 and the end.
 - `tick/weather-ice` (`"mob_spawning": "none"`): the same platform with still water at
   every even x and even z (stone on four sides and below, so a freeze notifies no block
-  override), default weather (no rain within 600 ticks, so no snow can land on water:
-  `BlockSnow.canPlaceBlockAt` is not transcribed); the snow roll freezes water on Taiga
-  columns only. `weather` every 10, `rng_state` every tick, `block_box` at t = 299 and the
+  override), default weather (no rain within 600 ticks; even under rain
+  `BlockSnow.canPlaceBlockAt` refuses water, which is not an opaque cube); the snow roll
+  freezes water on Taiga columns only. `weather` every 10, `rng_state` every tick, `block_box` at t = 299 and the
   end.
 - `tick/use-item-noop` (`"mob_spawning": "none"`, WP-1.6 prep): the stone platform and a
   player; `use_item` on the top face of a platform block at t = 1 with an empty hand and at
@@ -802,6 +802,23 @@ another task), and none dumps the player's `entity_state` (WP-2.5):
   netherrack forever; on obsidian `onBlockAdded` asks `BlockPortal.tryToCreatePortal` (no
   frame: false; the Rust port records it as a gap and answers false); on glass and in the
   air removed at once.
+- `tick/fire-farmland-rain`: the rain branches (`canBlockBeRainedOn`, World.java:2449-2459;
+  every platform column is a rainy biome at seed 123). `set_weather` starts rain at t = 59
+  (`isRaining` from about t = 80): fire on planks under open sky goes out
+  (BlockFire.java:61); fire on a plank floor under a stone roof with one hole burns on;
+  fire on netherrack set at t = 120 among tall grass on dirt removes the rained-on grass
+  instead of lighting it (BlockFire.java:119-127); dry farmland under open sky becomes wet
+  (BlockFarmland.java:37), under a stone roof turns to dirt. `block_box`,
+  `scheduled_ticks` and `weather` every 10.
+- `tick/fire-rain-spread`: steady rain from t = 0; nine fires on netherrack (never put out
+  by rain) ringed by wool at distance 2, under a stone roof at y = 63 with one-block holes,
+  1600 ticks. Holes over five of the fires block their neighbouring targets through each
+  rain term of the spread loop, and the two diagonal targets on the +x side only through
+  the vanilla bug that tests `(x' - 1, y', z)` with the fire's `z` (BlockFire.java:97);
+  holes over the corner targets of the other four block those through the target's own
+  term; two plain fires on wool under lone holes go out through the fire's own term
+  (BlockFire.java:61). With any one rain term of `updateTick` removed, or the bug fixed,
+  the Rust port fails this fixture. `block_box` and `scheduled_ticks` every 20.
 - `tick/grass-spread`: grass stripes and single blocks spread to lit dirt and die under stone;
   grass in a closed box neither; a dandelion in the dark and a dead bush on dirt drop;
   mushrooms in sunlight stay until a neighbour changes (`BlockMushroom.updateTick` does not
