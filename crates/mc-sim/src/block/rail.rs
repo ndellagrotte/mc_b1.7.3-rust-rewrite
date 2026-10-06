@@ -24,7 +24,7 @@
 
 use mc_core::java_hash::ChunkPosition;
 
-use super::{BlockBounds, BlockKind, block, dispatch};
+use super::{BlockBounds, block, dispatch};
 use crate::world::World;
 
 /// `Block.rail.blockID`.
@@ -348,10 +348,7 @@ impl RailLogic {
         let mut var7 = world.get_block_metadata(x, y, z);
         // src: RailLogic.java:25 (`BlockRail.isPoweredBlockRail`, the synthetic
         // accessor of `isPowered`, BlockRail.java:251-254)
-        let is_powered_rail = matches!(
-            block(var6).map(|b| b.kind),
-            Some(BlockKind::Rail { is_powered: true } | BlockKind::DetectorRail)
-        );
+        let is_powered_rail = is_powered(var6);
         if is_powered_rail {
             var7 &= -9;
         }
@@ -708,6 +705,7 @@ impl RailLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::BlockKind;
 
     #[test]
     fn rail_ids_and_powered_flags() {
