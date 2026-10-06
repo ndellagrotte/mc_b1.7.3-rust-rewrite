@@ -55,6 +55,9 @@
 //! | `interact` | `TickScenario.interact` in `interact`: the stack into slot `currentItem`, `EntityPlayer.useCurrentItemOnEntity` ([`dispatch::interact`] with the player and the target both in hand; when false, `ItemStack.useItemOnEntity` on a living target is a recorded gap, WP-2.6), then `sendUseItem` ([`send_use_item`]) → `id`, `result`, `used`, `stack` |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
+//! | `craft` | `craft`: [`CraftingManager::find_matching_recipe`] over a new [`InventoryCrafting`] (3×3 or 2×2) filled in slot order → `result` |
+//! | `slot_click` | `open_container` (the player's `ContainerPlayer`, built by the `player` op and held in the harness, or the last opened / a new workbench, chest (on [`chest_inventory`]), furnace or dispenser container), then [`Container::slot_click`] with the player in hand → `slot`, `result`, `stack`, `held` |
+//! | `inventory` | `inventory_line`: the player's `InventoryPlayer` and its `ContainerPlayer` grid and result |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
 //! | `block` / `block_box` | [`World::block_dump`] |
 //! | `scheduled_ticks` | [`World::scheduled_ticks`] |
@@ -98,10 +101,19 @@
 //! removes `Score` from the player compound before `level.dat` is written.
 
 use mc_sim::block::dispatch as block_dispatch;
+use mc_sim::crafting::CraftingManager;
 use mc_sim::entity::dispatch;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::player::{new_entity_player_sp, swing_item};
 use mc_sim::golden::{StateValue, entity_state_fields};
+use mc_sim::inventory::container::chest::new_container_chest;
+use mc_sim::inventory::container::dispenser::new_container_dispenser;
+use mc_sim::inventory::container::furnace::new_container_furnace;
+use mc_sim::inventory::container::player::new_container_player;
+use mc_sim::inventory::container::workbench::new_container_workbench;
+use mc_sim::inventory::container::{Container, ContainerKind};
+use mc_sim::inventory::crafting::InventoryCrafting;
+use mc_sim::inventory::large_chest::chest_inventory;
 use mc_sim::item::ItemStack;
 use mc_sim::save::{ChunkLoader, NoSave, SaveError, SaveHandler, SaveOldDir, SharedSaveStore, Tag};
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
@@ -135,6 +147,8 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         difficulty: sc.difficulty,
         mob_spawning: sc.mob_spawning.unwrap_or_default(),
         player_pos: None,
+        player_container: None,
+        open_container: None,
     };
 
     implicit_preload(&mut world, &sc.ops, w);
@@ -156,7 +170,7 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         world.updating_lighting();
         for d in &sc.dumps {
             if d.due_at(t) {
-                dump(&mut world, d, t, w)?;
+                dump(&mut world, &h, d, t, w)?;
             }
         }
     }
@@ -383,6 +397,14 @@ struct Harness {
     /// `loadedEntityList`: the oracle keeps the `HarnessPlayer` object after
     /// it leaves the list and still centres `randomDisplayUpdates` on it.
     player_pos: Option<(f64, f64, f64)>,
+    /// The player's `inventorySlots` (`new ContainerPlayer(inventory,
+    /// !multiplayerWorld)`, EntityPlayer.java:42), built by the `player` op.
+    /// Held here because the port's `PlayerData` has no container yet
+    /// (`EntityPlayer`'s fields are WP-2.5a's).
+    player_container: Option<Container>,
+    /// `TickScenario.openContainer` / `openSpec`: the container the last
+    /// `slot_click` with a spec other than `"player"` opened.
+    open_container: Option<(String, Container)>,
 }
 
 /// `HarnessWorld.runTick` (module docs).
@@ -527,6 +549,8 @@ fn apply(
             let pitch = pitch.unwrap_or(e.base.rotation_pitch);
             e.base.set_location_and_angles(x, y, z, yaw, pitch);
             let eid = e.id();
+            // src: EntityPlayer.java:42 (in the constructor; no draws, no world access)
+            h.player_container = Some(new_container_player(!world.multiplayer_world));
             let joined = world.spawn_entity_in_world(e); // src: World.java:896-918
             h.player = Some(eid);
             line("player").with("id", eid).with("joined", joined)
@@ -685,6 +709,55 @@ fn apply(
             };
             line("explode").with("destroyed", e.destroyed_block_positions.len() as u64)
         }
+        OpKind::Craft { ref grid } => line("craft").with("result", stack_json(craft(t, grid)?)),
+        OpKind::SlotClick {
+            ref container,
+            slot,
+            button,
+            shift,
+        } => {
+            let Some(pid) = h.player else {
+                return Err(GoldenError::other(format!(
+                    "t={t}: slot_click needs a player op first"
+                )));
+            };
+            let c = open_container(world, h, t, container)?;
+            if slot != -999 && (slot < 0 || slot as usize >= c.slots.len()) {
+                return Err(GoldenError::other(format!(
+                    "t={t}: slot_click: slot {slot} outside 0..{} and not -999",
+                    c.slots.len() as i32 - 1
+                )));
+            }
+            let r = world.with_entity_mut(pid, |world, p| {
+                // src: PlayerController.java:96-98, Container.java:47-150
+                let r = c.slot_click(world, p, slot, button, shift);
+                let st = if slot == -999 {
+                    None
+                } else {
+                    c.slot_get_stack(world, p, slot as usize)
+                };
+                let held = p
+                    .kind
+                    .player()
+                    .expect("the player op's entity is an EntityPlayer")
+                    .inventory
+                    .get_item_stack();
+                (r, st, held)
+            });
+            let Some((r, st, held)) = r else {
+                return Err(unsupported(
+                    t,
+                    "slot_click",
+                    "the player is no longer in loadedEntityList (the oracle keeps using its \
+                     HarnessPlayer object)",
+                ));
+            };
+            line("slot_click")
+                .with("slot", slot)
+                .with("result", stack_json(r))
+                .with("stack", stack_json(st))
+                .with("held", stack_json(held))
+        }
         OpKind::Save { ref chunks } => {
             let Some(store) = h.save_store.clone() else {
                 return Err(GoldenError::other(
@@ -709,6 +782,102 @@ fn apply(
     };
     w.push(out);
     Ok(())
+}
+
+/// `TickScenario.craft`: `CraftingManager.findMatchingRecipe` over a new
+/// 3×3 (9 entries) or 2×2 (4 entries) `InventoryCrafting`, entry `i` put
+/// into slot `i` (`setInventorySlotContents`; the grid's event handler is a
+/// container without slots, so nothing else runs).
+// src: CraftingManager.java:160-169, InventoryCrafting.java:8-13, :58-61
+fn craft(t: u32, grid: &[Option<[i32; 3]>]) -> Result<Option<ItemStack>, GoldenError> {
+    let w = match grid.len() {
+        9 => 3,
+        4 => 2,
+        _ => {
+            return Err(GoldenError::other(format!(
+                "t={t}: craft: \"grid\" needs 9 or 4 entries"
+            )));
+        }
+    };
+    let mut inv = InventoryCrafting::new(w, w);
+    for (k, e) in grid.iter().enumerate() {
+        if let Some([id, count, damage]) = *e {
+            // src: ItemStack.java:33-38
+            inv.set_inventory_slot_contents(k as i32, Some(ItemStack::new(id, count, damage)));
+        }
+    }
+    Ok(CraftingManager::get_instance().find_matching_recipe(&inv))
+}
+
+/// `TickScenario.container`: the container a `slot_click` names (README
+/// "Ops"): the player's own `ContainerPlayer`; the last opened container
+/// when the spec repeats; otherwise a new `ContainerWorkbench`
+/// (`"workbench"` at 0,0,0, or `"workbench at x,y,z"`), `ContainerChest` on
+/// the inventory `BlockChest.blockActivated` builds
+/// ([`mc_sim::inventory::large_chest::chest_inventory`]), `ContainerFurnace`
+/// or `ContainerDispenser` on the tile entity at `x,y,z`, replacing the
+/// previous one without `onCraftGuiClosed`.
+fn open_container<'h>(
+    world: &mut World,
+    h: &'h mut Harness,
+    t: u32,
+    spec: &str,
+) -> Result<&'h mut Container, GoldenError> {
+    if spec == "player" {
+        return Ok(h
+            .player_container
+            .as_mut()
+            .expect("the player op built the player's container"));
+    }
+    if h.open_container.as_ref().is_some_and(|(s, _)| s == spec) {
+        return Ok(&mut h.open_container.as_mut().expect("checked").1);
+    }
+    let bad = |what: &str| GoldenError::other(format!("t={t}: slot_click: {what}"));
+    let c = if spec == "workbench" {
+        new_container_workbench(0, 0, 0)
+    } else {
+        let (kind, pos) = spec
+            .split_once(" at ")
+            .ok_or_else(|| bad(&format!("unknown container {spec:?}")))?;
+        let xyz: Vec<i32> = pos
+            .split(',')
+            .map(|v| v.parse::<i32>())
+            .collect::<Result<_, _>>()
+            .map_err(|_| bad(&format!("unknown container {spec:?}")))?;
+        let [x, y, z] = xyz[..] else {
+            return Err(bad(&format!("unknown container {spec:?}")));
+        };
+        let te_kind = |world: &mut World| {
+            world.get_block_tile_entity(x, y, z).and_then(|r| {
+                world
+                    .tile_entities
+                    .get(&r)
+                    .map(|te| (r, te.kind.java_class()))
+            })
+        };
+        match kind {
+            "workbench" => new_container_workbench(x, y, z),
+            "chest" => {
+                if world.get_block_id(x, y, z) != mc_sim::block::ids::CHEST {
+                    return Err(bad(&format!("no chest at {x},{y},{z}")));
+                }
+                let inv = chest_inventory(world, x, y, z)
+                    .ok_or_else(|| bad(&format!("no chest tile entity at {x},{y},{z}")))?;
+                new_container_chest(world, inv)
+            }
+            "furnace" => match te_kind(world) {
+                Some((r, "TileEntityFurnace")) => new_container_furnace(r),
+                _ => return Err(bad(&format!("no furnace at {x},{y},{z}"))),
+            },
+            "dispenser" => match te_kind(world) {
+                Some((r, "TileEntityDispenser")) => new_container_dispenser(r),
+                _ => return Err(bad(&format!("no dispenser at {x},{y},{z}"))),
+            },
+            _ => return Err(bad(&format!("unknown container {spec:?}"))),
+        }
+    };
+    h.open_container = Some((spec.to_string(), c));
+    Ok(&mut h.open_container.as_mut().expect("just set").1)
 }
 
 /// `TickScenario.attack`: the target (and the attacker, if given) found in
@@ -1150,6 +1319,50 @@ fn stack_json(s: Option<ItemStack>) -> Value {
     }
 }
 
+/// `Dumps.inventory`: the player's `InventoryPlayer` (`currentItem`, the 36
+/// main and 4 armour slots, the cursor stack) and its `ContainerPlayer`'s
+/// grid and result.
+fn inventory_line(world: &World, h: &Harness, t: i64) -> Result<TraceLine, GoldenError> {
+    let Some(pid) = h.player else {
+        return Err(GoldenError::other("dump inventory needs a player op first"));
+    };
+    let Some(p) = world.entity(pid) else {
+        return Err(GoldenError::other(format!(
+            "t={t}: dump inventory: the player is no longer in loadedEntityList (the oracle keeps \
+             using its HarnessPlayer object)"
+        )));
+    };
+    let inv = &p
+        .kind
+        .player()
+        .expect("the player op's entity is an EntityPlayer")
+        .inventory;
+    let list = |a: &[Option<ItemStack>]| Value::Array(a.iter().map(|s| stack_json(*s)).collect());
+    let c = h
+        .player_container
+        .as_ref()
+        .expect("the player op built the player's container");
+    let ContainerKind::Player {
+        craft_matrix,
+        craft_result,
+        ..
+    } = &c.kind
+    else {
+        unreachable!("inventorySlots is a ContainerPlayer");
+    };
+    let grid: Vec<Option<ItemStack>> = (0..4).map(|i| craft_matrix.get_stack_in_slot(i)).collect();
+    Ok(TraceLine::new(t, "inventory")
+        .with("current_item", inv.current_item)
+        .with("main", list(&inv.main_inventory))
+        .with("armor", list(&inv.armor_inventory))
+        .with("held", stack_json(inv.get_item_stack()))
+        .with("craft_matrix", list(&grid))
+        .with(
+            "craft_result",
+            stack_json(craft_result.get_stack_in_slot(0)),
+        ))
+}
+
 /// The entity `id` in `loadedEntityList` (`TickScenario.entity`).
 fn loaded_entity<'w>(
     world: &'w mut World,
@@ -1173,7 +1386,13 @@ fn not_loaded(what: &str, x: i32, y: i32, z: i32) -> GoldenError {
 }
 
 /// One due dump (`TickScenario.dump`, `Dumps`).
-fn dump(world: &mut World, d: &Dump, t: u32, w: &mut TraceWriter) -> Result<(), GoldenError> {
+fn dump(
+    world: &mut World,
+    h: &Harness,
+    d: &Dump,
+    t: u32,
+    w: &mut TraceWriter,
+) -> Result<(), GoldenError> {
     let ti = t as i64;
     match d.what {
         DumpKind::ChunkDigest { x, z, full } => {
@@ -1318,6 +1537,7 @@ fn dump(world: &mut World, d: &Dump, t: u32, w: &mut TraceWriter) -> Result<(), 
                     .with("indirectly_powered", indirectly),
             );
         }
+        DumpKind::Inventory => w.push(inventory_line(world, h, ti)?),
         DumpKind::Weather => {
             // Dumps.weather: WorldInfo's timers and flags, World's strengths.
             let i = &world.world_info;

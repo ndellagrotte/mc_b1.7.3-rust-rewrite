@@ -12,7 +12,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.minecraft.src.AxisAlignedBB;
+import net.minecraft.src.Block;
+import net.minecraft.src.Container;
+import net.minecraft.src.ContainerChest;
+import net.minecraft.src.ContainerDispenser;
+import net.minecraft.src.ContainerFurnace;
+import net.minecraft.src.ContainerWorkbench;
+import net.minecraft.src.CraftingManager;
 import net.minecraft.src.Entity;
 import net.minecraft.src.EntityEgg;
 import net.minecraft.src.EntityFireball;
@@ -27,10 +36,17 @@ import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EntitySlime;
 import net.minecraft.src.EnumArt;
 import net.minecraft.src.Explosion;
+import net.minecraft.src.IInventory;
+import net.minecraft.src.InventoryCrafting;
+import net.minecraft.src.InventoryLargeChest;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
 import net.minecraft.src.MathHelper;
 import net.minecraft.src.PlayerControllerSP;
+import net.minecraft.src.TileEntity;
+import net.minecraft.src.TileEntityChest;
+import net.minecraft.src.TileEntityDispenser;
+import net.minecraft.src.TileEntityFurnace;
 import net.minecraft.src.Vec3D;
 import net.minecraft.src.World;
 import net.minecraft.src.WorldInfo;
@@ -44,9 +60,9 @@ final class TickScenario {
 
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode",
-            "interact");
+            "interact", "craft", "slot_click");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
-            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather");
+            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory");
 
     @SuppressWarnings("unchecked")
     static Trace run(Map<String, Object> sc, Path dir) throws Exception {
@@ -95,6 +111,8 @@ final class TickScenario {
         // Every vanilla Math.random() draws from HarnessMath: one stream per scenario.
         HarnessMath.seed(seed);
         HarnessWorld hw = HarnessWorld.create(seed, dimension, worldType, saveFormat, difficulty);
+        openContainer = null;
+        openSpec = null;
         hw.noMobSpawning = mobSpawning.equals("none");
         Trace trace = new Trace();
         try {
@@ -289,6 +307,12 @@ final class TickScenario {
                 break;
             case "explode":
                 explode(hw, op, l);
+                break;
+            case "craft":
+                craft(op, l);
+                break;
+            case "slot_click":
+                slotClick(hw, op, l);
                 break;
             case "save":
                 trace.add(l);
@@ -616,6 +640,123 @@ final class TickScenario {
         l.put("destroyed", e.destroyedBlockPositions.size());
     }
 
+    /**
+     * {@code CraftingManager.getInstance().findMatchingRecipe} over a new {@code InventoryCrafting}
+     * of 3x3 (a 9-entry grid) or 2x2 (4 entries), each entry {@code null} or {@code [id, count,
+     * damage]} put with {@code setInventorySlotContents} into slot i (column i % w, row i / w).
+     * The grid's event handler is a Container without slots (RecipeTable.grid), so its
+     * {@code onCraftMatrixChanged} does nothing.
+     */
+    private static void craft(Map<String, Object> op, Json.Line l) {
+        List<Object> g = list(op, "grid");
+        int w = g.size() == 9 ? 3 : g.size() == 4 ? 2 : -1;
+        if (w < 0) throw new IllegalArgumentException("craft: \"grid\" needs 9 or 4 entries");
+        InventoryCrafting inv = RecipeTable.grid(w);
+        for (int k = 0; k < g.size(); k++) {
+            Object e = g.get(k);
+            if (e == null) continue;
+            if (!(e instanceof List) || ((List<?>) e).size() != 3) {
+                throw new IllegalArgumentException("craft: a grid entry is null or [id, count, damage]");
+            }
+            List<?> st = (List<?>) e;
+            int[] v = new int[3];
+            for (int j = 0; j < 3; j++) {
+                if (!(st.get(j) instanceof Long)) throw new IllegalArgumentException("craft: grid numbers are integers");
+                v[j] = Math.toIntExact((Long) st.get(j));
+            }
+            inv.setInventorySlotContents(k, new ItemStack(v[0], v[1], v[2]));
+        }
+        l.raw("result", Dumps.stack(CraftingManager.getInstance().findMatchingRecipe(inv)));
+    }
+
+    /** The container the last slot_click opened ("player" is never kept here); per scenario. */
+    private static Container openContainer;
+    private static String openSpec;
+    private static final Pattern AT = Pattern.compile("(workbench|chest|furnace|dispenser) at (-?[0-9]+),(-?[0-9]+),(-?[0-9]+)");
+
+    /**
+     * The container a slot_click names. {@code "player"}: the player's own
+     * {@code inventorySlots} (the ContainerPlayer its constructor built, EntityPlayer.java:42).
+     * Any other spec equal to the last one opened reuses that container; a new spec builds a new
+     * one (the previous container is dropped without {@code onCraftGuiClosed}):
+     * {@code "workbench"} = {@code new ContainerWorkbench(inventory, world, 0, 0, 0)} (the
+     * position only feeds {@code isUsableByPlayer}, which slotClick never calls),
+     * {@code "workbench at x,y,z"} the same at x, y, z; {@code "chest at x,y,z"} =
+     * {@code new ContainerChest(inventory, chest)} with the chest inventory
+     * BlockChest.blockActivated would open (BlockChest.java:186, :198-212: the large-chest
+     * wrapping with each neighbouring chest; the normal-cube checks that may refuse to open are
+     * not applied); {@code "furnace at x,y,z"} / {@code "dispenser at x,y,z"} = the container on
+     * the tile entity there.
+     */
+    private static Container container(HarnessWorld hw, String spec) {
+        EntityPlayer p = hw.player;
+        if (spec.equals("player")) return p.inventorySlots;
+        if (spec.equals(openSpec)) return openContainer;
+        World w = hw.world;
+        Container c;
+        if (spec.equals("workbench")) {
+            c = new ContainerWorkbench(p.inventory, w, 0, 0, 0);
+        } else {
+            Matcher m = AT.matcher(spec);
+            if (!m.matches()) throw new IllegalArgumentException("slot_click: unknown container \"" + spec + "\"");
+            int x = Integer.parseInt(m.group(2)), y = Integer.parseInt(m.group(3)), z = Integer.parseInt(m.group(4));
+            switch (m.group(1)) {
+                case "workbench":
+                    c = new ContainerWorkbench(p.inventory, w, x, y, z);
+                    break;
+                case "chest": {
+                    int chest = Block.chest.blockID;
+                    if (w.getBlockId(x, y, z) != chest) throw new IllegalArgumentException("slot_click: no chest at " + x + "," + y + "," + z);
+                    IInventory inv = (TileEntityChest) w.getBlockTileEntity(x, y, z);
+                    if (w.getBlockId(x - 1, y, z) == chest) inv = new InventoryLargeChest("Large chest", (TileEntityChest) w.getBlockTileEntity(x - 1, y, z), inv);
+                    if (w.getBlockId(x + 1, y, z) == chest) inv = new InventoryLargeChest("Large chest", inv, (TileEntityChest) w.getBlockTileEntity(x + 1, y, z));
+                    if (w.getBlockId(x, y, z - 1) == chest) inv = new InventoryLargeChest("Large chest", (TileEntityChest) w.getBlockTileEntity(x, y, z - 1), inv);
+                    if (w.getBlockId(x, y, z + 1) == chest) inv = new InventoryLargeChest("Large chest", inv, (TileEntityChest) w.getBlockTileEntity(x, y, z + 1));
+                    c = new ContainerChest(p.inventory, inv);
+                    break;
+                }
+                case "furnace": {
+                    TileEntity te = w.getBlockTileEntity(x, y, z);
+                    if (!(te instanceof TileEntityFurnace)) throw new IllegalArgumentException("slot_click: no furnace at " + x + "," + y + "," + z);
+                    c = new ContainerFurnace(p.inventory, (TileEntityFurnace) te);
+                    break;
+                }
+                default: {
+                    TileEntity te = w.getBlockTileEntity(x, y, z);
+                    if (!(te instanceof TileEntityDispenser)) throw new IllegalArgumentException("slot_click: no dispenser at " + x + "," + y + "," + z);
+                    c = new ContainerDispenser(p.inventory, (TileEntityDispenser) te);
+                    break;
+                }
+            }
+        }
+        openContainer = c;
+        openSpec = spec;
+        return c;
+    }
+
+    /**
+     * {@code container.slotClick(slot, button, shift, player)} (Container.java:47-150), as
+     * PlayerController.handleMouseClick passes a GUI click (PlayerController.java:96-98), with the
+     * player's {@code inventory.getItemStack()} as the stack on the cursor. {@code slot} is a slot
+     * number of the container or -999 (outside the window: drops through dropPlayerItem).
+     * Line: {@code slot}, {@code result} (slotClick's return value), {@code stack} (the slot's
+     * stack afterwards, {@code getSlot(slot).getStack()}; null for -999) and {@code held}.
+     */
+    private static void slotClick(HarnessWorld hw, Map<String, Object> op, Json.Line l) {
+        EntityPlayer p = hw.player;
+        if (p == null) throw new IllegalArgumentException("slot_click needs a player op first");
+        Container c = container(hw, str(op, "container"));
+        int slot = i(op, "slot"), button = i(op, "button");
+        boolean shift = op.containsKey("shift") && bool(op, "shift");
+        if (slot != -999 && (slot < 0 || slot >= c.slots.size())) {
+            throw new IllegalArgumentException("slot_click: slot " + slot + " outside 0.." + (c.slots.size() - 1) + " and not -999");
+        }
+        ItemStack r = c.slotClick(slot, button, shift, p);
+        l.put("slot", slot).raw("result", Dumps.stack(r))
+                .raw("stack", slot == -999 ? "null" : Dumps.stack(c.getSlot(slot).getStack()))
+                .raw("held", Dumps.stack(p.inventory.getItemStack()));
+    }
+
     // ---- dumps ------------------------------------------------------------------
 
     private static void dump(HarnessWorld hw, Map<String, Object> d, int t, Trace trace) {
@@ -635,6 +776,10 @@ final class TickScenario {
                 break;
             case "power": Dumps.power(trace, t, w, i(d, "x"), i(d, "y"), i(d, "z")); break;
             case "weather": Dumps.weather(trace, t, w); break;
+            case "inventory":
+                if (hw.player == null) throw new IllegalArgumentException("dump inventory needs a player op first");
+                Dumps.inventory(trace, t, hw.player);
+                break;
             default: throw new IllegalArgumentException("unknown dump " + d.get("what"));
         }
     }

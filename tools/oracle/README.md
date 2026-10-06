@@ -14,7 +14,7 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace` and `power`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power` and `inventory`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
@@ -238,6 +238,20 @@ effects on shared state (`getStrVsBlock`/`canHarvestBlock` read block singletons
 restore, so `ItemTable` calls `setBlockBoundsForItemRender()` on both first (full
 cube, the static-init state) in case an earlier tick scenario in the same JVM left
 a piston extended.
+
+## Containers and crafting ops (WP-2.5)
+
+`TickScenario` keeps the container a `slot_click` opened in a static field
+(`openContainer`, with its spec string), reset at the start of every tick scenario; the
+`"player"` spec always means the `HarnessPlayer`'s own `inventorySlots`. Switching to another
+spec drops the previous container without `onCraftGuiClosed` (which would drop items
+through `dropPlayerItem` and so draw from the player's `rand`): a scenario that wants a
+workbench grid emptied clicks its stacks out first. The chest inventory is composed exactly
+as `BlockChest.blockActivated` does (lines 198-212), copied into the harness because that
+method's last step, `displayGUIChest`, is `EntityPlayer`'s empty body for the
+`HarnessPlayer`. The `craft` op's grid uses the same slot-less `Container` as
+`RecipeTable.grid`. Neither op draws from any `Random`; fixtures still dump `rng_state` so
+`check-sensitivity.sh` sees the seed.
 
 ## `recipe_table` (WP-2.5)
 

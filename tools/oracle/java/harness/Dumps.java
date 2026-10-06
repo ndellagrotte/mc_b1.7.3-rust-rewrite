@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import net.minecraft.src.Chunk;
+import net.minecraft.src.ContainerPlayer;
 import net.minecraft.src.Entity;
 import net.minecraft.src.EntityArrow;
 import net.minecraft.src.EntityItem;
@@ -282,6 +283,32 @@ final class Dumps {
             }
         }
         return buf.array();
+    }
+
+    /** A JSON list of {@link #stack}s. */
+    static String stacks(ItemStack[] a) {
+        StringBuilder b = new StringBuilder("[");
+        for (int i = 0; i < a.length; i++) {
+            if (i > 0) b.append(',');
+            b.append(stack(a[i]));
+        }
+        return b.append(']').toString();
+    }
+
+    /**
+     * {@code inventory}: the player's InventoryPlayer (InventoryPlayer.java:4-8: currentItem,
+     * mainInventory[0..35], armorInventory[0..3], the cursor stack getItemStack) and the 2x2 grid
+     * and result of its ContainerPlayer {@code inventorySlots} (ContainerPlayer.java:4-5).
+     */
+    static void inventory(Trace t, long tick, EntityPlayer p) {
+        InventoryPlayer inv = p.inventory;
+        ContainerPlayer c = (ContainerPlayer) p.inventorySlots;
+        ItemStack[] grid = new ItemStack[4];
+        for (int i = 0; i < 4; i++) grid[i] = c.craftMatrix.getStackInSlot(i);
+        t.add(line(tick, "inventory").put("current_item", inv.currentItem)
+                .raw("main", stacks(inv.mainInventory)).raw("armor", stacks(inv.armorInventory))
+                .raw("held", stack(inv.getItemStack()))
+                .raw("craft_matrix", stacks(grid)).raw("craft_result", stack(c.craftResult.getStackInSlot(0))));
     }
 
     static Map<String, Object> map(Object o, String what) {

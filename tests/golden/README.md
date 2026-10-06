@@ -614,6 +614,8 @@ were not loaded yet (population and moving entities may load more).
 | `interact` | `id`, `item_id?`, `count?` (1), `meta?` (0) | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-entity branch of `Minecraft.clickMouse(1)` (Minecraft.java:800-817, :846-850) with the op's entity instead of the ray trace: `PlayerController.interactWithEntity` (PlayerController.java:88-90) = `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469), `result = entity.interact(player)` (a boat or an empty minecart takes the player on, or puts it off when it already rides it; a furnace minecart takes a coal; a chest minecart opens its GUI), and when that is false the held stack's `useItemOnEntity` on a living entity (ItemStack.java:170-172) and its removal at size ≤ 0; then, as `clickMouse` leaves `var2` true on this branch, `sendUseItem` with the held stack (PlayerController.java:47-61) | `id`, `result`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `attack` | `target_id`, `attacker_id?`, `damage` (unless the attacker is the player) | attacker = the player: `swingItem` then `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814, PlayerController.java:92-94). Otherwise `target.attackEntityFrom(attacker or null, damage)` (Entity.java:746, EntityLiving.java:307) | `target_id`, `via` (`player` \| `direct`), `result` (direct only) |
 | `explode` | `x,y,z` (f64: integer or bit pattern), `size` (f32), `flaming?` (false) | `World.createExplosion(null, x, y, z, size)` (World.java:1518-1520: `newExplosion(…, false)`, Explosion.java:29-164). With `flaming`: the body of `World.newExplosion(null, x, y, z, size, true)` (World.java:1522-1528) with the explosion's `ExplosionRNG` (a clock-seeded `new Random()`, Explosion.java:11, census §2) set to `mix(seed, -6)` before `doExplosionA`; only the fire roll draws it (Explosion.java:118). No exploder: no entity is excluded, the attacker is null. Not part of the implicit preload (WP-1.8) | `destroyed` (size of `destroyedBlockPositions`) |
+| `craft` | `grid`: 9 (3×3) or 4 (2×2) entries, each `null` or `[id, count, damage]` | `CraftingManager.getInstance().findMatchingRecipe(grid)` (CraftingManager.java:160-169) over a new `InventoryCrafting` of that size, entry `i` put into slot `i` (column `i % w`, row `i / w`) with `setInventorySlotContents`; the grid's event handler is a `Container` without slots, so nothing else runs. Needs no player (WP-2.5) | `result` (`{id,count,damage}` or `null`: the first matching recipe's `getCraftingResult`) |
+| `slot_click` | `container`, `slot`, `button`, `shift?` (false) | needs a player. `container.slotClick(slot, button, shift, player)` (Container.java:47-150), as `PlayerController.handleMouseClick` passes a GUI click (PlayerController.java:96-98), with the player's `inventory.getItemStack()` as the stack on the cursor. `container`: `"player"` is the player's own `inventorySlots` (the `ContainerPlayer` its constructor built, EntityPlayer.java:42); any other spec is opened by the op: `"workbench"` (`new ContainerWorkbench(inventory, world, 0, 0, 0)`; the position only feeds `isUsableByPlayer`, which `slotClick` never calls), `"workbench at x,y,z"`, `"chest at x,y,z"` (`new ContainerChest(inventory, chest)` on the inventory `BlockChest.blockActivated` would open, BlockChest.java:186, :198-212: the chest's tile entity wrapped in `InventoryLargeChest("Large chest", …)` with each neighbouring chest, −x and −z as the upper half, +x and +z as the lower; the normal-cube checks that may refuse to open are not applied), `"furnace at x,y,z"` (`ContainerFurnace` on the `TileEntityFurnace` there), `"dispenser at x,y,z"` (`ContainerDispenser`). A spec equal to the previous non-`"player"` one reuses that container (its crafting grid survives); a different spec replaces it without `onCraftGuiClosed` (a workbench grid's stacks are then lost). `slot` is a slot number of the container (each container class's module documents its layout, e.g. player: 0 output, 1–4 grid, 5–8 armour helmet first, 9–35 main, 36–44 hotbar) or −999 (outside the window: the held stack, or one item of it, goes to `dropPlayerItem`); any other value is a scenario error. `button` 0 left, 1 right (others do nothing). `shift` runs the container's `getStackInSlot(slot)` override (b1.7.3's shift-click move) | `slot`, `result` (`slotClick`'s return value: a copy of the slot's stack before the click, or `null`), `stack` (`getSlot(slot).getStack()` afterwards; `null` for −999), `held` (`inventory.getItemStack()` afterwards) |
 | `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` | — then the Tier S lines |
 
 **`spawn` kinds beyond `EntityList`'s `(World)` constructors** (WP-2.4). Each is seeded right
@@ -648,6 +650,7 @@ rod is not used).
 | `rng_state` | — | `{"e":"rng_state","world_rand","lcg","math_random"}`: the 48-bit state of `World.rand`, `field_9437_g`, the 48-bit state of the `Math.random()` stream — the fastest first-divergence signal |
 | `ray_trace` | `from:[x,y,z]`, `to:[x,y,z]` (f64: integer or bit pattern), `stop_on_liquid?` (false) | `{"e":"ray_trace","from","to","stop_on_liquid","hit"}`: `World.rayTraceBlocks_do(Vec3D.createVector(from), Vec3D.createVector(to), stop_on_liquid)` (World.java:708-861). `from`/`to` echo the inputs as f64 bit strings. `hit` is `null` or the `MovingObjectPosition`: `{"type":"TILE","x","y","z","side","hit_vec":[3 f64 bit strings],"entity":null}` (`blockX/Y/Z`, `sideHit`, `hitVec`, `entityHit`; MovingObjectPosition.java:12-19). Every chunk of the block box spanned by `from` and `to` (x and z) must be loaded |
 | `power` | `x,y,z` | `{"e":"power","x","y","z","powered","indirectly_powered"}`: `World.isBlockGettingPowered`, then `World.isBlockIndirectlyGettingPowered` (World.java:2151-2190). They read blocks up to two away horizontally; those chunks must be loaded |
+| `inventory` | — | needs a player. `{"e":"inventory","current_item","main","armor","held","craft_matrix","craft_result"}`: `InventoryPlayer.currentItem`, `mainInventory[0..35]` and `armorInventory[0..3]` as lists of `{id,count,damage}` or `null`, the cursor stack `getItemStack()`, and the player's `ContainerPlayer` 2×2 `craftMatrix` (slots 0–3) and `craftResult` (WP-2.5) |
 | `weather` | — | `{"e":"weather","rain_time","raining","thunder_time","thundering","prev_rain_strength","rain_strength","prev_thunder_strength","thunder_strength"}`: the `WorldInfo` timers and flags (WorldInfo.java:191-221) and `World`'s `prevRainingStrength`, `rainingStrength`, `prevThunderingStrength`, `thunderingStrength` (World.java:27-30; f32 bits) |
 
 `entity` line: `idx` (list index), `id` (`entityId`), `kind` (Java class simple name, e.g.
@@ -1294,6 +1297,27 @@ Not pinned by a fixture (unit-tested in `crates/mc-sim/tests/monsters.rs`): the 
 and `EntityList`'s `Monster`, NBT, the powered creeper (lightning) and its record drop,
 `EntitySlime.onCollideWithPlayer` (called by `EntityPlayer.onLivingUpdate`, WP-2.5), and the
 spawn checks (`getCanSpawnHere`: natural hostile spawning is not reproducible in the oracle).
+
+Crafting and containers (WP-2.5), empty world, seed 123, `"mob_spawning": "none"`, a player on
+a stone floor; `use_item` on a workbench (its `blockActivated` returns true, so the stack is
+not used) loads hotbar slot 0 with a stack before the clicks:
+
+- `tick/craft-ops`: `craft` ops for 23 grids: 2×2 and 3×3, a `Block` ingredient of another
+  damage (any damage matches), patterns at an offset and mirrored (axe, bow, stairs), shapeless
+  dyes in any cells and with 1–4 ingredients, an `ItemStack` ingredient (charcoal), the cake,
+  ingots both ways, a wrong damage, wrong grids (`null`), a 2×2 shapeless recipe. The recipe
+  list itself is `recipe/recipe-table` (Tier A).
+- `tick/inventory-slot-clicks`: `slot_click` in the player's `ContainerPlayer`: pick up
+  (left: all, right: the larger half), place (all, one), merge, swap, armour slots refusing and
+  taking a helmet, crafting planks and sticks in the 2×2 grid (`SlotCrafting` pickups into an
+  empty hand and onto a matching held stack), shift-clicks from the output, main inventory,
+  hotbar and armour (`mergeItemStack`'s top-up and first-empty passes); `inventory` every tick.
+- `tick/chest-container-clicks` (Tier S): `slot_click` in a double chest's `ContainerChest`
+  (`InventoryLargeChest`) and a single chest's, shift-clicks both ways, a container switch;
+  then `save`: the chests' `Items` in the `tile_entity` lines.
+- `tick/furnace-dispenser-clicks` (Tier S): `ContainerFurnace` (input, fuel, the
+  `SlotFurnace` output taken after 200 ticks of smelting, shift-clicks) and
+  `ContainerDispenser` (no shift-click move); then `save`.
 
 Vanilla behaviour these fixtures pin down:
 

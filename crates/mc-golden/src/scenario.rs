@@ -546,6 +546,25 @@ pub enum OpKind {
         #[serde(default)]
         flaming: bool,
     },
+    /// `CraftingManager.findMatchingRecipe` over a new 3×3 (9 entries) or
+    /// 2×2 (4 entries) `InventoryCrafting`, entry `i` in slot `i`.
+    Craft {
+        /// The grid: `null` or `[id, count, damage]` per slot, row-major.
+        grid: Vec<Option<[i32; 3]>>,
+    },
+    /// `Container.slotClick(slot, button, shift, player)` on the named
+    /// container (README "Ops").
+    SlotClick {
+        /// `"player"`, `"workbench"`, or `"<workbench|chest|furnace|dispenser> at x,y,z"`.
+        container: String,
+        /// Slot number in the container, or −999 (outside the window).
+        slot: i32,
+        /// Mouse button: 0 left, 1 right (others do nothing).
+        button: i32,
+        /// Shift held (default false).
+        #[serde(default)]
+        shift: bool,
+    },
     /// `World.saveWorld(true, null)` then the Tier S dumps (needs
     /// `save_format: "mcregion"`).
     Save {
@@ -681,6 +700,9 @@ pub enum DumpKind {
         #[serde(default)]
         stop_on_liquid: bool,
     },
+    /// `inventory` line: the player's `InventoryPlayer` slots, selected
+    /// slot and cursor stack, and its `ContainerPlayer` grid and result.
+    Inventory,
     /// `power` line: `isBlockGettingPowered` and
     /// `isBlockIndirectlyGettingPowered` at a block.
     Power {
