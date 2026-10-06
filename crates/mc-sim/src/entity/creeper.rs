@@ -139,6 +139,7 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
         }
         let d = cd_mut(e);
         d.time_since_ignited += var1;
+        #[allow(clippy::manual_clamp)] // Java's two ifs, kept
         if d.time_since_ignited < 0 {
             d.time_since_ignited = 0;
         }

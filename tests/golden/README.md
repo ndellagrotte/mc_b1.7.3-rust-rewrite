@@ -1086,10 +1086,10 @@ stated, `rng_state` and `entity_state` every tick (`entity/flat-pig-falls` and
 - `entity/pig-ladder`: a pig falls onto a ladder column: the ladder clamps of
   `moveEntityWithHeading` (`fallDistance` reset, no fall damage).
 
-Not pinned by a fixture: `faceEntity` toward a player (`EntityLiving.updatePlayerActionState`'s
-2 % look-at roll reads the player's `getEyeHeight`, `EntityPlayer`'s override, WP-2.5;
-`entity/pig-attacked` diverges at its player punch before the pig looks at the player;
-`entity/wolf-begs-bone` below waits for it). Paths to an entity (`getPathToEntity`) are pinned
+Not pinned by these: `faceEntity` toward a player (it reads the player's `getEyeHeight`,
+`EntityPlayer`'s override, transcribed with WP-2.3b, whose monster fixtures below pin it and
+`getPathToEntity`, as does `entity/wolf-begs-bone`; `entity/pig-attacked` diverges at its player
+punch before the pig looks at the player). Paths to an entity (`getPathToEntity`) are also pinned
 since WP-2.3 by the wolf fixtures below (the wolf is the only b1.7.3 animal with a target).
 `Pathfinder` is also unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`). The `entity_state`
 dump has none of `EntityLiving`'s body yaw and walk state (`renderYawOffset`,
@@ -1180,6 +1180,51 @@ their drops only where a player is present: the player's own update is WP-2.5):
   by two direct hits.
 - `entity/boat-player-ride` (player): `interact` puts the player in a boat, which is sent into
   the rim and breaks with its rider; the run ends before the player could pick up the drops.
+
+Monsters, slime and ghast (WP-2.3, task 2), empty world, seed 123, `"mob_spawning": "none"`,
+`"difficulty": 1` (`EntityMob.onUpdate` and `EntityGhast.updatePlayerActionState` kill them
+on peaceful), `rng_state` and `entity_state` every tick. A monster that hits the player makes
+the player's own fields diverge (`EntityPlayer.attackEntityFrom`'s difficulty scaling and
+`damageEntity`'s armour are WP-2.5; its knock-back is `EntityLiving`'s and matches), so those
+scenarios dump the monsters only (`which`) and stop before the port's player, which takes the
+unscaled damage, would die. Night is `set_time 18000` at t=0 with the mobs joining at t=1,
+after `World.tick` has recomputed `skylightSubtracted`:
+
+- `entity/zombie-chase-player` (night, 150 ticks): `EntityMob.findPlayerToAttack` (16 blocks,
+  `canEntityBeSeen`), `getPathToEntity`, the walk, `faceEntity`, three melee hits 20 ticks
+  apart that knock the player back.
+- `entity/skeleton-shoot` (night, 300 ticks): the skeleton at a player behind a fence row:
+  an arrow every 30 ticks (`attackTime`), the arrows (ids 1-12 dumped) stick in the floor or
+  hit the player.
+- `entity/skeleton-sunburn` (noon, no player, 600 ticks): the daylight burn roll, fire damage
+  every 20 ticks, the wander, death and the arrow/bone drop.
+- `entity/spider-leap` (night, 200 ticks): `EntitySpider.findPlayerToAttack` in the dark, the
+  1-in-10 leap between 2 and 6 blocks, melee, and climbing the arena wall
+  (`isOnLadder = isCollidedHorizontally`).
+- `entity/creeper-fuse-explode` (100 ticks): the creeper slides along a fence toward the
+  player, fuses (watcher byte 16) and explodes after 30 ticks (`createExplosion(creeper, …,
+  3)`); `block_box` of the dirt crater at t=99. The fence keeps the explosion weak enough for
+  the port's player to survive, so the random block ticks around it continue as in the oracle.
+- `entity/pigzombie-anger` (day, 300 ticks, everything dumped: the player is never hit): the
+  harness `FishingHook` hooks one of three pigmen, `attackEntityFrom(angler, 0)` is a player's
+  hit, so every pigman within 32 becomes angry (`becomeAngryAt`'s two draws); they run to the
+  fence that keeps them from the player; the angry sounds.
+- `entity/slime-split` (no player, 480 ticks): a size-4 slime jumps for 400 ticks (the jump
+  timer, strafe and sound draws, the landing particles), is killed with exactly its health and
+  splits into four size-2 slimes, killed in turn into sixteen size-1 slimes, killed again
+  (slimeball drops). The split slimes are killed on the tick after they appear, before their
+  first ground tick runs `slimeJumpDelay`: their constructors draw it from the oracle's
+  unseeded `Random` (census §3, a gap the join hook does not close).
+- `entity/ghast-waypoints` (336 ticks): a ghast in a closed stone box, the player behind a
+  dividing wall: 300 ticks of waypoints (new ones, pushes, blocked courses), then the wall is
+  removed, the ghast charges and fires one fireball; the run ends before the fireball reaches
+  anything, since `new EntityFireball(world, ghast, …)` draws its acceleration jitter from the
+  oracle's unseeded `Random` (census §3; the fireball is not dumped).
+
+Not pinned by a fixture (unit-tested in `crates/mc-sim/tests/monsters.rs`): the giant zombie
+and `EntityList`'s `Monster`, NBT, the powered creeper (lightning) and its record drop,
+`EntitySlime.onCollideWithPlayer` (called by `EntityPlayer.onLivingUpdate`, WP-2.5), and the
+spawn checks (`getCanSpawnHere`: natural hostile spawning is not reproducible in the oracle).
 
 Vanilla behaviour these fixtures pin down:
 

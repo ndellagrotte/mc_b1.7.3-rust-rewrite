@@ -1535,9 +1535,9 @@ pub fn attack_blocked_entity(e: &mut Entity, world: &mut World, target: i32, dis
     let _ = (target, distance);
     if let K::Creeper(..) = e.kind {
         // src: EntityCreeper.java:31-42
-        return creeper::attack_blocked_entity(e, world);
+        creeper::attack_blocked_entity(e, world);
     }
-    // src: EntityCreature.java:148-149 (empty)
+    // else: src: EntityCreature.java:148-149 (empty)
 }
 
 /// `getBlockPathWeight(x, y, z)` (`EntityCreature`).

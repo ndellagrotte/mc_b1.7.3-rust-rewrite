@@ -532,3 +532,28 @@ fn skeleton_drops() {
     assert_eq!(skeleton::get_held_item().item_id, skeleton::BOW);
     assert_eq!(pig_zombie::get_held_item().item_id, pig_zombie::SWORD_GOLD);
 }
+
+/// `EntitySlime.onCollideWithPlayer` (EntitySlime.java:114-120): a slime of
+/// size 2 or more that sees the player and is closer than `0.6 × size` hits
+/// it for `size` (through the player's `attackEntityFrom`, WP-2.5's
+/// override recorded); a size-1 slime never does.
+#[test]
+fn slime_hits_a_touching_player() {
+    let mut w = empty_world(14);
+    let mut p = placed(new_entity_player_sp(&mut w), 0.5, 61.0, 0.5);
+    let hp = living(&p).health;
+    let mut s = placed(slime::new_entity_slime(&mut w), 1.0, 62.0, 0.5);
+    slime::set_slime_size(&mut s, 1);
+    dispatch::on_collide_with_player(&mut s, &mut w, &mut p);
+    assert_eq!(living(&p).health, hp, "size 1");
+    slime::set_slime_size(&mut s, 2);
+    s.base.set_position(1.0, 62.0, 0.5);
+    assert!((s.base.get_distance_to_entity(&p.base) as f64) < 1.2);
+    dispatch::on_collide_with_player(&mut s, &mut w, &mut p);
+    assert_eq!(living(&p).health, hp - 2);
+    let mut far = placed(slime::new_entity_slime(&mut w), 3.5, 61.0, 0.5);
+    slime::set_slime_size(&mut far, 2);
+    p.base.hearts_life = 0;
+    dispatch::on_collide_with_player(&mut far, &mut w, &mut p);
+    assert_eq!(living(&p).health, hp - 2, "too far");
+}
