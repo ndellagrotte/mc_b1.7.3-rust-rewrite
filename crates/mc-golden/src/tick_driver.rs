@@ -20,7 +20,11 @@
 //!    [`World::make_deterministic`] (`makeDeterministic` + `resetStatics`).
 //!    `"save_format": "mcregion"` puts a [`SaveOldDir`] on `world/` of an
 //!    in-memory [`mc_sim::save::Storage`] (the oracle's temp directory), see
-//!    "The `save` op".
+//!    "The `save` op". `"world": "load"` (`TickScenario.load`) copies the
+//!    save directory `dir` (relative to the fixture directory, which only
+//!    [`drive_in`] knows) into such a storage and opens it with
+//!    [`World::new_from_save`], then `makeDeterministic` with the scenario
+//!    seed.
 //! 3. The implicit preload (`TickScenario.implicitPreload`) and its
 //!    `preload` line.
 //! 4. For each tick `t`: the ops with this `t` in file order (a stable sort
@@ -48,10 +52,13 @@
 //! | `set_time` | [`World::set_world_time`] |
 //! | `set_weather` | the given fields of [`World::world_info`] (`rain_time`, `raining`, `thunder_time`, `thundering`) |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
-//! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
+//! | `player` | [`new_entity_player_sp`] (the `EntityPlayer` constructor chain), username `"Player"` (HarnessPlayer's), the `inventory` stacks ([`inventory_set_inventory_slot_contents`]), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
+//! | `input` | the player's [`PlayerSpData::movement_input`](mc_sim::entity::PlayerSpData) = [`MovementInput::from_keys`]; `hotbar` → `inventory.currentItem` |
+//! | `dig` | `dig`: [`PlayerControllerSp::update_controller`], on a press or every 5 ticks held [`swing_item`] + [`PlayerControllerSp::click_block`], then [`PlayerControllerSp::send_block_removing`] → `x`, `y`, `z`, `clicked`, `progress`, `broken`; a tick without `dig` releases ([`PlayerControllerSp::reset_block_removing`]) |
+//! | `sleep` | [`block_dispatch::block_activated`] as the player → `result`, `status` ([`PlayerSpData::last_sleep_status`](mc_sim::entity::PlayerSpData)) |
 //! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook`, a `Painting` with `direction` and a `Minecart` with `type`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
-//! | `attack` | `attack`: `target.attackEntityFrom(attacker or null, damage)` through [`mc_sim::entity::dispatch::attack_entity_from`] (target out of its slot, attacker a copy) → `target_id`, `via` `"direct"`, `result` |
+//! | `attack` | `attack`: the player as attacker: [`swing_item`], [`player_controller::attack_entity`] (both out of their slots) → `target_id`, `via` `"player"`; otherwise `target.attackEntityFrom(attacker or null, damage)` through [`mc_sim::entity::dispatch::attack_entity_from`] (target out of its slot, attacker a copy) → `target_id`, `via` `"direct"`, `result` |
 //! | `interact` | `TickScenario.interact` in `interact`: the stack into slot `currentItem`, `EntityPlayer.useCurrentItemOnEntity` ([`dispatch::interact`] with the player and the target both in hand; when false, `ItemStack.useItemOnEntity` on a living target is a recorded gap, WP-2.6), then `sendUseItem` ([`send_use_item`]) → `id`, `result`, `used`, `stack` |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
@@ -64,14 +71,16 @@
 //! | `entity_state` | [`mc_sim::golden::entity_state_fields`] in `loadedEntityList` order |
 //! | `world_time` / `rng_state` | [`World::get_world_time`] / [`World::rng_state`] |
 //! | `weather` | [`World::world_info`] timers and flags, the `World` rain/thunder strengths |
+//! | `player_state` | the player's [`PlayerData`](mc_sim::entity::PlayerData) fields, box and offsets (`player_state_line`) |
 //! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
 //! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
 //! `spawn` of the mobs other than `Pig`, `Sheep`, `Cow`, `Chicken`, `Wolf`,
-//! `Minecart` and `Boat` (their `(World)` constructors), `attack` with the player as the attacker
-//! (`EntityPlayer.attackTargetEntityWithCurrentItem`, WP-2.5). `use_item` runs, but every item's `onItemUse` /
+//! `Minecart` and `Boat` (their `(World)` constructors); an op that needs
+//! the player after it left `loadedEntityList` (the oracle keeps the
+//! `HarnessPlayer` object). `use_item` runs, but every item's `onItemUse` /
 //! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
 //! item does something diverges at the first block or inventory dump after
 //! the op.

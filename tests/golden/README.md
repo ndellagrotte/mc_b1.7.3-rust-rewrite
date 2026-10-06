@@ -532,7 +532,8 @@ nondeterminism census behind it in `tools/oracle/census.md`.
 | `seed` | required; the world seed and the root of every harness seed |
 | `dimension` | `overworld` (WorldProviderSurface) \| `nether` (WorldProviderHell) |
 | `ticks` | number of ticks, ≥ 1; ticks are numbered 0 … ticks−1 |
-| `world` | `generated` (default; the dimension's terrain generator) \| `empty` (every chunk all air) |
+| `world` | `generated` (default; the dimension's terrain generator) \| `empty` (every chunk all air) \| `load` (a saved world, `dir`; see "Loaded worlds" below) |
+| `dir` | `world: "load"` only: the save directory (`level.dat`, `region/`), relative to the scenario directory; `..` may climb up to the fixture tree `tests/golden` (so `"../../save/testworld/world"` reuses the committed testWorld) |
 | `save_format` | `none` (default; `SaveHandlerMP`, nothing on disk) \| `mcregion` (`SaveOldDir` on a fresh temp directory; needed by `save`) |
 | `mob_spawning` | `default` (default) \| `none`. A Tier B isolation knob: `none` makes the tick loop call `setAllowedMobSpawns(false, false)` instead of `(difficulty > 0, true)` (step 6 below), so `SpawnerAnimals.performSpawning` returns before drawing anything (SpawnerAnimals.java:20-21). For scenarios about blocks that need a player for random ticks but must not depend on the spawner |
 | `difficulty` | 0–3, default **0**; `world.difficultySetting` every tick and `setAllowedMobSpawns(difficulty > 0, true)` (Minecraft.java:1142, :1163). Not GameSettings' default 2: hostile spawn checks draw from an unseeded `Entity.rand` (census §3), so hostile spawning is not reproducible; the oracle warns when a scenario with a player sets it above 0 |
@@ -605,18 +606,31 @@ were not loaded yet (population and moving entities may load more).
 | `set_time` | `time` | `World.setWorldTime` (World.java:2274) | — |
 | `set_weather` | `rain_time?`, `raining?`, `thunder_time?`, `thundering?` (int, bool, int, bool) | the `WorldInfo` setters `setRainTime`, `setRaining`, `setThunderTime`, `setThundering` (WorldInfo.java:195-221) for the fields given. A Tier B knob to reach `updateWeather`'s toggles (World.java:1792-1859) without waiting 12000+ ticks | — |
 | `preload` | `cx,cz,radius` | preload square (above) | `loaded` |
-| `player` | `x,y,z` (feet), `yaw?,pitch?` | `new HarnessPlayer(world)`, seeded, `setLocationAndAngles`, `entityJoinedWorld`. At most one | `id`, `joined` |
+| `player` | `x,y,z` (feet), `yaw?,pitch?`, `inventory?` (list of `{slot,id,count,damage?}`) | `new HarnessPlayer(world)` (username `"Player"`, as an `EntityPlayerSP`'s session gives it), seeded, each `inventory` entry `inventory.setInventorySlotContents(slot, new ItemStack(id, count, damage))` (InventoryPlayer.java:180-188: slot 0–35 main, 0–8 the hotbar, 36–39 armour, `armorInventory[slot - 36]`; the armour slot of a piece of `armorType` t is `39 - t`, as `ContainerPlayer` places it), `setLocationAndAngles`, `entityJoinedWorld`. At most one | `id`, `joined` |
 | `spawn` | `kind`, `pos:[x,y,z]` (bounding-box bottom), `yaw?,pitch?`, `id?`; for `kind: "Item"`: `item:{id,count,damage?}`, `pickup_delay?` (10); for `kind: "Painting"`: `direction?` (0–3); for `kind: "Minecart"`: `type?` (0 plain, 1 chest, 2 furnace) | `new Entity<kind>(world)` with the class from EntityList's name table (EntityList.java:82-107: `Arrow`, `Snowball`, `Item`, `Painting`, `Mob`, `Monster`, `Creeper`, `Skeleton`, `Spider`, `Giant`, `Zombie`, `Slime`, `Ghast`, `PigZombie`, `Pig`, `Sheep`, `Cow`, `Chicken`, `Squid`, `Wolf`, `PrimedTnt`, `FallingSand`, `Minecart`, `Boat`); `rand.setSeed(mix(seed, id))` (Slime: size and jump delay redrawn); `setLocationAndAngles(x, y, z, yaw, pitch)` (Entity.java:669-676: `posY = y + yOffset`; yaw/pitch default to the constructor's, a `Math.random()` yaw for living entities); `entityJoinedWorld`. `Item` instead uses `new EntityItem(world, x, y, z, stack)` (EntityItem.java:11-21: `Math.random()` yaw and horizontal motion, `motionY` 0.2, position via `setPosition`) and `delayBeforeCanPickup = pickup_delay`, as block drops do (Block.java:355-364). Constructors that take the position (no `setLocationAndAngles` after them) and the harness-defined kinds (below). `id`, if given, must equal the entity id it gets | `id`, `kind` (class simple name), `joined` |
 | `set_motion` | `id`, `motion:[x,y,z]` | assigns `motionX/Y/Z` | `id` |
 | `set_pos` | `id`, `pos:[x,y,z]` | `Entity.setPosition` (Entity.java:163-170; `prevPos*` untouched) | `id` |
 | `set_rotation` | `id`, `yaw`, `pitch` | assigns `rotationYaw`/`rotationPitch` (no `% 360`) | `id` |
 | `use_item` | `item_id?`, `count?` (1), `meta?` (0), `x,y,z,side` | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-block branch of `Minecraft.clickMouse(1)` (Minecraft.java:819-850) with the op's hit instead of a ray trace: `PlayerController.sendPlaceBlock` (PlayerController.java:75-82: the block's `blockActivated`, else `ItemStack.useItem` → `Item.onItemUse`); on success `swingItem`; a stack left at size 0 is removed; if nothing was placed, `sendUseItem` (`useItemRightClick`, PlayerController.java:47-61) | `placed`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `interact` | `id`, `item_id?`, `count?` (1), `meta?` (0) | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-entity branch of `Minecraft.clickMouse(1)` (Minecraft.java:800-817, :846-850) with the op's entity instead of the ray trace: `PlayerController.interactWithEntity` (PlayerController.java:88-90) = `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469), `result = entity.interact(player)` (a boat or an empty minecart takes the player on, or puts it off when it already rides it; a furnace minecart takes a coal; a chest minecart opens its GUI), and when that is false the held stack's `useItemOnEntity` on a living entity (ItemStack.java:170-172) and its removal at size ≤ 0; then, as `clickMouse` leaves `var2` true on this branch, `sendUseItem` with the held stack (PlayerController.java:47-61) | `id`, `result`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
+| `input` | `forward?`, `strafe?` (f32, default 0: the key sums, +1 forward / left), `jump?`, `sneak?` (default false), `hotbar?` (0–8) | needs a player. From now until the next `input` op the player's `MovementInput` is what `MovementInputFromOptions.updatePlayerMoveState` makes of those keys (MovementInputFromOptions.java:50-76): `moveForward = forward`, `moveStrafe = strafe`, both `(float)((double)v * 0.3D)` while `sneak`. `HarnessPlayer` applies it where `EntityPlayerSP` does: after `EntityPlayer.updatePlayerActionState`, `moveStrafing`/`moveForward`/`isJumping` from it (EntityPlayerSP.java:27-32), and `isSneaking() = sneak && !sleeping` (:144-146; `Entity.moveEntity`'s edge guard and the ladder hold read it). Not the `ySize` dip of sneaking (EntityPlayerSP.java:79-81, client part of `onLivingUpdate`). `hotbar` is a number key: `inventory.currentItem = hotbar` (Minecraft.java:1073-1076) | — |
+| `dig` | `x,y,z,side` | needs a player; at most one per tick. The left button held on that block face this tick, with the op's block instead of the ray trace (`Minecraft.runTick`'s mouse handling with `PlayerControllerSP`, Minecraft.java:779-830, :962-964, :1003-1022, :1110-1113): `updateController` (`prevBlockDamage`); then on a press (no `dig` last tick, or another block) or when 5 ticks (`ticksPerSecond / 4`) passed since the last click, `clickMouse(0)`: `swingItem`, `clickBlock` (`World.onBlockHit` puts out fire in front of the face; the block's `onBlockClicked` when `curBlockDamage == 0`; `sendBlockRemoved` at once when `blockStrength(player) >= 1`); then `sendBlockRemoving` (after a break `blockHitWait` 5 ticks; the same block as last time adds `blockStrength` and breaks at 1; another block resets the damage to 0 that tick). `sendBlockRemoved`: aux effect 2001, the block set to air, `onBlockDestroyedByPlayer`, the held stack's `onDestroyBlock` (tool wear), `harvestBlock` (the drops) when the player could harvest it (PlayerControllerSP.java:126-199, PlayerController.java:21-32). A tick without a `dig` op (after one) releases the button: `updateController`, `resetBlockRemoving` | `x`, `y`, `z`, `clicked` (whether `clickMouse(0)` ran), `progress` (`curBlockDamage` afterwards, f32 bits), `broken` (a `sendBlockRemoved` of this tick returned true) |
+| `sleep` | `x,y,z` | needs a player. `Block.blockActivated(world, x, y, z, player)` on the block there (a bed: BlockBed.java:14-83, which calls `EntityPlayer.sleepInBedAt`, EntityPlayer.java:537-596) | `result` (`blockActivated`'s value), `status`: the name of the `EnumStatus` `sleepInBedAt` returned (`OK`, `NOT_POSSIBLE_HERE`, `NOT_POSSIBLE_NOW`, `TOO_FAR_AWAY`, `OTHER_PROBLEM`; b1.7.3 has no `NOT_SAFE`), or `null` when the bed did not call it (another player sleeps there; no bed half with bit 3; not the overworld, where the bed explodes) |
 | `attack` | `target_id`, `attacker_id?`, `damage` (unless the attacker is the player) | attacker = the player: `swingItem` then `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814, PlayerController.java:92-94). Otherwise `target.attackEntityFrom(attacker or null, damage)` (Entity.java:746, EntityLiving.java:307) | `target_id`, `via` (`player` \| `direct`), `result` (direct only) |
 | `explode` | `x,y,z` (f64: integer or bit pattern), `size` (f32), `flaming?` (false) | `World.createExplosion(null, x, y, z, size)` (World.java:1518-1520: `newExplosion(…, false)`, Explosion.java:29-164). With `flaming`: the body of `World.newExplosion(null, x, y, z, size, true)` (World.java:1522-1528) with the explosion's `ExplosionRNG` (a clock-seeded `new Random()`, Explosion.java:11, census §2) set to `mix(seed, -6)` before `doExplosionA`; only the fire roll draws it (Explosion.java:118). No exploder: no entity is excluded, the attacker is null. Not part of the implicit preload (WP-1.8) | `destroyed` (size of `destroyedBlockPositions`) |
 | `craft` | `grid`: 9 (3×3) or 4 (2×2) entries, each `null` or `[id, count, damage]` | `CraftingManager.getInstance().findMatchingRecipe(grid)` (CraftingManager.java:160-169) over a new `InventoryCrafting` of that size, entry `i` put into slot `i` (column `i % w`, row `i / w`) with `setInventorySlotContents`; the grid's event handler is a `Container` without slots, so nothing else runs. Needs no player (WP-2.5) | `result` (`{id,count,damage}` or `null`: the first matching recipe's `getCraftingResult`) |
 | `slot_click` | `container`, `slot`, `button`, `shift?` (false) | needs a player. `container.slotClick(slot, button, shift, player)` (Container.java:47-150), as `PlayerController.handleMouseClick` passes a GUI click (PlayerController.java:96-98), with the player's `inventory.getItemStack()` as the stack on the cursor. `container`: `"player"` is the player's own `inventorySlots` (the `ContainerPlayer` its constructor built, EntityPlayer.java:42); any other spec is opened by the op: `"workbench"` (`new ContainerWorkbench(inventory, world, 0, 0, 0)`; the position only feeds `isUsableByPlayer`, which `slotClick` never calls), `"workbench at x,y,z"`, `"chest at x,y,z"` (`new ContainerChest(inventory, chest)` on the inventory `BlockChest.blockActivated` would open, BlockChest.java:186, :198-212: the chest's tile entity wrapped in `InventoryLargeChest("Large chest", …)` with each neighbouring chest, −x and −z as the upper half, +x and +z as the lower; the normal-cube checks that may refuse to open are not applied), `"furnace at x,y,z"` (`ContainerFurnace` on the `TileEntityFurnace` there), `"dispenser at x,y,z"` (`ContainerDispenser`). A spec equal to the previous non-`"player"` one reuses that container (its crafting grid survives); a different spec replaces it without `onCraftGuiClosed` (a workbench grid's stacks are then lost). `slot` is a slot number of the container (each container class's module documents its layout, e.g. player: 0 output, 1–4 grid, 5–8 armour helmet first, 9–35 main, 36–44 hotbar) or −999 (outside the window: the held stack, or one item of it, goes to `dropPlayerItem`); any other value is a scenario error. `button` 0 left, 1 right (others do nothing). `shift` runs the container's `getStackInSlot(slot)` override (b1.7.3's shift-click move) | `slot`, `result` (`slotClick`'s return value: a copy of the slot's stack before the click, or `null`), `stack` (`getSlot(slot).getStack()` afterwards; `null` for −999), `held` (`inventory.getItemStack()` afterwards) |
-| `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` | — then the Tier S lines |
+| `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` or `"world": "load"` | — then the Tier S lines |
+
+**Loaded worlds** (`"world": "load"`, WP-2.5a). The save directory `dir` is copied to a
+temp directory and opened with the loading constructor `World(SaveOldDir, "harness", seed,
+null)` (World.java:149-208), as `world_read` opens one: the dimension and the world seed come
+from `level.dat` (`dimension` is required but ignored), `seed` only roots the harness streams
+(the determinism overrides and `resetStatics` run with it). No `save_format`: the copy is the
+world's save, so autosaves (every 40 ticks) and `save` ops write there, and a chunk missing
+from it is generated and populated as vanilla does. The `level.dat` player is not applied
+(`spawnPlayerWithLoadedChunks` is the client's); a `player` op adds the harness player. The
+Rust side needs the fixture directory: `mc_golden::tick_driver::drive_in`.
 
 **`spawn` kinds beyond `EntityList`'s `(World)` constructors** (WP-2.4). Each is seeded right
 after construction like every `spawn`; where the vanilla constructor draws from the then
@@ -651,6 +665,7 @@ rod is not used).
 | `ray_trace` | `from:[x,y,z]`, `to:[x,y,z]` (f64: integer or bit pattern), `stop_on_liquid?` (false) | `{"e":"ray_trace","from","to","stop_on_liquid","hit"}`: `World.rayTraceBlocks_do(Vec3D.createVector(from), Vec3D.createVector(to), stop_on_liquid)` (World.java:708-861). `from`/`to` echo the inputs as f64 bit strings. `hit` is `null` or the `MovingObjectPosition`: `{"type":"TILE","x","y","z","side","hit_vec":[3 f64 bit strings],"entity":null}` (`blockX/Y/Z`, `sideHit`, `hitVec`, `entityHit`; MovingObjectPosition.java:12-19). Every chunk of the block box spanned by `from` and `to` (x and z) must be loaded |
 | `power` | `x,y,z` | `{"e":"power","x","y","z","powered","indirectly_powered"}`: `World.isBlockGettingPowered`, then `World.isBlockIndirectlyGettingPowered` (World.java:2151-2190). They read blocks up to two away horizontally; those chunks must be loaded |
 | `inventory` | — | needs a player. `{"e":"inventory","current_item","main","armor","held","craft_matrix","craft_result"}`: `InventoryPlayer.currentItem`, `mainInventory[0..35]` and `armorInventory[0..3]` as lists of `{id,count,damage}` or `null`, the cursor stack `getItemStack()`, and the player's `ContainerPlayer` 2×2 `craftMatrix` (slots 0–3) and `craftResult` (WP-2.5) |
+| `player_state` | — | needs a player. `{"e":"player_state","id","sleeping","sleepTimer","bed","spawn","isSwinging","swingProgressInt","swingProgress","width","height","yOffset","ySize","cameraYaw","score","damageRemainder","timeUntilPortal","inPortal","sneaking"}`: the `EntityPlayer` state an `entity` line lacks (EntityPlayer.java:7-38): `isPlayerSleeping()`, `getSleepTimer()`, `bedChunkCoordinates` and `getPlayerSpawnCoordinate()` as `[x,y,z]` or `null`, the arm swing (`swingProgress` f32 bits), the box size, `yOffset`, `ySize`, `cameraYaw` (f32 bits), `score`, the private `damageRemainder` and `inPortal`, `timeUntilPortal`, `isSneaking()` |
 | `weather` | — | `{"e":"weather","rain_time","raining","thunder_time","thundering","prev_rain_strength","rain_strength","prev_thunder_strength","thunder_strength"}`: the `WorldInfo` timers and flags (WorldInfo.java:191-221) and `World`'s `prevRainingStrength`, `rainingStrength`, `prevThunderingStrength`, `thunderingStrength` (World.java:27-30; f32 bits) |
 
 `entity` line: `idx` (list index), `id` (`entityId`), `kind` (Java class simple name, e.g.
@@ -1124,9 +1139,8 @@ stated, `rng_state` and `entity_state` every tick (`entity/flat-pig-falls` and
   `moveEntityWithHeading` (`fallDistance` reset, no fall damage).
 
 Not pinned by these: `faceEntity` toward a player (it reads the player's `getEyeHeight`,
-`EntityPlayer`'s override, transcribed with WP-2.3b, whose monster fixtures below pin it and
-`getPathToEntity`, as does `entity/wolf-begs-bone`; `entity/pig-attacked` diverges at its player
-punch before the pig looks at the player). Paths to an entity (`getPathToEntity`) are also pinned
+`EntityPlayer`'s override, 0.12, transcribed with WP-2.3b, whose monster fixtures below pin it
+and `getPathToEntity`, as does `entity/wolf-begs-bone`). Paths to an entity (`getPathToEntity`) are also pinned
 since WP-2.3 by the wolf fixtures below (the wolf is the only b1.7.3 animal with a target).
 `Pathfinder` is also unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`). The `entity_state`
 dump has none of `EntityLiving`'s body yaw and walk state (`renderYawOffset`,
@@ -1322,6 +1336,44 @@ not used) loads hotbar slot 0 with a stack before the clicks:
 - `tick/furnace-dispenser-clicks` (Tier S): `ContainerFurnace` (input, fuel, the
   `SlotFurnace` output taken after 200 ticks of smelting, shift-clicks) and
   `ContainerDispenser` (no shift-click move); then `save`.
+
+The player (WP-2.5a: `EntityPlayer`, the `EntityPlayerSP` overrides `HarnessPlayer` has,
+`PlayerControllerSP`), empty world, seed 123, `"mob_spawning": "none"`, stone floors at
+y = 60; `entity_state`, `player_state` and `rng_state` every tick unless stated. Drops are
+placed beyond the player's pick-up reach (`InventoryPlayer.addItemStackToInventory` is
+WP-2.5b):
+
+- `entity/player-walk-jump` (175 ticks): `input` walks forward, jumps onto a one-high step,
+  strafes, then sneak-strafes to the east edge, where `Entity.moveEntity`'s sneak guard holds
+  the player; released, its remaining motion carries it over the edge.
+- `entity/player-dig-stone` (240 ticks): `dig` breaks a dandelion on the first click, stone
+  bare-handed (150 ticks, no drop: not harvestable by hand; the 5-tick repeat clicks; the
+  5-tick wait after a break), then with a wooden and an iron pickaxe chosen by `input`
+  `hotbar` (cobblestone drops, tool wear); `block_box` of the four blocks every tick.
+- `entity/player-fall-damage` / `entity/player-fall-damage-armour`: two 10-block falls,
+  without armour and in full leather (`damageEntity`'s 25ths and `damageRemainder`,
+  `damageArmor`'s wear); the peaceful heal every 20 ticks.
+- `entity/player-attack-pig`: `attack` with the player as attacker and a wooden sword: 4 + 1
+  (the ground's gravity step makes `motionY < 0`), knock-back from the player, the hurt
+  window, the kill (`addToPlayerScore` with `scoreValue` 0), sword wear, a hit on the corpse.
+- `entity/player-death-drops` (56 ticks): a 39-block fall kills the player:
+  `EntityPlayer.onDeath`, `dropAllItems` (six stacks incl. a chestplate, two `rand` draws
+  each), `entity_state` and `rng_state` only; it ends before the player leaves
+  `loadedEntityList` (vanilla keeps the dead player in `World.playerEntities`, which the
+  port's `World` cannot hold yet).
+- `entity/player-sleep` (170 ticks): `sleep` by day (`NOT_POSSIBLE_NOW`), at a far bed
+  (`TOO_FAR_AWAY`), `OK`, again on the occupied bed (`null`); `set_time` to day wakes the
+  player (`wakeUpPlayer(false, true, true)`, the bed becomes the spawn point); asleep again,
+  `World.tick` skips to the next morning after 100 ticks; `world_time` and the bed's
+  `block_box` every tick.
+
+Gate 2's long run (PLAN_v4 §5): `tick/testworld-6000`, `"world": "load"` of
+`save/testworld/world`, the player at the spawn point (the `EntityPlayer` constructor's
+spot), natural spawning off, 6000 ticks; every 500 ticks the four chunks around the spawn,
+`rng_state`, `world_time` and the player. The port cannot run it yet: the region's 24
+saved mobs (cows, skeletons, zombies, creepers, squid, sheep, a spider) have no port
+constructor (WP-2.3), so they are missing from its world (the test is ignored with the
+first differing line).
 
 Vanilla behaviour these fixtures pin down:
 

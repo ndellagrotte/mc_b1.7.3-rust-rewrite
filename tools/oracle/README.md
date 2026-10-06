@@ -168,16 +168,25 @@ scenario or an earlier one, and the iteration order of the keys is the same eith
 `EntityPlayerSP` needs a `Minecraft` (constructor, `onLivingUpdate` reads
 `mc.statFileWriter`, `mc.currentScreen`, `movementInput`), so `harness.HarnessPlayer`
 extends `EntityPlayer` directly: the one abstract method, `func_6420_o`, is a no-op as in
-EntityPlayerSP.java:169, and `updatePlayerActionState` zeroes strafe/forward/jump after
-`EntityPlayer`'s swing update, as EntityPlayerSP.java:27-32 does with no keys pressed. Not
-modelled: portals, `pushOutOfBlocks`, sneaking, statistics/achievements (EntityPlayer's
-`addStat` is a no-op), the pickup animation. Vanilla paths that only run with a player in
+EntityPlayerSP.java:169. It has the `EntityPlayerSP` overrides that need no client: a
+`MovementInput` (all zero until an `input` op sets it) applied after `EntityPlayer`'s
+`updatePlayerActionState` as EntityPlayerSP.java:27-32 does, and `isSneaking()` =
+`movementInput.sneak && !sleeping` (EntityPlayerSP.java:144-146). Its username is `"Player"`,
+as a session gives an `EntityPlayerSP` one (EntityPlayerSP.java:20; `EntityPlayer.onDeath`
+dereferences it, EntityPlayer.java:223). It keeps the last `sleepInBedAt` result for the
+`sleep` op. Not modelled: the rest of `EntityPlayerSP.onLivingUpdate` (portal timing and
+`Minecraft.usePortal`, the sneak `ySize` dip, `pushOutOfBlocks`), statistics/achievements
+(EntityPlayer's `addStat` is a no-op), the pickup animation. The port has those
+`EntityPlayerSP` parts behind `PlayerSpData::client_additions`, which the golden driver
+leaves off. Vanilla paths that only run with a player in
 `World.playerEntities`: random block ticks, snow/ice, lightning and cave sounds
 (World.updateBlocksAndPlayCaveSounds, chunks within 9 of a player), mob spawning
 (SpawnerAnimals.performSpawning, chunks within 8), sleeping, despawning and AI target
 search (`getClosestPlayer`), item pickup, and the client's `World.randomDisplayUpdates`
 (6000 `world.rand` draws per tick), which the tick loop runs for it. A player therefore
-also loads (generates) the 19 × 19 chunks around it on the first tick.
+also loads (generates) the 19 × 19 chunks around it on the first tick. A player that dies
+stays in `World.playerEntities` after it leaves `loadedEntityList` (only `World.setEntityDead`
+removes it, World.java:945; the client's respawn calls that).
 
 `use_item`, `interact` and `attack` drive the vanilla controller code without a
 `Minecraft`: `new PlayerControllerSP(null)` (its constructor only stores `mc`;
@@ -185,8 +194,15 @@ also loads (generates) the 19 × 19 chunks around it on the first tick.
 (what `PlayerController.interactWithEntity` calls, inlined in `TickScenario.interact` to
 report `entity.interact(player)`) and `EntityPlayer.attackTargetEntityWithCurrentItem`. The
 ray trace that picks the block or entity (`Minecraft.objectMouseOver`) is replaced by the
-op's coordinates or entity id; left-click block breaking (`PlayerControllerSP.clickBlock`, which reads
-`mc.theWorld`/`mc.thePlayer`) is not an op yet.
+op's coordinates or entity id. Left-click block breaking (`dig`) cannot use the vanilla
+`PlayerControllerSP`: its `clickBlock`, `sendBlockRemoving` and `sendBlockRemoved` reach
+the world and the player through `mc.theWorld` / `mc.thePlayer`, and `Minecraft.thePlayer`
+is an `EntityPlayerSP`. `HarnessWorld.Controller` mirrors those methods (and
+`PlayerController.sendBlockRemoved`, `resetBlockRemoving`, `updateController`) line for line
+with the world and the player as fields, leaving out only the dig step sound
+(`mc.sndManager.playSound`, no draws); the button logic around it (`clickMouse(0)` on a
+press and every 5 ticks while held, `func_6254_a`) is `TickScenario.dig` /
+`releaseButton`. The `sleep` op calls the bed's `blockActivated`.
 
 ### `"world": "empty"`
 
@@ -202,7 +218,11 @@ unloading stay vanilla. Its chunks are all air with `generateSkylightMap()` appl
   (`Files.createTempDirectory`); the directory is deleted after the scenario. `SaveOldDir`
   writes `session.lock` at construction and `level.dat` on every save, including the
   autosave `World.tick` runs every 40 ticks.
-- `world_read` copies the committed save to a temp directory before opening it.
+- `world_read` copies the committed save to a temp directory before opening it; so does a
+  `tick` scenario with `"world": "load"` (`TickScenario.load`, `HarnessWorld.open` with the
+  scenario's seed and difficulty), whose `dir` may climb out of the scenario directory but
+  not out of `tests/golden`. The copy is the running world's save (autosaves, `save` ops)
+  and is deleted afterwards.
 - Read-back always goes through vanilla readers (`CompressedStreamTools`,
   `RegionFileCache.getChunkInputStream`, `McRegionChunkLoader.loadChunk`,
   `TileEntity.createAndLoadEntity`, `new WorldInfo(NBTTagCompound)`); raw bytes of
