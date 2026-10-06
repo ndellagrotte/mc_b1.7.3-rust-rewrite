@@ -74,7 +74,7 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
         // vanilla bug (transcribed): the whole held stack is replaced by one
         // milk bucket, so milking with a stack of buckets loses the rest.
         let slot = p.inventory.current_item;
-        // src: ItemStack.java:13-15, :33-38 (new ItemStack(Item): count 1,
+        // src: ItemStack.java:21-23, :33-38 (new ItemStack(Item): count 1,
         // damage 0)
         set_inventory_slot_contents(
             &mut p.inventory,
