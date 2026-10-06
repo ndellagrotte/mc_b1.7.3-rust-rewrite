@@ -67,7 +67,9 @@ pub mod grass;
 pub mod leaves;
 pub mod lever;
 pub mod material;
+pub mod misc;
 pub mod pressure_plate;
+pub mod pumpkin;
 pub mod redstone_ore;
 pub mod redstone_torch;
 pub mod redstone_wire;
@@ -75,8 +77,11 @@ pub mod repeater;
 pub mod sand;
 pub mod sapling;
 pub mod snow;
+pub mod soul_sand;
 mod table;
+pub mod tnt;
 pub mod torch;
+pub mod web;
 
 pub use material::{MapColor, Material};
 

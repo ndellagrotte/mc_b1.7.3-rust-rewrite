@@ -85,6 +85,8 @@ pub enum RandomSource {
 /// "Coverage"). A transcriber adds to its class's row (or adds the row) in
 /// the same change that replaces the recorded arm.
 pub const TRANSCRIBED: &[(&str, &[&str])] = &[
+    // src: BlockBreakable.java:15-18
+    ("BlockBreakable", &["shouldSideBeRendered"]),
     // src: BlockButton.java (super::button)
     (
         "BlockButton",
@@ -235,6 +237,11 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateTick",
         ],
     ),
+    // src: BlockPumpkin.java:46-58
+    (
+        "BlockPumpkin",
+        &["canPlaceBlockAt", "onBlockAdded", "onBlockPlacedBy"],
+    ),
     // src: BlockRedstoneOre.java (super::redstone_ore)
     (
         "BlockRedstoneOre",
@@ -327,6 +334,16 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ),
     // src: BlockSnowBlock.java:19-25
     ("BlockSnowBlock", &["updateTick"]),
+    // src: BlockSoulSand.java:8-16
+    (
+        "BlockSoulSand",
+        &[
+            "getCollisionBoundingBoxFromPool",
+            "onEntityCollidedWithBlock",
+        ],
+    ),
+    // src: BlockSponge.java:9-34
+    ("BlockSponge", &["onBlockAdded", "onBlockRemoval"]),
     // src: BlockStairs.java:18-20, :69-71, :129-131
     (
         "BlockStairs",
@@ -338,6 +355,19 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ),
     // src: BlockStationary.java:15-21, :32-52
     ("BlockStationary", &["onNeighborBlockChange", "updateTick"]),
+    // src: BlockTNT.java:18-68 (the EntityTNTPrimed spawn is WP-2.4, recorded
+    // as "EntityTNTPrimed.<init>" by super::tnt)
+    (
+        "BlockTNT",
+        &[
+            "blockActivated",
+            "onBlockAdded",
+            "onBlockClicked",
+            "onBlockDestroyedByExplosion",
+            "onBlockDestroyedByPlayer",
+            "onNeighborBlockChange",
+        ],
+    ),
     // src: BlockTallGrass.java:22-37
     ("BlockTallGrass", &["colorMultiplier"]),
     // src: BlockTorch.java (super::torch)
@@ -352,6 +382,14 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "onNeighborBlockChange",
             "randomDisplayTick",
             "updateTick",
+        ],
+    ),
+    // src: BlockWeb.java:10-20
+    (
+        "BlockWeb",
+        &[
+            "getCollisionBoundingBoxFromPool",
+            "onEntityCollidedWithBlock",
         ],
     ),
 ];
@@ -477,7 +515,8 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Flowing => return super::fluid::flowing::on_block_added(world, id, x, y, z),
         // src: BlockFluid.java:239-241
         K::Stationary => return super::fluid::on_block_added(world, id, x, y, z),
-        K::Sponge => "BlockSponge.onBlockAdded",
+        // src: BlockSponge.java:9-21
+        K::Sponge => return super::misc::sponge_on_block_added(world, x, y, z),
         K::Dispenser => "BlockDispenser.onBlockAdded",
         K::Note | K::MobSpawner | K::Chest | K::Sign { .. } | K::JukeBox => {
             "BlockContainer.onBlockAdded"
@@ -486,7 +525,8 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::PistonBase { .. } => "BlockPistonBase.onBlockAdded",
         K::PistonMoving => "BlockPistonMoving.onBlockAdded",
         K::Step { .. } => "BlockStep.onBlockAdded",
-        K::Tnt => "BlockTNT.onBlockAdded",
+        // src: BlockTNT.java:18-25
+        K::Tnt => return super::tnt::on_block_added(world, x, y, z),
         // src: BlockTorch.java:78-92
         K::Torch => return super::torch::on_block_added(world, id, x, y, z),
         // src: BlockFire.java:191-199
@@ -501,7 +541,8 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::RedstoneTorch { torch_active } => {
             return super::redstone_torch::on_block_added(world, id, x, y, z, torch_active);
         }
-        K::Pumpkin { .. } => "BlockPumpkin.onBlockAdded",
+        // src: BlockPumpkin.java:46-48: only super.onBlockAdded (empty, Block.java:313-314)
+        K::Pumpkin { .. } => return,
         // src: BlockRedstoneRepeater.java:141-148
         K::RedstoneRepeater { .. } => return super::repeater::on_block_added(world, id, x, y, z),
         _ => return,
@@ -519,7 +560,8 @@ pub fn on_block_removal(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Log => return super::leaves::log_on_block_removal(world, x, y, z),
         // src: BlockLeaves.java:37-54
         K::Leaves => return super::leaves::on_block_removal(world, x, y, z),
-        K::Sponge => "BlockSponge.onBlockRemoval",
+        // src: BlockSponge.java:23-34
+        K::Sponge => return super::misc::sponge_on_block_removal(world, x, y, z),
         K::Dispenser => "BlockDispenser.onBlockRemoval",
         K::Note | K::MobSpawner | K::Sign { .. } => "BlockContainer.onBlockRemoval",
         K::PistonExtension => "BlockPistonExtension.onBlockRemoval",
@@ -557,7 +599,6 @@ pub fn on_neighbor_block_change(
     z: i32,
     neighbor_id: i32,
 ) {
-    let _ = neighbor_id;
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
@@ -582,7 +623,8 @@ pub fn on_neighbor_block_change(
         K::PistonBase { .. } => "BlockPistonBase.onNeighborBlockChange",
         K::PistonExtension => "BlockPistonExtension.onNeighborBlockChange",
         K::PistonMoving => "BlockPistonMoving.onNeighborBlockChange",
-        K::Tnt => "BlockTNT.onNeighborBlockChange",
+        // src: BlockTNT.java:27-33
+        K::Tnt => return super::tnt::on_neighbor_block_change(world, x, y, z, neighbor_id),
         // src: BlockTorch.java:94-124
         K::Torch => return super::torch::on_neighbor_block_change(world, id, x, y, z),
         // src: BlockFire.java:185-189
@@ -670,7 +712,8 @@ pub fn get_collision_bounding_box_from_pool(
         // src: BlockFluid.java:82-84
         K::Flowing | K::Stationary => return super::fluid::get_collision_bounding_box_from_pool(),
         K::Rail { .. } | K::DetectorRail => "BlockRail.getCollisionBoundingBoxFromPool",
-        K::Web => "BlockWeb.getCollisionBoundingBoxFromPool",
+        // src: BlockWeb.java:18-20
+        K::Web => return super::web::get_collision_bounding_box_from_pool(),
         K::PistonMoving => "BlockPistonMoving.getCollisionBoundingBoxFromPool",
         // src: BlockTorch.java:11-13
         K::Torch | K::RedstoneTorch { .. } => return None,
@@ -697,7 +740,8 @@ pub fn get_collision_bounding_box_from_pool(
         // src: BlockReed.java:66-68
         K::Reed => return None,
         K::Fence => "BlockFence.getCollisionBoundingBoxFromPool",
-        K::SoulSand => "BlockSoulSand.getCollisionBoundingBoxFromPool",
+        // src: BlockSoulSand.java:8-11
+        K::SoulSand => return super::soul_sand::get_collision_bounding_box_from_pool(x, y, z),
         K::Portal => "BlockPortal.getCollisionBoundingBoxFromPool",
         K::Cake => "BlockCake.getCollisionBoundingBoxFromPool",
         K::TrapDoor => "BlockTrapDoor.getCollisionBoundingBoxFromPool",
@@ -777,7 +821,8 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         // src: BlockReed.java:33-48
         K::Reed => return super::cactus::reed_can_place_block_at(world, id, x, y, z),
         K::Fence => Some("BlockFence.canPlaceBlockAt"),
-        K::Pumpkin { .. } => Some("BlockPumpkin.canPlaceBlockAt"),
+        // src: BlockPumpkin.java:50-53
+        K::Pumpkin { .. } => return super::pumpkin::can_place_block_at(world, x, y, z),
         K::Cake => Some("BlockCake.canPlaceBlockAt"),
         // src: BlockRedstoneRepeater.java:20-22
         K::RedstoneRepeater { .. } => return super::repeater::can_place_block_at(world, x, y, z),
@@ -838,7 +883,8 @@ pub fn block_activated(
         K::Bed => "BlockBed.blockActivated",
         K::PistonBase { .. } => "BlockPistonBase.blockActivated",
         K::PistonMoving => "BlockPistonMoving.blockActivated",
-        K::Tnt => "BlockTNT.blockActivated",
+        // src: BlockTNT.java:66-68
+        K::Tnt => return super::tnt::block_activated(),
         K::Stairs { .. } => "BlockStairs.blockActivated",
         K::Chest => "BlockChest.blockActivated",
         K::Workbench => "BlockWorkbench.blockActivated",
@@ -895,7 +941,8 @@ pub fn on_entity_collided_with_block(
     use BlockKind as K;
     let what = match b.kind {
         K::DetectorRail => "BlockDetectorRail.onEntityCollidedWithBlock",
-        K::Web => "BlockWeb.onEntityCollidedWithBlock",
+        // src: BlockWeb.java:10-12
+        K::Web => return super::web::on_entity_collided_with_block(e),
         // src: BlockPressurePlate.java:61-67
         K::PressurePlate { trigger_mob_type } => {
             return super::pressure_plate::on_entity_collided_with_block(
@@ -910,7 +957,8 @@ pub fn on_entity_collided_with_block(
         }
         // src: BlockCactus.java:87-89
         K::Cactus => return super::cactus::on_entity_collided_with_block(world, e),
-        K::SoulSand => "BlockSoulSand.onEntityCollidedWithBlock",
+        // src: BlockSoulSand.java:13-16
+        K::SoulSand => return super::soul_sand::on_entity_collided_with_block(e),
         K::Portal => "BlockPortal.onEntityCollidedWithBlock",
         _ => return,
     };
@@ -1340,7 +1388,18 @@ pub fn should_side_be_rendered(
         }
         // src: BlockLeavesBase.java:15-18
         K::Leaves => return super::leaves::should_side_be_rendered(world, id, x, y, z, side),
-        K::Glass { .. } => "BlockBreakable.shouldSideBeRendered",
+        // src: BlockBreakable.java:15-18
+        K::Glass { .. } => {
+            return super::misc::breakable_should_side_be_rendered(
+                world,
+                id,
+                x,
+                y,
+                z,
+                side,
+                base_should_side_be_rendered,
+            );
+        }
         K::Step { .. } => "BlockStep.shouldSideBeRendered",
         K::Stairs { .. } => "BlockStairs.shouldSideBeRendered",
         // src: BlockSnow.java:79-81
@@ -1465,11 +1524,11 @@ pub fn get_selected_bounding_box_from_pool(
 /// Base: nothing.
 // src: Block.java:303-304
 pub fn on_block_destroyed_by_player(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
-    let _ = (x, y, z, meta);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::Tnt => "BlockTNT.onBlockDestroyedByPlayer",
+        // src: BlockTNT.java:45-56
+        K::Tnt => return super::tnt::on_block_destroyed_by_player(world, x, y, z, meta),
         K::Stairs { .. } => "BlockStairs.onBlockDestroyedByPlayer",
         _ => return,
     };
@@ -1598,11 +1657,11 @@ pub fn get_explosion_resistance(world: &World, id: i32, exploder: Option<&Entity
 /// the block (Explosion.java:160). Base: nothing.
 // src: Block.java:490-491
 pub fn on_block_destroyed_by_explosion(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
-    let _ = (x, y, z);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::Tnt => "BlockTNT.onBlockDestroyedByExplosion",
+        // src: BlockTNT.java:39-43
+        K::Tnt => return super::tnt::on_block_destroyed_by_explosion(world, x, y, z),
         K::Stairs { .. } => "BlockStairs.onBlockDestroyedByExplosion",
         _ => return,
     };
@@ -1636,12 +1695,12 @@ pub fn on_block_placed(world: &mut World, id: i32, x: i32, y: i32, z: i32, side:
 /// (PlayerControllerSP.java:47). Base: nothing.
 // src: Block.java:516-517
 pub fn on_block_clicked(world: &mut World, id: i32, x: i32, y: i32, z: i32, player: &mut Entity) {
-    let _ = player;
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
         K::Note => "BlockNote.onBlockClicked",
-        K::Tnt => "BlockTNT.onBlockClicked",
+        // src: BlockTNT.java:58-64
+        K::Tnt => return super::tnt::on_block_clicked(world, x, y, z, player),
         K::Stairs { .. } => "BlockStairs.onBlockClicked",
         K::Door => "BlockDoor.onBlockClicked",
         // src: BlockLever.java:149-151
@@ -1823,7 +1882,6 @@ pub fn can_block_stay(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> boo
 /// its yaw/pitch to orient the block. Base: nothing.
 // src: Block.java:560-561
 pub fn on_block_placed_by(world: &mut World, id: i32, x: i32, y: i32, z: i32, placer: &Entity) {
-    let _ = (x, y, z, placer);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
@@ -1831,7 +1889,8 @@ pub fn on_block_placed_by(world: &mut World, id: i32, x: i32, y: i32, z: i32, pl
         K::PistonBase { .. } => "BlockPistonBase.onBlockPlacedBy",
         K::Stairs { .. } => "BlockStairs.onBlockPlacedBy",
         K::Furnace { .. } => "BlockFurnace.onBlockPlacedBy",
-        K::Pumpkin { .. } => "BlockPumpkin.onBlockPlacedBy",
+        // src: BlockPumpkin.java:55-58
+        K::Pumpkin { .. } => return super::pumpkin::on_block_placed_by(world, x, y, z, placer),
         // src: BlockRedstoneRepeater.java:131-139
         K::RedstoneRepeater { .. } => {
             return super::repeater::on_block_placed_by(world, id, x, y, z, placer);
