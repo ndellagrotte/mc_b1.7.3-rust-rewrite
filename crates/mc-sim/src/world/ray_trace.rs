@@ -206,6 +206,8 @@ impl World {
             if var41 {
                 var25 = (var19 - var1.z_coord) / var31;
             }
+            // vanilla bug: the walk moves the caller's start vector (module
+            // docs); callers that reuse it see the last face crossed.
             let var42: i32;
             if var21 < var23 && var21 < var25 {
                 var42 = if var5 > var8 { 4 } else { 5 };

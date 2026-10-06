@@ -198,6 +198,8 @@ pub fn perform_spawning(world: &mut World, var1: bool, var2: bool) -> i32 {
                 for _var26 in 0..4 {
                     var22 +=
                         world.rand.next_int_bounded(var25) - world.rand.next_int_bounded(var25);
+                    // vanilla bug: nextInt(1) is always 0, so a pack never
+                    // changes height, yet both calls still draw (SpawnerAnimals.java:109).
                     var23 += world.rand.next_int_bounded(1) - world.rand.next_int_bounded(1);
                     var24 +=
                         world.rand.next_int_bounded(var25) - world.rand.next_int_bounded(var25);
@@ -229,6 +231,9 @@ pub fn perform_spawning(world: &mut World, var1: bool, var2: bool) -> i32 {
                         // joins, `var20` stays 0 and `var20 >=
                         // getMaxSpawnedInChunk()` (`continue label130`, the
                         // next chunk) is never reached.
+                        // vanilla bug: inside the position loop, so the pack
+                        // count is added again for every position that passes
+                        // the distance tests; the caller ignores the total.
                         var3 += var20; // src: SpawnerAnimals.java:139
                     }
                 }
