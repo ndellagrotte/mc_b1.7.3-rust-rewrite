@@ -10,13 +10,13 @@
 //! | Module | Vanilla | Shape |
 //! |---|---|---|
 //! | [`block`] | `Block`, `Material`, `StepSound` + subclasses | const table [`block::BLOCKS`], `BlockKind` enum, behaviour in [`block::dispatch`] |
-//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; block texture lookups live in `block::block_texture` |
-//! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess` | [`world::World`] owns everything; client side effects are [`world::events`] |
+//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | item table done (WP-1.2): const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; item behaviour is WP-2.6; block texture lookups live in `block::block_texture` |
+//! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess` | lighting done (WP-1.3); [`world::World`] owns everything; client side effects are [`world::events`] |
 //! | [`tick`] | `World.tick` and its block systems | `impl World` |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer` | layout only (WP-2.5) |
-//! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | traits + `NoSave`; McRegion is WP-1.9 |
-//! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | empty (WP-1.4, WP-1.7) |
+//! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | traits + `NoSave`; McRegion container in progress (WP-1.9) |
+//! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4); population (`WorldGen*`, `populate`) is WP-1.7 |
 //! | [`golden`] | — | read-only views in the golden-trace shapes |
 //!
 //! `worldgen` is the plan's `gen`, renamed because `gen` is a reserved keyword

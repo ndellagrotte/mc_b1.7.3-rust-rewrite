@@ -145,6 +145,7 @@ fn fields(def: &BlockDef, st: &BlockStatics) -> Value {
         K::Sign { is_freestanding } => {
             put("isFreestanding", is_freestanding.into());
             // BlockSign.java:6, Block.java:655/660: always TileEntitySign.class.
+            // Emitted as a literal string; the real TileEntitySign type arrives with WP-1.8.
             put("signEntityClass", "TileEntitySign".into());
         }
         K::PressurePlate { trigger_mob_type } => {
