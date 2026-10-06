@@ -59,6 +59,16 @@ fixtures! {
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
     entity_item_drop => "entity" / "item-drop";
     entity_lightning_strike => "entity" / "lightning-strike";
+    // WP-2.4b: minecart and boat.
+    entity_boat_on_water => "entity" / "boat-on-water";
+    entity_boat_player_ride => "entity" / "boat-player-ride";
+    entity_minecart_rail_loop => "entity" / "minecart-rail-loop";
+    entity_minecart_powered_brake => "entity" / "minecart-powered-brake";
+    entity_minecart_detector_rail => "entity" / "minecart-detector-rail";
+    entity_minecart_derail_collide => "entity" / "minecart-derail-collide";
+    entity_minecart_break_drops => "entity" / "minecart-break-drops";
+    entity_minecart_player_ride => "entity" / "minecart-player-ride";
+    entity_minecart_furnace_push => "entity" / "minecart-furnace-push";
     entity_painting_art => "entity" / "painting-art";
     #[ignore = "EntityPlayer.attackTargetEntityWithCurrentItem (WP-2.5): lines 1-25 match (the pig's and the player's EntityLiving updates, t=0..9); the driver stops at line 26 (t=10 op attack, via player: the player punch). The t=20 direct hit (EntityLiving.attackEntityFrom) is transcribed and pinned by entity/pig-knockback"]
     entity_pig_attacked => "entity" / "pig-attacked";

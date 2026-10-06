@@ -1,0 +1,12 @@
+{"name": "boat-player-ride", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 45, "mob_spawning": "none",
+ "comment":"WP-2.4b. The pool of entity/boat-on-water. The player (id 0) stands on the west rim; a boat (id 1) is spawned on the water at (-3.5, 60, 0.5) and floats up. At t = 5 the interact op (the ENTITY branch of Minecraft.clickMouse(1): EntityBoat.interact, EntityBoat.java:336-346) puts the player in the boat (Entity.mountEntity); from then on World.updateEntityWithOptionalForce updates the rider after the boat and EntityBoat.updateRiderPosition places it 0.4 ahead along the boat's yaw. The boat steers by the rider's motionX/Z * 0.2 (:195-198), which the player's own update leaves at 0 with no input. At t = 20 set_motion (0.35, 0, 0.25) sends the boat with its rider into the south rim on the diagonal: it breaks (motionZ zeroed, motionX above 0.15, :246-258) and drops 3 planks and 2 sticks; World.updateEntities then unlinks the rider from the dead boat. Only the boat and its drops are dumped (entity_state which [1..6]): the player's own update is EntityPlayer's (WP-2.5), and the run ends before the drops' pickup delay runs out (the player would pick them up at t = 46). rng_state every tick.",
+ "ops":[{"t": 0, "op": "preload", "cx": 0, "cz": 0, "radius": 3},
+        {"t": 0, "op": "fill", "x0": -7, "y0": 57, "z0": -7, "x1": 6, "y1": 61, "z1": 6, "id": 1},
+        {"t": 0, "op": "fill", "x0": -5, "y0": 58, "z0": -5, "x1": 4, "y1": 61, "z1": 4, "id": 0},
+        {"t": 0, "op": "fill", "x0": -5, "y0": 58, "z0": -5, "x1": 4, "y1": 60, "z1": 4, "id": 9},
+        {"t": 0, "op": "player", "x": "0xc01a000000000000", "y": 62, "z": "0x3fe0000000000000"},
+        {"t": 0, "op": "spawn", "kind": "Boat", "pos": ["0xc00c000000000000", 60, "0x3fe0000000000000"], "id": 1},
+        {"t": 5, "op": "interact", "id": 1},
+        {"t": 20, "op": "set_motion", "id": 1, "motion": ["0x3fd6666666666666", 0, "0x3fd0000000000000"]}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 1, "what": "entity_state", "which": [1, 2, 3, 4, 5, 6]}]}
