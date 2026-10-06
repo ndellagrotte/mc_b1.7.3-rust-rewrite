@@ -1051,7 +1051,9 @@ pub fn update_ridden(e: &mut Entity, world: &mut World) {
 }
 
 /// `mount.updateRiderPosition()` with the rider in hand (the rider is out of
-/// its slot while it updates). `EntityBoat` overrides it.
+/// its slot while it updates). `EntityBoat` overrides it. Java positions
+/// `mount.riddenByEntity` (Entity.java:970-972); this positions the rider in
+/// hand, which is the same object unless the links are inconsistent.
 // src: Entity.java:970-972
 fn update_rider_position_of(world: &mut World, mount_id: i32, rider: &mut Entity) {
     let Some(m) = world.entity(mount_id) else {
@@ -1080,18 +1082,37 @@ pub fn get_mounted_y_offset(e: &Entity) -> f64 {
 pub fn dismount(e: &mut Entity, world: &mut World) {
     e.base.entity_rider_pitch_delta = 0.0;
     e.base.entity_rider_yaw_delta = 0.0;
-    if let Some(mount_id) = e.base.riding_entity
-        && let Some(m) = world.entity_mut(mount_id)
-    {
-        let (x, y, z) = (
-            m.base.pos_x,
-            m.base.bounding_box.min_y + m.base.height as f64,
-            m.base.pos_z,
-        );
-        m.base.ridden_by_entity = None;
-        let (yaw, pitch) = (e.base.rotation_yaw, e.base.rotation_pitch);
-        e.base.set_location_and_angles(x, y, z, yaw, pitch);
+    if let Some(mount_id) = e.base.riding_entity {
+        if let Some(m) = world.entity_mut(mount_id) {
+            let (x, y, z) = (
+                m.base.pos_x,
+                m.base.bounding_box.min_y + m.base.height as f64,
+                m.base.pos_z,
+            );
+            m.base.ridden_by_entity = None;
+            let (yaw, pitch) = (e.base.rotation_yaw, e.base.rotation_pitch);
+            e.base.set_location_and_angles(x, y, z, yaw, pitch);
+        } else {
+            world.note_unimplemented("Entity.mountEntity(null): mount out of its slot");
+        }
     }
+    e.base.riding_entity = None;
+}
+
+/// `mountEntity(null)` with the mount in hand (it is out of its slot).
+// src: Entity.java:982-991
+pub fn dismount_from(e: &mut Entity, m: &mut EntityBase) {
+    e.base.entity_rider_pitch_delta = 0.0;
+    e.base.entity_rider_yaw_delta = 0.0;
+    let (yaw, pitch) = (e.base.rotation_yaw, e.base.rotation_pitch);
+    e.base.set_location_and_angles(
+        m.pos_x,
+        m.bounding_box.min_y + m.height as f64,
+        m.pos_z,
+        yaw,
+        pitch,
+    );
+    m.ridden_by_entity = None;
     e.base.riding_entity = None;
 }
 

@@ -271,3 +271,40 @@ fn world_tick_advances_time_and_draws_weather_timers() {
     assert_eq!(w.rng_state().lcg, before.lcg);
     assert_eq!(w.rng_state().world_rand, r.state());
 }
+
+#[test]
+fn set_entity_dead_dismounts_rider_from_mount_in_hand() {
+    let mut w = empty_world(1);
+    preload(&mut w, 0, 0);
+    let a = new_entity_item(&mut w, 1.0, 70.0, 1.0, ItemStack::new(1, 1, 0));
+    let b = new_entity_item(&mut w, 5.0, 64.0, 7.0, ItemStack::new(1, 1, 0));
+    let (aid, bid) = (a.base.entity_id, b.base.entity_id);
+    w.spawn_entity_in_world(a);
+    w.spawn_entity_in_world(b);
+    w.entity_mut(aid).unwrap().base.riding_entity = Some(bid);
+    w.entity_mut(bid).unwrap().base.ridden_by_entity = Some(aid);
+    let (bx, by, bz, bh) = {
+        let m = &w.entity(bid).unwrap().base;
+        (m.pos_x, m.bounding_box.min_y, m.pos_z, m.height as f64)
+    };
+    w.with_entity_mut(bid, |w, e| w.set_entity_dead(e)).unwrap();
+    let a = &w.entity(aid).unwrap().base;
+    assert_eq!(
+        (a.pos_x, a.pos_y, a.pos_z),
+        (bx, by + bh + a.y_offset as f64, bz)
+    );
+    assert_eq!(a.riding_entity, None);
+    assert_eq!(w.entity(bid).unwrap().base.ridden_by_entity, None);
+}
+
+#[test]
+fn last_save_time_untouched_without_chunk_loader() {
+    let mut w = empty_world(1);
+    w.get_chunk_from_chunk_coords(0, 0);
+    w.get_chunk_from_chunk_coords(1, 1);
+    w.set_world_time(100);
+    w.save_chunks(false);
+    for z in 0..=1 {
+        assert_eq!(w.loaded_chunk(z, z).unwrap().last_save_time, 0);
+    }
+}

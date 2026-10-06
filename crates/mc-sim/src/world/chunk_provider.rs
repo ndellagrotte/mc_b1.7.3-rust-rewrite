@@ -32,6 +32,9 @@
 //! `chunkMap` is keyed by `ChunkCoordIntPair.chunkXZ2Int(x, z)`
 //! (ChunkProvider.java:28, :45), which keeps 15 bits per axis, so chunks 32768
 //! apart share a key and replace each other. The map here uses the same key.
+//! `chunk_list` holds keys where Java holds `Chunk` objects
+//! (ChunkProvider.java:46,133-134), so with `chunkXZ2Int` aliasing Java saves
+//! both aliased chunks while this port saves the current one twice.
 
 use std::collections::BTreeMap;
 
@@ -308,8 +311,8 @@ impl World {
                 let _ = l.save_extra_chunk_data(c);
             }
             if c.needs_saving(all, world_time) {
-                c.last_save_time = world_time;
                 if let Some(l) = self.chunk_provider.chunk_loader.as_mut() {
+                    c.last_save_time = world_time;
                     let _ = l.save_chunk(c);
                 }
                 c.is_modified = false;
@@ -347,12 +350,12 @@ impl World {
                 {
                     chunk::on_chunk_unload(self, cx, cz);
                     let world_time = self.world_info.world_time;
-                    if let Some(c) = self.chunk_provider.chunk_map.get_mut(&var2) {
+                    if let Some(c) = self.chunk_provider.chunk_map.get_mut(&var2)
+                        && let Some(l) = self.chunk_provider.chunk_loader.as_mut()
+                    {
                         c.last_save_time = world_time;
-                        if let Some(l) = self.chunk_provider.chunk_loader.as_mut() {
-                            let _ = l.save_chunk(c);
-                            let _ = l.save_extra_chunk_data(c);
-                        }
+                        let _ = l.save_chunk(c);
+                        let _ = l.save_extra_chunk_data(c);
                     }
                 }
                 self.chunk_provider.dropped_chunks_set.remove(&var2);

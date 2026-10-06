@@ -48,7 +48,10 @@ impl World {
     /// for an update further up the stack (it is running, so not removed).
     pub fn is_entity_dead_or_gone(&self, id: i32) -> bool {
         match self.loaded_entity_list.iter().find(|s| s.entity_id == id) {
-            None => true,
+            None => {
+                self.note_unimplemented("Entity ref to an entity no longer in loadedEntityList");
+                true
+            }
             Some(s) => s.entity.as_ref().is_some_and(|e| e.base.is_dead),
         }
     }
@@ -142,7 +145,16 @@ impl World {
     // src: World.java:934-949
     pub fn set_entity_dead(&mut self, e: &mut Entity) {
         if let Some(rider) = e.base.ridden_by_entity {
-            self.with_entity_mut(rider, |w, r| crate::entity::base::dismount(r, w));
+            let mount_id = e.base.entity_id;
+            // The mount is in hand (out of its slot): the rider must see it.
+            let m = &mut e.base;
+            self.with_entity_mut(rider, |w, r| {
+                if r.base.riding_entity == Some(mount_id) {
+                    crate::entity::base::dismount_from(r, m)
+                } else {
+                    crate::entity::base::dismount(r, w)
+                }
+            });
         }
         if e.base.riding_entity.is_some() {
             crate::entity::base::dismount(e, self);
@@ -257,9 +269,17 @@ impl World {
             let id = self.loaded_entity_list[i].entity_id;
             let riding = self.slot_entity(i).base.riding_entity;
             if let Some(mount) = riding {
-                let mount_ok = self
-                    .entity(mount)
-                    .is_some_and(|m| !m.base.is_dead && m.base.ridden_by_entity == Some(id));
+                let mount_ok = match self.entity(mount) {
+                    Some(m) => !m.base.is_dead && m.base.ridden_by_entity == Some(id),
+                    None => {
+                        if self.entity_index(mount).is_none() {
+                            self.note_unimplemented(
+                                "Entity ref to an entity no longer in loadedEntityList",
+                            );
+                        }
+                        false
+                    }
+                };
                 if mount_ok {
                     i += 1;
                     continue;
@@ -482,9 +502,17 @@ impl World {
         while i < self.loaded_entity_list.len() {
             let id = self.loaded_entity_list[i].entity_id;
             if let Some(mount) = self.slot_entity(i).base.riding_entity {
-                let mount_ok = self
-                    .entity(mount)
-                    .is_some_and(|m| !m.base.is_dead && m.base.ridden_by_entity == Some(id));
+                let mount_ok = match self.entity(mount) {
+                    Some(m) => !m.base.is_dead && m.base.ridden_by_entity == Some(id),
+                    None => {
+                        if self.entity_index(mount).is_none() {
+                            self.note_unimplemented(
+                                "Entity ref to an entity no longer in loadedEntityList",
+                            );
+                        }
+                        false
+                    }
+                };
                 if mount_ok {
                     i += 1;
                     continue;
@@ -590,10 +618,19 @@ impl World {
                         if Some(id) == exclude {
                             continue;
                         }
-                        if let Some(o) = self.entity(id)
-                            && o.base.bounding_box.intersects_with(bb)
-                        {
-                            out.push(id);
+                        match self.entity(id) {
+                            Some(o) => {
+                                if o.base.bounding_box.intersects_with(bb) {
+                                    out.push(id);
+                                }
+                            }
+                            None => {
+                                if self.entity_index(id).is_none() {
+                                    self.note_unimplemented(
+                                        "Chunk entity list holds an entity not in loadedEntityList",
+                                    );
+                                }
+                            }
                         }
                     }
                 }
