@@ -1154,16 +1154,16 @@ pub fn on_entity_collided_with_block(
 ) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockDetectorRail.java:20-27
         K::DetectorRail => {
-            return super::detector_rail::on_entity_collided_with_block(world, id, x, y, z, e);
+            super::detector_rail::on_entity_collided_with_block(world, id, x, y, z, e)
         }
         // src: BlockWeb.java:10-12
-        K::Web => return super::web::on_entity_collided_with_block(e),
+        K::Web => super::web::on_entity_collided_with_block(e),
         // src: BlockPressurePlate.java:61-67
         K::PressurePlate { trigger_mob_type } => {
-            return super::pressure_plate::on_entity_collided_with_block(
+            super::pressure_plate::on_entity_collided_with_block(
                 world,
                 id,
                 x,
@@ -1171,17 +1171,16 @@ pub fn on_entity_collided_with_block(
                 z,
                 trigger_mob_type,
                 e,
-            );
+            )
         }
         // src: BlockCactus.java:87-89
-        K::Cactus => return super::cactus::on_entity_collided_with_block(world, e),
+        K::Cactus => super::cactus::on_entity_collided_with_block(world, e),
         // src: BlockSoulSand.java:13-16
-        K::SoulSand => return super::soul_sand::on_entity_collided_with_block(e),
+        K::SoulSand => super::soul_sand::on_entity_collided_with_block(e),
         // src: BlockPortal.java:150-155
-        K::Portal => return super::portal::on_entity_collided_with_block(world, e),
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::Portal => super::portal::on_entity_collided_with_block(world, e),
+        _ => {}
+    }
 }
 
 /// `velocityToAddToEntity(world, x, y, z, entity, vec)`: fluids push.
@@ -1427,29 +1426,27 @@ pub fn collision_ray_trace(
 pub fn is_powering_to(world: &mut World, id: i32, x: i32, y: i32, z: i32, side: i32) -> bool {
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockButton.java:197-199
-        K::Button => return super::button::is_powering_to(world, x, y, z),
+        K::Button => super::button::is_powering_to(world, x, y, z),
         // src: BlockDetectorRail.java:38-40
-        K::DetectorRail => return super::detector_rail::is_powering_to(world, x, y, z, side),
+        K::DetectorRail => super::detector_rail::is_powering_to(world, x, y, z, side),
         // src: BlockRedstoneRepeater.java:69-84
         K::RedstoneRepeater {
             is_repeater_powered,
-        } => return super::repeater::is_powering_to(world, x, y, z, side, is_repeater_powered),
+        } => super::repeater::is_powering_to(world, x, y, z, side, is_repeater_powered),
         // src: BlockLever.java:201-203
-        K::Lever => return super::lever::is_powering_to(world, x, y, z),
+        K::Lever => super::lever::is_powering_to(world, x, y, z),
         // src: BlockRedstoneWire.java:291-333
-        K::RedstoneWire => return super::redstone_wire::is_powering_to(world, x, y, z, side),
+        K::RedstoneWire => super::redstone_wire::is_powering_to(world, x, y, z, side),
         // src: BlockRedstoneTorch.java:73-90
         K::RedstoneTorch { torch_active } => {
-            return super::redstone_torch::is_powering_to(world, x, y, z, side, torch_active);
+            super::redstone_torch::is_powering_to(world, x, y, z, side, torch_active)
         }
         // src: BlockPressurePlate.java:133-135
-        K::PressurePlate { .. } => return super::pressure_plate::is_powering_to(world, x, y, z),
-        _ => return false,
-    };
-    untranscribed(world, what);
-    false
+        K::PressurePlate { .. } => super::pressure_plate::is_powering_to(world, x, y, z),
+        _ => false,
+    }
 }
 
 /// `isIndirectlyPoweringTo(world, x, y, z, side)`: strong power through
@@ -1465,51 +1462,29 @@ pub fn is_indirectly_powering_to(
 ) -> bool {
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockButton.java:201-219
-        K::Button => return super::button::is_indirectly_powering_to(world, x, y, z, side),
+        K::Button => super::button::is_indirectly_powering_to(world, x, y, z, side),
         // src: BlockDetectorRail.java:42-48
-        K::DetectorRail => {
-            return super::detector_rail::is_indirectly_powering_to(world, x, y, z, side);
-        }
+        K::DetectorRail => super::detector_rail::is_indirectly_powering_to(world, x, y, z, side),
         // src: BlockRedstoneRepeater.java:65-67
         K::RedstoneRepeater {
             is_repeater_powered,
-        } => {
-            return super::repeater::is_indirectly_powering_to(
-                world,
-                x,
-                y,
-                z,
-                side,
-                is_repeater_powered,
-            );
-        }
+        } => super::repeater::is_indirectly_powering_to(world, x, y, z, side, is_repeater_powered),
         // src: BlockLever.java:205-225
-        K::Lever => return super::lever::is_indirectly_powering_to(world, x, y, z, side),
+        K::Lever => super::lever::is_indirectly_powering_to(world, x, y, z, side),
         // src: BlockRedstoneWire.java:287-289
-        K::RedstoneWire => {
-            return super::redstone_wire::is_indirectly_powering_to(world, x, y, z, side);
-        }
+        K::RedstoneWire => super::redstone_wire::is_indirectly_powering_to(world, x, y, z, side),
         // src: BlockRedstoneTorch.java:139-141
         K::RedstoneTorch { torch_active } => {
-            return super::redstone_torch::is_indirectly_powering_to(
-                world,
-                x,
-                y,
-                z,
-                side,
-                torch_active,
-            );
+            super::redstone_torch::is_indirectly_powering_to(world, x, y, z, side, torch_active)
         }
         // src: BlockPressurePlate.java:137-143
         K::PressurePlate { .. } => {
-            return super::pressure_plate::is_indirectly_powering_to(world, x, y, z, side);
+            super::pressure_plate::is_indirectly_powering_to(world, x, y, z, side)
         }
-        _ => return false,
-    };
-    untranscribed(world, what);
-    false
+        _ => false,
+    }
 }
 
 /// `randomDisplayTick(world, x, y, z, rand)`: client particles and sounds
@@ -2054,31 +2029,29 @@ pub fn color_multiplier(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> i
 }
 
 /// `canProvidePower()`: whether the block is a power source (redstone wire
-/// connects to it). Base: false. `world` only records untranscribed
-/// overrides (and holds `BlockRedstoneWire.wiresProvidePower`).
+/// connects to it). Base: false. `world` holds
+/// `BlockRedstoneWire.wiresProvidePower`.
 // src: Block.java:537-539
 pub fn can_provide_power(world: &World, id: i32) -> bool {
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockDetectorRail.java:16-18
-        K::DetectorRail => return super::detector_rail::can_provide_power(),
+        K::DetectorRail => super::detector_rail::can_provide_power(),
         // src: BlockRedstoneWire.java:335-337
-        K::RedstoneWire => return super::redstone_wire::can_provide_power(world),
+        K::RedstoneWire => super::redstone_wire::can_provide_power(world),
         // src: BlockLever.java:227-229
-        K::Lever => return super::lever::can_provide_power(),
+        K::Lever => super::lever::can_provide_power(),
         // src: BlockPressurePlate.java:145-147
-        K::PressurePlate { .. } => return super::pressure_plate::can_provide_power(),
+        K::PressurePlate { .. } => super::pressure_plate::can_provide_power(),
         // src: BlockRedstoneTorch.java:147-149
-        K::RedstoneTorch { .. } => return super::redstone_torch::can_provide_power(),
+        K::RedstoneTorch { .. } => super::redstone_torch::can_provide_power(),
         // src: BlockButton.java:221-223
-        K::Button => return super::button::can_provide_power(),
+        K::Button => super::button::can_provide_power(),
         // src: BlockRedstoneRepeater.java:127-129
-        K::RedstoneRepeater { .. } => return super::repeater::can_provide_power(),
-        _ => return false,
-    };
-    untranscribed(world, what);
-    false
+        K::RedstoneRepeater { .. } => super::repeater::can_provide_power(),
+        _ => false,
+    }
 }
 
 /// `setBlockBoundsForItemRender()`: overrides reset the singleton's bounds
