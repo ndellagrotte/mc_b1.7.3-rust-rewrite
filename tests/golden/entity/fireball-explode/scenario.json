@@ -1,0 +1,9 @@
+{"name":"fireball-explode","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":40,"mob_spawning":"none",
+ "comment":"WP-2.4. A glass platform (id 20) at y = 60 instead of stone. EntityFireball(World) (harness kind Fireball, id 1, no acceleration) at (0.5, 66, 0.5) with motion (0, -0.4, 0): no gravity, drag 0.95, fire = 10 every tick (EntityFireball.java:61-174); it reaches the glass, rayTraceBlocks hits, and newExplosion(null, pos, 1.0F, flaming) runs with the fireball itself in the entity pass. The flaming pass draws the explosion's own Random only for an air position above an opaque cube (Explosion.java:118); that Random is clock-seeded in vanilla with no harness hook for an entity's explosion (census §2), so the platform is glass (not opaque) and nothing is drawn there: the fire placement itself is unverified here (tick/explosion-fire covers it through the explode op). An EntityItem (id 0) on the glass at (2.5, 61, 0.5) is knocked away. rng_state and entity_state every tick, block_box of the crater at the end.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":20},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1},"pos":["0x4004000000000000",61,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"spawn","kind":"Fireball","pos":["0x3fe0000000000000",66,"0x3fe0000000000000"],"id":1},
+        {"t":0,"op":"set_motion","id":1,"motion":[0,"0xbfd999999999999a",0]}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"t":39,"what":"block_box","x0":-3,"y0":59,"z0":-3,"x1":4,"y1":63,"z1":3}]}

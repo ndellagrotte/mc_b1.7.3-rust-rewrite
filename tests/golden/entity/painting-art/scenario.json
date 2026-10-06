@@ -1,0 +1,13 @@
+{"name":"painting-art","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":120,"mob_spawning":"none",
+ "comment":"WP-2.4. A stone wall at z = 3 (x -8..8, y 61-66). Four paintings by the position constructor (spawn Painting with direction, EntityPainting(world, x, y, z, dir), EntityPainting.java:22-45): every motive that fits is a candidate and one is drawn with rand.nextInt on the painting's own seeded rand (the oracle replays the draw, tests/golden/README.md); ids 0-2 on the wall's -z face (direction 0) at anchors x = -5, 0, 5 (y 63), id 3 on its +z face (direction 2) at x = 0. Later paintings exclude motives overlapping earlier ones (onValidSurface's painting scan). At t = 50 the anchor block of painting 0 is removed; on its 101st update (t = 100, tickCounter1) onValidSurface fails, the painting dies and drops a painting item (Math.random draws). A snowball (id 4) at (0.5, 64, -2) flies +z into painting 1 (the entity hit beats the wall behind it): EntityPainting.attackEntityFrom kills it and drops an item. rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":3,"x1":8,"y1":66,"z1":3,"id":1},
+        {"t":0,"op":"spawn","kind":"Painting","direction":0,"pos":[-5,63,3],"id":0},
+        {"t":0,"op":"spawn","kind":"Painting","direction":0,"pos":[0,63,3],"id":1},
+        {"t":0,"op":"spawn","kind":"Painting","direction":0,"pos":[5,63,3],"id":2},
+        {"t":0,"op":"spawn","kind":"Painting","direction":2,"pos":[0,63,3],"id":3},
+        {"t":5,"op":"spawn","kind":"Snowball","pos":["0x3fe0000000000000",64,-2],"id":4},
+        {"t":5,"op":"set_motion","id":4,"motion":[0,"0x3fb999999999999a","0x3fe3333333333333"]},
+        {"t":50,"op":"set_block","x":-5,"y":63,"z":3,"id":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

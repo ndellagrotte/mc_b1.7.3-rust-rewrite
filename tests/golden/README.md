@@ -1024,10 +1024,43 @@ platform at y = 60 (none needs a player unless it says so):
 
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
-would need the one-in-100000 roll on a platform column of a rainy biome, and
-`EntityLightningBolt` is WP-2.4), and so `canBlockBeRainedOn`'s biome test
+would need the one-in-100000 roll on a platform column of a rainy biome, and the bolt it makes
+draws from an unseeded `rand` in the oracle, census §3; the bolt itself is pinned by
+`entity/lightning-strike` below), and so `canBlockBeRainedOn`'s biome test
 (World.java:2449-2460). A roll that does succeed on an empty column stops at
 `canBlockSeeTheSky` (y = -1), before the biome test.
+
+Non-living entities (WP-2.4, task 1), empty world, seed 123, `"mob_spawning": "none"`, the
+stone platform unless stated, `rng_state` and `entity_state` every tick:
+
+- `entity/arrow-flight` (above, generated terrain) and `entity/arrow-in-ground-pickup`: a
+  spawned arrow flies (rotation from the motion on its first update, `rayTraceBlocks_do_do`
+  with `ignoreNoCollision`), sticks (0.05 back-off, `arrowShake` 7), a player is moved onto it
+  (a spawned arrow does not belong to a player, so `onCollideWithPlayer` never reaches the
+  WP-2.5 inventory), and when its block is removed it falls out (three `rand` floats) and
+  sticks again.
+- `entity/tnt-explode`: a redstone torch primes a TNT block (fuse 80, the `Math.random()`
+  kick), the fuse runs out, size-4 explosion with the TNT in the entity pass; it primes a
+  second TNT block (`World.rand` fuse) and knocks back or destroys items.
+- `tick/tnt-by-fire` (above): fire primes the TNT.
+- `entity/snowball-egg-flight`: two snowballs and an egg (harness kind `Egg`) into a wall and
+  onto the floor; the egg's `nextInt(8)` hatch roll fails with seed 123 (a hatched chicken is
+  WP-2.3: the port would diverge at the next entity line).
+- `entity/painting-art`: four paintings by the position constructor (art draws replayed on
+  the seeded `rand`); one loses its wall block and drops at its 101st update, one is hit by a
+  snowball (`EntityPainting.attackEntityFrom`).
+- `entity/fireball-explode`: a fireball (harness kind `Fireball`) falls onto a **glass**
+  platform and explodes flaming; glass is not an opaque cube, so the explosion's clock-seeded
+  `Random` is never drawn (census §2). The fire placement of an entity's flaming explosion is
+  therefore not pinned (the `explode` op's `tick/explosion-fire` pins the code with a seeded
+  `Random`).
+- `entity/lightning-strike`: a bolt (harness kind `LightningBolt`, difficulty 0), its thunder
+  draws, re-strikes that set fire, an item in range destroyed by `onStruckByLightning`; also
+  `weather` every tick.
+- `entity/fishing-hook` (player, 600 ticks): a rod given through a workbench `use_item`, then
+  the harness kind `FishingHook`; the bobber flies into a 5-deep pool, floats and draws its
+  bite rolls. `catchFish` needs the rod's right click (WP-2.6) and is unit-tested only
+  (`crates/mc-sim/tests/non_living_entities.rs`).
 
 Vanilla behaviour these fixtures pin down:
 

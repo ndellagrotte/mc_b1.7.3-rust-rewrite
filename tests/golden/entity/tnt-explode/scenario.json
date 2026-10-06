@@ -1,0 +1,12 @@
+{"name":"tnt-explode","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":140,"mob_spawning":"none",
+ "comment":"WP-2.4. Two EntityItems (ids 0, 1) near a TNT block at (0, 61, 0) on the stone platform; a second TNT at (-1, 61, 0). A lit redstone torch (76) set at (1, 61, 0) at t = 0 notifies its neighbours (BlockRedstoneTorch.onBlockAdded) and BlockTNT.onNeighborBlockChange primes the first TNT: EntityTNTPrimed(world, 0.5, 61.5, 0.5) (id 2, one Math.random() kick, fuse 80, EntityTNTPrimed.java:14-25). It falls and slides, its fuse runs down without super.onUpdate (ticksExisted stays 0), and at t = 80 it dies and explodes (createExplosion size 4 with the TNT itself in the entity pass). The explosion destroys the second TNT block, which primes with a World.rand fuse (BlockTNT.onBlockDestroyedByExplosion) and explodes later; the items are knocked back or destroyed. rng_state and entity_state every tick, block_box of the area every 10 ticks.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":59,"z0":-8,"x1":8,"y1":59,"z1":8,"id":1},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1},"pos":["0x400c000000000000",61,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":280,"count":2},"pos":["0x3fe0000000000000",61,"0xc012000000000000"],"id":1},
+        {"t":0,"op":"set_block","x":0,"y":61,"z":0,"id":46},
+        {"t":0,"op":"set_block","x":-1,"y":61,"z":0,"id":46},
+        {"t":0,"op":"set_block","x":1,"y":61,"z":0,"id":76}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"every":10,"what":"block_box","x0":-6,"y0":57,"z0":-6,"x1":6,"y1":63,"z1":6}]}

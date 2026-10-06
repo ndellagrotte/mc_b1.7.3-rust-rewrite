@@ -1,0 +1,12 @@
+{"name":"snowball-egg-flight","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":40,"mob_spawning":"none",
+ "comment":"WP-2.4. A stone wall at x = 4 (y 61-64, z -3..3) on the platform. EntitySnowball(World) (id 0) at (0.5, 62, -1.5) and EntityEgg(World) (harness kind Egg, id 1) at (0.5, 62, 1.5), both with motion (0.5, 0.1, 0) toward the wall; a second snowball (id 2) at (-3.5, 62, 0.5) thrown up and back (-0.2, 0.5, 0) falls onto the platform. Flight: lastTickPos, super.onUpdate, rayTraceBlocks, the entity scan, gravity 0.03 and drag 0.99 (EntitySnowball.java:87-202). On the hit each dies; the egg draws rand.nextInt(8) (and nextInt(32)) for its chickens (EntityEgg.java:156-167). If the oracle hatches a chicken the port, which records EntityChicken.<init> (WP-2.3) after the chicken's Math.random() draws, diverges at the next entity line. rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":4,"y0":61,"z0":-3,"x1":4,"y1":64,"z1":3,"id":1},
+        {"t":0,"op":"spawn","kind":"Snowball","pos":["0x3fe0000000000000",62,"0xbff8000000000000"],"id":0},
+        {"t":0,"op":"set_motion","id":0,"motion":["0x3fe0000000000000","0x3fb999999999999a",0]},
+        {"t":0,"op":"spawn","kind":"Egg","pos":["0x3fe0000000000000",62,"0x3ff8000000000000"],"id":1},
+        {"t":0,"op":"set_motion","id":1,"motion":["0x3fe0000000000000","0x3fb999999999999a",0]},
+        {"t":0,"op":"spawn","kind":"Snowball","pos":["0xc00c000000000000",62,"0x3fe0000000000000"],"id":2},
+        {"t":0,"op":"set_motion","id":2,"motion":["0xbfc999999999999a","0x3fe0000000000000",0]}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

@@ -1,0 +1,13 @@
+{"name":"arrow-in-ground-pickup","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":80,"mob_spawning":"none",
+ "comment":"WP-2.4. Two stone layers (y = 59, 60). EntityArrow(World) (id 0) at (0.5, 64, 0.5) with motion (0.3, -0.6, 0.1): the first onUpdate derives its rotation from the motion (EntityArrow.java:88-92); rayTraceBlocks_do_do hits the platform top, the arrow backs off 0.05 along its motion, sticks (inGround, arrowShake 7, inTile/inData) and counts ticksInGround. The arrow sticks in block (1, 60, 0). A player (id 1) stands at (-4.5, 61, 0.5), is moved onto the arrow at t = 20 (set_pos with posY = 61 + yOffset 1.62F, feet on the platform) and back at t = 25: EntityPlayer.onLivingUpdate calls the arrow's onCollideWithPlayer, which does nothing because a spawned arrow does not belong to a player (doesArrowBelongToPlayer false, EntityArrow.java:259), so the WP-2.5 inventory pickup is never reached. At t = 30 the block it is stuck in, (1, 60, 0), is removed: the arrow's motion is scaled by three rand floats (EntityArrow.java:117-122), it flies again and sticks in the layer below. rng_state every tick, entity_state of the arrow every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":59,"z0":-8,"x1":8,"y1":59,"z1":8,"id":1},
+        {"t":0,"op":"spawn","kind":"Arrow","pos":["0x3fe0000000000000",64,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"set_motion","id":0,"motion":["0x3fd3333333333333","0xbfe3333333333333","0x3fb999999999999a"]},
+        {"t":0,"op":"player","x":"0xc012000000000000","y":61,"z":"0x3fe0000000000000"},
+        {"t":20,"op":"set_pos","id":1,"pos":["0x3ff8000000000000","0x404f4f5c29000000","0x3fe0000000000000"]},
+        {"t":25,"op":"set_pos","id":1,"pos":["0xc012000000000000","0x404f4f5c29000000","0x3fe0000000000000"]},
+        {"t":30,"op":"set_block","x":1,"y":60,"z":0,"id":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":[0]},
+          {"t":79,"what":"block_box","x0":-1,"y0":58,"z0":-1,"x1":2,"y1":61,"z1":2}]}

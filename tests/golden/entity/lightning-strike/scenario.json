@@ -1,0 +1,10 @@
+{"name":"lightning-strike","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":60,"mob_spawning":"none",
+ "comment":"WP-2.4. EntityLightningBolt(world, 0.5, 61, 0.5) (harness kind LightningBolt, id 2) over the stone platform, joined with addWeatherEffect (it is ticked first in updateEntities and never listed by entity_state). Difficulty 0, so the constructor places no fire; its boltVertex and boltLivingTime draws are replayed on the seeded rand (tests/golden/README.md). onUpdate (EntityLightningBolt.java:36-74): thunder sounds with two rand floats, lightningState counting down, re-strikes (rand.nextInt(10), nextLong) that set fire at (0, 61, 0) with no difficulty test, onStruckByLightning (5 fire damage, fire + 1) on the entities within 3 blocks while lightningState >= 0, World.field_27172_i = 2. EntityItems: id 0 at (1.5, 61, 0.5) (struck: EntityItem health 5, dies), id 1 at (6.5, 61, 0.5) (out of range). The fire burns out on the stone (BlockFire, World.rand). rng_state and weather every tick, entity_state every tick, block_box around the strike every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1},"pos":["0x3ff8000000000000",61,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"spawn","kind":"Item","item":{"id":4,"count":1},"pos":["0x401a000000000000",61,"0x3fe0000000000000"],"id":1},
+        {"t":0,"op":"spawn","kind":"LightningBolt","pos":["0x3fe0000000000000",61,"0x3fe0000000000000"],"id":2}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"weather"},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"every":1,"what":"block_box","x0":-2,"y0":60,"z0":-2,"x1":2,"y1":62,"z1":2}]}

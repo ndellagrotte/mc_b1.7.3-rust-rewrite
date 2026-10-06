@@ -49,16 +49,23 @@ fixtures! {
     entity_item_in_web => "entity" / "item-in-web";
     entity_item_out_of_world => "entity" / "item-out-of-world";
     entity_item_steps_up => "entity" / "item-steps-up";
-    #[ignore = "EntityArrow(World) constructor (WP-2.4): the driver stops at line 2 (t=0 op spawn kind Arrow); line 1 matches. Then EntityArrow.onUpdate; generated and populated terrain is in (WP-1.4, WP-1.7)"]
+    // The other entity fixtures (WP-2.4a's non-living entities among them).
     entity_arrow_flight => "entity" / "arrow-flight";
+    entity_arrow_in_ground_pickup => "entity" / "arrow-in-ground-pickup";
+    entity_fireball_explode => "entity" / "fireball-explode";
+    entity_fishing_hook => "entity" / "fishing-hook";
     entity_flat_item_drop => "entity" / "flat-item-drop";
     #[ignore = "EntityPig(World) constructor not transcribed: first diff line 7 (t=0 op spawn kind Pig); then EntityLiving.onLivingUpdate / EntityCreature.updatePlayerActionState wander AI (WP-2.2)"]
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
     entity_item_drop => "entity" / "item-drop";
+    entity_lightning_strike => "entity" / "lightning-strike";
+    entity_painting_art => "entity" / "painting-art";
     #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5); population is in (WP-1.7)"]
     entity_pig_attacked => "entity" / "pig-attacked";
     #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig: expected the op line with kind EntityPig); line 1 (preload) matches. Then EntityPig (WP-2.3); the Entity base and water physics are in (WP-2.1), population is in (WP-1.7)"]
     entity_pig_falls => "entity" / "pig-falls";
+    entity_snowball_egg_flight => "entity" / "snowball-egg-flight";
+    entity_tnt_explode => "entity" / "tnt-explode";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
     light_blocklight_glowstone => "light" / "blocklight-glowstone";
@@ -134,7 +141,6 @@ fixtures! {
     tick_soul_sand_web_item => "tick" / "soul-sand-web-item";
     tick_spawning_draws => "tick" / "spawning-draws";
     tick_sponge_removal_notifies => "tick" / "sponge-removal-notifies";
-    #[ignore = "needs EntityTNTPrimed (WP-2.4): first diff line 170 (t=79 rng_state math_random: the fire reaches the TNT and the EntityTNTPrimed constructor draws Math.random(); the port records EntityTNTPrimed.<init>); lines 1-169 match, BlockFire (WP-1.6b) is in. Then the primed TNT entity and Explosion (WP-1.8)"]
     tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
     #[ignore = "SpawnerAnimals mob constructors (EntityChicken, EntitySheep, EntitySquid, EntityCow: WP-2.3): the oracle spawns animals in tick 0, whose EntityLiving constructors draw Math.random() (with rng_state every tick: math_random differs from t=0, world_rand and lcg from t=1, while the scheduled ticks of population still match). Here the first diff is line 4 (t=99 chunk_digest -2,-4: blocks, data; sky light and height map match); then the player's own update (EntityPlayer, WP-2.5: entity_state posY). Population (WP-1.7) and the BlockSapling/BlockGrass random ticks (WP-1.6) are in"]
