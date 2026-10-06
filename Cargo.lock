@@ -3542,6 +3542,7 @@ dependencies = [
  "mc-core",
  "mc-golden",
  "mc-nbt",
+ "serde_json",
 ]
 
 [[package]]

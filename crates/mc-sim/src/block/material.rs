@@ -79,9 +79,30 @@ impl MapColor {
         color_index: 13,
         color_value: 6837042,
     };
+
+    /// `mapColorArray` (MapColor.java:3): each constructor stores itself at
+    /// its `colorIndex` (MapColor.java:22-26); slots 14 and 15 stay null.
+    pub const MAP_COLOR_ARRAY: [Option<MapColor>; 16] = [
+        Some(Self::AIR_COLOR),
+        Some(Self::GRASS_COLOR),
+        Some(Self::SAND_COLOR),
+        Some(Self::CLOTH_COLOR),
+        Some(Self::TNT_COLOR),
+        Some(Self::ICE_COLOR),
+        Some(Self::IRON_COLOR),
+        Some(Self::FOLIAGE_COLOR),
+        Some(Self::SNOW_COLOR),
+        Some(Self::CLAY_COLOR),
+        Some(Self::DIRT_COLOR),
+        Some(Self::STONE_COLOR),
+        Some(Self::WATER_COLOR),
+        Some(Self::WOOD_COLOR),
+        None,
+        None,
+    ];
 }
 
-/// One of the 27 `Material` singletons (Material.java:4-31), in declaration
+/// One of the 28 `Material` singletons (Material.java:4-31), in declaration
 /// order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Material {
@@ -197,6 +218,92 @@ impl MaterialProps {
 }
 
 impl Material {
+    /// Every singleton in declaration order (Material.java:4-31).
+    pub const ALL: [Material; 28] = [
+        Material::Air,
+        Material::GrassMaterial,
+        Material::Ground,
+        Material::Wood,
+        Material::Rock,
+        Material::Iron,
+        Material::Water,
+        Material::Lava,
+        Material::Leaves,
+        Material::Plants,
+        Material::Sponge,
+        Material::Cloth,
+        Material::Fire,
+        Material::Sand,
+        Material::Circuits,
+        Material::Glass,
+        Material::Tnt,
+        Material::Coral,
+        Material::Ice,
+        Material::Snow,
+        Material::BuiltSnow,
+        Material::Cactus,
+        Material::Clay,
+        Material::Pumpkin,
+        Material::Portal,
+        Material::CakeMaterial,
+        Material::Web,
+        Material::Piston,
+    ];
+
+    /// The name of the `Material` static field holding this singleton.
+    // src: Material.java:4-31
+    pub const fn java_name(self) -> &'static str {
+        match self {
+            Material::Air => "air",
+            Material::GrassMaterial => "grassMaterial",
+            Material::Ground => "ground",
+            Material::Wood => "wood",
+            Material::Rock => "rock",
+            Material::Iron => "iron",
+            Material::Water => "water",
+            Material::Lava => "lava",
+            Material::Leaves => "leaves",
+            Material::Plants => "plants",
+            Material::Sponge => "sponge",
+            Material::Cloth => "cloth",
+            Material::Fire => "fire",
+            Material::Sand => "sand",
+            Material::Circuits => "circuits",
+            Material::Glass => "glass",
+            Material::Tnt => "tnt",
+            Material::Coral => "coral",
+            Material::Ice => "ice",
+            Material::Snow => "snow",
+            Material::BuiltSnow => "builtSnow",
+            Material::Cactus => "cactus",
+            Material::Clay => "clay",
+            Material::Pumpkin => "pumpkin",
+            Material::Portal => "portal",
+            Material::CakeMaterial => "cakeMaterial",
+            Material::Web => "web",
+            Material::Piston => "piston",
+        }
+    }
+
+    /// The Java class of the singleton (`Material` or one of its four
+    /// subclasses), for traces.
+    pub const fn java_class(self) -> &'static str {
+        match self.props().class {
+            MaterialClass::Plain => "Material",
+            MaterialClass::Logic => "MaterialLogic",
+            MaterialClass::Transparent => "MaterialTransparent",
+            MaterialClass::Liquid => "MaterialLiquid",
+            MaterialClass::Portal => "MaterialPortal",
+        }
+    }
+
+    /// The private field `isOpaque` itself (set by `setIsTranslucent`; read
+    /// only through [`Material::get_is_translucent`]).
+    // src: Material.java:34, :59-62
+    pub const fn is_opaque(self) -> bool {
+        self.props().is_opaque
+    }
+
     /// The static initialiser, one row per singleton.
     const fn props(self) -> MaterialProps {
         use MaterialClass as C;

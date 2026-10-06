@@ -9,8 +9,9 @@
 //!
 //! Not in this table: the `Item.itemsList` entries the initialiser also
 //! creates (Block.java:689-702; WP-1.2), `StatList.initBreakableStats()`
-//! (Block.java:705; WP-2.7) and `BlockFire.initializeBlock()`'s burn rates
-//! (BlockFire.java:14-24, called via Block.java:700; the fire task of WP-1.6).
+//! (Block.java:705; WP-2.7). `BlockFire.initializeBlock()`'s burn rates
+//! (BlockFire.java:14-24, called via Block.java:700) are data and are here
+//! ([`FIRE_BURN_RATES`]); the fire behaviour that reads them is WP-1.6.
 
 use super::material::Material as M;
 use super::*;
@@ -1148,6 +1149,35 @@ const TRAPDOOR: BlockDef = block_trap_door(96, M::Wood)
     .set_block_name("trapdoor")
     .disable_stats()
     .disable_neighbor_notify_on_metadata_change();
+
+/// `BlockFire.initializeBlock()`'s `setBurnRate(id, encourage, catch)` calls,
+/// applied to two zeroed `int[256]`: `(chanceToEncourageFire,
+/// abilityToCatchFire)`. Block.java:697-702 calls `initializeBlock` on every
+/// block that has no item yet; only `BlockFire` overrides it.
+// src: BlockFire.java:14-29
+pub(super) const FIRE_BURN_RATES: ([i32; 256], [i32; 256]) = {
+    let rates: [(i32, i32, i32); 9] = [
+        (PLANKS.block_id, 5, 20),
+        (FENCE.block_id, 5, 20),
+        (STAIR_COMPACT_PLANKS.block_id, 5, 20),
+        (WOOD.block_id, 5, 5),
+        (LEAVES.block_id, 30, 60),
+        (BOOK_SHELF.block_id, 30, 20),
+        (TNT.block_id, 15, 100),
+        (TALL_GRASS.block_id, 60, 100),
+        (CLOTH.block_id, 30, 60),
+    ];
+    let mut encourage = [0i32; 256];
+    let mut catch = [0i32; 256];
+    let mut i = 0;
+    while i < rates.len() {
+        let (id, e, c) = rates[i];
+        encourage[id as usize] = e;
+        catch[id as usize] = c;
+        i += 1;
+    }
+    (encourage, catch)
+};
 
 /// Every row in initialiser order.
 const ROWS: [BlockDef; 96] = [
