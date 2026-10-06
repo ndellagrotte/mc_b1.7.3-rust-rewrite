@@ -68,6 +68,8 @@ fixtures! {
     entity_minecart_derail_collide => "entity" / "minecart-derail-collide";
     entity_minecart_break_drops => "entity" / "minecart-break-drops";
     entity_minecart_player_ride => "entity" / "minecart-player-ride";
+    // WP-2.3 (squid, water mobs, spawn rules).
+    entity_squid_swim => "entity" / "squid-swim";
     entity_minecart_furnace_push => "entity" / "minecart-furnace-push";
     entity_painting_art => "entity" / "painting-art";
     #[ignore = "EntityPlayer.attackTargetEntityWithCurrentItem (WP-2.5): lines 1-25 match (the pig's and the player's EntityLiving updates, t=0..9); the driver stops at line 26 (t=10 op attack, via player: the player punch). The t=20 direct hit (EntityLiving.attackEntityFrom) is transcribed and pinned by entity/pig-knockback"]
@@ -140,7 +142,6 @@ fixtures! {
     tick_explosion_fire => "tick" / "explosion-fire";
     tick_furnace_idle => "tick" / "furnace-idle";
     tick_mob_spawner_delay => "tick" / "mob-spawner-delay";
-    #[ignore = "TileEntityMobSpawner.updateEntity's spawn loop (tile_entity/mob_spawner.rs) still records EntityList.createEntityInWorld and returns; EntityList.createEntityInWorld(\"Pig\"), getCanSpawnHere (dispatch::get_can_spawn_here) and spawnExplosionParticle exist since WP-2.2 but the spawner does not call them yet: first diff line 25 (t=20 rng_state, field math_random: EntityLiving's constructor draws); lines 1-24 (the count-down) match"]
     tick_mob_spawner_spawn => "tick" / "mob-spawner-spawn";
     tick_note_jukebox_activate => "tick" / "note-jukebox-activate";
     tick_sign_pops_off => "tick" / "sign-pops-off";
@@ -176,10 +177,15 @@ fixtures! {
     tick_sapling_grow => "tick" / "sapling-grow";
     tick_soul_sand_web_item => "tick" / "soul-sand-web-item";
     tick_spawning_draws => "tick" / "spawning-draws";
+    tick_natural_spawn_squid => "tick" / "natural-spawn-squid";
+    #[ignore = "needs EntityChicken/EntitySheep/EntityCow (WP-2.3a; EntitySquid and EntityPig construct here, the others are EntityList gaps whose constructor side effects are made and which then count as not spawnable): first diff line 4 (t=1 rng_state: world_rand, lcg, math_random); lines 1-3 match, i.e. tick 0's performSpawning, which the oracle ends with sheep, chickens and cows in the world, draws alike. Then also the player's EntityPlayer.onLivingUpdate (peaceful heal after its fall, WP-2.5)"]
+    tick_natural_spawn_pigs => "tick" / "natural-spawn-pigs";
+    #[ignore = "needs EntityPlayer.sleepInBedAt (WP-2.5a; BlockBed.blockActivated records it), then EntityPlayer.onUpdate's sleep timer and wakeUpPlayer (WP-2.5) and the EntitySkeleton constructor and AI (WP-2.3b) for the skeleton performSleepSpawning places at t=101: first diff line 18 (t=2 entity_state of the player, field isCollidedVertically: the oracle's player lies in the bed); lines 1-17 match"]
+    tick_sleep_spawning => "tick" / "sleep-spawning";
     tick_sponge_removal_notifies => "tick" / "sponge-removal-notifies";
     tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
-    #[ignore = "SpawnerAnimals.performSpawning still records the mob constructor (spawner.rs constructor_name) and EntitySquid is not built (squid and spawn rules: WP-2.3c; EntityChicken, EntitySheep, EntityCow exist since WP-2.3a): the oracle spawns animals in tick 0, whose EntityLiving constructors draw Math.random() (with rng_state every tick: math_random differs from t=0, world_rand and lcg from t=1, while the scheduled ticks of population still match). Here the first diff is line 4 (t=99 chunk_digest -2,-4: blocks, data; sky light and height map match); then the player's own update: its EntityLiving physics match since WP-2.2, its health does not (EntityPlayer.onLivingUpdate's peaceful heal, WP-2.5: entity_state t=99 health 19, expected 20). Population (WP-1.7) and the BlockSapling/BlockGrass random ticks (WP-1.6) are in"]
+    #[ignore = "SpawnerAnimals mob constructors (EntityChicken, EntitySheep, EntityCow: WP-2.3a; EntitySquid exists since WP-2.3c): the oracle spawns animals in tick 0, whose EntityLiving constructors draw Math.random() (with rng_state every tick: math_random differs from t=0, world_rand and lcg from t=1, while the scheduled ticks of population still match). Here the first diff is line 4 (t=99 chunk_digest -2,-4: blocks, data; sky light and height map match); then the player's own update: its EntityLiving physics match since WP-2.2, its health does not (EntityPlayer.onLivingUpdate's peaceful heal, WP-2.5: entity_state t=99 health 19, expected 20). Population (WP-1.7) and the BlockSapling/BlockGrass random ticks (WP-1.6) are in"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     tick_snow_ice => "tick" / "snow-ice";
     tick_water_flow => "tick" / "water-flow";

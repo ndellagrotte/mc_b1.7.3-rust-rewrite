@@ -1016,8 +1016,9 @@ platform at y = 60 (none needs a player unless it says so):
 - `tick/explosion-fire`: a flaming `explode` (size 3): the fires `doExplosionA` sets are cleared
   again by `doExplosionB` (no fire is left; their scheduled ticks are). Needs `BlockFire` (WP-1.6b, in).
 - `tick/mob-spawner-delay` (player): a mob spawner counting down its 20 ticks (three `World.rand`
-  draws per tick); `tick/mob-spawner-spawn` continues into the spawn attempts (needs the
-  `EntityPig` constructor, in since WP-2.2, and the spawner's spawn loop in a port).
+  draws per tick); `tick/mob-spawner-spawn` continues into the spawn attempts (the
+  `EntityPig` constructor through `EntityList.createEntityInWorld`, the placement draws, an
+  animal's `getCanSpawnHere` failing on stone: in since WP-2.3).
 - `tick/sign-pops-off`: wall signs and a sign post losing their support (`BlockSign.onNeighborBlockChange`
   drops an `Item.sign`), a wall sign with metadata 0 dropping at the first neighbour change.
 - `save/tile-entities` (Tier S, player): one tile entity of each class in chunk (0, 0), the note
@@ -1180,6 +1181,24 @@ their drops only where a player is present: the player's own update is WP-2.5):
   by two direct hits.
 - `entity/boat-player-ride` (player): `interact` puts the player in a boat, which is sent into
   the rim and breaks with its rider; the run ends before the player could pick up the drops.
+- `entity/squid-swim` (WP-2.3, 600 ticks, no player): an 11-deep pool; one squid swims
+  (`EntitySquid`'s stroke cycle and random swim direction, `isInWater`'s current push), one sits
+  on a ledge (out of water it falls and tips over), one drops into the pool and is killed by a
+  direct hit (1-3 ink sacs, `dropFewItems`). The constructor's `rotationVelocity` draw is the
+  oracle join hook's redraw (census §3).
+- `tick/natural-spawn-squid` (WP-2.3, player, difficulty 0): `SpawnerAnimals.performSpawning`
+  with mobs that join: a pool more than 24 blocks from the player and the spawn point fills
+  with squid packs (construction through `EntityList`'s table, `setLocationAndAngles`,
+  `EntityWaterMob.getCanSpawnHere`, `entityJoinedWorld`, the 4-per-pack and 5-per-world caps);
+  nothing else is a spawn spot, so no animal constructor is reached.
+- `tick/natural-spawn-pigs` (WP-2.3, generated terrain, player on the grass of
+  `tick/sapling-with-player`, difficulty 0): natural animal and squid spawning end to end; needs
+  every `SpawnListEntry` constructor (sheep, pig, chicken, cow, squid; wolves in forests).
+- `tick/sleep-spawning` (WP-2.3, player, difficulty 1): a player sleeps in a bed in a dark,
+  water-roofed stone room (no monster spot outside it, so the unseeded `EntityMob.getCanSpawnHere`
+  rolls of census §3 always pass); after 100 ticks `performSleepSpawning` places a skeleton by
+  the bed and wakes the player. Stops before the skeleton's first arrow (unseeded heading
+  jitter). Needs `EntityPlayer.sleepInBedAt` (WP-2.5) and the skeleton (WP-2.3).
 
 Monsters, slime and ghast (WP-2.3, task 2), empty world, seed 123, `"mob_spawning": "none"`,
 `"difficulty": 1` (`EntityMob.onUpdate` and `EntityGhast.updatePlayerActionState` kill them

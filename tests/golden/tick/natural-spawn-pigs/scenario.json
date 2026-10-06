@@ -1,0 +1,6 @@
+{"name": "natural-spawn-pigs", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "ticks": 400,
+ "mob_spawning": "default", "difficulty": 0,
+ "comment":"WP-2.3: SpawnerAnimals.performSpawning end to end in a generated world (seed 123) with peaceful spawning only (difficulty 0: setAllowedMobSpawns(false, true)). The player stands on the grass near (-22, 65, -58) (tick/sapling-with-player's spot) in daylight; the oracle spawns the creature packs of the biome lists on grass in light (EntityAnimal.getCanSpawnHere: sheep 12, pig 10, chicken 10, cow 8, wolves in forest and taiga; creatureSpecificInit's fleece colour for sheep) and squid in water, up to the caps, on the first tick, then lets them wander (EntityCreature AI, despawn rolls). Falling sand from the generated terrain (EntityFallingSand) shows in the entity list too. rng_state every tick, entity_state all every 40 ticks.",
+ "ops":[{"t": 0, "op": "player", "x": -22, "y": 70, "z": -58}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 40, "what": "entity_state", "which": "all"}]}

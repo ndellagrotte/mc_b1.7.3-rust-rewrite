@@ -1,0 +1,13 @@
+{"name": "squid-swim", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 600, "mob_spawning": "none",
+ "comment":"WP-2.3 (squid). A 9x9 pool of still water (id 9; x, z in -4..4, y = 50..60, 11 deep) in a stone block (x, z in -5..5, y = 49..60), a stone ledge east of it at y = 60 (x 7..10, z -2..2); chunks within 3 preloaded; no player (no despawn, no spawner). Three squids (EntityList constructor; rotationVelocity drawn on the seeded rand, the oracle's join-hook redraw): 0 swims in the middle of the pool (EntitySquid.updatePlayerActionState's swim direction on 1-in-50 rolls, onLivingUpdate's stroke cycle and motion, isInWater's handleMaterialAcceleration over the shrunk box, called twice a tick, moveEntityWithHeading = moveEntity); 1 sits on the ledge (out of water: zero horizontal motion, gravity, a new direction every tick, the pitch sinking toward -90; it does not drown, canBreatheUnderwater); 2 drops into the pool from y = 66 and is killed at t = 300 by a direct hit of 20 (EntityLiving.attackEntityFrom with no attacker, then onDeath: EntitySquid.dropFewItems, 1-3 ink sacs, dye damage 0, which float in the water) and dies 20 ticks later. rng_state and entity_state of squid 0 every tick, entity_state of all every 5 ticks.",
+ "ops":[{"t": 0, "op": "preload", "cx": 0, "cz": 0, "radius": 3},
+        {"t": 0, "op": "fill", "x0": -5, "y0": 49, "z0": -5, "x1": 5, "y1": 60, "z1": 5, "id": 1},
+        {"t": 0, "op": "fill", "x0": -4, "y0": 50, "z0": -4, "x1": 4, "y1": 60, "z1": 4, "id": 9},
+        {"t": 0, "op": "fill", "x0": 7, "y0": 60, "z0": -2, "x1": 10, "y1": 60, "z1": 2, "id": 1},
+        {"t": 0, "op": "spawn", "kind": "Squid", "pos": ["0x3fe0000000000000", 54, "0x3fe0000000000000"], "id": 0},
+        {"t": 0, "op": "spawn", "kind": "Squid", "pos": ["0x4021000000000000", 61, "0x3fe0000000000000"], "id": 1},
+        {"t": 0, "op": "spawn", "kind": "Squid", "pos": ["0x4004000000000000", 66, "0xc004000000000000"], "id": 2},
+        {"t": 300, "op": "attack", "target_id": 2, "damage": 20}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 1, "what": "entity_state", "which": [0]},
+          {"every": 5, "what": "entity_state", "which": "all"}]}

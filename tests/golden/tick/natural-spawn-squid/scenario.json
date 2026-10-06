@@ -1,0 +1,9 @@
+{"name": "natural-spawn-squid", "tier": "C", "kind": "tick", "seed": 123, "dimension": "overworld", "world": "empty", "ticks": 400,
+ "mob_spawning": "default", "difficulty": 0,
+ "comment":"WP-2.3: SpawnerAnimals.performSpawning end to end with mobs that join (difficulty 0: setAllowedMobSpawns(false, true), creatures and water creatures). The player stands on a 5x5 stone pad at y = 60 around (0.5, 61, 0.5); the only other blocks are a pool filling chunk (3, 3) (still water, x, z 48..63, y 56..63, on a stone floor at y = 55): more than 24 blocks from the player and from the spawn point (0, 0, 0). Water-creature packs land in the pool (canCreatureTypeSpawnAtLocation: liquid, no normal cube above), each squid is built by EntityList's constructor (EntitySquid; its rotationVelocity draw is the oracle join hook's redraw), placed by setLocationAndAngles with a World.rand yaw, passes EntityWaterMob.getCanSpawnHere and joins until the pack reaches getMaxSpawnedInChunk (4) or the cap (5 * 289 / 256 = 5 water creatures) stops the type. Creature packs find no normal cube under air beyond 24 blocks (the stone floor is under water), so no animal constructor is reached. The squids then swim (entity/squid-swim). rng_state every tick, entity_state all every 4 ticks.",
+ "ops":[{"t": 0, "op": "fill", "x0": -2, "y0": 60, "z0": -2, "x1": 2, "y1": 60, "z1": 2, "id": 1},
+        {"t": 0, "op": "player", "x": "0x3fe0000000000000", "y": 61, "z": "0x3fe0000000000000"},
+        {"t": 0, "op": "fill", "x0": 48, "y0": 55, "z0": 48, "x1": 63, "y1": 55, "z1": 63, "id": 1},
+        {"t": 0, "op": "fill", "x0": 48, "y0": 56, "z0": 48, "x1": 63, "y1": 63, "z1": 63, "id": 9}],
+ "dumps":[{"every": 1, "what": "rng_state"},
+          {"every": 4, "what": "entity_state", "which": "all"}]}
