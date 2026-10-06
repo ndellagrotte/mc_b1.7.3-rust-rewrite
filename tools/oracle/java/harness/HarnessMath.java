@@ -20,4 +20,9 @@ public final class HarnessMath {
     public static double random() {
         return STREAM.nextDouble();
     }
+
+    /** The stream's 48-bit LCG state (trace field {@code rng_state.math_random}). */
+    static long state() {
+        return Rng.state(STREAM);
+    }
 }

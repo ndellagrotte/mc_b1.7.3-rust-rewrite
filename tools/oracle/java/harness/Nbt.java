@@ -212,7 +212,7 @@ final class Nbt {
     // ---- vanilla tags -> canonical JSON --------------------------------------
 
     /** {@code {"type":"compound","name":..,"value":{..}}}. */
-    private static String canonicalRoot(NBTTagCompound root) {
+    static String canonicalRoot(NBTTagCompound root) {
         StringBuilder b = new StringBuilder("{\"type\":\"compound\",\"name\":");
         Json.quote(b, checkString(root.getKey()));
         b.append(",\"value\":");

@@ -179,7 +179,7 @@ final class TierA {
         }
         // src: World.java:62. SaveHandlerMP: no disk, no level.dat, no chunk loader.
         World world = new World(new SaveHandlerMP(), "harness", provider, seed);
-        makeDeterministic(world, seed);
+        HarnessWorld.makeDeterministic(world, seed);
         IChunkProvider chunks = world.getIChunkProvider();
 
         Trace t = new Trace();
@@ -200,7 +200,7 @@ final class TierA {
                 }
             }
             Chunk chunk = world.getChunkFromChunkCoords(x, z);
-            chunkDigest(t, chunk, x, z, "generated", full);
+            chunkDigest(t, 0, chunk, x, z, "generated", full);
 
             // 2. populated: load the 3x3 neighbourhood, dz outer, dx inner.
             for (int dz = -1; dz <= 1; dz++) {
@@ -211,7 +211,7 @@ final class TierA {
             if (!chunk.isTerrainPopulated) {
                 throw new IllegalStateException("chunk " + x + "," + z + " not populated after loading its neighbours");
             }
-            chunkDigest(t, chunk, x, z, "populated", full);
+            chunkDigest(t, 0, chunk, x, z, "populated", full);
 
             // 3. biome (overworld only). A fresh WorldChunkManager gives the same arrays as
             // the world's own (the noise is a pure function of seed and coordinates) without
@@ -233,38 +233,13 @@ final class TierA {
         return t;
     }
 
-    /**
-     * Removes the World constructor's unseeded randomness (PLAN_v4 §4.2, ADR-007 §4.3).
-     * Overrides, all derived from the scenario seed:
-     * <ul>
-     *   <li>{@code rand.setSeed(seed)}; src: World.java:82 ({@code rand = new Random()}).
-     *   <li>{@code field_9437_g = new Random(seed).nextInt()}; src: World.java:75
-     *       ({@code (new Random()).nextInt()}, clock-seeded; the random-tick LCG state).
-     *   <li>{@code soundCounter = <same Random>.nextInt(12000)}; src: World.java:90 (drawn from
-     *       the then-unseeded {@code rand}).
-     * </ul>
-     * {@code lockTimestamp} (World.java:80, wall clock) only guards session locks, which
-     * SaveHandlerMP does not have, so it never reaches the output and is left alone.
-     */
-    private static void makeDeterministic(World world, long seed) throws Exception {
-        world.rand.setSeed(seed);
-        Random derived = new Random(seed);
-        setInt(world, "field_9437_g", derived.nextInt());
-        setInt(world, "soundCounter", derived.nextInt(12000));
-    }
-
-    private static void setInt(World world, String name, int value) throws Exception {
-        Field f = World.class.getDeclaredField(name);
-        f.setAccessible(true);
-        f.setInt(world, value);
-    }
-
-    private static void chunkDigest(Trace t, Chunk c, int x, int z, String stage, boolean full) {
+    /** {@code chunk_digest} (+ {@code chunk_full}) line at tick {@code tick}; shared with Tier B/C/S. */
+    static void chunkDigest(Trace t, long tick, Chunk c, int x, int z, String stage, boolean full) {
         byte[][] arrays = {c.blocks, c.data.data, c.skylightMap.data, c.blocklightMap.data, c.heightMap};
         String[] keys = {"blocks", "data", "skylight", "blocklight", "heightmap"};
         int[] lengths = {32768, 16384, 16384, 16384, 256};
-        Json.Line digest = new Json.Line().put("t", 0).put("e", "chunk_digest").put("x", x).put("z", z).put("stage", stage);
-        Json.Line dump = new Json.Line().put("t", 0).put("e", "chunk_full").put("x", x).put("z", z).put("stage", stage);
+        Json.Line digest = new Json.Line().put("t", tick).put("e", "chunk_digest").put("x", x).put("z", z).put("stage", stage);
+        Json.Line dump = new Json.Line().put("t", tick).put("e", "chunk_full").put("x", x).put("z", z).put("stage", stage);
         for (int i = 0; i < arrays.length; i++) {
             if (arrays[i].length != lengths[i]) {
                 throw new IllegalStateException(keys[i] + " has length " + arrays[i].length + ", expected " + lengths[i]);

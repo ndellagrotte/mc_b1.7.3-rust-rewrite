@@ -60,7 +60,7 @@ public final class Main {
             if (!only.isEmpty() && !only.contains(id)) continue;
             try {
                 Map<String, Object> sc = Scenario.load(file, rel.getFileName().toString());
-                Trace t = TierA.run(sc, file.getParent());
+                Trace t = "A".equals(sc.get("tier")) ? TierA.run(sc, file.getParent()) : worldTier(sc, file.getParent());
                 t.write(out.resolve(rel));
                 System.out.println("harness: " + id + " (" + t.lines.size() + " lines)");
                 ran++;
@@ -76,6 +76,22 @@ public final class Main {
         }
     }
 
+    /**
+     * Tiers B, C, S (tests/golden/README.md "Tier B/C/S scenarios"): kind {@code tick} (any of
+     * the three) or {@code world_read} (S only).
+     */
+    private static Trace worldTier(Map<String, Object> sc, Path dir) throws Exception {
+        Rng.selfTest();
+        String kind = Scenario.str(sc, "kind");
+        switch (kind) {
+            case "tick": return TickScenario.run(sc, dir);
+            case "world_read":
+                if (!"S".equals(sc.get("tier"))) throw new IllegalArgumentException("world_read is tier \"S\"");
+                return TierS.worldRead(sc, dir);
+            default: throw new IllegalArgumentException("unknown tier " + sc.get("tier") + " kind " + kind);
+        }
+    }
+
     /** Typed access to a parsed scenario.json. */
     static final class Scenario {
         private Scenario() {}
@@ -87,8 +103,9 @@ public final class Main {
             if (!dirName.equals(sc.get("name"))) {
                 throw new IllegalArgumentException("\"name\" must equal the directory name " + dirName);
             }
-            if (!"A".equals(sc.get("tier"))) {
-                throw new IllegalArgumentException("only tier \"A\" is implemented, got " + sc.get("tier"));
+            Object tier = sc.get("tier");
+            if (!"A".equals(tier) && !"B".equals(tier) && !"C".equals(tier) && !"S".equals(tier)) {
+                throw new IllegalArgumentException("tier must be \"A\", \"B\", \"C\" or \"S\", got " + tier);
             }
             return sc;
         }
