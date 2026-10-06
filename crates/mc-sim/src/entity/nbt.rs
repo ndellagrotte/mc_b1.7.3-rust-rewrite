@@ -34,13 +34,12 @@
 //! was the last). The read side's `match` keeps a fallback arm (recording
 //! `"Entity*.readEntityFromNBT"` in [`World::unimplemented_hits`]) for the
 //! kinds read and returned before it (painting, pig, sheep, wolf, creeper,
-//! slime), so it is never reached.
+//! slime, player), so it is never reached.
 //!
 //! Compound children are in `BTreeMap` order (vanilla's `HashMap` order only
 //! shows in bytes, never compared, PLAN_v4 §4.3).
 
 use mc_core::java_hash::ChunkCoordinates;
-use mc_core::math::floor_double;
 use mc_nbt::{Tag, TagType};
 
 use super::{Entity, EntityKindData, LivingData, PlayerData};
@@ -402,7 +401,19 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         super::slime::set_slime_size(e, size);
         return Ok(());
     }
-    let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
+    if let K::PlayerSp(l, p, _) = &mut e.kind {
+        read_living(l, c)?;
+        read_player(p, c)?;
+        // src: EntityPlayer.java:315-318 (a player saved asleep is woken)
+        super::player::read_entity_from_nbt_tail(e, world);
+        let Some(p) = e.kind.player_mut() else {
+            unreachable!("the PlayerSp arm above")
+        };
+        read_player_spawn(p, c)?;
+        // src: EntityPlayerSP.java:103-106
+        p.score = n::get_integer(c, "Score")?;
+        return Ok(());
+    }
     match &mut e.kind {
         K::Item(d) => {
             // src: EntityItem.java:103-108
@@ -440,12 +451,6 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         // src: EntitySquid.java:30-32, EntityWaterMob.java:16-18 (`super`
         // only)
         K::Squid(l, ..) => read_living(l, c)?,
-        K::PlayerSp(l, p, _) => {
-            read_living(l, c)?;
-            read_player(p, c, (px, py, pz), world)?;
-            // src: EntityPlayerSP.java:103-106
-            p.score = n::get_integer(c, "Score")?;
-        }
         other => {
             if let Some(l) = other.living_mut() {
                 read_living(l, c)?;
@@ -469,32 +474,24 @@ fn read_living(l: &mut LivingData, c: &Compound) -> Result<(), SaveError> {
     Ok(())
 }
 
-/// `EntityPlayer.readEntityFromNBT` (after `super`). A sleeping player's
-/// `bedChunkCoordinates` and `wakeUpPlayer(true, true, false)` are WP-2.5
-/// (recorded); `sleeping` and `sleepTimer` are read as saved.
-// src: EntityPlayer.java:308-324
-fn read_player(
-    p: &mut PlayerData,
-    c: &Compound,
-    pos: (f64, f64, f64),
-    world: &mut World,
-) -> Result<(), SaveError> {
+/// `EntityPlayer.readEntityFromNBT` (after `super`), up to the sleep
+/// state; a player saved asleep is then woken by
+/// [`super::player::read_entity_from_nbt_tail`] (EntityPlayer.java:315-318),
+/// and [`read_player_spawn`] reads the rest.
+// src: EntityPlayer.java:308-314
+fn read_player(p: &mut PlayerData, c: &Compound) -> Result<(), SaveError> {
     let var2 = n::get_tag_list(c, "Inventory")?;
     inventory_read_from_nbt(&mut p.inventory, var2)?;
     p.dimension = n::get_integer(c, "Dimension")?;
     p.sleeping = n::get_boolean(c, "Sleeping")?;
     p.sleep_timer = n::get_short(c, "SleepTimer")? as i32;
-    if p.sleeping {
-        // src: EntityPlayer.java:314-316
-        let _bed = ChunkCoordinates::new(
-            floor_double(pos.0),
-            floor_double(pos.1),
-            floor_double(pos.2),
-        );
-        world.note_unimplemented(
-            "EntityPlayer.readEntityFromNBT: bedChunkCoordinates and wakeUpPlayer(true, true, false) (WP-2.5)",
-        );
-    }
+    Ok(())
+}
+
+/// The end of `EntityPlayer.readEntityFromNBT`: the bed spawn, when all
+/// three keys are present.
+// src: EntityPlayer.java:320-322
+fn read_player_spawn(p: &mut PlayerData, c: &Compound) -> Result<(), SaveError> {
     if n::has_key(c, "SpawnX") && n::has_key(c, "SpawnY") && n::has_key(c, "SpawnZ") {
         p.player_spawn_coordinate = Some(ChunkCoordinates::new(
             n::get_integer(c, "SpawnX")?,

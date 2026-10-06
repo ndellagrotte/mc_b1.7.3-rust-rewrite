@@ -135,6 +135,8 @@ pub use tnt_primed::TntPrimedData;
 pub use wolf::WolfData;
 pub use zombie::ZombieData;
 
+use mc_core::java_hash::ChunkCoordinates;
+
 use crate::inventory::InventoryPlayer;
 
 /// An entity: `Entity.java`'s fields plus the subclass data.
@@ -180,44 +182,129 @@ empty_level!(
     WaterMobData,
     /// `EntityWeatherEffect` (EntityWeatherEffect.java).
     WeatherEffectData,
-    /// `EntityPlayerSP` (EntityPlayerSP.java).
-    PlayerSpData,
 );
 
-/// `EntityPlayer` (EntityPlayer.java). Only the fields the world reads so
-/// far (construction: [`player::new_entity_player_sp`]).
-#[derive(Clone, Debug, Default, PartialEq)]
+pub use player::{MovementInput, PlayerSpData};
+
+/// `EntityPlayer` (EntityPlayer.java:7-38): its fields in declaration
+/// order (construction: [`player::new_entity_player_sp`]; behaviour:
+/// [`player`]). Not here: `inventorySlots` / `craftingInventory` (the
+/// `ContainerPlayer`, WP-2.5b; `craftingInventory` is always
+/// `inventorySlots` without a GUI) and `playerCloakUrl` (an online cloak
+/// URL, D2). Renamed `field_NNN` fields are in docs/mappings.md.
+#[derive(Clone, Debug, PartialEq)]
 pub struct PlayerData {
     /// `inventory` (EntityPlayer.java:7).
     pub inventory: InventoryPlayer,
-    /// `username` (EntityPlayer.java:16): null for a fresh `EntityPlayer`;
-    /// `EntityPlayerSP` copies the session's (client, EntityPlayerSP.java:18).
-    pub username: Option<String>,
-    /// `sleeping` (EntityPlayer.java:25, protected): `isPlayerSleeping()`.
-    pub sleeping: bool,
-    /// `sleepTimer` (EntityPlayer.java:27, private): `isPlayerFullyAsleep()`
-    /// needs 100.
-    pub sleep_timer: i32,
-    /// `isSwinging` (EntityPlayer.java:14): set by `swingItem`, advanced by
-    /// `updatePlayerActionState` (EntityPlayer.java:158-170, WP-2.5).
-    pub is_swinging: bool,
-    /// `swingProgressInt` (EntityPlayer.java:15).
-    pub swing_progress_int: i32,
+    /// `unusedByte` (EntityPlayer.java:10): never read.
+    pub unused_byte: i8,
     /// `score` (EntityPlayer.java:11): saved by `EntityPlayerSP` only
     /// (EntityPlayerSP.java:98-106, [`nbt`]).
     pub score: i32,
+    /// `prevCameraYaw` (EntityPlayer.java:12).
+    pub prev_camera_yaw: f32,
+    /// `cameraYaw` (EntityPlayer.java:13): the view bob (render).
+    pub camera_yaw: f32,
+    /// `isSwinging` (EntityPlayer.java:14): set by `swingItem`, advanced by
+    /// `updatePlayerActionState` (EntityPlayer.java:158-170).
+    pub is_swinging: bool,
+    /// `swingProgressInt` (EntityPlayer.java:15).
+    pub swing_progress_int: i32,
+    /// `username` (EntityPlayer.java:16): null for a fresh `EntityPlayer`;
+    /// `EntityPlayerSP` copies the session's (client, EntityPlayerSP.java:20).
+    pub username: Option<String>,
     /// `dimension` (EntityPlayer.java:17): saved as `Dimension`
     /// (EntityPlayer.java:312, :329, [`nbt`]).
     pub dimension: i32,
+    /// `field_20066_r` (EntityPlayer.java:19): last tick's
+    /// [`PlayerData::chasing_pos_x`] (the cape's lagging position, render).
+    pub prev_chasing_pos_x: f64,
+    /// `field_20065_s` (EntityPlayer.java:20).
+    pub prev_chasing_pos_y: f64,
+    /// `field_20064_t` (EntityPlayer.java:21).
+    pub prev_chasing_pos_z: f64,
+    /// `field_20063_u` (EntityPlayer.java:22): eases a quarter of the way
+    /// toward `posX` each tick (EntityPlayer.java:86-119).
+    pub chasing_pos_x: f64,
+    /// `field_20062_v` (EntityPlayer.java:23).
+    pub chasing_pos_y: f64,
+    /// `field_20061_w` (EntityPlayer.java:24).
+    pub chasing_pos_z: f64,
+    /// `sleeping` (EntityPlayer.java:25, protected): `isPlayerSleeping()`.
+    pub sleeping: bool,
+    /// `bedChunkCoordinates` (EntityPlayer.java:26): the bed slept in.
+    pub bed_chunk_coordinates: Option<ChunkCoordinates>,
+    /// `sleepTimer` (EntityPlayer.java:27, private): `isPlayerFullyAsleep()`
+    /// needs 100.
+    pub sleep_timer: i32,
+    /// `renderOffsetX` (EntityPlayer.java:28): set by
+    /// `setRenderOffsetForSleep` (render).
+    pub render_offset_x: f32,
+    /// `renderOffsetY` (EntityPlayer.java:29): never written.
+    pub render_offset_y: f32,
+    /// `renderOffsetZ` (EntityPlayer.java:30).
+    pub render_offset_z: f32,
     /// `playerSpawnCoordinate` (EntityPlayer.java:31, private): the bed
     /// spawn, saved as `SpawnX/Y/Z` when set (EntityPlayer.java:320-322,
     /// :332-336, [`nbt`]).
-    pub player_spawn_coordinate: Option<mc_core::java_hash::ChunkCoordinates>,
+    pub player_spawn_coordinate: Option<ChunkCoordinates>,
+    /// `startMinecartRidingCoordinate` (EntityPlayer.java:32, private): where
+    /// the current minecart ride began (the `onARail` achievement).
+    pub start_minecart_riding_coordinate: Option<ChunkCoordinates>,
+    /// `timeUntilPortal` (EntityPlayer.java:33): 20 at construction.
+    pub time_until_portal: i32,
+    /// `inPortal` (EntityPlayer.java:34, protected).
+    pub in_portal: bool,
+    /// `timeInPortal` (EntityPlayer.java:35).
+    pub time_in_portal: f32,
+    /// `prevTimeInPortal` (EntityPlayer.java:36).
+    pub prev_time_in_portal: f32,
+    /// `damageRemainder` (EntityPlayer.java:37, private): the armour's
+    /// carried-over fraction of damage, in 25ths.
+    pub damage_remainder: i32,
     /// `fishEntity` (EntityPlayer.java:38), as the bobber's entity id: set by
     /// `new EntityFish(world, player)` (EntityFish.java:61), cleared when the
     /// bobber dies (EntityFish.java:148, :381). Read by
     /// `ItemFishingRod.onItemRightClick` (WP-2.6).
     pub fish_entity: Option<i32>,
+}
+
+impl Default for PlayerData {
+    /// The field initialisers (EntityPlayer.java:7-38).
+    // src: EntityPlayer.java:7-38
+    fn default() -> Self {
+        PlayerData {
+            inventory: InventoryPlayer::default(),
+            unused_byte: 0,
+            score: 0,
+            prev_camera_yaw: 0.0,
+            camera_yaw: 0.0,
+            is_swinging: false,
+            swing_progress_int: 0,
+            username: None,
+            dimension: 0,
+            prev_chasing_pos_x: 0.0,
+            prev_chasing_pos_y: 0.0,
+            prev_chasing_pos_z: 0.0,
+            chasing_pos_x: 0.0,
+            chasing_pos_y: 0.0,
+            chasing_pos_z: 0.0,
+            sleeping: false,
+            bed_chunk_coordinates: None,
+            sleep_timer: 0,
+            render_offset_x: 0.0,
+            render_offset_y: 0.0,
+            render_offset_z: 0.0,
+            player_spawn_coordinate: None,
+            start_minecart_riding_coordinate: None,
+            time_until_portal: 20,
+            in_portal: false,
+            time_in_portal: 0.0,
+            prev_time_in_portal: 0.0,
+            damage_remainder: 0,
+            fish_entity: None,
+        }
+    }
 }
 
 impl PlayerData {
@@ -231,6 +318,30 @@ impl PlayerData {
     // src: EntityPlayer.java:690-692
     pub fn is_player_fully_asleep(&self) -> bool {
         self.sleeping && self.sleep_timer >= 100
+    }
+
+    /// `getSleepTimer()`.
+    // src: EntityPlayer.java:694-696
+    pub fn get_sleep_timer(&self) -> i32 {
+        self.sleep_timer
+    }
+
+    /// `getScore()`.
+    // src: EntityPlayer.java:214-216
+    pub fn get_score(&self) -> i32 {
+        self.score
+    }
+
+    /// `getPlayerSpawnCoordinate()`.
+    // src: EntityPlayer.java:701-703
+    pub fn get_player_spawn_coordinate(&self) -> Option<ChunkCoordinates> {
+        self.player_spawn_coordinate
+    }
+
+    /// `setPlayerSpawnCoordinate(c)`: a copy, or null.
+    // src: EntityPlayer.java:705-712
+    pub fn set_player_spawn_coordinate(&mut self, c: Option<ChunkCoordinates>) {
+        self.player_spawn_coordinate = c;
     }
 }
 

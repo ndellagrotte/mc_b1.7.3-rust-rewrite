@@ -14,13 +14,9 @@
 //! `getBlockTextureFromSideAndMetadata`, `getRenderType`, …) are in
 //! [`crate::block`].
 //!
-//! Not transcribed, recorded with [`World::note_unimplemented`]:
-//! `EntityPlayer.sleepInBedAt` (WP-2.5; its result is taken as "not OK", so
-//! the bed is not marked occupied), `EntityPlayer.bedChunkCoordinates` (the
-//! field is not in [`crate::entity::PlayerData`] yet, WP-2.5; read only for a
-//! sleeping player, and no player can sleep before `sleepInBedAt` exists).
-//! The bed exploding outside the overworld is [`World::new_explosion`]
-//! (WP-1.8).
+//! The player side, `EntityPlayer.sleepInBedAt` and `bedChunkCoordinates`,
+//! is [`crate::entity::player`] (WP-2.5). The bed exploding outside the
+//! overworld is [`World::new_explosion`] (WP-1.8).
 //! `addChatMessage` is a client-only message: `EntityPlayer`'s body is empty
 //! (EntityPlayer.java:698-699), `EntityPlayerSP`'s writes to the chat GUI
 //! (EntityPlayerSP.java:172-174); a no-op here.
@@ -60,8 +56,10 @@ fn step(direction: i32) -> [i32; 2] {
 
 /// `blockActivated(world, x, y, z, player)`: always true. Redirects to the
 /// half with bit 3; outside the overworld removes both halves and explodes
-/// (WP-1.8); otherwise clears a stale occupied bit and lets the player
-/// sleep (WP-2.5, module docs).
+/// (WP-1.8); otherwise refuses a bed another sleeping player is in, clears
+/// a stale occupied bit and lets the player sleep
+/// ([`crate::entity::player::sleep_in_bed_at`]), marking the bed occupied
+/// on `OK`.
 // src: BlockBed.java:14-83
 pub fn block_activated(
     world: &mut World,
@@ -119,20 +117,30 @@ pub fn block_activated(
         // src: BlockBed.java:49-60: the player sleeping in this bed, if any.
         // `playerEntities` holds the activating player too, which is out of
         // its slot here, so it is read from the parameter.
-        let var14: Option<i32> = None;
+        let mut var14: Option<i32> = None;
         for pid in world.player_entities.clone() {
-            let sleeping = if pid == player.id() {
-                player.kind.player().is_some_and(|p| p.is_player_sleeping())
+            let bed_of = |p: &crate::entity::PlayerData| {
+                if p.is_player_sleeping() {
+                    Some(p.bed_chunk_coordinates)
+                } else {
+                    None
+                }
+            };
+            let var10 = if pid == player.id() {
+                player.kind.player().and_then(bed_of)
             } else {
                 world
                     .entity(pid)
                     .and_then(|e| e.kind.player())
-                    .is_some_and(|p| p.is_player_sleeping())
+                    .and_then(bed_of)
             };
-            if sleeping {
-                // src: BlockBed.java:55-58: compares var9.bedChunkCoordinates
-                // with (var2, var3, var4); the field is WP-2.5 (module docs).
-                world.note_unimplemented("EntityPlayer.bedChunkCoordinates");
+            if let Some(var10) = var10 {
+                // A sleeping player always has its bed coordinates (Java would
+                // throw on null, EntityPlayer.java:587-589).
+                let c = var10.expect("a sleeping player has bedChunkCoordinates");
+                if c.pos_x == var2 && c.pos_y == var3 && c.pos_z == var4 {
+                    var14 = Some(pid);
+                }
             }
         }
         if var14.is_some() {
@@ -142,11 +150,12 @@ pub fn block_activated(
         }
         set_bed_occupied(world, var2, var3, var4, false);
     }
-    // src: BlockBed.java:70-80: var5.sleepInBedAt(var2, var3, var4); OK marks
-    // the bed occupied, NOT_POSSIBLE_NOW adds the chat message
-    // "tile.bed.noSleep" (client); true either way. sleepInBedAt is WP-2.5
-    // (module docs): taken as not OK.
-    world.note_unimplemented("EntityPlayer.sleepInBedAt");
+    // src: BlockBed.java:70-80: OK marks the bed occupied; NOT_POSSIBLE_NOW
+    // adds the chat message "tile.bed.noSleep" (client); true either way.
+    let var15 = crate::entity::player::sleep_in_bed_at(player, world, var2, var3, var4);
+    if var15 == crate::entity::player::EnumStatus::Ok {
+        set_bed_occupied(world, var2, var3, var4, true);
+    }
     true
 }
 

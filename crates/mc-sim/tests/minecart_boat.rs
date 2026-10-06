@@ -266,8 +266,8 @@ fn furnace_cart_takes_coal_and_a_push() {
 }
 
 /// `EntityBoat.updateRiderPosition`: 0.4 ahead along the yaw, at the mounted
-/// offset plus the rider's own (Entity's `yOffset`; `EntityPlayer.getYOffset`
-/// is WP-2.5 and records itself).
+/// offset plus the rider's own (`EntityPlayer.getYOffset`: `yOffset - 0.5`,
+/// EntityPlayer.java:479-481).
 #[test]
 fn boat_places_its_rider_ahead() {
     let mut w = empty_world(12);
@@ -280,7 +280,7 @@ fn boat_places_its_rider_ahead() {
     assert_eq!(p.base.pos_z, b.base.pos_z + jmath::sin(a) * 0.4);
     assert_eq!(
         p.base.pos_y,
-        b.base.pos_y + boat::get_mounted_y_offset(&b) + p.base.y_offset as f64
+        b.base.pos_y + boat::get_mounted_y_offset(&b) + (p.base.y_offset - 0.5) as f64
     );
     assert_eq!(boat::get_mounted_y_offset(&b), -0.30000001192092896);
 }

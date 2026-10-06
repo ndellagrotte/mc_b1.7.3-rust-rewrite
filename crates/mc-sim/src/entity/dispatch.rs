@@ -34,8 +34,8 @@ use mc_core::{Aabb, Vec3D};
 use super::{
     Entity, EntityKindData as K, animal, arrow, base, boat, chicken, cow, creature, creeper, egg,
     falling_sand, fireball, fish, flying, ghast, giant_zombie, item, lightning_bolt, living,
-    minecart, mob, painting, pig, pig_zombie, sheep, skeleton, slime, snowball, spider, squid,
-    tnt_primed, water_mob, wolf, zombie,
+    minecart, mob, painting, pig, pig_zombie, player, sheep, skeleton, slime, snowball, spider,
+    squid, tnt_primed, water_mob, wolf, zombie,
 };
 use crate::world::World;
 
@@ -169,9 +169,30 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("EntityPig", &["fall", "interact"]),
     // src: EntityPigZombie.java:18-25, :49-65 (super::pig_zombie, WP-2.3)
     ("EntityPigZombie", &["attackEntityFrom", "onUpdate"]),
-    // src: EntityPlayer.java:349-351 (transcribed by WP-2.3b: the mobs aim at
-    // and look at the player's eyes; the rest of EntityPlayer is WP-2.5)
-    ("EntityPlayer", &["getEyeHeight"]),
+    // src: EntityPlayer.java:59-125, :140-156, :239-247, :349-351, :357-396,
+    // :479-481, :524-535, :787-800, :811-817 (super::player, WP-2.5)
+    (
+        "EntityPlayer",
+        &[
+            "addToPlayerScore",
+            "attackEntityFrom",
+            "fall",
+            "getEyeHeight",
+            "getYOffset",
+            "isEntityInsideOpaqueBlock",
+            "onKillEntity",
+            "onUpdate",
+            "preparePlayerToSpawn",
+            "setEntityDead",
+            "setInPortal",
+            "updateRidden",
+        ],
+    ),
+    // src: EntityPlayerSP.java:23-25, :144-146, :194-250 (super::player, WP-2.5)
+    (
+        "EntityPlayerSP",
+        &["isSneaking", "moveEntity", "pushOutOfBlocks"],
+    ),
     // src: EntitySheep.java:19-21, :34-53 (super::sheep, WP-2.3)
     ("EntitySheep", &["attackEntityFrom", "interact"]),
     // src: EntitySlime.java:43-66, :98-112, :114-120 (super::slime, WP-2.3)
@@ -257,10 +278,8 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
         K::Slime(..) => slime::on_update(e, world),
         // src: EntityGhast.java:25-29
         K::Ghast(..) => ghast::on_update(e, world),
-        K::PlayerSp(..) => {
-            world.note_unimplemented("EntityPlayer.onUpdate");
-            living::on_update(e, world);
-        }
+        // src: EntityPlayer.java:59-125
+        K::PlayerSp(..) => player::on_update(e, world),
         // src: EntityArrow.java:86-233
         K::Arrow(..) => arrow::on_update(e, world),
         // src: EntitySnowball.java:87-202
@@ -312,9 +331,9 @@ pub fn attack_entity_from(
     attacker: Option<&Entity>,
     damage: i32,
 ) -> bool {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityItem.java:87-95
-        K::Item(..) => return item::attack_entity_from(e, world, attacker, damage),
+        K::Item(..) => item::attack_entity_from(e, world, attacker, damage),
         // src: Entity.java:746-749
         K::Arrow(..)
         | K::Snowball(..)
@@ -322,20 +341,18 @@ pub fn attack_entity_from(
         | K::Fish(..)
         | K::FallingSand(..)
         | K::TntPrimed(..)
-        | K::LightningBolt(..) => {
-            return base::attack_entity_from(e, world, attacker, damage);
-        }
+        | K::LightningBolt(..) => base::attack_entity_from(e, world, attacker, damage),
         // src: EntityFireball.java:202-219
-        K::Fireball(..) => return fireball::attack_entity_from(e, world, attacker, damage),
+        K::Fireball(..) => fireball::attack_entity_from(e, world, attacker, damage),
         // src: EntityPainting.java:204-212
-        K::Painting(..) => return painting::attack_entity_from(e, world, attacker, damage),
+        K::Painting(..) => painting::attack_entity_from(e, world, attacker, damage),
         // src: EntityMinecart.java:73-123
-        K::Minecart(..) => return minecart::attack_entity_from(e, world, attacker, damage),
+        K::Minecart(..) => minecart::attack_entity_from(e, world, attacker, damage),
         // src: EntityBoat.java:63-90
-        K::Boat(..) => return boat::attack_entity_from(e, world, attacker, damage),
+        K::Boat(..) => boat::attack_entity_from(e, world, attacker, damage),
         // src: EntityLiving.java:307-365
         K::Slime(..) | K::Ghast(..) | K::Pig(..) | K::Cow(..) | K::Chicken(..) | K::Squid(..) => {
-            return living::attack_entity_from(e, world, attacker, damage);
+            living::attack_entity_from(e, world, attacker, damage)
         }
         // src: EntityMob.java:33-47
         K::Mob(..)
@@ -343,17 +360,16 @@ pub fn attack_entity_from(
         | K::Skeleton(..)
         | K::Spider(..)
         | K::Zombie(..)
-        | K::GiantZombie(..) => return mob::attack_entity_from(e, world, attacker, damage),
+        | K::GiantZombie(..) => mob::attack_entity_from(e, world, attacker, damage),
         // src: EntityPigZombie.java:49-65
-        K::PigZombie(..) => return pig_zombie::attack_entity_from(e, world, attacker, damage),
+        K::PigZombie(..) => pig_zombie::attack_entity_from(e, world, attacker, damage),
         // src: EntitySheep.java:19-21
-        K::Sheep(..) => return sheep::attack_entity_from(e, world, attacker, damage),
+        K::Sheep(..) => sheep::attack_entity_from(e, world, attacker, damage),
         // src: EntityWolf.java:254-298
-        K::Wolf(..) => return wolf::attack_entity_from(e, world, attacker, damage),
-        K::PlayerSp(..) => "EntityPlayer.attackEntityFrom",
-    };
-    world.note_unimplemented(what);
-    living::attack_entity_from(e, world, attacker, damage)
+        K::Wolf(..) => wolf::attack_entity_from(e, world, attacker, damage),
+        // src: EntityPlayer.java:357-396
+        K::PlayerSp(..) => player::attack_entity_from(e, world, attacker, damage),
+    }
 }
 
 /// `kill()`.
@@ -369,23 +385,24 @@ pub fn kill(e: &mut Entity, world: &mut World) {
 
 /// `setEntityDead()`.
 pub fn set_entity_dead(e: &mut Entity, world: &mut World) {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityMinecart.java:136-162
-        K::Minecart(..) => return minecart::set_entity_dead(e, world),
+        K::Minecart(..) => minecart::set_entity_dead(e, world),
         // src: EntitySlime.java:98-112
-        K::Slime(..) => return slime::set_entity_dead(e, world),
-        K::PlayerSp(..) => "EntityPlayer.setEntityDead",
+        K::Slime(..) => slime::set_entity_dead(e, world),
+        // src: EntityPlayer.java:524-531
+        K::PlayerSp(..) => player::set_entity_dead(e, world),
         // src: Entity.java:149-151
-        _ => return e.base.set_entity_dead(),
-    };
-    world.note_unimplemented(what);
-    e.base.set_entity_dead();
+        _ => e.base.set_entity_dead(),
+    }
 }
 
 /// `isSneaking()`.
 pub fn is_sneaking(e: &Entity, world: &World) -> bool {
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayerSP.isSneaking");
+        // src: EntityPlayerSP.java:144-146
+        return player::sp_is_sneaking(e);
     }
     // src: Entity.java:1067-1069
     e.base.get_entity_flag(1)
@@ -411,23 +428,22 @@ pub fn can_trigger_walking(e: &Entity) -> bool {
 
 /// `fall(distance)`.
 pub fn fall(e: &mut Entity, world: &mut World, distance: f32) {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityFlying.java:8-9 (empty: no super call)
-        K::Ghast(..) => return,
+        K::Ghast(..) => {}
         // src: EntityPig.java:71-77
-        K::Pig(..) => return pig::fall(e, world, distance),
+        K::Pig(..) => pig::fall(e, world, distance),
         // src: EntityChicken.java:51-52 (empty: no damage, no rider)
-        K::Chicken(..) => return,
-        K::PlayerSp(..) => "EntityPlayer.fall",
+        K::Chicken(..) => {}
+        // src: EntityPlayer.java:787-793
+        K::PlayerSp(..) => player::fall(e, world, distance),
         _ if e.kind.living().is_some() => {
             // src: EntityLiving.java:440-452
-            return living::fall(e, world, distance);
+            living::fall(e, world, distance)
         }
         // src: Entity.java:569-574
-        _ => return base::fall(e, world, distance),
-    };
-    world.note_unimplemented(what);
-    living::fall(e, world, distance);
+        _ => base::fall(e, world, distance),
+    }
 }
 
 /// `dealFireDamage(amount)`.
@@ -501,9 +517,8 @@ pub fn get_eye_height(e: &Entity, world: &World) -> f32 {
     match e.kind {
         // src: EntityWolf.java:221-223
         K::Wolf(..) => return wolf::get_eye_height(e),
-        // src: EntityPlayer.java:349-351 (the player's posY is its eyes:
-        // yOffset 1.62, EntityPlayer.java:44)
-        K::PlayerSp(..) => return 0.12,
+        // src: EntityPlayer.java:349-351
+        K::PlayerSp(..) => return player::EYE_HEIGHT,
         _ => {}
     }
     if e.kind.living().is_some() {
@@ -517,8 +532,10 @@ pub fn get_eye_height(e: &Entity, world: &World) -> f32 {
 
 /// `getYOffset()`.
 pub fn get_y_offset(e: &Entity, world: &World) -> f64 {
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.getYOffset");
+        // src: EntityPlayer.java:479-481
+        return player::get_y_offset(e);
     }
     // src: Entity.java:974-976
     e.base.get_y_offset()
@@ -545,7 +562,8 @@ pub fn move_entity(e: &mut Entity, world: &mut World, dx: f64, dy: f64, dz: f64)
     match e.kind {
         // src: EntityPainting.java:245-251
         K::Painting(..) => return painting::move_entity(e, world, dx, dy, dz),
-        K::PlayerSp(..) => world.note_unimplemented("EntityPlayerSP.moveEntity"),
+        // src: EntityPlayerSP.java:23-25 (super only)
+        K::PlayerSp(..) => {}
         _ => {}
     }
     // src: Entity.java:293-540
@@ -565,10 +583,8 @@ pub fn is_entity_alive(e: &Entity) -> bool {
 /// `updateRidden()`.
 pub fn update_ridden(e: &mut Entity, world: &mut World) {
     match e.kind {
-        K::PlayerSp(..) => {
-            world.note_unimplemented("EntityPlayer.updateRidden");
-            living::update_ridden(e, world);
-        }
+        // src: EntityPlayer.java:140-148
+        K::PlayerSp(..) => player::update_ridden(e, world),
         // src: EntityLiving.java:187-191
         _ if e.kind.living().is_some() => living::update_ridden(e, world),
         // src: Entity.java:916-968
@@ -586,7 +602,8 @@ pub fn update_ridden(e: &mut Entity, world: &mut World) {
 /// `preparePlayerToSpawn()`.
 pub fn prepare_player_to_spawn(e: &mut Entity, world: &mut World) {
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.preparePlayerToSpawn");
+        // src: EntityPlayer.java:150-156
+        return player::prepare_player_to_spawn(e, world);
     }
     // src: Entity.java:133-147
     base::prepare_player_to_spawn(e, world);
@@ -631,9 +648,10 @@ pub fn add_velocity(e: &mut Entity, world: &mut World, dx: f64, dy: f64, dz: f64
 
 /// `addToPlayerScore(victim, score)`.
 pub fn add_to_player_score(e: &mut Entity, world: &mut World, victim: &Entity, score: i32) {
-    let _ = (victim, score);
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.addToPlayerScore");
+        // src: EntityPlayer.java:239-247
+        player::add_to_player_score(e, victim, score);
     }
     // src: Entity.java:759-760 (empty)
 }
@@ -697,7 +715,8 @@ pub fn get_shadow_size(e: &Entity, world: &World) -> f32 {
 /// `isEntityInsideOpaqueBlock()`.
 pub fn is_entity_inside_opaque_block(e: &Entity, world: &mut World) -> bool {
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.isEntityInsideOpaqueBlock");
+        // src: EntityPlayer.java:533-535
+        return player::is_entity_inside_opaque_block(e, world);
     }
     // src: Entity.java:892-906
     base::is_entity_inside_opaque_block(e, world)
@@ -790,8 +809,10 @@ pub fn get_look_vec(e: &Entity, world: &World) -> Option<Vec3D> {
 
 /// `setInPortal()`.
 pub fn set_in_portal(e: &mut Entity, world: &mut World) {
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.setInPortal");
+        // src: EntityPlayer.java:811-817
+        player::set_in_portal(e);
     }
     // src: Entity.java:1038-1039 (empty)
 }
@@ -853,9 +874,10 @@ pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World, bolt: &Entity) 
 
 /// `onKillEntity(victim)`.
 pub fn on_kill_entity(e: &mut Entity, world: &mut World, victim: &Entity) {
-    let _ = victim;
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.onKillEntity");
+        // src: EntityPlayer.java:795-800
+        player::on_kill_entity(e, victim);
     }
     // src: Entity.java:1094-1095 (empty)
 }
@@ -863,7 +885,8 @@ pub fn on_kill_entity(e: &mut Entity, world: &mut World, victim: &Entity) {
 /// `pushOutOfBlocks(x, y, z)`.
 pub fn push_out_of_blocks(e: &mut Entity, world: &mut World, x: f64, y: f64, z: f64) -> bool {
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayerSP.pushOutOfBlocks");
+        // src: EntityPlayerSP.java:198-250
+        return player::sp_push_out_of_blocks(e, world, x, y, z);
     }
     // src: Entity.java:1097-1170
     base::push_out_of_blocks(e, world, x, y, z)
@@ -994,6 +1017,26 @@ pub const LIVING_TRANSCRIBED: &[(&str, &[&str])] = &[
             "getLivingSound",
             "onLivingUpdate",
         ],
+    ),
+    // src: EntityPlayer.java:127-129, :158-212, :218-237, :439-446, :721-732
+    // (super::player, WP-2.5)
+    (
+        "EntityPlayer",
+        &[
+            "damageEntity",
+            "isMovementBlocked",
+            "jump",
+            "moveEntityWithHeading",
+            "onDeath",
+            "onLivingUpdate",
+            "updatePlayerActionState",
+        ],
+    ),
+    // src: EntityPlayerSP.java:27-88 (super::player, WP-2.5; the client-only
+    // part of onLivingUpdate behind PlayerSpData::client_additions)
+    (
+        "EntityPlayerSP",
+        &["onLivingUpdate", "updatePlayerActionState"],
     ),
     // src: EntitySheep.java:23-32, :67-77 (super::sheep, WP-2.3)
     (
@@ -1250,7 +1293,8 @@ pub fn get_sound_volume(e: &Entity, world: &World) -> f32 {
 /// `damageEntity(amount)`.
 pub fn damage_entity(e: &mut Entity, world: &mut World, amount: i32) {
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.damageEntity");
+        // src: EntityPlayer.java:439-446
+        return player::damage_entity(e, world, amount);
     }
     // src: EntityLiving.java:372-374
     living::damage_entity(e, amount);
@@ -1259,7 +1303,8 @@ pub fn damage_entity(e: &mut Entity, world: &mut World, amount: i32) {
 /// `onDeath(attacker)`.
 pub fn on_death(e: &mut Entity, world: &mut World, attacker: Option<&Entity>) {
     match e.kind {
-        K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.onDeath"),
+        // src: EntityPlayer.java:218-237
+        K::PlayerSp(..) => return player::on_death(e, world, attacker),
         // src: EntityCreeper.java:81-87
         K::Creeper(..) => return creeper::on_death(e, world, attacker),
         _ => {}
@@ -1322,7 +1367,8 @@ pub fn move_entity_with_heading(e: &mut Entity, world: &mut World, strafe: f32, 
         K::Ghast(..) => return flying::move_entity_with_heading(e, world, strafe, forward),
         // src: EntitySquid.java:127-129
         K::Squid(..) => return squid::move_entity_with_heading(e, world),
-        K::PlayerSp(..) => world.note_unimplemented("EntityPlayer.moveEntityWithHeading"),
+        // src: EntityPlayer.java:726-732
+        K::PlayerSp(..) => return player::move_entity_with_heading(e, world, strafe, forward),
         _ => {}
     }
     // src: EntityLiving.java:454-548
@@ -1355,40 +1401,39 @@ pub fn can_breathe_underwater(e: &Entity, world: &World) -> bool {
 
 /// `onLivingUpdate()`.
 pub fn on_living_update(e: &mut Entity, world: &mut World) {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityLiving.java:583-653
         K::Slime(..) | K::Ghast(..) | K::Pig(..) | K::Sheep(..) | K::Cow(..) => {
-            return living::on_living_update(e, world);
+            living::on_living_update(e, world)
         }
         // src: EntityMob.java:11-18
         K::Mob(..) | K::Creeper(..) | K::Spider(..) | K::GiantZombie(..) => {
-            return mob::on_living_update(e, world);
+            mob::on_living_update(e, world)
         }
         // src: EntitySkeleton.java:23-32
-        K::Skeleton(..) => return skeleton::on_living_update(e, world),
+        K::Skeleton(..) => skeleton::on_living_update(e, world),
         // src: EntityZombie.java:11-20
-        K::Zombie(..) => return zombie::on_living_update(e, world),
+        K::Zombie(..) => zombie::on_living_update(e, world),
         // src: EntityPigZombie.java:45-47
-        K::PigZombie(..) => return pig_zombie::on_living_update(e, world),
+        K::PigZombie(..) => pig_zombie::on_living_update(e, world),
         // src: EntityChicken.java:20-49
-        K::Chicken(..) => return chicken::on_living_update(e, world),
+        K::Chicken(..) => chicken::on_living_update(e, world),
         // src: EntityWolf.java:125-150
-        K::Wolf(..) => return wolf::on_living_update(e, world),
+        K::Wolf(..) => wolf::on_living_update(e, world),
         // src: EntitySquid.java:71-125
-        K::Squid(..) => return squid::on_living_update(e, world),
-        // EntityPlayerSP's (client input) calls EntityPlayer's (heal, pick-up,
-        // camera), which calls EntityLiving's (WP-2.5).
-        K::PlayerSp(..) => "EntityPlayerSP.onLivingUpdate",
+        K::Squid(..) => squid::on_living_update(e, world),
+        // src: EntityPlayerSP.java:34-88, EntityPlayer.java:172-212
+        K::PlayerSp(..) => player::sp_on_living_update(e, world),
         _ => unreachable!("onLivingUpdate on a non-living entity"),
-    };
-    world.note_unimplemented(what);
-    living::on_living_update(e, world);
+    }
 }
 
 /// `isMovementBlocked()`.
 pub fn is_movement_blocked(e: &Entity, world: &World) -> bool {
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.isMovementBlocked");
+        // src: EntityPlayer.java:127-129
+        return player::is_movement_blocked(e);
     }
     // src: EntityLiving.java:655-657
     living::lv(e).health <= 0
@@ -1396,8 +1441,10 @@ pub fn is_movement_blocked(e: &Entity, world: &World) -> bool {
 
 /// `jump()`.
 pub fn jump(e: &mut Entity, world: &mut World) {
+    let _ = world;
     if let K::PlayerSp(..) = e.kind {
-        world.note_unimplemented("EntityPlayer.jump");
+        // src: EntityPlayer.java:721-724
+        return player::jump(e);
     }
     // src: EntityLiving.java:659-661
     living::jump(e);
@@ -1416,11 +1463,9 @@ pub fn can_despawn(e: &Entity, world: &World) -> bool {
 
 /// `updatePlayerActionState()`: the AI step.
 ///
-/// The player's arm runs no body: `EntityPlayerSP`'s override reads the
-/// client's movement input after `EntityPlayer`'s, which only advances the
-/// arm swing and does not call `EntityLiving`'s (EntityPlayer.java:158-170,
-/// EntityPlayerSP.java:27-32; WP-2.5). Running `EntityLiving`'s idle AI
-/// there would turn and steer the player where vanilla does not.
+/// The player's arm is `EntityPlayerSP`'s: `EntityPlayer`'s (the arm swing
+/// only, no `EntityLiving` idle AI), then the movement input
+/// (EntityPlayer.java:158-170, EntityPlayerSP.java:27-32).
 pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
     match e.kind {
         // src: EntityCreature.java:16-116
@@ -1435,9 +1480,8 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
         | K::Sheep(..)
         | K::Cow(..)
         | K::Chicken(..) => creature::update_player_action_state(e, world),
-        K::PlayerSp(..) => {
-            world.note_unimplemented("EntityPlayerSP.updatePlayerActionState");
-        }
+        // src: EntityPlayerSP.java:27-32, EntityPlayer.java:158-170
+        K::PlayerSp(..) => player::sp_update_player_action_state(e),
         // src: EntityWolf.java:96-123
         K::Wolf(..) => wolf::update_player_action_state(e, world),
         // src: EntitySlime.java:68-96

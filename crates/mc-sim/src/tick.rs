@@ -109,9 +109,9 @@ impl World {
         }
     }
 
-    /// `wakeUpAllPlayers()`: clears the flag, wakes every sleeping player and
-    /// stops the rain. `EntityPlayer.wakeUpPlayer(false, false, true)`
-    /// (EntityPlayer.java, WP-2.5) is recorded per sleeping player.
+    /// `wakeUpAllPlayers()`: clears the flag, wakes every sleeping player
+    /// (`wakeUpPlayer(false, false, true)`: the bed becomes the spawn point)
+    /// and stops the rain.
     // src: World.java:2395-2407
     pub fn wake_up_all_players(&mut self) {
         self.all_players_sleeping = false;
@@ -122,7 +122,10 @@ impl World {
                 .and_then(|p| p.kind.player())
                 .is_some_and(|p| p.is_player_sleeping());
             if sleeping {
-                self.note_unimplemented("EntityPlayer.wakeUpPlayer (World.wakeUpAllPlayers)");
+                // src: World.java:2402 (EntityPlayer.java:617-647)
+                self.with_entity_mut(pid, |w, p| {
+                    crate::entity::player::wake_up_player(p, w, false, false, true)
+                });
             }
         }
         self.stop_precipitation();

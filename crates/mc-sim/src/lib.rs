@@ -18,6 +18,7 @@
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer`, `IInventory` implementations, `Container*`, `Slot*` | inventories and container click logic (WP-2.5); `IInventory` references are [`inventory::InventoryRef`] |
 //! | [`crafting`] | `CraftingManager`, `IRecipe`, `ShapedRecipes`, `ShapelessRecipes`, `RecipeSorter`, `Recipes*` | the sorted recipe list (151) and matching (WP-2.5) |
+//! | [`player_controller`] | `PlayerController`, `PlayerControllerSP` | the left-click block-breaking state machine (WP-2.5) |
 //! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | McRegion saves: `SaveOldDir`/`SaveHandler`, `McRegionChunkLoader`, chunk NBT, `EntityList`, import validation (WP-1.9a/b) |
 //! | [`worldgen`] | `ChunkProviderGenerate`, noise, biomes | noise, biomes and terrain shape (`provideChunk`) done (WP-1.4), trees (WP-1.6b), population ([`worldgen::populate`], [`worldgen::features`]) done (WP-1.7) |
 //! | [`golden`] | — | read-only views in the golden-trace shapes |
@@ -43,6 +44,7 @@ pub mod entity;
 pub mod golden;
 pub mod inventory;
 pub mod item;
+pub mod player_controller;
 pub mod save;
 pub mod spawner;
 pub mod tick;
