@@ -5,17 +5,17 @@
         <key>CFBundleDevelopmentRegion</key>
         <string>en</string>
         <key>CFBundleDisplayName</key>
-        <string>BevyGame</string> <!-- ToDo: this should be the same as your OSX app name in the release flow -->
+        <string>Minecraft Beta 1.7.3 (Rust)</string>
         <key>CFBundleExecutable</key>
-        <string>bevy_game</string> <!-- ToDo: this should be the same as your executable name in the release flow -->
+        <string>mc_b173</string> <!-- same as GAME_EXECUTABLE_NAME in .github/workflows/release.yaml -->
         <key>CFBundleIconFile</key>
         <string>AppIcon.icns</string>
         <key>CFBundleIdentifier</key>
-        <string>your.domain.bevy-game</string> <!-- ToDo -->
+        <string>io.github.ndellagrotte.mc_b173</string>
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
         <key>CFBundleName</key>
-        <string>Bevy Game</string> <!-- ToDo -->
+        <string>mc_b173</string> <!-- same as GAME_OSX_APP_NAME in .github/workflows/release.yaml -->
         <key>CFBundlePackageType</key>
         <string>APPL</string>
         <key>CFBundleShortVersionString</key>
