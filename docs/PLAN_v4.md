@@ -211,8 +211,9 @@ build/  index.html  Trunk.toml   web and packaging (template)
 
 `mc-sim` is one crate on purpose: blocks call the world, the world calls blocks,
 entities call both, items place blocks and spawn entities. Modules inside it
-(`block/`, `item/`, `world/`, `gen/`, `entity/`, `inventory/`, `save/`) are the
-ownership units for agents. `gen/` is the clean piece to split out if compile
+(`block/`, `item/`, `world/`, `worldgen/`, `entity/`, `inventory/`, `save/`) are the
+ownership units for agents (`worldgen/`, not `gen/`: `gen` is a reserved keyword
+in Rust 2024). `worldgen/` is the clean piece to split out if compile
 times hurt.
 
 ### 3.2 Simulation shape
