@@ -33,7 +33,7 @@ depends on another: the oracle reseeds its `Math.random()` replacement stream
 (`HarnessMath`, see `tools/oracle/README.md`) from the scenario `seed` (0 when there
 is none) at the start of every scenario. A scenario without a `seed` is allowed only
 for the kinds whose output is a pure function of the scenario file: `sine_table`,
-`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`
+`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`, `item_table`
 (`tools/oracle/check-sensitivity.sh` enforces this).
 
 ### `kind: "java_random"` — `java.util.Random` sequences
@@ -397,6 +397,65 @@ error, so a new field cannot slip through unreduced.
 Rust side: `crates/mc-sim/tests/golden_block_table.rs` rebuilds every line from
 `mc_sim::block` (the table, the data-only functions, `BlockStatics::default()`)
 and compares the whole trace with `mc_golden::compare`.
+
+### `kind: "item_table"` — `Item.itemsList`, tool materials, item icons, `ItemStack` (WP-1.2)
+
+```json
+{"name":"item-table","tier":"A","kind":"item_table",
+ "stacks":[{"id":256,"count":1,"damage":0,"damage_by":[1,248,1,1],"split":1}, ...]}
+```
+No seed: the output is the vanilla static state after `Block`'s and `Item`'s static
+initialisers (the oracle initialises `Block` first, as the game does, then reseeds
+`Item.itemRand` with `mix(0, -1)`; nothing draws from it). The kind-specific field
+`stacks` is read by the Rust test itself (`crates/mc-sim/tests/golden_item_table.rs`);
+`mc-golden` models the kind as a unit variant. Trace, in this order:
+
+1. **items**: one line per id `0..=N`, `N` the highest non-null index of
+   `Item.itemsList` (2257). A null entry is `{"t":0,"e":"item","id":N,"present":false}`.
+   Otherwise `"present":true`, `"class"` (simple name), and:
+   - `"fields"`: an object keyed by every class from the concrete class up to `Item`
+     (simple names), each holding that class's declared non-static, non-synthetic
+     fields by Java name (empty `{}` for classes with none). Reduction rules: `int`,
+     `short`, `byte`, `long` → numbers; `boolean` → booleans; `float`/`double` →
+     bit-pattern strings; `String` → string; null → null; `Block` → its `blockID`;
+     `Item` → its `shiftedIndex`; `ItemStack` → `{"id","count","damage"}`; `Material`
+     → the name of the `Material` static field holding it (`"wood"`); enums →
+     `name()`; arrays → lists of reduced elements. Any other type fails the oracle.
+   - `"methods"`: the data-method results. Per damage `d` in `0..16` (lists of 16):
+     `getIconFromDamage(d)`, `getItemNameIS(new ItemStack(item, 1, d))` (string or
+     null), `getPlacedBlockMetadata(d)`, `getColorFromDamage(d)`. Scalars:
+     `getItemName` (string or null), `getItemStackLimit`, `getMaxDamage`,
+     `isDamagable`, `isFull3D`, `shouldRotateAroundWhenRendering`, `getHasSubtypes`,
+     `getContainerItem` (its `shiftedIndex` or null), `hasContainerItem`,
+     `getDamageVsEntity(null)`. Per block id `0..256` (lists of 256, null where
+     `Block.blocksList[id]` is null): `getStrVsBlock(new ItemStack(item, 1, 0), block)`
+     (f32 bit patterns) and `canHarvestBlock(block)`.
+2. **tool materials**: one `{"e":"tool_material","name","ordinal","fields":{...},
+   "getMaxUses","getEfficiencyOnProperMaterial","getDamageVsEntity","getHarvestLevel"}`
+   per `EnumToolMaterial` constant in ordinal order (`fields` as above, for the
+   enum class's own fields).
+3. **block textures**: one `{"e":"block_texture","id",
+   "getBlockTextureFromSide":[6],"getBlockTextureFromSideAndMetadata":[6][16]}` per
+   non-null block, sides `0..6`, metadata `0..16` (the lookups the `ItemBlock` icons
+   come from; static-init state of the mutable singleton fields).
+4. **stacks**: one `{"e":"item_stack","i"}` line per `stacks` entry, in order, for
+   `st = new ItemStack(id, count, damage)`: `nbt_types` (tag key → NBT type id of
+   `st.writeToNBT(new NBTTagCompound())`), `nbt` (`getShort("id")`,
+   `getByte("Count")`, `getShort("Damage")` of it), `read` (`new ItemStack(nbt)`),
+   `copy` (`st.copy()`), `getMaxStackSize`, `isStackable`, `isItemStackDamageable`,
+   `isItemDamaged`, `getHasSubtypes`, `getMaxDamage`, `getItemName`, `getIconIndex`,
+   `getDamageVsEntity(null)`, `damageItem` (on one copy, `damageItem(n, null)` for each
+   `n` of `damage_by` in order, the stack after each), and `splitStack`
+   (`[rest, part]` of `copy().splitStack(split)`). Stacks are
+   `{"id","count","damage","animationsToGo"}`.
+
+Wherever a call throws, the value is `{"exception":"<simple class name>"}` (e.g. an
+`ItemSlab` name for damage 4..15, the piston head texture for direction 6/7); the
+Rust side must return the matching `mc_sim::item::JavaException`. Only ids with a
+non-null item may appear in `stacks` (a null item is a `NullPointerException` the
+port does not model).
+
+Scenario: `item/item-table`.
 
 ## Tier B/C/S scenarios (WP-0.4)
 

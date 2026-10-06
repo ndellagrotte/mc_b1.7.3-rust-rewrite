@@ -11,14 +11,14 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `rewrite-math-random.sh` | Copies `src/minecraft` to `build/oracle-src`, rewrites `Math.random()` |
 | `regen.sh` | `build.sh`, runs the harness into `build/golden-out`, copies the results into `tests/golden`, prints `git status --short tests/golden` |
 | `check-reproducible.sh` | Three harness runs, byte-compared (§4.4 item 1) |
-| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table` may lack a seed (§4.4 item 2) |
+| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
-`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1). Tier B/C/S kinds (WP-0.4):
+`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1), `item_table` (WP-1.2). Tier B/C/S kinds (WP-0.4):
 `tick` (a world ticked under ops and dumps; tiers B, C, S) and `world_read` (S).
 
 ## Use
@@ -207,3 +207,17 @@ scenarios with a player load 361 chunks and spawn animals and squid, which exerc
 hook. `check-sensitivity.sh` requires every `tick` scenario (all have a seed) to change
 under a flipped seed bit; the empty-world scenarios do so through `rng_state` or entity
 `rand` fields, since their blocks do not depend on the seed.
+
+## `item_table` (WP-1.2)
+
+`ItemTable` dumps vanilla static state, so it needs no world and no seed. It calls
+`HarnessWorld.resetStatics(0)` first: that initialises `Block` before `Item` (the
+order the game uses; `Item` first fails in `AchievementList`) and reseeds
+`Item.itemRand`, which nothing in the dump draws from. Field values come from
+reflection over each class in the item's chain (`getDeclaredFields`, non-static,
+non-synthetic, sorted by name so the output is byte-stable); a field type without a
+reduction rule (tests/golden/README.md) aborts the scenario instead of being
+dropped. Every vanilla call is wrapped so an exception becomes
+`{"exception":"<simple name>"}` in the trace; the dump calls no method with side
+effects on shared state (`getStrVsBlock`/`canHarvestBlock` read block singletons,
+`ItemStack` operations work on fresh stacks).

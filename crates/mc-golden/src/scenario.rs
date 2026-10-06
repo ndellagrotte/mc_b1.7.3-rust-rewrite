@@ -150,6 +150,10 @@ pub enum ScenarioKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         chunks: Option<Vec<ChunkPos>>,
     },
+    /// `Item.itemsList`, `EnumToolMaterial`, block textures and `ItemStack`
+    /// samples (WP-1.2; README "`kind: \"item_table\"`"). The kind-specific
+    /// fields (`stacks`) are read by `mc-sim/tests/golden_item_table.rs`.
+    ItemTable,
     /// A kind of tier B/C/S/D that a later work package defines; never
     /// produced for tier A and never serialized.
     #[serde(skip)]
@@ -714,7 +718,7 @@ impl Scenario {
 
 impl ScenarioKind {
     /// Kinds that deserialize into a typed variant.
-    const KNOWN: [&'static str; 10] = [
+    const KNOWN: [&'static str; 11] = [
         "java_random",
         "sine_table",
         "math_sweep",
@@ -725,6 +729,7 @@ impl ScenarioKind {
         "block_table",
         "tick",
         "world_read",
+        "item_table",
     ];
 
     /// The `math_sweep` edge-case inputs for `function`, as `f64` bit
