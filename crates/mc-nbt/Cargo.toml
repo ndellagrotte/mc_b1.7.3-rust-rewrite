@@ -9,5 +9,11 @@ description = "NBT (tags 0-10) reader and writer for Beta 1.7.3 saves"
 [dependencies]
 flate2.workspace = true
 
+[dev-dependencies]
+# Golden-fixture runner. Dev-only cycle (mc-golden -> mc-sim -> mc-nbt) is
+# allowed by cargo: the test build links a second copy of mc-nbt's lib.
+mc-golden = { path = "../mc-golden" }
+serde_json.workspace = true
+
 [lints]
 workspace = true

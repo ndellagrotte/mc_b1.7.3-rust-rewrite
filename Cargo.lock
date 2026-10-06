@@ -3531,6 +3531,8 @@ name = "mc-nbt"
 version = "0.1.0"
 dependencies = [
  "flate2",
+ "mc-golden",
+ "serde_json",
 ]
 
 [[package]]
