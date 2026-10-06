@@ -1207,13 +1207,15 @@ their drops only where a player is present: the player's own update is WP-2.5):
   exceed 5));
   nothing else is a spawn spot, so no animal constructor is reached.
 - `tick/natural-spawn-pigs` (WP-2.3, generated terrain, player on the grass of
-  `tick/sapling-with-player`, difficulty 0): natural animal and squid spawning end to end; needs
-  every `SpawnListEntry` constructor (sheep, pig, chicken, cow, squid; wolves in forests).
+  `tick/sapling-with-player`, difficulty 0): natural animal and squid spawning end to end
+  (every `SpawnListEntry` constructor: sheep, pig, chicken, cow, squid; wolves in forests).
+  Since the WP-2.3c merge every line matches but the player's health (the peaceful heal of
+  `EntityPlayer.onLivingUpdate`, WP-2.5), as in `tick/sapling-with-player`.
 - `tick/sleep-spawning` (WP-2.3, player, difficulty 1): a player sleeps in a bed in a dark,
   water-roofed stone room (no monster spot outside it, so the unseeded `EntityMob.getCanSpawnHere`
   rolls of census §3 always pass); after 100 ticks `performSleepSpawning` places a skeleton by
   the bed and wakes the player. Stops before the skeleton's first arrow (unseeded heading
-  jitter). Needs `EntityPlayer.sleepInBedAt` (WP-2.5) and the skeleton (WP-2.3).
+  jitter). Needs `EntityPlayer.sleepInBedAt` (WP-2.5); the skeleton is in since WP-2.3b.
 
 Monsters, slime and ghast (WP-2.3, task 2), empty world, seed 123, `"mob_spawning": "none"`,
 `"difficulty": 1` (`EntityMob.onUpdate` and `EntityGhast.updatePlayerActionState` kill them

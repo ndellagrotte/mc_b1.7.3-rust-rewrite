@@ -30,11 +30,11 @@
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
-//! Every other class's own level (`EntitySquid`'s, …) is Phase 2; reaching it records
-//! `"Entity*.writeEntityToNBT"` / `"Entity*.readEntityFromNBT"` in
-//! [`World::unimplemented_hits`] and writes/reads only the levels above it.
-//! Such entities cannot exist in a world yet (no constructor); a saved one
-//! is kept as a compound by the chunk loader ([`crate::save::entity_list`]).
+//! Every entity class of the port has its level here (the squid, WP-2.3c,
+//! was the last). The read side's `match` keeps a fallback arm (recording
+//! `"Entity*.readEntityFromNBT"` in [`World::unimplemented_hits`]) for the
+//! kinds read and returned before it (painting, pig, sheep, wolf, creeper,
+//! slime), so it is never reached.
 //!
 //! Compound children are in `BTreeMap` order (vanilla's `HashMap` order only
 //! shows in bytes, never compared, PLAN_v4 §4.3).
@@ -207,12 +207,6 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
             write_player(p, c);
             // src: EntityPlayerSP.java:98-101
             n::set(c, "Score", Tag::Int(p.score));
-        }
-        other => {
-            if let Some(l) = other.living() {
-                write_living(l, c);
-            }
-            world.note_unimplemented("Entity*.writeEntityToNBT");
         }
     }
 }

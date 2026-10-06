@@ -181,14 +181,14 @@ fixtures! {
     tick_soul_sand_web_item => "tick" / "soul-sand-web-item";
     tick_spawning_draws => "tick" / "spawning-draws";
     tick_natural_spawn_squid => "tick" / "natural-spawn-squid";
-    #[ignore = "needs EntityChicken/EntitySheep/EntityCow (WP-2.3a; EntitySquid and EntityPig construct here, the others are EntityList gaps whose constructor side effects are made and which then count as not spawnable): first diff line 4 (t=1 rng_state: world_rand, lcg, math_random); lines 1-3 match: tick 0's performSpawning joins no animal in the oracle either (an oracle probe dumping entity_state every tick shows only the player after t=0); the oracle's first packs (4 chickens, a sheep, 12 squid) join in tick 1 and its first cow in tick 2, so line 4 (t=1 rng_state) is the first diff. Then also the player's EntityPlayer.onLivingUpdate (peaceful heal after its fall, WP-2.5)"]
+    #[ignore = "needs EntityPlayer.onLivingUpdate's peaceful heal (WP-2.5): first diff line 43 (t=39 entity_state of the player, field state.health: actual 19, expected 20); every other line matches, the spawning included (the animals since WP-2.3a, the squid and SpawnerAnimals since WP-2.3c)"]
     tick_natural_spawn_pigs => "tick" / "natural-spawn-pigs";
-    #[ignore = "needs EntityPlayer.sleepInBedAt (WP-2.5a; BlockBed.blockActivated records it), then EntityPlayer.onUpdate's sleep timer and wakeUpPlayer (WP-2.5) and the EntitySkeleton constructor and AI (WP-2.3b) for the skeleton performSleepSpawning places at t=101: first diff line 18 (t=2 entity_state of the player, field isCollidedVertically: the oracle's player lies in the bed); lines 1-17 match"]
+    #[ignore = "needs EntityPlayer.sleepInBedAt (WP-2.5a; BlockBed.blockActivated records it), then EntityPlayer.onUpdate's sleep timer and wakeUpPlayer (WP-2.5); the EntitySkeleton constructor and AI for the skeleton performSleepSpawning places at t=101 are in since WP-2.3b: first diff line 18 (t=2 entity_state of the player, field isCollidedVertically: the oracle's player lies in the bed); lines 1-17 match"]
     tick_sleep_spawning => "tick" / "sleep-spawning";
     tick_sponge_removal_notifies => "tick" / "sponge-removal-notifies";
     tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
-    #[ignore = "SpawnerAnimals mob constructors (EntityChicken, EntitySheep, EntityCow: WP-2.3a; EntitySquid exists since WP-2.3c): the oracle spawns animals in tick 0, whose EntityLiving constructors draw Math.random() (with rng_state every tick: math_random differs from t=0, world_rand and lcg from t=1, while the scheduled ticks of population still match). Here the first diff is line 4 (t=99 chunk_digest -2,-4: blocks, data; sky light and height map match); then the player's own update: its EntityLiving physics match since WP-2.2, its health does not (EntityPlayer.onLivingUpdate's peaceful heal, WP-2.5: entity_state t=99 health 19, expected 20). Population (WP-1.7) and the BlockSapling/BlockGrass random ticks (WP-1.6) are in"]
+    #[ignore = "needs EntityPlayer.onLivingUpdate's peaceful heal (WP-2.5): first diff line 7 (t=99 entity_state of the player, field state.health: actual 19, expected 20); every other line matches (the tick-0 animal spawning since WP-2.3a/WP-2.3c, population WP-1.7, the BlockSapling/BlockGrass random ticks WP-1.6)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     tick_snow_ice => "tick" / "snow-ice";
     tick_water_flow => "tick" / "water-flow";

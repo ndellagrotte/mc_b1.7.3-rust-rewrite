@@ -56,7 +56,7 @@ fn squid_data(e: &Entity) -> &squid::SquidData {
 fn squid_constructor_draws_rotation_velocity() {
     let mut w = world();
     let mut m = w.math_random.clone();
-    let s = squid::new_entity_squid(&mut w);
+    let mut s = squid::new_entity_squid(&mut w);
     for _ in 0..4 {
         m.next_double();
     }
@@ -70,7 +70,7 @@ fn squid_constructor_draws_rotation_velocity() {
     assert_eq!((l.health, l.texture), (10, "/mob/squid.png"));
     assert!(dispatch::can_breathe_underwater(&s, &w));
     assert_eq!(dispatch::get_talk_interval(&s, &w), 120);
-    assert_eq!(dispatch::get_living_sound(&s, &w), None);
+    assert_eq!(dispatch::get_living_sound(&mut s, &w), None);
     assert_eq!(dispatch::get_hurt_sound(&s, &w), None);
     assert_eq!(dispatch::get_death_sound(&s, &w), None);
     assert_eq!(dispatch::get_sound_volume(&s, &w), 0.4);
@@ -168,36 +168,31 @@ fn water_mob_spawn_test_is_only_the_entity_check() {
     w.set_block(3, 57, 3, 1);
     let mut s = squid::new_entity_squid(&mut w);
     s.base.set_location_and_angles(0.5, 56.0, 0.5, 0.0, 0.0);
-    assert!(dispatch::get_can_spawn_here(&s, &mut w));
+    assert!(dispatch::get_can_spawn_here(&mut s, &mut w));
     s.base.set_location_and_angles(3.5, 57.0, 3.5, 0.0, 0.0);
-    assert!(dispatch::get_can_spawn_here(&s, &mut w));
+    assert!(dispatch::get_can_spawn_here(&mut s, &mut w));
     // A spawn-blocking entity (any living one) in the box refuses it.
     let mut other = squid::new_entity_squid(&mut w);
     other.base.set_location_and_angles(3.5, 57.0, 3.5, 0.0, 0.0);
     assert!(w.spawn_entity_in_world(other));
-    assert!(!dispatch::get_can_spawn_here(&s, &mut w));
+    assert!(!dispatch::get_can_spawn_here(&mut s, &mut w));
 }
 
 /// Which `EntityList` names construct after this task, and which are still
-/// gaps. The integrator updates `MISSING` as the parallel mob tasks merge;
-/// it must end empty. Every constructor builds its own class, and
+/// gaps. The integrator updated `MISSING` as the parallel mob tasks merged;
+/// it is empty since WP-2.3c's merge. Every constructor builds its own class, and
 /// `createEntityInWorld` of a missing class makes the constructor's side
 /// effects (one id, and `EntityLiving`'s four `Math.random()` draws).
 #[test]
 fn entity_list_constructors_and_gaps() {
+    // Every concrete class constructs since WP-2.3a (the animals), WP-2.3b
+    // (the monsters) and WP-2.3c (the squid) merged; the gap branch below
+    // stays for a class added to MAPPINGS without a constructor.
     const CONSTRUCTS: &[&str] = &[
         "Arrow",
         "Snowball",
         "Item",
         "Painting",
-        "Pig",
-        "Squid",
-        "PrimedTnt",
-        "FallingSand",
-        "Minecart",
-        "Boat",
-    ];
-    const MISSING: &[&str] = &[
         "Monster",
         "Creeper",
         "Skeleton",
@@ -207,11 +202,18 @@ fn entity_list_constructors_and_gaps() {
         "Slime",
         "Ghast",
         "PigZombie",
+        "Pig",
         "Sheep",
         "Cow",
         "Chicken",
+        "Squid",
         "Wolf",
+        "PrimedTnt",
+        "FallingSand",
+        "Minecart",
+        "Boat",
     ];
+    const MISSING: &[&str] = &[];
     assert_eq!(entity_list::missing_constructors(), MISSING);
     let mut w = world();
     for m in MAPPINGS.iter() {
@@ -297,9 +299,10 @@ fn creature_specific_init_sheep_fleece() {
 }
 
 /// `World.tick` with every player fully asleep and hostile spawning on runs
-/// `performSleepSpawning`; with the monster constructors missing (WP-2.3b)
-/// no monster joins (each try that reaches a constructor records the gap),
-/// so the night is skipped and the player woken (`wakeUpPlayer` recorded).
+/// `performSleepSpawning`: the monsters are built (WP-2.3b) but none passes
+/// both `getCanSpawnHere` and the path test in the closed room, so none
+/// joins, the night is skipped and the player woken (`wakeUpPlayer`
+/// recorded).
 /// Hostile spawning off: no sleep spawning, the night is skipped too.
 #[test]
 fn sleep_spawning_from_world_tick() {
@@ -329,24 +332,21 @@ fn sleep_spawning_from_world_tick() {
         w.set_allowed_mob_spawns(hostile, true);
         assert!(w.is_all_players_fully_asleep());
         let entities = w.loaded_entity_list.len();
+        let ids = w.next_entity_id;
         w.tick();
         assert_eq!(w.world_info.world_time, 24001, "night skipped, then +1");
         assert_eq!(w.loaded_entity_list.len(), entities);
         let hits = w.unimplemented_hits.borrow();
-        // The gap records name the class: only nightSpawnEntities' monsters.
-        let monster_gaps: Vec<&str> = spawner::NIGHT_SPAWN_ENTITIES
-            .iter()
-            .map(|c| entity_list::by_class(c).unwrap().new_instance_gap)
-            .collect();
-        let gap = hits.keys().any(|k| monster_gaps.contains(k));
+        // Every monster of nightSpawnEntities constructs (WP-2.3b): no gap
+        // is recorded, and a monster is built (an id consumed) only with
+        // hostile spawning; none joins.
         assert!(
-            !hits
-                .keys()
-                .any(|k| k.starts_with("EntityList: the ") && !monster_gaps.contains(k)),
-            "no other class reached: {hits:?}"
+            !hits.keys().any(|k| k.starts_with("EntityList: the ")),
+            "no EntityList gap: {hits:?}"
         );
         assert_eq!(
-            gap, hostile,
+            w.next_entity_id > ids,
+            hostile,
             "monster constructors reached only with hostile spawning"
         );
         assert!(hits.contains_key("EntityPlayer.wakeUpPlayer (World.wakeUpAllPlayers)"));

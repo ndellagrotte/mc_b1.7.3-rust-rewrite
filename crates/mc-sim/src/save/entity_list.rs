@@ -12,7 +12,8 @@
 //! [`new_instance`] for `SpawnerAnimals`, the mob spawner, the golden
 //! driver's `spawn` op — picks it up). For the other names of the table,
 //! [`create_entity_from_nbt`] returns [`FromNbt::Gap`] (the classes still
-//! missing: [`missing_constructors`]):
+//! missing: [`missing_constructors`], empty since the WP-2.3 merges, so the
+//! path below is not reached by any stored id now):
 //!
 //! - the side effects the Java constructor has on the world are made: the
 //!   entity id is consumed (`Entity.nextEntityID++`, Entity.java:76) and,

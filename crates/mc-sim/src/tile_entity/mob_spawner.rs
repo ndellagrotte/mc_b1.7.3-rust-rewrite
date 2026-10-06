@@ -194,7 +194,7 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
             var9.base
                 .set_location_and_angles(var11, var13, var15, yaw, 0.0);
             // src: TileEntityMobSpawner.java:67-80
-            if dispatch::get_can_spawn_here(&var9, world) {
+            if dispatch::get_can_spawn_here(&mut var9, world) {
                 let id = var9.base.entity_id;
                 world.spawn_entity_in_world(var9);
                 for _var17 in 0..20 {

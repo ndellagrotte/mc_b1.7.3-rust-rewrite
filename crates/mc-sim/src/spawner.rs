@@ -240,7 +240,7 @@ pub fn perform_spawning(world: &mut World, var1: bool, var2: bool) -> i32 {
                                 0.0,
                             );
                             // src: SpawnerAnimals.java:130-137
-                            if dispatch::get_can_spawn_here(&var43, world) {
+                            if dispatch::get_can_spawn_here(&mut var43, world) {
                                 var20 += 1;
                                 let max = join_then(world, var43, |w, e| {
                                     creature_specific_init(e, w, var27, var28, var29);
@@ -474,7 +474,7 @@ pub fn perform_sleep_spawning(world: &mut World, var1: &[i32]) -> bool {
                         yaw,
                         0.0,
                     );
-                    if dispatch::get_can_spawn_here(&var17, world)
+                    if dispatch::get_can_spawn_here(&mut var17, world)
                         && sleep_spawn_next_to(world, var17, pid, var9, var13, var10)
                     {
                         var2 = true;

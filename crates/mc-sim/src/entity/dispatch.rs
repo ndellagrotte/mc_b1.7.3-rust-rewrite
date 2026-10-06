@@ -705,26 +705,24 @@ pub fn is_entity_inside_opaque_block(e: &Entity, world: &mut World) -> bool {
 
 /// `interact(player)`: `player` in hand.
 pub fn interact(e: &mut Entity, world: &mut World, player: &mut Entity) -> bool {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityBoat.java:336-346
-        K::Boat(..) => return boat::interact(e, world, player),
+        K::Boat(..) => boat::interact(e, world, player),
         // src: EntityCow.java:38-46
-        K::Cow(..) => return cow::interact(e, world, player),
+        K::Cow(..) => cow::interact(e, world, player),
         // src: EntityMinecart.java:763-791
-        K::Minecart(..) => return minecart::interact(e, world, player),
+        K::Minecart(..) => minecart::interact(e, world, player),
         // src: EntityPig.java:36-43
-        K::Pig(..) => return pig::interact(e, world, player),
+        K::Pig(..) => pig::interact(e, world, player),
         // src: EntitySheep.java:34-53
-        K::Sheep(..) => return sheep::interact(e, world, player),
+        K::Sheep(..) => sheep::interact(e, world, player),
         // src: EntitySquid.java:63-65
-        K::Squid(..) => return false,
+        K::Squid(..) => false,
         // src: EntityWolf.java:326-378
-        K::Wolf(..) => return wolf::interact(e, world, player),
+        K::Wolf(..) => wolf::interact(e, world, player),
         // src: Entity.java:908-910
-        _ => return false,
-    };
-    world.note_unimplemented(what);
-    false
+        _ => false,
+    }
 }
 
 /// `updateRiderPosition()` of `mount`, positioning its rider `rider` (Java's
@@ -1132,110 +1130,108 @@ pub fn get_talk_interval(e: &Entity, world: &World) -> i32 {
 ///
 /// `&mut`: `EntityWolf`'s draws from `rand` (EntityWolf.java:73).
 pub fn get_living_sound(e: &mut Entity, world: &World) -> Option<&'static str> {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityPig.java:24-26
-        K::Pig(..) => return Some("mob.pig"),
+        K::Pig(..) => Some("mob.pig"),
         // src: EntityChicken.java:62-64
-        K::Chicken(..) => return Some("mob.chicken"),
+        K::Chicken(..) => Some("mob.chicken"),
         // src: EntityCow.java:18-20
-        K::Cow(..) => return Some("mob.cow"),
+        K::Cow(..) => Some("mob.cow"),
         // src: EntityGhast.java:131-133
-        K::Ghast(..) => return Some("mob.ghast.moan"),
+        K::Ghast(..) => Some("mob.ghast.moan"),
         // src: EntitySheep.java:67-69
-        K::Sheep(..) => return Some("mob.sheep"),
+        K::Sheep(..) => Some("mob.sheep"),
         // src: EntityPigZombie.java:73-75
-        K::PigZombie(..) => return Some("mob.zombiepig.zpig"),
+        K::PigZombie(..) => Some("mob.zombiepig.zpig"),
         // src: EntitySkeleton.java:11-13
-        K::Skeleton(..) => return Some("mob.skeleton"),
+        K::Skeleton(..) => Some("mob.skeleton"),
         // src: EntitySquid.java:34-36 (`null`)
-        K::Squid(..) => return None,
+        K::Squid(..) => None,
         // src: EntityWolf.java:70-78
-        K::Wolf(..) => return Some(wolf::get_living_sound(e)),
+        K::Wolf(..) => Some(wolf::get_living_sound(e)),
         // src: EntitySpider.java:29-31
-        K::Spider(..) => return Some("mob.spider"),
+        K::Spider(..) => Some("mob.spider"),
         // src: EntityZombie.java:22-24
-        K::Zombie(..) => return Some("mob.zombie"),
+        K::Zombie(..) => Some("mob.zombie"),
         // src: EntityLiving.java:380-382
-        _ => return None,
-    };
-    world.note_unimplemented(what);
-    None
+        _ => None,
+    }
 }
 
 /// `getHurtSound()`.
 pub fn get_hurt_sound(e: &Entity, world: &World) -> Option<&'static str> {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityPig.java:28-30
-        K::Pig(..) => return Some("mob.pig"),
+        K::Pig(..) => Some("mob.pig"),
         // src: EntityChicken.java:66-68
-        K::Chicken(..) => return Some("mob.chickenhurt"),
+        K::Chicken(..) => Some("mob.chickenhurt"),
         // src: EntitySpider.java:33-35
-        K::Spider(..) => return Some("mob.spider"),
+        K::Spider(..) => Some("mob.spider"),
         // src: EntityCreeper.java:73-75
-        K::Creeper(..) => return Some("mob.creeper"),
+        K::Creeper(..) => Some("mob.creeper"),
         // src: EntityCow.java:22-24
-        K::Cow(..) => return Some("mob.cowhurt"),
+        K::Cow(..) => Some("mob.cowhurt"),
         // src: EntityGhast.java:135-137
-        K::Ghast(..) => return Some("mob.ghast.scream"),
+        K::Ghast(..) => Some("mob.ghast.scream"),
         // src: EntitySkeleton.java:15-17
-        K::Skeleton(..) => return Some("mob.skeletonhurt"),
+        K::Skeleton(..) => Some("mob.skeletonhurt"),
         // src: EntitySheep.java:71-73
-        K::Sheep(..) => return Some("mob.sheep"),
+        K::Sheep(..) => Some("mob.sheep"),
         // src: EntitySlime.java:122-124
-        K::Slime(..) => return Some("mob.slime"),
+        K::Slime(..) => Some("mob.slime"),
         // src: EntityPigZombie.java:77-79
-        K::PigZombie(..) => return Some("mob.zombiepig.zpighurt"),
+        K::PigZombie(..) => Some("mob.zombiepig.zpighurt"),
         // src: EntityWolf.java:80-82
-        K::Wolf(..) => return Some("mob.wolf.hurt"),
+        K::Wolf(..) => Some("mob.wolf.hurt"),
         // src: EntitySquid.java:38-40 (`null`)
-        K::Squid(..) => return None,
+        K::Squid(..) => None,
         // src: EntityZombie.java:26-28
-        K::Zombie(..) => return Some("mob.zombiehurt"),
+        K::Zombie(..) => Some("mob.zombiehurt"),
         // src: EntityLiving.java:384-386
-        _ => return Some("random.hurt"),
-    };
-    world.note_unimplemented(what);
-    Some("random.hurt")
+        _ => Some("random.hurt"),
+    }
 }
 
 /// `getDeathSound()`.
 pub fn get_death_sound(e: &Entity, world: &World) -> Option<&'static str> {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityPig.java:32-34
-        K::Pig(..) => return Some("mob.pigdeath"),
+        K::Pig(..) => Some("mob.pigdeath"),
         // src: EntityChicken.java:70-72
-        K::Chicken(..) => return Some("mob.chickenhurt"),
+        K::Chicken(..) => Some("mob.chickenhurt"),
         // src: EntityCow.java:26-28
-        K::Cow(..) => return Some("mob.cowhurt"),
+        K::Cow(..) => Some("mob.cowhurt"),
         // src: EntitySpider.java:37-39
-        K::Spider(..) => return Some("mob.spiderdeath"),
+        K::Spider(..) => Some("mob.spiderdeath"),
         // src: EntitySheep.java:75-77
-        K::Sheep(..) => return Some("mob.sheep"),
+        K::Sheep(..) => Some("mob.sheep"),
         // src: EntityCreeper.java:77-79
-        K::Creeper(..) => return Some("mob.creeperdeath"),
+        K::Creeper(..) => Some("mob.creeperdeath"),
         // src: EntitySquid.java:42-44 (`null`)
-        K::Squid(..) => return None,
+        K::Squid(..) => None,
         // src: EntitySkeleton.java:19-21 (the hurt sound again)
-        K::Skeleton(..) => return Some("mob.skeletonhurt"),
+        K::Skeleton(..) => Some("mob.skeletonhurt"),
         // src: EntityGhast.java:139-141
-        K::Ghast(..) => return Some("mob.ghast.death"),
+        K::Ghast(..) => Some("mob.ghast.death"),
         // src: EntitySlime.java:126-128
-        K::Slime(..) => return Some("mob.slime"),
+        K::Slime(..) => Some("mob.slime"),
         // src: EntityWolf.java:84-86
-        K::Wolf(..) => return Some("mob.wolf.death"),
+        K::Wolf(..) => Some("mob.wolf.death"),
         // src: EntityZombie.java:30-32
-        K::Zombie(..) => return Some("mob.zombiedeath"),
+        K::Zombie(..) => Some("mob.zombiedeath"),
         // src: EntityPigZombie.java:81-83
-        K::PigZombie(..) => return Some("mob.zombiepig.zpigdeath"),
+        K::PigZombie(..) => Some("mob.zombiepig.zpigdeath"),
         // src: EntityLiving.java:388-390
-        _ => return Some("random.hurt"),
-    };
-    world.note_unimplemented(what);
-    Some("random.hurt")
+        _ => Some("random.hurt"),
+    }
 }
 
 /// `getSoundVolume()`.
 pub fn get_sound_volume(e: &Entity, world: &World) -> f32 {
+    let _ = world;
     match e.kind {
         // src: EntityCow.java:30-32, EntityWolf.java:88-90
         K::Cow(..) | K::Wolf(..) => return 0.4,
@@ -1274,55 +1270,49 @@ pub fn on_death(e: &mut Entity, world: &mut World, attacker: Option<&Entity>) {
 
 /// `dropFewItems()`.
 pub fn drop_few_items(e: &mut Entity, world: &mut World) {
-    let what = match e.kind {
+    match e.kind {
         // src: EntitySheep.java:23-28
-        K::Sheep(..) => return sheep::drop_few_items(e, world),
+        K::Sheep(..) => sheep::drop_few_items(e, world),
         // src: EntitySkeleton.java:67-81
-        K::Skeleton(..) => return skeleton::drop_few_items(e, world),
+        K::Skeleton(..) => skeleton::drop_few_items(e, world),
         // src: EntitySquid.java:54-61
-        K::Squid(..) => return squid::drop_few_items(e, world),
-        _ => "",
-    };
-    if !what.is_empty() {
-        world.note_unimplemented(what);
-        return;
+        K::Squid(..) => squid::drop_few_items(e, world),
+        // src: EntityLiving.java:424-434
+        _ => living::drop_few_items(e, world),
     }
-    // src: EntityLiving.java:424-434
-    living::drop_few_items(e, world);
 }
 
 /// `getDropItemId()`: 0 or less drops nothing.
 pub fn get_drop_item_id(e: &Entity, world: &World) -> i32 {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityPig.java:45-47
-        K::Pig(..) => return pig::get_drop_item_id(e),
+        K::Pig(..) => pig::get_drop_item_id(e),
         // src: EntityCow.java:34-36
-        K::Cow(..) => return cow::get_drop_item_id(),
+        K::Cow(..) => cow::get_drop_item_id(),
         // src: EntityCreeper.java:129-131, EntityGhast.java:143-145
-        K::Creeper(..) | K::Ghast(..) => return creeper::GUNPOWDER,
+        K::Creeper(..) | K::Ghast(..) => creeper::GUNPOWDER,
         // src: EntityChicken.java:74-76
-        K::Chicken(..) => return chicken::get_drop_item_id(),
+        K::Chicken(..) => chicken::get_drop_item_id(),
         // src: EntitySkeleton.java:63-65
-        K::Skeleton(..) => return skeleton::ARROW,
+        K::Skeleton(..) => skeleton::ARROW,
         // src: EntitySheep.java:30-32
-        K::Sheep(..) => return sheep::get_drop_item_id(),
+        K::Sheep(..) => sheep::get_drop_item_id(),
         // src: EntitySlime.java:130-132
-        K::Slime(..) => return slime::get_drop_item_id(e),
+        K::Slime(..) => slime::get_drop_item_id(e),
         // src: EntityPigZombie.java:85-87
-        K::PigZombie(..) => return pig_zombie::PORK_COOKED,
+        K::PigZombie(..) => pig_zombie::PORK_COOKED,
         // src: EntitySquid.java:50-52
-        K::Squid(..) => return 0,
+        K::Squid(..) => 0,
         // src: EntityZombie.java:34-36
-        K::Zombie(..) => return zombie::FEATHER,
+        K::Zombie(..) => zombie::FEATHER,
         // src: EntitySpider.java:70-72
-        K::Spider(..) => return crate::item::ids::SILK,
+        K::Spider(..) => crate::item::ids::SILK,
         // src: EntityWolf.java:92-94
-        K::Wolf(..) => return -1,
+        K::Wolf(..) => -1,
         // src: EntityLiving.java:436-438
-        _ => return 0,
-    };
-    world.note_unimplemented(what);
-    0
+        _ => 0,
+    }
 }
 
 /// `moveEntityWithHeading(strafe, forward)`.
@@ -1432,7 +1422,7 @@ pub fn can_despawn(e: &Entity, world: &World) -> bool {
 /// EntityPlayerSP.java:27-32; WP-2.5). Running `EntityLiving`'s idle AI
 /// there would turn and steer the player where vanilla does not.
 pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityCreature.java:16-116
         K::Mob(..)
         | K::Creeper(..)
@@ -1444,22 +1434,20 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
         | K::Pig(..)
         | K::Sheep(..)
         | K::Cow(..)
-        | K::Chicken(..) => return creature::update_player_action_state(e, world),
+        | K::Chicken(..) => creature::update_player_action_state(e, world),
         K::PlayerSp(..) => {
             world.note_unimplemented("EntityPlayerSP.updatePlayerActionState");
-            return;
         }
         // src: EntityWolf.java:96-123
-        K::Wolf(..) => return wolf::update_player_action_state(e, world),
+        K::Wolf(..) => wolf::update_player_action_state(e, world),
         // src: EntitySlime.java:68-96
-        K::Slime(..) => return slime::update_player_action_state(e, world),
+        K::Slime(..) => slime::update_player_action_state(e, world),
         // src: EntityGhast.java:31-113
-        K::Ghast(..) => return ghast::update_player_action_state(e, world),
+        K::Ghast(..) => ghast::update_player_action_state(e, world),
         // src: EntitySquid.java:131-140
-        K::Squid(..) => return squid::update_player_action_state(e, world),
+        K::Squid(..) => squid::update_player_action_state(e, world),
         _ => unreachable!("updatePlayerActionState on a non-living entity"),
-    };
-    world.note_unimplemented(what);
+    }
 }
 
 /// `getVerticalFaceSpeed()`.
@@ -1478,10 +1466,10 @@ pub fn get_vertical_face_speed(e: &Entity, world: &World) -> i32 {
 /// `&mut`: the `EntityMob`, `EntityGhast` and `EntitySlime` overrides draw
 /// from the entity's `rand`.
 pub fn get_can_spawn_here(e: &mut Entity, world: &mut World) -> bool {
-    let what = match e.kind {
+    match e.kind {
         // src: EntityAnimal.java:20-25
         K::Pig(..) | K::Sheep(..) | K::Cow(..) | K::Chicken(..) | K::Wolf(..) => {
-            return animal::get_can_spawn_here(e, world);
+            animal::get_can_spawn_here(e, world)
         }
         // src: EntityMob.java:69-86
         K::Mob(..)
@@ -1489,25 +1477,17 @@ pub fn get_can_spawn_here(e: &mut Entity, world: &mut World) -> bool {
         | K::Skeleton(..)
         | K::Spider(..)
         | K::Zombie(..)
-        | K::GiantZombie(..) => return mob::get_can_spawn_here(e, world),
+        | K::GiantZombie(..) => mob::get_can_spawn_here(e, world),
         // src: EntityPigZombie.java:27-29
-        K::PigZombie(..) => return pig_zombie::get_can_spawn_here(e, world),
+        K::PigZombie(..) => pig_zombie::get_can_spawn_here(e, world),
         // src: EntityWaterMob.java:20-22
-        K::Squid(..) => return water_mob::get_can_spawn_here(e, world),
+        K::Squid(..) => water_mob::get_can_spawn_here(e, world),
         // src: EntityGhast.java:151-153
-        K::Ghast(..) => return ghast::get_can_spawn_here(e, world),
+        K::Ghast(..) => ghast::get_can_spawn_here(e, world),
         // src: EntitySlime.java:134-137
-        K::Slime(..) => return slime::get_can_spawn_here(e, world),
+        K::Slime(..) => slime::get_can_spawn_here(e, world),
         // src: EntityLiving.java:781-783
-        _ => return living::get_can_spawn_here(e, world),
-    };
-    world.note_unimplemented(what);
-    if creature::creature(&e.kind).is_some() {
-        // src: EntityCreature.java:159-164
-        creature::get_can_spawn_here(e, world)
-    } else {
-        // src: EntityLiving.java:781-783
-        living::get_can_spawn_here(e, world)
+        _ => living::get_can_spawn_here(e, world),
     }
 }
 

@@ -1172,43 +1172,33 @@ fn save_list_rename_delete() {
     ));
 }
 
-/// A stored entity of a class the port cannot construct (the first living
-/// `EntityList` class without a constructor yet: the cow was until WP-2.3):
-/// its id and `EntityLiving`'s `Math.random()` draws are consumed, the gap
-/// recorded, and a re-save writes the compound back. Once every living
-/// class is constructible the gap path (`FromNbt::Gap`) is unreachable with
-/// a living id (an unknown id takes the `Skipped` path, EntityList.java:49,
-/// a different mechanism), so the test fails loudly to be rewritten or
-/// removed with that path.
+/// A stored entity of every concrete `EntityList` class is built since the
+/// WP-2.3 merges (`missing_constructors` is empty), so the `FromNbt::Gap`
+/// path (the constructor's side effects, the record, the compound kept and
+/// written back) is no longer reachable from a stored id. What stays: a
+/// stored cow (the class this test kept as a gap until WP-2.3a) is built
+/// and read (`Health` 7), and re-saved as itself; `"Mob"`, the abstract
+/// `EntityLiving`, is skipped (no id consumed) and dropped on re-save
+/// (EntityList.java:34-53).
 #[test]
-fn unconstructible_entities_are_kept() {
-    let Some(name) = mc_sim::save::entity_list::MAPPINGS
-        .iter()
-        .filter(|m| m.concrete && m.living)
-        .map(|m| m.name)
-        .find(|n| {
-            mc_sim::save::entity_list::create_entity_in_world(n, &mut empty_world()).is_none()
-        })
-    else {
-        panic!(
-            "every living EntityList class is constructible: rewrite this test \
-             (a non-living class still without a constructor) or remove it with \
-             the FromNbt::Gap path"
-        );
-    };
+fn stored_entities_construct_and_mob_is_skipped() {
+    assert_eq!(
+        mc_sim::save::entity_list::missing_constructors(),
+        Vec::<&str>::new()
+    );
     let store = store_over(MemoryStorage::default());
     let mut a = build_saved_world(&store, "w");
     a.try_save_world(true).unwrap();
     drop(a);
-    let mut cow = BTreeMap::new();
-    cow.insert("id".to_string(), Tag::String(name.into()));
-    cow.insert(
-        "Pos".to_string(),
-        Tag::List {
-            elem: TagType::Double,
-            items: vec![Tag::Double(1.5), Tag::Double(61.0), Tag::Double(1.5)],
-        },
-    );
+    // A complete stored cow (readFromNBT runs outside the try and throws on
+    // a missing list such as Motion, EntityList.java:47): the port's own
+    // save of a cow, with Health 7.
+    let mut cow = {
+        let mut w0 = empty_world();
+        let mut c0 = mc_sim::entity::cow::new_entity_cow(&mut w0);
+        c0.base.set_location_and_angles(1.5, 61.0, 1.5, 0.0, 0.0);
+        mc_sim::entity::nbt::add_entity_id(&c0, &w0).unwrap()
+    };
     cow.insert("Health".to_string(), Tag::Short(7));
     let mut mob = BTreeMap::new();
     mob.insert("id".to_string(), Tag::String("Mob".into()));
@@ -1217,7 +1207,7 @@ fn unconstructible_entities_are_kept() {
         let Some(Tag::List { items, .. }) = level_mut(&mut t).get_mut("Entities") else {
             panic!()
         };
-        items.push(Tag::Compound(cow.clone()));
+        items.push(Tag::Compound(cow));
         items.push(Tag::Compound(mob));
         t
     };
@@ -1232,18 +1222,15 @@ fn unconstructible_entities_are_kept() {
     let handler = SaveOldDir::new(store.clone(), "", "w").unwrap();
     let mut b = World::new_from_save(Box::new(handler), "x", 0, None, ENV);
     b.make_deterministic(5);
-    let math_before = b.math_random.state();
     b.get_chunk_from_chunk_coords(0, 0);
-    // Item, sand (both built), the kept mob (id 2 consumed); "Mob" is
-    // abstract: skipped.
+    // Item, sand, the cow (ids 0..=2); "Mob" is abstract: skipped.
     assert_eq!(b.next_entity_id, 3);
-    assert_eq!(b.loaded_entity_list.len(), 2);
-    assert_ne!(b.math_random.state(), math_before);
+    assert_eq!(b.loaded_entity_list.len(), 3);
     assert!(
-        b.unimplemented_hits
+        !b.unimplemented_hits
             .borrow()
             .keys()
-            .any(|k| k.starts_with("EntityList.createEntityFromNBT"))
+            .any(|k| k.starts_with("EntityList."))
     );
     b.get_chunk_from_chunk_coords(0, 0).set_chunk_modified();
     b.try_save_world(true).unwrap();
@@ -1251,12 +1238,16 @@ fn unconstructible_entities_are_kept() {
     let Some(Tag::List { items, .. }) = t.get("Level").unwrap().get("Entities") else {
         panic!()
     };
-    assert_eq!(
-        items.len(),
-        3,
-        "item, sand, then the kept mob; the Mob is dropped"
-    );
-    assert_eq!(items[2], Tag::Compound(cow));
+    assert_eq!(items.len(), 3, "item, sand and the cow; the Mob is dropped");
+    let cows: Vec<_> = items
+        .iter()
+        .filter_map(|t| match t {
+            Tag::Compound(c) if c.get("id") == Some(&Tag::String("Cow".into())) => Some(c),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(cows.len(), 1);
+    assert_eq!(cows[0].get("Health"), Some(&Tag::Short(7)));
 }
 
 /// vanilla bug: a chunk stored under the wrong position stays wrong
