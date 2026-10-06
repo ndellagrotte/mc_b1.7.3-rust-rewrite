@@ -7,10 +7,10 @@
 //! `createEntityFromNBT` instantiates the class saved under `id` with its
 //! `(World)` constructor, then `readFromNBT`. The port has those
 //! constructors for `EntityItem`, `EntityFallingSand`, `EntityArrow`,
-//! `EntitySnowball`, `EntityPainting` and `EntityTNTPrimed` (WP-2.4) and
-//! `EntityPig` (WP-2.2); the other mobs, the minecart and the boat are
-//! Phase 2. For the other names of the
-//! table, [`create_entity_from_nbt`] returns [`FromNbt::Gap`]:
+//! `EntitySnowball`, `EntityPainting`, `EntityTNTPrimed`, `EntityMinecart`
+//! and `EntityBoat` (WP-2.4) and `EntityPig` (WP-2.2); the other mobs are
+//! Phase 2. For the other names of the table, [`create_entity_from_nbt`]
+//! returns [`FromNbt::Gap`]:
 //!
 //! - the side effects the Java constructor has on the world are made: the
 //!   entity id is consumed (`Entity.nextEntityID++`, Entity.java:76) and,
@@ -38,8 +38,10 @@ use mc_nbt::Tag;
 use super::SaveError;
 use super::nbt::{self as n, Compound};
 use crate::entity::arrow::new_entity_arrow_empty;
+use crate::entity::boat::new_entity_boat_empty;
 use crate::entity::falling_sand::new_entity_falling_sand_empty;
 use crate::entity::item::new_entity_item_empty;
+use crate::entity::minecart::new_entity_minecart_empty;
 use crate::entity::painting::new_entity_painting_empty;
 use crate::entity::pig::new_entity_pig;
 use crate::entity::snowball::new_entity_snowball_empty;
@@ -163,6 +165,10 @@ fn construct(class: &str, world: &mut World) -> Option<Entity> {
         "EntityPainting" => Some(new_entity_painting_empty(world)),
         // src: EntityTNTPrimed.java:6-12
         "EntityTNTPrimed" => Some(new_entity_tnt_primed_empty(world)),
+        // src: EntityMinecart.java:26-36
+        "EntityMinecart" => Some(new_entity_minecart_empty(world)),
+        // src: EntityBoat.java:19-27
+        "EntityBoat" => Some(new_entity_boat_empty(world)),
         // src: EntityPig.java:4-8
         "EntityPig" => Some(new_entity_pig(world)),
         _ => None,

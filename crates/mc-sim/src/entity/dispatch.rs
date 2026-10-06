@@ -32,8 +32,8 @@
 use mc_core::{Aabb, Vec3D};
 
 use super::{
-    Entity, EntityKindData as K, animal, arrow, base, creature, egg, falling_sand, fireball, fish,
-    item, lightning_bolt, living, painting, pig, snowball, tnt_primed,
+    Entity, EntityKindData as K, animal, arrow, base, boat, creature, egg, falling_sand, fireball,
+    fish, item, lightning_bolt, living, minecart, painting, pig, snowball, tnt_primed,
 };
 use crate::world::World;
 
@@ -45,8 +45,27 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup's
     // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
     ("EntityArrow", &["onCollideWithPlayer", "onUpdate"]),
-    // src: EntityBoat.java:29-31
-    ("EntityBoat", &["canTriggerWalking"]),
+    // src: EntityBoat.java:29-31, :36-46, :59-61, :63-120, :318-324, :332-346
+    // (super::boat)
+    (
+        "EntityBoat",
+        &[
+            "attackEntityFrom",
+            "canBeCollidedWith",
+            "canBePushed",
+            "canTriggerWalking",
+            "getBoundingBox",
+            "getCollisionBox",
+            "getMountedYOffset",
+            "getShadowSize",
+            "interact",
+            "onUpdate",
+            "performHurtAnimation",
+            "setPositionAndRotation2",
+            "setVelocity",
+            "updateRiderPosition",
+        ],
+    ),
     // src: EntityEgg.java:87-215, :235-242 (super::egg, super::snowball)
     ("EntityEgg", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityFallingSand.java:26-28, :33-71 (super::falling_sand)
@@ -98,8 +117,28 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateRidden",
         ],
     ),
-    // src: EntityMinecart.java:38-40
-    ("EntityMinecart", &["canTriggerWalking"]),
+    // src: EntityMinecart.java:38-55, :69-495, :642-714, :763-809
+    // (super::minecart)
+    (
+        "EntityMinecart",
+        &[
+            "applyEntityCollision",
+            "attackEntityFrom",
+            "canBeCollidedWith",
+            "canBePushed",
+            "canTriggerWalking",
+            "getBoundingBox",
+            "getCollisionBox",
+            "getMountedYOffset",
+            "getShadowSize",
+            "interact",
+            "onUpdate",
+            "performHurtAnimation",
+            "setEntityDead",
+            "setPositionAndRotation2",
+            "setVelocity",
+        ],
+    ),
     // src: EntityPainting.java:134-143, :200-212, :245-259 (super::painting)
     (
         "EntityPainting",
@@ -206,16 +245,13 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
         K::Painting(..) => painting::on_update(e, world),
         // src: EntityTNTPrimed.java:38-64
         K::TntPrimed(..) => tnt_primed::on_update(e, world),
-        K::Minecart(..) => untranscribed_base_update(e, world, "EntityMinecart.onUpdate"),
-        K::Boat(..) => untranscribed_base_update(e, world, "EntityBoat.onUpdate"),
+        // src: EntityMinecart.java:164-495
+        K::Minecart(..) => minecart::on_update(e, world),
+        // src: EntityBoat.java:120-316
+        K::Boat(..) => boat::on_update(e, world),
         // src: EntityLightningBolt.java:36-74
         K::LightningBolt(..) => lightning_bolt::on_update(e, world),
     }
-}
-
-fn untranscribed_base_update(e: &mut Entity, world: &mut World, what: &'static str) {
-    world.note_unimplemented(what);
-    base::on_update(e, world);
 }
 
 /// `onEntityUpdate()`.
@@ -263,14 +299,10 @@ pub fn attack_entity_from(
         K::Fireball(..) => return fireball::attack_entity_from(e, world, attacker, damage),
         // src: EntityPainting.java:204-212
         K::Painting(..) => return painting::attack_entity_from(e, world, attacker, damage),
-        K::Minecart(..) => {
-            world.note_unimplemented("EntityMinecart.attackEntityFrom");
-            return base::attack_entity_from(e, world, attacker, damage);
-        }
-        K::Boat(..) => {
-            world.note_unimplemented("EntityBoat.attackEntityFrom");
-            return base::attack_entity_from(e, world, attacker, damage);
-        }
+        // src: EntityMinecart.java:73-123
+        K::Minecart(..) => return minecart::attack_entity_from(e, world, attacker, damage),
+        // src: EntityBoat.java:63-90
+        K::Boat(..) => return boat::attack_entity_from(e, world, attacker, damage),
         // src: EntityLiving.java:307-365
         K::Slime(..) | K::Ghast(..) | K::Pig(..) | K::Cow(..) | K::Chicken(..) | K::Squid(..) => {
             return living::attack_entity_from(e, world, attacker, damage);
@@ -306,7 +338,8 @@ pub fn kill(e: &mut Entity, world: &mut World) {
 /// `setEntityDead()`.
 pub fn set_entity_dead(e: &mut Entity, world: &mut World) {
     let what = match e.kind {
-        K::Minecart(..) => "EntityMinecart.setEntityDead",
+        // src: EntityMinecart.java:136-162
+        K::Minecart(..) => return minecart::set_entity_dead(e, world),
         K::Slime(..) => "EntitySlime.setEntityDead",
         K::PlayerSp(..) => "EntityPlayer.setEntityDead",
         // src: Entity.java:149-151
@@ -374,59 +407,57 @@ pub fn deal_fire_damage(e: &mut Entity, world: &mut World, amount: i32) {
 
 /// `getBoundingBox()`: the box other entities collide with (`None` for most).
 pub fn get_bounding_box(e: &Entity, world: &World) -> Option<Aabb> {
+    let _ = world;
     match e.kind {
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.getBoundingBox"),
-        K::Boat(..) => world.note_unimplemented("EntityBoat.getBoundingBox"),
-        _ => {}
+        // src: EntityBoat.java:40-42 (other entities collide with a boat)
+        K::Boat(..) => Some(e.base.bounding_box),
+        // src: EntityMinecart.java:49-51 (`null`), Entity.java:558-560
+        _ => None,
     }
-    // src: Entity.java:558-560
-    None
 }
 
 /// `getCollisionBox(other)`: the box `e` presents to `other` (`None` for most).
 pub fn get_collision_box(e: &Entity, other: &Entity, world: &World) -> Option<Aabb> {
-    let _ = other;
+    let _ = world;
     match e.kind {
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.getCollisionBox"),
-        K::Boat(..) => world.note_unimplemented("EntityBoat.getCollisionBox"),
-        _ => {}
+        // src: EntityMinecart.java:45-47, EntityBoat.java:36-38 (a moving
+        // cart or boat collides with the box of every entity near it)
+        K::Minecart(..) | K::Boat(..) => Some(other.base.bounding_box),
+        // src: Entity.java:912-914
+        _ => None,
     }
-    // src: Entity.java:912-914
-    None
 }
 
 /// `canBeCollidedWith()`.
 pub fn can_be_collided_with(e: &Entity, world: &World) -> bool {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityLiving.java:81-83
-        _ if e.kind.living().is_some() => return !e.base.is_dead,
+        _ if e.kind.living().is_some() => !e.base.is_dead,
         // src: EntityFireball.java:194-196, EntityPainting.java:200-202 (`return true`)
-        K::Fireball(..) | K::Painting(..) => return true,
+        K::Fireball(..) | K::Painting(..) => true,
         // src: EntityFallingSand.java:33-35
-        K::FallingSand(..) => return falling_sand::can_be_collided_with(e),
+        K::FallingSand(..) => falling_sand::can_be_collided_with(e),
         // src: EntityTNTPrimed.java:34-36
-        K::TntPrimed(..) => return tnt_primed::can_be_collided_with(e),
-        K::Minecart(..) => "EntityMinecart.canBeCollidedWith",
-        K::Boat(..) => "EntityBoat.canBeCollidedWith",
+        K::TntPrimed(..) => tnt_primed::can_be_collided_with(e),
+        // src: EntityMinecart.java:132-134, EntityBoat.java:98-100
+        K::Minecart(..) | K::Boat(..) => !e.base.is_dead,
         // src: Entity.java:751-753
-        _ => return false,
-    };
-    world.note_unimplemented(what);
-    false
+        _ => false,
+    }
 }
 
 /// `canBePushed()`.
 pub fn can_be_pushed(e: &Entity, world: &World) -> bool {
-    let what = match e.kind {
+    let _ = world;
+    match e.kind {
         // src: EntityLiving.java:85-87
-        _ if e.kind.living().is_some() => return !e.base.is_dead,
-        K::Minecart(..) => "EntityMinecart.canBePushed",
-        K::Boat(..) => "EntityBoat.canBePushed",
+        _ if e.kind.living().is_some() => !e.base.is_dead,
+        // src: EntityMinecart.java:53-55, EntityBoat.java:44-46
+        K::Minecart(..) | K::Boat(..) => true,
         // src: Entity.java:755-757
-        _ => return false,
-    };
-    world.note_unimplemented(what);
-    false
+        _ => false,
+    }
 }
 
 /// `getEyeHeight()`.
@@ -457,8 +488,10 @@ pub fn get_y_offset(e: &Entity, world: &World) -> f64 {
 /// `getMountedYOffset()`.
 pub fn get_mounted_y_offset(e: &Entity, world: &World) -> f64 {
     match e.kind {
-        K::Boat(..) => world.note_unimplemented("EntityBoat.getMountedYOffset"),
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.getMountedYOffset"),
+        // src: EntityBoat.java:59-61
+        K::Boat(..) => return boat::get_mounted_y_offset(e),
+        // src: EntityMinecart.java:69-71
+        K::Minecart(..) => return minecart::get_mounted_y_offset(e),
         K::Spider(..) => world.note_unimplemented("EntitySpider.getMountedYOffset"),
         _ => {}
     }
@@ -537,7 +570,8 @@ pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut En
 /// `applyEntityCollision(other)`: `other` in hand.
 pub fn apply_entity_collision(e: &mut Entity, world: &mut World, other: &mut Entity) {
     if let K::Minecart(..) = e.kind {
-        world.note_unimplemented("EntityMinecart.applyEntityCollision");
+        // src: EntityMinecart.java:646-714
+        return minecart::apply_entity_collision(e, world, other);
     }
     // src: Entity.java:709-734
     base::apply_entity_collision(e, world, other);
@@ -602,12 +636,12 @@ pub fn get_entity_texture(e: &Entity, world: &World) -> Option<&'static str> {
 pub fn get_shadow_size(e: &Entity, world: &World) -> f32 {
     match e.kind {
         K::Arrow(..) => world.note_unimplemented("EntityArrow.getShadowSize"),
-        K::Boat(..) => world.note_unimplemented("EntityBoat.getShadowSize"),
+        // src: EntityBoat.java:332-334, EntityMinecart.java:642-644
+        K::Boat(..) | K::Minecart(..) => return 0.0,
         K::Egg(..) => world.note_unimplemented("EntityEgg.getShadowSize"),
         K::FallingSand(..) => world.note_unimplemented("EntityFallingSand.getShadowSize"),
         K::Fireball(..) => world.note_unimplemented("EntityFireball.getShadowSize"),
         K::Fish(..) => world.note_unimplemented("EntityFish.getShadowSize"),
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.getShadowSize"),
         K::Snowball(..) => world.note_unimplemented("EntitySnowball.getShadowSize"),
         K::TntPrimed(..) => world.note_unimplemented("EntityTNTPrimed.getShadowSize"),
         _ => {}
@@ -628,9 +662,11 @@ pub fn is_entity_inside_opaque_block(e: &Entity, world: &mut World) -> bool {
 /// `interact(player)`: `player` in hand.
 pub fn interact(e: &mut Entity, world: &mut World, player: &mut Entity) -> bool {
     let what = match e.kind {
-        K::Boat(..) => "EntityBoat.interact",
+        // src: EntityBoat.java:336-346
+        K::Boat(..) => return boat::interact(e, world, player),
         K::Cow(..) => "EntityCow.interact",
-        K::Minecart(..) => "EntityMinecart.interact",
+        // src: EntityMinecart.java:763-791
+        K::Minecart(..) => return minecart::interact(e, world, player),
         // src: EntityPig.java:36-43
         K::Pig(..) => return pig::interact(e, world, player),
         K::Sheep(..) => "EntitySheep.interact",
@@ -647,7 +683,8 @@ pub fn interact(e: &mut Entity, world: &mut World, player: &mut Entity) -> bool 
 /// `mount.riddenByEntity`, passed in hand: [`base::update_rider_position`]).
 pub fn update_rider_position(mount: &Entity, rider: &mut Entity, world: &World) {
     if let K::Boat(..) = mount.kind {
-        world.note_unimplemented("EntityBoat.updateRiderPosition");
+        // src: EntityBoat.java:318-324
+        return boat::update_rider_position(mount, rider, world);
     }
     // src: Entity.java:970-972
     base::update_rider_position(mount, rider, world);
@@ -666,9 +703,15 @@ pub fn set_position_and_rotation2(
     increments: i32,
 ) {
     match e.kind {
-        K::Boat(..) => world.note_unimplemented("EntityBoat.setPositionAndRotation2"),
+        // src: EntityBoat.java:102-112
+        K::Boat(..) => {
+            return boat::set_position_and_rotation2(e, x, y, z, yaw, pitch, increments);
+        }
         K::Fish(..) => world.note_unimplemented("EntityFish.setPositionAndRotation2"),
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.setPositionAndRotation2"),
+        // src: EntityMinecart.java:793-803
+        K::Minecart(..) => {
+            return minecart::set_position_and_rotation2(e, x, y, z, yaw, pitch, increments);
+        }
         _ if e.kind.living().is_some() => {
             // src: EntityLiving.java:193-201
             return living::set_position_and_rotation2(e, x, y, z, yaw, pitch, increments);
@@ -711,10 +754,12 @@ pub fn set_in_portal(e: &mut Entity, world: &mut World) {
 pub fn set_velocity(e: &mut Entity, world: &mut World, x: f64, y: f64, z: f64) {
     match e.kind {
         K::Arrow(..) => world.note_unimplemented("EntityArrow.setVelocity"),
-        K::Boat(..) => world.note_unimplemented("EntityBoat.setVelocity"),
+        // src: EntityBoat.java:114-118
+        K::Boat(..) => return boat::set_velocity(e, x, y, z),
         K::Egg(..) => world.note_unimplemented("EntityEgg.setVelocity"),
         K::Fish(..) => world.note_unimplemented("EntityFish.setVelocity"),
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.setVelocity"),
+        // src: EntityMinecart.java:805-809
+        K::Minecart(..) => return minecart::set_velocity(e, x, y, z),
         K::Snowball(..) => world.note_unimplemented("EntitySnowball.setVelocity"),
         _ => {}
     }
@@ -737,10 +782,12 @@ pub fn handle_health_update(e: &mut Entity, world: &mut World, status: i8) {
 }
 
 /// `performHurtAnimation()`.
-pub fn perform_hurt_animation(e: &mut Entity, world: &mut World) {
+pub fn perform_hurt_animation(e: &mut Entity, _world: &mut World) {
     match e.kind {
-        K::Boat(..) => world.note_unimplemented("EntityBoat.performHurtAnimation"),
-        K::Minecart(..) => world.note_unimplemented("EntityMinecart.performHurtAnimation"),
+        // src: EntityBoat.java:92-96
+        K::Boat(..) => boat::perform_hurt_animation(e),
+        // src: EntityMinecart.java:125-130
+        K::Minecart(..) => minecart::perform_hurt_animation(e),
         // src: EntityLiving.java:367-370
         _ if e.kind.living().is_some() => living::perform_hurt_animation(e),
         _ => {}

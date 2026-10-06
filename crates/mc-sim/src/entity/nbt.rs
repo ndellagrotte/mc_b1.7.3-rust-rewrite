@@ -12,6 +12,8 @@
 //! | `EntityFireball` | EntityFireball.java:176-183 | EntityFireball.java:185-192 |
 //! | `EntityFish` | EntityFish.java:324-331 | EntityFish.java:333-340 |
 //! | `EntityPainting` | EntityPainting.java:214-220 | EntityPainting.java:222-243 |
+//! | `EntityMinecart` | EntityMinecart.java:598-619 | EntityMinecart.java:621-640 |
+//! | `EntityBoat` | EntityBoat.java:326-327 (empty) | EntityBoat.java:329-330 (empty) |
 //! | `EntityLightningBolt` | EntityLightningBolt.java:82-83 (empty) | EntityLightningBolt.java:79-80 (empty) |
 //! | `EntityLiving` | EntityLiving.java:557-562 | EntityLiving.java:564-573 |
 //! | `EntityAnimal` (`super` only) | EntityAnimal.java:12-14 | EntityAnimal.java:16-18 |
@@ -128,6 +130,9 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
         K::Fireball(d) => super::fireball::write_entity_to_nbt(d, c),
         K::Fish(d) => super::fish::write_entity_to_nbt(d, c),
         K::Painting(d) => super::painting::write_entity_to_nbt(d, c, world),
+        K::Minecart(d) => super::minecart::write_entity_to_nbt(d, c),
+        // src: EntityBoat.java:326-327 (empty)
+        K::Boat(..) => {}
         // src: EntityLightningBolt.java:82-83 (empty)
         K::LightningBolt(..) => {}
         K::Pig(l, ..) => {
@@ -315,6 +320,9 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         K::Snowball(d) | K::Egg(d) => super::snowball::read_entity_from_nbt(d, c)?,
         K::Fireball(d) => super::fireball::read_entity_from_nbt(d, c)?,
         K::Fish(d) => super::fish::read_entity_from_nbt(d, c)?,
+        K::Minecart(d) => super::minecart::read_entity_from_nbt(d, c)?,
+        // src: EntityBoat.java:329-330 (empty)
+        K::Boat(..) => {}
         // src: EntityLightningBolt.java:79-80 (empty)
         K::LightningBolt(..) => {}
         K::PlayerSp(l, p, _) => {

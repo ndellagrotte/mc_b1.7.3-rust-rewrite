@@ -66,6 +66,7 @@
 pub mod animal;
 pub mod arrow;
 pub mod base;
+pub mod boat;
 pub mod creature;
 pub mod data_watcher;
 pub mod dispatch;
@@ -76,6 +77,7 @@ pub mod fish;
 pub mod item;
 pub mod lightning_bolt;
 pub mod living;
+pub mod minecart;
 pub mod nbt;
 pub mod painting;
 pub mod pathfinding;
@@ -87,6 +89,7 @@ pub mod tnt_primed;
 pub use animal::AnimalData;
 pub use arrow::ArrowData;
 pub use base::EntityBase;
+pub use boat::BoatData;
 pub use creature::CreatureData;
 pub use egg::EggData;
 pub use falling_sand::FallingSandData;
@@ -95,6 +98,7 @@ pub use fish::FishData;
 pub use item::ItemData;
 pub use lightning_bolt::LightningBoltData;
 pub use living::LivingData;
+pub use minecart::MinecartData;
 pub use painting::{EnumArt, PaintingData};
 pub use pig::PigData;
 pub use snowball::{SnowballData, ThrowableData};
@@ -149,10 +153,6 @@ empty_level!(
     FlyingData,
     /// `EntityWeatherEffect` (EntityWeatherEffect.java).
     WeatherEffectData,
-    /// `EntityMinecart` (EntityMinecart.java).
-    MinecartData,
-    /// `EntityBoat` (EntityBoat.java).
-    BoatData,
     /// `EntityCreeper` (EntityCreeper.java).
     CreeperData,
     /// `EntitySkeleton` (EntitySkeleton.java).
