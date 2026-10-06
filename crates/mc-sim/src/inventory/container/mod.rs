@@ -668,6 +668,9 @@ impl Container {
                         if left == Some(0) {
                             self.slot_put_stack(world, player, idx, None);
                         }
+                        // vanilla bug: onPickupFromSlot gets the whole held stack, so a
+                        // crafting output's onCrafting counts the held items too
+                        // (objectCraftStats, WP-2.7).
                         let held = inventory_of(player).get_item_stack();
                         self.slot_on_pickup_from_slot(world, player, idx, held);
                     }
@@ -933,6 +936,10 @@ impl Container {
             if var2.is_some_and(|v| var4.stack_size == v.stack_size) {
                 return None;
             }
+            // vanilla bug: when the inventory takes only part of a crafting output,
+            // the rest stays in the output slot until SlotCrafting.onPickupFromSlot
+            // consumes the grid, whose onCraftMatrixChanged then overwrites the output
+            // with a fresh result: the untaken part is lost.
             self.slot_on_pickup_from_slot(world, player, var1, Some(var4));
         }
         var2
