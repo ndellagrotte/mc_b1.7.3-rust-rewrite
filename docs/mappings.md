@@ -147,6 +147,11 @@ mixed-case originals).
 | `WorldGenBigTree.func_524_a` | `WorldGenBigTree::func_524_a` | Walks a line: -1 if it is clear (air and leaves), else the distance to the first obstruction (:258-300) |
 | `WorldGenBigTree.func_519_e` | `WorldGenBigTree::func_519_e` | Site check: grass or dirt below, at least 6 clear blocks up (:302-319) |
 | `WorldGenerator.func_517_a`, `WorldGenBigTree.func_517_a` | `WorldGen::func_517_a`, `WorldGenBigTree::func_517_a` | Scale hook, empty except in the big tree (height-limit bound, branch length, node count); population calls it with `(1, 1, 1)` (WorldGenerator.java:8-9, WorldGenBigTree.java:321-329, ChunkProviderGenerate.java:450) |
+| `WorldGenLakes.field_15235_a` | `WorldGenLakes::field_15235_a` | The lake's liquid block id: fills the lower four layers, the one non-solid border block the check tolerates, and lava (by its material) gets a stone lining (WorldGenLakes.java:6, :59, :71, :87); population passes `waterStill` / `lavaStill` (ChunkProviderGenerate.java:327, :335) |
+| `WorldGenTallGrass.field_28060_a` | `WorldGenTallGrass::field_28060_a` | The block id placed (`Block.tallGrass`, ChunkProviderGenerate.java:512) and whose `canBlockStay` is asked (WorldGenTallGrass.java:6, :23-24) |
+| `WorldGenTallGrass.field_28059_b` | `WorldGenTallGrass::field_28059_b` | The metadata placed with it: 1 grass, 2 fern (rainforest, two in three) (WorldGenTallGrass.java:7, :24; ChunkProviderGenerate.java:504-507) |
+| `WorldGenDeadBush.field_28058_a` | `WorldGenDeadBush::field_28058_a` | The block id placed (`Block.deadBush`, ChunkProviderGenerate.java:524) and asked `canBlockStay` (WorldGenDeadBush.java:6, :21-22) |
+| `WorldGenHellLava.field_4158_a` | `WorldGenHellLava::field_4158_a` | The spring's liquid id (`Block.lavaMoving`, ChunkProviderHell.java:315), placed and ticked once (WorldGenHellLava.java:6, :61-64) |
 | `RailLogic.handleKeyPress(RailLogic)` | `RailLogic::handle_key_press` | An MCP misnomer kept as the Java name (later MCP: `canConnectTo`): whether this rail can take the argument as a connection, i.e. already connected, or fewer than two connections (RailLogic.java:146-157; its last branch is `true` either way) |
 
 ## Real names changed for Rust
