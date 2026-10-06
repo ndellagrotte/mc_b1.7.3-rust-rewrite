@@ -62,3 +62,30 @@ pub(crate) fn subdirs(path: &Path) -> Result<Vec<PathBuf>, GoldenError> {
     dirs.sort();
     Ok(dirs)
 }
+
+/// Every file below `root`, as (`/`-separated path relative to `root`,
+/// bytes), sorted by path. For sidecar directories (Tier S `world_read`).
+pub(crate) fn read_tree(root: &Path) -> Result<Vec<(String, Vec<u8>)>, GoldenError> {
+    fn walk(root: &Path, dir: &Path, out: &mut Vec<(String, Vec<u8>)>) -> Result<(), GoldenError> {
+        for entry in std::fs::read_dir(dir).map_err(io_err(dir))? {
+            let path = entry.map_err(io_err(dir))?.path();
+            if path.is_dir() {
+                walk(root, &path, out)?;
+            } else {
+                let rel = path
+                    .strip_prefix(root)
+                    .expect("walked below root")
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                out.push((rel, read_bytes(&path)?));
+            }
+        }
+        Ok(())
+    }
+    let mut out = Vec::new();
+    walk(root, root, &mut out)?;
+    out.sort();
+    Ok(out)
+}

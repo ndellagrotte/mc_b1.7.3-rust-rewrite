@@ -18,7 +18,9 @@
 //!    generator (`WorldProvider::get_chunk_provider(seed)`, WP-1.4; population
 //!    is still a recorded stub, WP-1.7) for `"world": "generated"`, then
 //!    [`World::make_deterministic`] (`makeDeterministic` + `resetStatics`).
-//!    `"save_format": "mcregion"` is an error: McRegion saving is WP-1.9.
+//!    `"save_format": "mcregion"` puts a [`SaveOldDir`] on `world/` of an
+//!    in-memory [`mc_sim::save::Storage`] (the oracle's temp directory), see
+//!    "The `save` op".
 //! 3. The implicit preload (`TickScenario.implicitPreload`) and its
 //!    `preload` line.
 //! 4. For each tick `t`: the ops with this `t` in file order (a stable sort
@@ -59,11 +61,11 @@
 //! | `weather` | [`World::world_info`] timers and flags, the `World` rain/thunder strengths |
 //! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
 //! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
+//! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
 //! `spawn` of any kind but `Item` (the `Entity<kind>(World)` constructors),
-//! `attack` (`attackEntityFrom` of living entities, the player), `save`
-//! (Tier S, WP-1.9). `use_item` runs, but every item's `onItemUse` /
+//! `attack` (`attackEntityFrom` of living entities, the player). `use_item` runs, but every item's `onItemUse` /
 //! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
 //! item does something diverges at the first block or inventory dump after
 //! the op.
@@ -75,14 +77,30 @@
 //! The oracle's player is its own subclass `HarnessPlayer` of
 //! `EntityPlayerSP`, so the port's `EntityPlayerSP` is reported as
 //! `HarnessPlayer` ([`trace_kind`]).
+//!
+//! # The `save` op (Tier S)
+//!
+//! `World.saveWorld(true, null)` through the world's [`SaveOldDir`] (session
+//! lock, `level.dat` with `version` 19132 and the player, every chunk with
+//! `needsSaving(true)` through `McRegionChunkLoader`), then `TierS.emitFiles`
+//! with the masked `level.dat` ([`emit_tier_s`]). The save code's clock is
+//! [`crate::world_read_driver::HARNESS_CLOCK_MILLIS`] (`LastPlayed` and the region timestamps are not
+//! compared).
+//!
+//! One class difference is bridged, as [`trace_kind`] bridges the name: the
+//! oracle's `HarnessPlayer` extends `EntityPlayer`, whose `writeEntityToNBT`
+//! has no `Score` (that is `EntityPlayerSP`'s, EntityPlayerSP.java:98-101),
+//! while the port's player is `EntityPlayerSP`. [`HarnessSaveHandler`]
+//! removes `Score` from the player compound before `level.dat` is written.
 
 use mc_sim::block::dispatch as block_dispatch;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::player::{new_entity_player_sp, swing_item};
 use mc_sim::golden::{StateValue, entity_state_fields};
 use mc_sim::item::ItemStack;
-use mc_sim::save::NoSave;
+use mc_sim::save::{ChunkLoader, NoSave, SaveError, SaveHandler, SaveOldDir, SharedSaveStore, Tag};
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+use mc_sim::world::info::WorldInfo;
 use mc_sim::world::provider::{Dimension as SimDimension, WorldProvider};
 use mc_sim::world::ray_trace::EnumMovingObjectType;
 use mc_sim::world::{World, WorldEnvironment};
@@ -92,6 +110,7 @@ use crate::scenario::{
     Dimension, Dump, DumpKind, EntityWhich, MobSpawning, Op, OpKind, TickScenario, WorldSource,
 };
 use crate::trace::{ChunkArrays, EntityLine, ScheduledTick};
+use crate::world_read_driver::{WORLD_DIR, emit_tier_s, harness_store};
 use crate::{GoldenError, Scenario, ScenarioKind, TraceLine, TraceWriter, blake3_hex};
 
 /// Drives a `kind: "tick"` scenario (module docs). Other kinds are an error.
@@ -103,8 +122,9 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         )));
     };
     validate(sc)?;
-    let mut world = build_world(sc)?;
+    let (mut world, save_store) = build_world(sc)?;
     let mut h = Harness {
+        save_store,
         player: None,
         join_player_counter: 0,
         difficulty: sc.difficulty,
@@ -215,9 +235,40 @@ fn validate(sc: &TickScenario) -> Result<(), GoldenError> {
     Ok(())
 }
 
+/// The oracle's `SaveOldDir` as its `HarnessPlayer` meets it (module docs,
+/// "The `save` op"): the player compound loses `EntityPlayerSP`'s `Score`.
+#[derive(Debug)]
+pub struct HarnessSaveHandler(pub SaveOldDir);
+
+impl SaveHandler for HarnessSaveHandler {
+    fn load_world_info(&mut self) -> Option<WorldInfo> {
+        self.0.load_world_info()
+    }
+    fn check_session_lock(&mut self) -> Result<(), SaveError> {
+        self.0.check_session_lock()
+    }
+    fn get_chunk_loader(&mut self, provider: &WorldProvider) -> Option<Box<dyn ChunkLoader>> {
+        self.0.get_chunk_loader(provider)
+    }
+    fn save_world_info_and_player(
+        &mut self,
+        info: &mut WorldInfo,
+        mut player: Option<Tag>,
+    ) -> Result<(), SaveError> {
+        if let Some(Tag::Compound(m)) = player.as_mut() {
+            m.remove("Score");
+        }
+        self.0.save_world_info_and_player(info, player)
+    }
+    fn save_world_info(&mut self, info: &WorldInfo) -> Result<(), SaveError> {
+        self.0.save_world_info(info)
+    }
+}
+
 /// `HarnessWorld.create`: `new World(handler, "harness", provider, seed)`,
-/// then `makeDeterministic` / `resetStatics`.
-fn build_world(sc: &TickScenario) -> Result<World, GoldenError> {
+/// then `makeDeterministic` / `resetStatics`. With `"save_format":
+/// "mcregion"`, also the shared store holding the save.
+fn build_world(sc: &TickScenario) -> Result<(World, Option<SharedSaveStore>), GoldenError> {
     let dimension = match sc.dimension {
         Dimension::Overworld => SimDimension::Surface,
         Dimension::Nether => SimDimension::Hell,
@@ -230,17 +281,20 @@ fn build_world(sc: &TickScenario) -> Result<World, GoldenError> {
         // (WP-1.7), see `ChunkGenerator::populate`.
         WorldSource::Generated => provider.get_chunk_provider(sc.seed),
     };
-    match sc.save_format.as_deref().unwrap_or("none") {
-        "none" => {}
-        "mcregion" => {
-            return Err(GoldenError::other(
-                "\"save_format\": \"mcregion\": SaveOldDir / McRegionChunkLoader not transcribed (WP-1.9)",
-            ));
-        }
-        other => return Err(GoldenError::other(format!("unknown save_format {other}"))),
-    }
+    let (handler, store): (Box<dyn SaveHandler>, Option<SharedSaveStore>) =
+        match sc.save_format.as_deref().unwrap_or("none") {
+            "none" => (Box::new(NoSave), None),
+            "mcregion" => {
+                // `new SaveOldDir(tempRoot, "world", true)` (HarnessWorld.create)
+                let store = harness_store(mc_sim::save::MemoryStorage::default());
+                let dir = SaveOldDir::new(store.clone(), "", WORLD_DIR)
+                    .map_err(|e| GoldenError::other(e.to_string()))?;
+                (Box::new(HarnessSaveHandler(dir)), Some(store))
+            }
+            other => return Err(GoldenError::other(format!("unknown save_format {other}"))),
+        };
     let mut world = World::new(
-        Box::new(NoSave),
+        handler,
         "harness",
         provider,
         sc.seed,
@@ -253,7 +307,7 @@ fn build_world(sc: &TickScenario) -> Result<World, GoldenError> {
         },
     );
     world.make_deterministic(sc.seed);
-    Ok(world)
+    Ok((world, store))
 }
 
 /// `MathHelper.floor_double`.
@@ -309,6 +363,9 @@ fn preload_square(world: &mut World, cx: i32, cz: i32, r: i32) -> u64 {
 /// The harness's per-scenario state besides the world (`HarnessWorld`'s
 /// fields).
 struct Harness {
+    /// The save's storage (`HarnessWorld.saveRoot`), for `"save_format":
+    /// "mcregion"`.
+    save_store: Option<SharedSaveStore>,
     /// `HarnessWorld.player`: the entity id of the `player` op's player.
     player: Option<i32>,
     /// `HarnessWorld.joinPlayerCounter` (Minecraft.joinPlayerCounter).
@@ -597,13 +654,26 @@ fn apply(
             };
             line("explode").with("destroyed", e.destroyed_block_positions.len() as u64)
         }
-        OpKind::Save { .. } => {
-            return Err(unsupported(
-                t,
-                "save",
-                "World.saveWorld through SaveOldDir / McRegionChunkLoader and the Tier S \
-                 dumps (WP-1.9)",
-            ));
+        OpKind::Save { ref chunks } => {
+            let Some(store) = h.save_store.clone() else {
+                return Err(GoldenError::other(
+                    "op save needs \"save_format\": \"mcregion\"",
+                ));
+            };
+            // src: TierS.save: World.saveWorld(true, null) (World.java:278-291)
+            world
+                .try_save_world(true)
+                .map_err(|e| GoldenError::other(format!("t={t}: save: {e}")))?;
+            w.push(line("save"));
+            return emit_tier_s(
+                t as i64,
+                &store,
+                WORLD_DIR,
+                chunks.as_deref(),
+                true,
+                world,
+                w,
+            );
         }
     };
     w.push(out);

@@ -39,6 +39,10 @@
 //!   oracle's per-tick sequence and emits the dumps. Ops and world types the
 //!   port cannot run yet fail with a [`GoldenError::Other`] naming the
 //!   missing Java code.
+//! - [`world_read_driver::drive_in`] — the drive closure for Tier S
+//!   `kind: "world_read"`: copies the sidecar save into an in-memory
+//!   `Storage`, opens it with the loading `World` constructor and emits the
+//!   Tier S lines (shared with the tick driver's `save` op).
 //! - [`terrain_driver::drive`] — the drive closure for `kind: "terrain"`
 //!   scenarios: generates each chunk, its 3×3 neighbourhood and the biome
 //!   arrays as `TierA.terrain` does.
@@ -69,6 +73,7 @@ pub mod scenario;
 pub mod terrain_driver;
 pub mod tick_driver;
 pub mod trace;
+pub mod world_read_driver;
 
 pub use bits::{Bits32, Bits64, hex_bytes, parse_hex_bytes};
 pub use compare::{Mismatch, MismatchKind, compare};
