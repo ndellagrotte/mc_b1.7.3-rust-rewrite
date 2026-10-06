@@ -42,6 +42,7 @@ final class TierA {
             case "nbt_write": return Nbt.write(sc);
             case "nbt_read": return Nbt.read(sc, dir);
             case "java_hash_order": return HashOrder.run(sc);
+            case "block_table": return BlockTable.run(sc);
             default: throw new IllegalArgumentException("unknown kind " + kind);
         }
     }

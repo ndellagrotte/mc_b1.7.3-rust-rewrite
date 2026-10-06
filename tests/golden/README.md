@@ -24,7 +24,7 @@ Layout: `tests/golden/<area>/<name>/scenario.json` + `expected.jsonl`
 - Every trace line has `"t"` (tick; `0` for Tier A) and `"e"` (event name).
   Lines of one scenario are emitted in a fixed, documented order.
 
-## Tier A scenarios (WP-0.2, WP-0.3)
+## Tier A scenarios (WP-0.2, WP-0.3, WP-1.1)
 
 Common fields: `"name"` (must equal the scenario directory name), `"tier": "A"`,
 `"kind"`. Kind-specific fields below. Every trace line, including the last, ends
@@ -33,8 +33,8 @@ depends on another: the oracle reseeds its `Math.random()` replacement stream
 (`HarnessMath`, see `tools/oracle/README.md`) from the scenario `seed` (0 when there
 is none) at the start of every scenario. A scenario without a `seed` is allowed only
 for the kinds whose output is a pure function of the scenario file: `sine_table`,
-`nbt_write`, `nbt_read`, `java_hash_order` (`tools/oracle/check-sensitivity.sh`
-enforces this).
+`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`
+(`tools/oracle/check-sensitivity.sh` enforces this).
 
 ### `kind: "java_random"` — `java.util.Random` sequences
 
@@ -329,6 +329,74 @@ plus redstone-wire neighbours, Explosion.java:65, BlockRedstoneWire.java:161; 0,
 values as in `ChunkProvider.droppedChunksSet`, ChunkProvider.java:12; 4, 256),
 `hash/string-names` (block and item names, incl. `"Aa"`/`"BB"`, equal hash 2112;
 0, 256).
+
+### `kind: "block_table"` — the block registry after static init (WP-1.1)
+
+```json
+{"name":"block-table","tier":"A","kind":"block_table"}
+```
+No `seed` (the output is a pure function of the vanilla classes). The oracle
+(`tools/oracle/java/harness/BlockTable.java`) loads the vanilla classes into a
+**fresh class loader**, so the dump is the state right after `Block`'s static
+initialiser (Block.java:592-706, which also initialises `Material`, `MapColor`,
+`Item` and `StatList`) whatever ran earlier in the JVM, and reads everything by
+reflection. `BlockLeavesBase.graphicsLevel` keeps its default (false; no renderer).
+Trace, in this order:
+
+1. 256 lines `{"t":0,"e":"block_def","id":N,"present":false}` or, when
+   `Block.blocksList[N] != null`:
+   `{"t":0,"e":"block_def","id":N,"present":true,"class":"<simple class name>","fields":{…},`
+   `"isOpaqueCube":b,"renderAsNormalBlock":b,"getRenderType":i,"getRenderBlockPass":i,`
+   `"isCollidable":b,"getMobilityFlag":i,"tickRate":i,"getBlockName":s|null,`
+   `"damageDropped":[16],"idDropped":[16],"quantityDropped":i,`
+   `"getBlockTextureFromSide":[6],"getBlockTextureFromSideAndMetadata":[96]}`.
+   The event is `block_def`, not `block`, which is the Tier B block dump.
+   - `fields`: every non-static field declared from `Block` down to the instance's
+     class (private and protected included), keyed by Java field name (a name
+     repeated in one class chain is an oracle error).
+   - Method results are the virtual calls on the instance (protected
+     `damageDropped` included): `damageDropped(m)` and `idDropped(m, new Random(0))`
+     for `m` in 0..16; `quantityDropped(new Random(0))`; **a fresh `new Random(0)`
+     per call**, so the gravel/tall-grass/glowstone/leaves/ore draws are the first
+     draw of seed 0; `getBlockTextureFromSide(s)` for `s` in 0..6;
+     `getBlockTextureFromSideAndMetadata(s, m)` at index `s * 16 + m`.
+   - A call that throws is `{"throws":"<exception simple name>"}`. The one case:
+     `BlockPistonExtension.getBlockTextureFromSideAndMetadata` with `m & 7` of 6 or 7
+     on a side other than `m & 7` throws `ArrayIndexOutOfBoundsException`
+     (`faceToSide` has 6 entries, BlockPistonExtension.java:50; vanilla bug, 24
+     entries of id 34). The Rust port returns `None` there.
+2. `{"t":0,"e":"block_statics",…}` with the per-id arrays of Block.java:17-23 under
+   their Java names (`tickOnLoad`, `opaqueCubeLookup`, `isBlockContainer`,
+   `lightOpacity`, `canBlockGrass`, `lightValue`, `setNeighborNotifyOnMetadataChange`
+   — later MCP's `requiresSelfNotify`), each 256 entries; `blockName` (256,
+   `getBlockName()` or null); `fire_encourage` / `fire_catch`: the fire singleton's
+   `chanceToEncourageFire` / `abilityToCatchFire` (BlockFire.java:6-7, filled by
+   `initializeBlock`, Block.java:700). The two arrays also appear in block 51's
+   `fields`.
+3. One `{"t":0,"e":"material","name":"<static field name in Material.java>","class":…,`
+   `"fields":{…},"getIsLiquid":b,"isSolid":b,"getCanBlockGrass":b,"getIsSolid":b,`
+   `"getBurning":b,"getIsGroundCover":b,"getIsTranslucent":b,"getIsHarvestable":b,`
+   `"getMaterialMobility":i}` per `Material` static, **sorted by name** (Java
+   `String` order); `fields` as for blocks, from `Material` down.
+4. 16 lines `{"t":0,"e":"map_color","index":i,"present":b,"fields":{"colorIndex":…,"colorValue":…}}`
+   for `MapColor.mapColorArray` (slots 14, 15 are null: `"present":false`, no `fields`).
+
+Reduction rules for field values and method results: `int`/`short`/`byte`/`long`
+→ JSON number; `boolean` → JSON boolean; `float`/`double` → bit-pattern strings
+(`floatToRawIntBits`); `String` → string; `null` → null; a `Block` → its `blockID`;
+a `Material` → its static field name (`"rock"`); a `MapColor` → its `colorIndex`; a
+`StepSound` → `{"class","name","volume","pitch","stepSoundDir","stepSoundDir2"}`
+(`name` is `field_1678_a`, the others are the getters); an enum → `name()`; a
+`Class` → simple name (`BlockSign.signEntityClass`: `"TileEntitySign"`); a
+`java.util.Random` → the string `"java.util.Random"` (the unseeded `new Random()`
+field initialisers of `BlockChest`, `BlockDispenser`, `BlockFurnace`; state not
+dumped); arrays and collections → lists of reduced elements in index/iteration order
+(`BlockRedstoneWire.blocksNeedingUpdate` is empty). Any other type is an oracle
+error, so a new field cannot slip through unreduced.
+
+Rust side: `crates/mc-sim/tests/golden_block_table.rs` rebuilds every line from
+`mc_sim::block` (the table, the data-only functions, `BlockStatics::default()`)
+and compares the whole trace with `mc_golden::compare`.
 
 ## Tier B/C/S scenarios (WP-0.4)
 

@@ -6,7 +6,7 @@
 # incl. "strict", terrain, tick), each scenario without one must be identical. Only
 # the kinds listed in UNSEEDED may lack a seed (their output is a pure function of
 # the scenario and its input files): sine_table, nbt_write, nbt_read,
-# java_hash_order, world_read. A seedless scenario of any other kind fails. The
+# java_hash_order, world_read, block_table. A seedless scenario of any other kind fails. The
 # kind is the first "kind" in scenario.json, so it must precede any op's "kind".
 # Needs a built oracle.
 set -eu
@@ -18,7 +18,7 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
 
 oracle_run "$TMP" -Dharness.perturbSeed=1 > /dev/null
 
-UNSEEDED=" sine_table nbt_write nbt_read java_hash_order world_read "
+UNSEEDED=" sine_table nbt_write nbt_read java_hash_order world_read block_table "
 
 cd "$ROOT/tests/golden"
 status=0
