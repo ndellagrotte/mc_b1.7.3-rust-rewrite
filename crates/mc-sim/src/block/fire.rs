@@ -10,13 +10,11 @@
 //! [`super::ABILITY_TO_CATCH_FIRE`]); the other data methods (`tickRate` 40,
 //! `isCollidable`, `quantityDropped`, …) are in [`crate::block`].
 //!
-//! Gaps: `onBlockAdded` on obsidian asks `Block.portal.tryToCreatePortal`
-//! (BlockFire.java:192), which is `BlockPortal`'s (the interactables task of
-//! WP-1.6) and has no dispatch entry point (it is not a `Block` method): the
-//! call records `"BlockPortal.tryToCreatePortal"` and answers false, so the
-//! fire takes the no-portal path. Burning TNT calls
-//! `Block.tnt.onBlockDestroyedByPlayer` through the dispatch, which records
-//! until the TNT task lands.
+//! `onBlockAdded` on obsidian asks `Block.portal.tryToCreatePortal`
+//! (BlockFire.java:192), which is not a `Block` method and so has no
+//! dispatch entry point: it calls [`super::portal::try_to_create_portal`]
+//! directly. Burning TNT calls `Block.tnt.onBlockDestroyedByPlayer` through
+//! the dispatch.
 //!
 //! Vanilla bugs, transcribed: the spread loop tests rain at
 //! `(x - 1, y', z)` with the *fire's* `z` instead of the target's
@@ -221,25 +219,19 @@ pub fn on_neighbor_block_change(world: &mut World, x: i32, y: i32, z: i32) {
 }
 
 /// `onBlockAdded(world, x, y, z)`: on obsidian, first try to light a portal
-/// (a recorded gap, module docs); otherwise go out at once or schedule the
-/// first tick.
+/// (`Block.portal.tryToCreatePortal`); otherwise go out at once or schedule
+/// the first tick.
 // src: BlockFire.java:191-199
 pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
-    if world.get_block_id(x, y - 1, z) != OBSIDIAN || !try_to_create_portal(world, x, y, z) {
+    if world.get_block_id(x, y - 1, z) != OBSIDIAN
+        || !super::portal::try_to_create_portal(world, x, y, z)
+    {
         if !world.is_block_normal_cube(x, y - 1, z) && !can_neighbor_catch_fire(world, x, y, z) {
             world.set_block_with_notify(x, y, z, 0);
         } else {
             world.schedule_block_update(x, y, z, id, TICK_RATE);
         }
     }
-}
-
-/// `Block.portal.tryToCreatePortal(world, x, y, z)` (BlockPortal.java:37):
-/// not transcribed here (module docs); recorded, answers false.
-fn try_to_create_portal(world: &mut World, x: i32, y: i32, z: i32) -> bool {
-    let _ = (x, y, z);
-    world.note_unimplemented("BlockPortal.tryToCreatePortal");
-    false
 }
 
 /// `randomDisplayTick(world, x, y, z, rand)`: the crackle sound and smoke

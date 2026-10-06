@@ -841,7 +841,7 @@ another task), and none dumps the player's `entity_state` (WP-2.5):
   blocks; `block_box` and `scheduled_ticks` every 10.
 - `tick/fire-burnout-stone`: fires of ages 0, 2, 3, 4, 14 and 15 on stone burn out; on
   netherrack forever; on obsidian `onBlockAdded` asks `BlockPortal.tryToCreatePortal` (no
-  frame: false; the Rust port records it as a gap and answers false); on glass and in the
+  frame: false); on glass and in the
   air removed at once.
 - `tick/fire-farmland-rain`: the rain branches (`canBlockBeRainedOn`, World.java:2449-2459;
   every platform column is a rainy biome at seed 123). `set_weather` starts rain at t = 59
@@ -909,13 +909,13 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   unseeded display `Random` (census, World.java:1999) and emits only particles and sounds,
   so the fixture pins only that it draws nothing from `World.rand` and changes no block;
   its own draw order is unverified.
-- Ignored on the Rust side until their dependencies land: `tick/door-iron-powered`
-  (redstone torch: doors and trapdoors opened by power, and the trapdoor's power branch
-  running on its emptied cell, BlockTrapDoor.java:115-123), `tick/door-upper-powered`
-  (lever: the upper half forwarding a power notification to the lower half,
-  BlockDoor.java:141-143), `tick/portal-ignite` (`BlockFire.onBlockAdded` →
-  `tryToCreatePortal`), `tick/bed-nether` (`Explosion`), `tick/block-item-placement`
-  (`ItemBlock` and the other placing items, WP-2.6).
+- `tick/door-iron-powered` (redstone torch: doors and trapdoors opened by power, and the
+  trapdoor's power branch running on its emptied cell, BlockTrapDoor.java:115-123),
+  `tick/door-upper-powered` (lever: the upper half forwarding a power notification to the
+  lower half, BlockDoor.java:141-143) and `tick/portal-ignite` (`BlockFire.onBlockAdded` →
+  `tryToCreatePortal`) need the redstone and fire tasks, both in.
+- Ignored on the Rust side until their dependencies land: `tick/bed-nether` (`Explosion`),
+  `tick/block-item-placement` (`ItemBlock` and the other placing items, WP-2.6).
 
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike

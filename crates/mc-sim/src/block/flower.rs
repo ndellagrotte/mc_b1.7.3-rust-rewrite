@@ -21,15 +21,6 @@ use super::dispatch;
 use super::{BlockKind, ids};
 use crate::world::World;
 
-/// The base `Block.canPlaceBlockAt`: the target is air or ground cover
-/// (`super.canPlaceBlockAt` of `BlockFlower` and `BlockCactus`; the
-/// dispatch's base arm is not reachable from here).
-// src: Block.java:501-504
-pub(super) fn base_can_place_block_at(world: &mut World, x: i32, y: i32, z: i32) -> bool {
-    let var5 = world.get_block_id(x, y, z);
-    var5 == 0 || super::material_of(var5).get_is_ground_cover()
-}
-
 /// `canThisPlantGrowOnThisBlockID(id)` (protected) for each `BlockFlower`
 /// subclass: grass, dirt or farmland for `BlockFlower` itself (and the
 /// sapling and tall grass, which inherit it); farmland for crops; sand for
@@ -54,7 +45,7 @@ fn kind_of(id: i32) -> BlockKind {
 /// soil this plant grows on below.
 // src: BlockFlower.java:14-16
 pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
-    base_can_place_block_at(world, x, y, z)
+    dispatch::base_can_place_block_at(world, x, y, z)
         && can_this_plant_grow_on_this_block_id(kind_of(id), world.get_block_id(x, y - 1, z))
 }
 

@@ -67,10 +67,8 @@ fixtures! {
     #[ignore = "needs ItemBlock / ItemReed / ItemDoor / ItemBed / ItemSlab.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match"]
     tick_block_item_placement => "tick" / "block-item-placement";
     tick_cake_eat => "tick" / "cake-eat";
-    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 15 (t=2 blocks_full, field metas: the torch's BlockTorch.onBlockAdded metadata (5) and, with no power source, neither door nor the hanging trapdoor opens and the floating trapdoor's power branch leaves its emptied cell at meta 0, not 4); lines 1-14 match. Passes with wp-1.6c d87dd84 merged"]
     tick_door_iron_powered => "tick" / "door-iron-powered";
     tick_door_support_removed => "tick" / "door-support-removed";
-    #[ignore = "needs BlockLever (WP-1.6c): first diff line 12 (t=2 op use_item, field placed: BlockLever.blockActivated is a recorded arm, so the lever stays off and the door shut); lines 1-11 match. Passes with wp-1.6c d87dd84 merged"]
     tick_door_upper_powered => "tick" / "door-upper-powered";
     tick_door_toggle => "tick" / "door-toggle";
     tick_fence_stairs_step_bounds => "tick" / "fence-stairs-step-bounds";
@@ -78,7 +76,6 @@ fixtures! {
     tick_locked_chest_vanishes => "tick" / "locked-chest-vanishes";
     tick_portal_display => "tick" / "portal-display";
     tick_portal_frame => "tick" / "portal-frame";
-    #[ignore = "needs BlockFire (WP-1.6b): first diff line 12 (t=2 blocks_full, field blocklight: BlockFire.onBlockAdded does not call BlockPortal.tryToCreatePortal yet, the fire stays); lines 1-11 match"]
     tick_portal_ignite => "tick" / "portal-ignite";
     tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
     #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then population (WP-1.7); BlockSapling.growTree is in (WP-1.6)"]

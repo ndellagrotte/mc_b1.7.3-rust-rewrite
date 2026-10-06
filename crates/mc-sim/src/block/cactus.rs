@@ -76,7 +76,7 @@ pub fn get_selected_bounding_box_from_pool(x: i32, y: i32, z: i32) -> Aabb {
 /// cover), then `canBlockStay`.
 // src: BlockCactus.java:60-62
 pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
-    if !super::flower::base_can_place_block_at(world, x, y, z) {
+    if !super::dispatch::base_can_place_block_at(world, x, y, z) {
         false
     } else {
         dispatch::can_block_stay(world, id, x, y, z)
