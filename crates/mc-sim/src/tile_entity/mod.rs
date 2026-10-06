@@ -329,6 +329,19 @@ pub fn get_block_metadata(world: &mut World, r: TileEntityRef) -> i32 {
     }
 }
 
+/// `getBlockType()`: `Block.blocksList[getBlockId(x, y, z)]` (null for air
+/// or an unregistered id). Its only callers are client code
+/// (GuiEditSign.java:75, TileEntitySignRenderer.java:9, Phase 3).
+// src: TileEntity.java:84-86
+pub fn get_block_type(
+    world: &mut World,
+    r: TileEntityRef,
+) -> Option<&'static crate::block::BlockDef> {
+    let t = world.tile_entities.get(&r)?;
+    let (x, y, z) = (t.x_coord, t.y_coord, t.z_coord);
+    crate::block::block(world.get_block_id(x, y, z))
+}
+
 // ---- IInventory (IInventory.java) ----------------------------------------------------
 
 /// The slots of an `IInventory` tile entity (`None` for the classes that are

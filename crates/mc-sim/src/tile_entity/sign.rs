@@ -41,7 +41,7 @@ impl Default for TileEntitySign {
 /// dropped (unreachable from vanilla's sign editor, which allows only
 /// `ChatAllowedCharacters`, all in the basic plane).
 // src: TileEntitySign.java:21-24
-fn truncate_15(s: String) -> String {
+fn truncate_15(mut s: String) -> String {
     let mut units = 0;
     let mut end = s.len();
     for (i, ch) in s.char_indices() {
@@ -52,11 +52,8 @@ fn truncate_15(s: String) -> String {
         }
         units += n;
     }
-    if units >= 15 || end < s.len() {
-        s[..end].to_string()
-    } else {
-        s
-    }
+    s.truncate(end);
+    s
 }
 
 impl TileEntitySign {

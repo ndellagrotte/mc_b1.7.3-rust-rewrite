@@ -4,8 +4,10 @@
 //! `EntitySnowball`, whose constructors and headings are Phase 2 (WP-2.4):
 //! those branches record `"EntityArrow.<init>"` (and so on), keep the aux
 //! sounds and particles, and spawn nothing. Any other item is an
-//! `EntityItem`, transcribed in full, with the dispenser singleton's
-//! `Random` ([`super::BlockStatics::dispenser_random`]) for its velocity.
+//! `EntityItem`, transcribed in full, with velocity from `updateTick`'s
+//! `Random` (World.rand). The dispenser singleton's `Random`
+//! ([`super::BlockStatics::dispenser_random`]) only scatters items when the
+//! block is broken.
 
 use mc_core::math::floor_double;
 
@@ -210,4 +212,78 @@ pub fn on_block_placed_by(world: &mut World, x: i32, y: i32, z: i32, placer: &En
 pub fn on_block_removal(world: &mut World, x: i32, y: i32, z: i32) {
     container::scatter_inventory(world, x, y, z, |w| &mut w.block_statics.dispenser_random);
     container::on_block_removal(world, x, y, z);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ARROW, EGG, SNOWBALL, dispense_item};
+    use crate::item::ItemStack;
+    use crate::save::NoSave;
+    use crate::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use crate::world::events::WorldEvent;
+    use crate::world::provider::{Dimension, WorldProvider};
+    use crate::world::tile_entity::TileEntityKindData;
+    use crate::world::{World, WorldEnvironment};
+
+    fn world() -> World {
+        let mut w = World::new(
+            Box::new(NoSave),
+            "harness",
+            WorldProvider::new(Dimension::Surface),
+            5,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.make_deterministic(5);
+        w.get_chunk_from_chunk_coords(0, 0);
+        w
+    }
+
+    /// The projectile branches (BlockDispenser.java:106-121) record their
+    /// WP-2.4 constructor, take one item from the slot (the tile entity's
+    /// `Random`, not `World.rand`), spawn nothing, and keep the aux 1002 and
+    /// the smoke aux 2000 with `var9 + 1 + (var10 + 1) * 3`.
+    #[test]
+    fn projectiles_record_their_gap_and_keep_the_effects() {
+        for (item, gap) in [
+            (ARROW, "EntityArrow.<init>"),
+            (EGG, "EntityEgg.<init>"),
+            (SNOWBALL, "EntitySnowball.<init>"),
+        ] {
+            let mut w = world();
+            // Meta 3 faces +z: var9 = 0, var10 = 1.
+            w.set_block_and_metadata_with_notify(1, 64, 1, 23, 3);
+            let r = w.get_block_tile_entity(1, 64, 1).unwrap();
+            let TileEntityKindData::Dispenser(d) = &mut w.tile_entities.get_mut(&r).unwrap().kind
+            else {
+                panic!()
+            };
+            d.dispenser_contents[4] = Some(ItemStack::new(item, 2, 0));
+            let world_rand = w.rand.clone();
+            let entities = w.loaded_entity_list.len();
+            w.events.drain();
+            dispense_item(&mut w, 1, 64, 1, super::dispatch::RandomSource::WorldRand);
+            assert_eq!(w.unimplemented_hits.borrow().get(gap), Some(&1), "{gap}");
+            assert_eq!(w.rand, world_rand, "{gap}: no World.rand draw");
+            assert_eq!(w.loaded_entity_list.len(), entities, "{gap}");
+            let TileEntityKindData::Dispenser(d) = &w.tile_entities[&r].kind else {
+                panic!()
+            };
+            assert_eq!(d.dispenser_contents[4], Some(ItemStack::new(item, 1, 0)));
+            let aux: Vec<(i32, i32)> = w
+                .events
+                .drain()
+                .into_iter()
+                .filter_map(|e| match e {
+                    WorldEvent::PlayAuxSfx { kind, data, .. } => Some((kind, data)),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(aux, vec![(1002, 0), (2000, 7)], "{gap}");
+        }
+    }
 }

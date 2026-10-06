@@ -118,6 +118,9 @@ impl Explosion {
         exploder: Option<&Entity>,
         mut in_hand: Option<&mut Entity>,
     ) {
+        // Java's one `exploder` field (Explosion.java:16) feeds both the
+        // entity scan and the resistance/attacker roles: the two must agree.
+        debug_assert_eq!(exploder.map(|e| e.base.entity_id), self.exploder);
         let var1 = self.explosion_size;
         let var2: i32 = 16;
         // src: Explosion.java:39-75
@@ -382,5 +385,87 @@ impl World {
         var10.do_explosion_a(self, exploder, None);
         var10.do_explosion_b(self, true);
         var10
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Explosion;
+    use crate::entity::item::new_entity_item;
+    use crate::item::ItemStack;
+    use crate::save::NoSave;
+    use crate::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use crate::world::provider::{Dimension, WorldProvider};
+    use crate::world::{World, WorldEnvironment};
+
+    /// A world with three dropped items around (8.5, 65, 8.5), and their ids.
+    fn world() -> (World, Vec<i32>) {
+        let mut w = World::new(
+            Box::new(NoSave),
+            "harness",
+            WorldProvider::new(Dimension::Surface),
+            7,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.make_deterministic(7);
+        for dz in -1..=1 {
+            for dx in -1..=1 {
+                w.get_chunk_from_chunk_coords(dx, dz);
+            }
+        }
+        // Stone under the blast so the rays break blocks and draw World.rand.
+        for x in 4..13 {
+            for z in 4..13 {
+                w.set_block(x, 63, z, 1);
+            }
+        }
+        let mut ids = Vec::new();
+        for (x, y, z) in [(9.5, 65.0, 8.5), (8.5, 65.5, 11.0), (2.5, 66.0, 8.5)] {
+            let e = new_entity_item(&mut w, x, y, z, ItemStack::new(4, 1, 0));
+            ids.push(e.base.entity_id);
+            assert!(w.spawn_entity_in_world(e));
+        }
+        (w, ids)
+    }
+
+    fn state(w: &World, ids: &[i32]) -> String {
+        let es: Vec<String> = ids
+            .iter()
+            .map(|&id| format!("{:?}", w.entity(id).map(|e| &e.base)))
+            .collect();
+        format!("{es:?} {:?}", w.rand)
+    }
+
+    /// `doExplosionA` with an entity held out of its slot (`in_hand`, the
+    /// exploding TNT or fireball of Phase 2) damages and pushes it exactly as
+    /// when it sits in the world, in the scan's order: the world, the World.rand
+    /// state and every entity end up identical.
+    #[test]
+    fn in_hand_entity_is_hit_as_if_in_the_world() {
+        let (mut a, ids) = world();
+        let mut ex = Explosion::new(&a, None, 8.5, 65.0, 8.5, 4.0);
+        ex.do_explosion_a(&mut a, None, None);
+        let want = state(&a, &ids);
+        let want_set: Vec<_> = ex.destroyed_block_positions.iter().copied().collect();
+
+        for &held in &ids {
+            let (mut b, ids_b) = world();
+            assert_eq!(ids, ids_b);
+            let mut ex = Explosion::new(&b, None, 8.5, 65.0, 8.5, 4.0);
+            b.with_entity_mut(held, |w, e| ex.do_explosion_a(w, None, Some(e)))
+                .unwrap();
+            assert!(b.unimplemented_hits.borrow().is_empty(), "held {held}");
+            assert_eq!(state(&b, &ids), want, "held {held}");
+            let got_set: Vec<_> = ex.destroyed_block_positions.iter().copied().collect();
+            assert_eq!(got_set, want_set);
+        }
+        // The two near items were hit (pushed away from the centre).
+        let e0 = a.entity(ids[0]).unwrap();
+        assert!(e0.base.motion_x > 0.0);
     }
 }

@@ -47,6 +47,11 @@ const ENTITY_LIST_NAMES: [&str; 24] = [
     "Boat",
 ];
 
+/// The one `EntityList` id whose class is abstract (`EntityLiving`, "Mob"):
+/// `createEntityInWorld` returns null for it.
+// src: EntityList.java:87, EntityLiving.java:5
+const ABSTRACT_ENTITY_LIST_NAME: &str = "Mob";
+
 /// The fields `TileEntityMobSpawner` declares.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TileEntityMobSpawner {
@@ -79,6 +84,18 @@ impl Default for TileEntityMobSpawner {
 }
 
 impl TileEntityMobSpawner {
+    /// `getMobID()`.
+    // src: TileEntityMobSpawner.java:13-15
+    pub fn get_mob_id(&self) -> &str {
+        &self.mob_id
+    }
+
+    /// `setMobID(id)` (WorldGenDungeons.java:100 sets the dungeon's mob).
+    // src: TileEntityMobSpawner.java:17-19
+    pub fn set_mob_id(&mut self, id: String) {
+        self.mob_id = id;
+    }
+
     /// `readFromNBT(compound)` after `super.readFromNBT`: `EntityId`
     /// (string), `Delay` (short).
     // src: TileEntityMobSpawner.java:93-97
@@ -162,8 +179,20 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
         // src: TileEntityMobSpawner.java:48-50: four attempts, each
         // constructing the mob first.
         let mob_id = data(world, r).map(|d| d.mob_id.clone()).unwrap_or_default();
-        // `var9 == null` (an id EntityList does not know): return.
-        if ENTITY_LIST_NAMES.contains(&mob_id.as_str()) {
+        // `var9 == null` (an id EntityList does not know): return. "Mob" maps
+        // to the abstract `EntityLiving` (EntityList.java:87,
+        // EntityLiving.java:5): `newInstance` throws `InstantiationException`,
+        // which `createEntityInWorld` catches (EntityList.java:27-29), so it
+        // returns null too, before any constructor runs.
+        // src: EntityList.java:19-32
+        //
+        // The ids that are not `EntityLiving` (Arrow, Snowball, Item,
+        // Painting, PrimedTnt, FallingSand, Minecart, Boat) are constructed
+        // and then throw `ClassCastException` at the `(EntityLiving)` cast
+        // (TileEntityMobSpawner.java:51) in vanilla; that is unreachable from
+        // `WorldGenDungeons.pickMobSpawner` (Skeleton/Zombie/Spider only), and
+        // the port records the same gap for them.
+        if ENTITY_LIST_NAMES.contains(&mob_id.as_str()) && mob_id != ABSTRACT_ENTITY_LIST_NAME {
             // src: TileEntityMobSpawner.java:51 (`EntityList.createEntityInWorld`,
             // then `getEntitiesWithinAABB`, the placement draws, `getCanSpawnHere`,
             // `entityJoinedWorld`, 20 particle pairs, `spawnExplosionParticle`,
@@ -171,5 +200,5 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
             world.note_unimplemented("EntityList.createEntityInWorld");
         }
     }
-    // super.updateEntity() (TileEntityMobSpawner.java:84): empty.
+    // super.updateEntity() (TileEntityMobSpawner.java:85): empty.
 }

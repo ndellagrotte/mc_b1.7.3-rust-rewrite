@@ -259,7 +259,7 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
     }
     if !multiplayer {
         if d.furnace_burn_time == 0 && d.can_smelt() {
-            // src: TileEntityFurnace.java:115 (both fields from one call)
+            // src: TileEntityFurnace.java:114 (both fields from one call)
             d.furnace_burn_time = get_item_burn_time(d.furnace_item_stacks[1].as_ref());
             d.current_item_burn_time = d.furnace_burn_time;
             if d.furnace_burn_time > 0 {
