@@ -22,9 +22,10 @@
 //! # The point map keys on the hash alone
 //!
 //! `MCHash.lookup` compares only the `int` key (MCHash.java:19-29), and the
-//! key is `PathPoint.func_22329_a(x, y, z)` (PathPoint.java:19-21), which is
-//! not injective: `z` keeps 8 bits (`(z & 32767) << 24`), and the `z < 0`
-//! flag `0x8000` shares bit 15 with bit 7 of `x`. `openPoint` therefore
+//! key is `PathPoint.func_22329_a(x, y, z)` (PathPoint.java:22-24), which is
+//! not injective: `z` keeps 8 bits (`(z & 32767) << 24`), the `z < 0` flag
+//! `0x8000` shares bit 15 with bit 7 of `x`, and bit 31 is shared between
+//! bit 7 of `z` and the `x < 0` flag (`Integer.MIN_VALUE`). `openPoint` therefore
 //! returns an existing point whose coordinates differ from the ones asked
 //! for when two cells collide (vanilla bug, transcribed: the map is keyed by
 //! the hash only).
@@ -42,7 +43,7 @@ use crate::world::World;
 use crate::world::chunk::Chunk;
 
 /// The block reads `Pathfinder` makes through its `IBlockAccess`
-/// (Pathfinder.java:359, :375).
+/// (Pathfinder.java:156, :172).
 pub trait PathBlockAccess {
     /// `getBlockId(x, y, z)`.
     fn get_block_id(&self, x: i32, y: i32, z: i32) -> i32;

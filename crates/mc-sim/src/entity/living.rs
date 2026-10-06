@@ -85,14 +85,18 @@ pub struct LivingData {
     /// `prevRenderYawOffset`.
     pub prev_render_yaw_offset: f32,
     /// `field_9362_u`: last tick's [`LivingData::on_ground_speed_factor`].
+    /// Written by EntityLiving only; never read anywhere in the client tree.
     pub prev_on_ground_speed_factor: f32,
     /// `field_9361_v`: eases toward 1 while walking on the ground, 0
-    /// otherwise (EntityLiving.java:227).
+    /// otherwise (EntityLiving.java:227). Written by EntityLiving only;
+    /// never read anywhere in the client tree.
     pub on_ground_speed_factor: f32,
     /// `field_9360_w`: accumulated walk distance × 3, signed by facing
-    /// (EntityLiving.java:289).
+    /// (EntityLiving.java:289). Written by EntityLiving only; never read
+    /// anywhere in the client tree.
     pub moved_distance: f32,
     /// `field_9359_x`: last tick's [`LivingData::moved_distance`].
+    /// Written by EntityLiving only; never read anywhere in the client tree.
     pub prev_moved_distance: f32,
     /// `field_9358_y` (`true`, never read).
     pub unused_flag_y: bool,
@@ -525,7 +529,9 @@ pub fn set_position_and_rotation2(
 }
 
 /// `EntityLiving.onUpdate()`: `Entity.onUpdate`, `onLivingUpdate` (virtual),
-/// then the body yaw and walk animation state the renderer reads.
+/// then the body yaw (`renderYawOffset`, which RenderLiving reads) and the
+/// walk-distance fields `field_9362_u`/`field_9361_v`/`field_9360_w`
+/// (written here, never read anywhere in the client tree).
 // src: EntityLiving.java:203-290
 #[allow(clippy::manual_clamp)] // Java's two ifs, kept (NaN behaviour)
 pub fn on_update(e: &mut Entity, world: &mut World) {
@@ -1126,8 +1132,11 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
 ///
 /// vanilla bug (transcribed): the target pitch is stepped toward from the
 /// stored pitch and the result stored negated
-/// (`rotationPitch = -updateRotation(rotationPitch, …)`), so toward a target
-/// off level the pitch alternates between two values instead of settling;
+/// (`rotationPitch = -updateRotation(rotationPitch, …)`): `p = -(p +
+/// clamp(t - p, ±maxPitchStep))` has the fixed point `p = -t`, so the pitch
+/// settles at the negated target pitch when `|t| <= maxPitchStep / 2`, and
+/// otherwise alternates between two values (step 30 toward a 40 degree
+/// target: -30, 0, -30, …);
 /// and the height difference has opposite signs in the two cases (`this -
 /// target` for a living target, `target - this` otherwise), so a non-living
 /// target above is first looked at downward.

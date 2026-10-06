@@ -25,13 +25,13 @@ pub struct PathPoint {
     /// `previous`, as an arena index.
     pub previous: Option<usize>,
     /// `isFirst`: set when the point is taken off the open set (the closed
-    /// set; Pathfinder.java:47).
+    /// set; Pathfinder.java:49).
     pub is_first: bool,
 }
 
 impl PathPoint {
     /// `new PathPoint(x, y, z)`.
-    // src: PathPoint.java:14-19
+    // src: PathPoint.java:15-20
     pub fn new(x: i32, y: i32, z: i32) -> PathPoint {
         PathPoint {
             x_coord: x,
@@ -50,7 +50,7 @@ impl PathPoint {
     /// `func_22329_a(x, y, z)`: the point-map key, `y & 255 | (x & 32767) << 8
     /// | (z & 32767) << 24 | (x < 0 ? 0x80000000 : 0) | (z < 0 ? 0x8000 : 0)`.
     /// Not injective (module docs of [`super`]).
-    // src: PathPoint.java:21-23
+    // src: PathPoint.java:22-24
     pub fn make_hash(x: i32, y: i32, z: i32) -> i32 {
         (y & 255)
             | (x & 32767) << 8
@@ -60,7 +60,7 @@ impl PathPoint {
     }
 
     /// `distanceTo(other)`: Euclidean, in `float`.
-    // src: PathPoint.java:25-30
+    // src: PathPoint.java:26-31
     pub fn distance_to(&self, other: &PathPoint) -> f32 {
         let var2 = (other.x_coord - self.x_coord) as f32;
         let var3 = (other.y_coord - self.y_coord) as f32;
@@ -69,7 +69,7 @@ impl PathPoint {
     }
 
     /// `equals(other)`: same hash and coordinates.
-    // src: PathPoint.java:32-39
+    // src: PathPoint.java:33-40
     pub fn equals(&self, other: &PathPoint) -> bool {
         self.hash == other.hash
             && self.x_coord == other.x_coord
@@ -78,7 +78,7 @@ impl PathPoint {
     }
 
     /// `isAssigned()`: in the open-set heap.
-    // src: PathPoint.java:45-47
+    // src: PathPoint.java:46-48
     pub fn is_assigned(&self) -> bool {
         self.index >= 0
     }
