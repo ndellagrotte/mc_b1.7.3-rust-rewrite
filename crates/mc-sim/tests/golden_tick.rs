@@ -101,7 +101,6 @@ fixtures! {
     entity_wolf_pack_retaliates => "entity" / "wolf-pack-retaliates";
     entity_wolf_rain_shake => "entity" / "wolf-rain-shake";
     entity_wolf_bone_refused => "entity" / "wolf-bone-refused";
-    #[ignore = "EntityPlayer.getEyeHeight (0.12F, EntityPlayer.java:349-351; WP-2.5): the wolf faces the player's eyes once EntityLiving's idle AI picks the player at t=70; the port uses EntityLiving's height * 0.85 (recorded) and differs first at line 227 (t=71 entity 1, rotationPitch -19.99 for -6.23); lines 1-226 match, and with the player's 0.12 the whole fixture matches (checked by hand)"]
     entity_wolf_begs_bone => "entity" / "wolf-begs-bone";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
