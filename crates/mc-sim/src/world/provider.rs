@@ -1,7 +1,8 @@
 //! `WorldProvider` and its surface/nether subclasses (WorldProvider.java,
 //! WorldProviderSurface.java, WorldProviderHell.java), minus the parts that
-//! belong to other systems: `canCoordinateBeSpawn` and the sky colour helpers
-//! (client).
+//! belong to other systems: the sky and fog colour helpers (client).
+//! `canCoordinateBeSpawn` reads the world, so it is
+//! [`World::can_coordinate_be_spawn`].
 //!
 //! # The biome manager and the generator
 //!
@@ -143,5 +144,24 @@ impl World {
         self.world_provider
             .world_chunk_mgr
             .get_or_insert_with(|| WorldChunkManager::new(seed))
+    }
+
+    /// `worldProvider.canCoordinateBeSpawn(x, z)`: the surface wants sand as
+    /// the first uncovered block; the nether any opaque cube but bedrock.
+    // src: WorldProvider.java:37-40, WorldProviderHell.java:30-39
+    pub fn can_coordinate_be_spawn(&mut self, x: i32, z: i32) -> bool {
+        let var3 = self.get_first_uncovered_block(x, z);
+        match self.world_provider.dimension {
+            // Block.sand = 12
+            Dimension::Surface => var3 == 12,
+            // Block.bedrock = 7
+            Dimension::Hell => {
+                if var3 == 7 || var3 == 0 {
+                    false
+                } else {
+                    crate::block::opaque_cube_lookup(var3)
+                }
+            }
+        }
     }
 }

@@ -480,3 +480,274 @@ pub fn velocity_to_add_to_entity(
     };
     untranscribed(world, what);
 }
+
+// ---- entry points added for World's queries (WP-1.5) ----------------------------
+
+/// `canCollideCheck(meta, stopOnLiquid)`: whether a ray trace may select the
+/// block. Base: `isCollidable()` ([`super::is_collidable`]).
+// src: Block.java:289-291
+pub fn can_collide_check(id: i32, meta: i32, stop_on_liquid: bool) -> bool {
+    let Some(b) = block(id) else { return false };
+    use BlockKind as K;
+    match b.kind {
+        // src: BlockFluid.java:56-58 (only a source block, and only when asked)
+        K::Flowing | K::Stationary => stop_on_liquid && meta == 0,
+        // src: BlockStairs.java:129-131: modelBlock.canCollideCheck, and both
+        // model blocks (cobblestone, planks) keep the base body.
+        K::Stairs { model_block } => block(model_block).is_some_and(super::is_collidable),
+        _ => super::is_collidable(b),
+    }
+}
+
+/// `setBlockBoundsBasedOnState(world, x, y, z)`: overrides rewrite the
+/// singleton's bounds ([`crate::block::BlockStatics::bounds`]) from the
+/// metadata. Base: nothing.
+// src: Block.java:522-523
+pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
+    let _ = (x, y, z);
+    let Some(b) = block(id) else { return };
+    use BlockKind as K;
+    let what = match b.kind {
+        // src: BlockStairs.java:18-20
+        K::Stairs { .. } => {
+            world.block_statics.bounds[(id & 255) as usize] = super::BlockBounds::FULL;
+            return;
+        }
+        K::Bed => "BlockBed.setBlockBoundsBasedOnState",
+        K::Button => "BlockButton.setBlockBoundsBasedOnState",
+        K::Rail { .. } | K::DetectorRail => "BlockRail.setBlockBoundsBasedOnState",
+        K::PistonBase { .. } => "BlockPistonBase.setBlockBoundsBasedOnState",
+        K::Snow => "BlockSnow.setBlockBoundsBasedOnState",
+        K::Door => "BlockDoor.setBlockBoundsBasedOnState",
+        K::Cake => "BlockCake.setBlockBoundsBasedOnState",
+        K::PistonExtension => "BlockPistonExtension.setBlockBoundsBasedOnState",
+        K::Lever => "BlockLever.setBlockBoundsBasedOnState",
+        K::PistonMoving => "BlockPistonMoving.setBlockBoundsBasedOnState",
+        K::Sign { .. } => "BlockSign.setBlockBoundsBasedOnState",
+        K::PressurePlate { .. } => "BlockPressurePlate.setBlockBoundsBasedOnState",
+        K::Portal => "BlockPortal.setBlockBoundsBasedOnState",
+        K::TrapDoor => "BlockTrapDoor.setBlockBoundsBasedOnState",
+        _ => return,
+    };
+    untranscribed(world, what);
+}
+
+/// The base `collisionRayTrace`: the segment `start -> end` against the
+/// block's current bounds at `(x, y, z)`. Candidates are tested in Java's
+/// order (min x, max x, min y, max y, min z, max z); a later candidate
+/// replaces the best only when strictly nearer by `Vec3D.distanceTo` (a
+/// `float` square root), and the side is the one of the chosen candidate
+/// (Java compares the candidates by identity, so equal points keep the first).
+// src: Block.java:375-488
+fn base_collision_ray_trace(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    start: &Vec3D,
+    end: &Vec3D,
+) -> Option<crate::world::ray_trace::MovingObjectPosition> {
+    set_block_bounds_based_on_state(world, id, x, y, z);
+    let bb = world.block_statics.bounds[(id & 255) as usize];
+    let var5 = start.add_vector(-(x as f64), -(y as f64), -(z as f64));
+    let var6 = end.add_vector(-(x as f64), -(y as f64), -(z as f64));
+    // src: Block.java:466-488 (isVecInside{YZ,XZ,XY}Bounds; inclusive)
+    let in_yz = |v: &Vec3D| {
+        v.y_coord >= bb.min_y
+            && v.y_coord <= bb.max_y
+            && v.z_coord >= bb.min_z
+            && v.z_coord <= bb.max_z
+    };
+    let in_xz = |v: &Vec3D| {
+        v.x_coord >= bb.min_x
+            && v.x_coord <= bb.max_x
+            && v.z_coord >= bb.min_z
+            && v.z_coord <= bb.max_z
+    };
+    let in_xy = |v: &Vec3D| {
+        v.x_coord >= bb.min_x
+            && v.x_coord <= bb.max_x
+            && v.y_coord >= bb.min_y
+            && v.y_coord <= bb.max_y
+    };
+    // (candidate, sideHit): var7..var12 and the sides of Block.java:437-460.
+    let candidates = [
+        (
+            var5.get_intermediate_with_x_value(&var6, bb.min_x)
+                .filter(in_yz),
+            4,
+        ),
+        (
+            var5.get_intermediate_with_x_value(&var6, bb.max_x)
+                .filter(in_yz),
+            5,
+        ),
+        (
+            var5.get_intermediate_with_y_value(&var6, bb.min_y)
+                .filter(in_xz),
+            0,
+        ),
+        (
+            var5.get_intermediate_with_y_value(&var6, bb.max_y)
+                .filter(in_xz),
+            1,
+        ),
+        (
+            var5.get_intermediate_with_z_value(&var6, bb.min_z)
+                .filter(in_xy),
+            2,
+        ),
+        (
+            var5.get_intermediate_with_z_value(&var6, bb.max_z)
+                .filter(in_xy),
+            3,
+        ),
+    ];
+    // src: Block.java:409-432
+    let mut var13: Option<(Vec3D, i32)> = None;
+    for (c, side) in candidates {
+        let Some(c) = c else { continue };
+        let nearer = match var13 {
+            None => true,
+            Some((best, _)) => var5.distance_to(&c) < var5.distance_to(&best),
+        };
+        if nearer {
+            var13 = Some((c, side));
+        }
+    }
+    // src: Block.java:434-462
+    let (hit, side) = var13?;
+    Some(crate::world::ray_trace::MovingObjectPosition::tile(
+        x,
+        y,
+        z,
+        side,
+        hit.add_vector(x as f64, y as f64, z as f64),
+    ))
+}
+
+/// `collisionRayTrace(world, x, y, z, start, end)`: where the segment enters
+/// the block, or `None`. Base: `base_collision_ray_trace` (Block.java:375-488).
+// src: Block.java:375-464
+#[allow(clippy::too_many_arguments)]
+pub fn collision_ray_trace(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    start: &Vec3D,
+    end: &Vec3D,
+) -> Option<crate::world::ray_trace::MovingObjectPosition> {
+    let b = block(id)?;
+    use BlockKind as K;
+    let what = match b.kind {
+        K::Door => Some("BlockDoor.collisionRayTrace"),
+        K::Rail { .. } | K::DetectorRail => Some("BlockRail.collisionRayTrace"),
+        K::TrapDoor => Some("BlockTrapDoor.collisionRayTrace"),
+        K::Torch | K::RedstoneTorch { .. } => Some("BlockTorch.collisionRayTrace"),
+        _ => None,
+    };
+    if let Some(what) = what {
+        untranscribed(world, what);
+    }
+    base_collision_ray_trace(world, id, x, y, z, start, end)
+}
+
+/// `isPoweringTo(blockAccess, x, y, z, side)`: weak power into the
+/// neighbour on `side`. Base: false.
+// src: Block.java:533-535
+pub fn is_powering_to(world: &mut World, id: i32, x: i32, y: i32, z: i32, side: i32) -> bool {
+    let _ = (x, y, z, side);
+    let Some(b) = block(id) else { return false };
+    use BlockKind as K;
+    let what = match b.kind {
+        K::Button => "BlockButton.isPoweringTo",
+        K::DetectorRail => "BlockDetectorRail.isPoweringTo",
+        K::RedstoneRepeater { .. } => "BlockRedstoneRepeater.isPoweringTo",
+        K::Lever => "BlockLever.isPoweringTo",
+        K::RedstoneWire => "BlockRedstoneWire.isPoweringTo",
+        K::RedstoneTorch { .. } => "BlockRedstoneTorch.isPoweringTo",
+        K::PressurePlate { .. } => "BlockPressurePlate.isPoweringTo",
+        _ => return false,
+    };
+    untranscribed(world, what);
+    false
+}
+
+/// `isIndirectlyPoweringTo(world, x, y, z, side)`: strong power through
+/// the block on `side`. Base: false.
+// src: Block.java:544-546
+pub fn is_indirectly_powering_to(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> bool {
+    let _ = (x, y, z, side);
+    let Some(b) = block(id) else { return false };
+    use BlockKind as K;
+    let what = match b.kind {
+        K::Button => "BlockButton.isIndirectlyPoweringTo",
+        K::DetectorRail => "BlockDetectorRail.isIndirectlyPoweringTo",
+        K::RedstoneRepeater { .. } => "BlockRedstoneRepeater.isIndirectlyPoweringTo",
+        K::Lever => "BlockLever.isIndirectlyPoweringTo",
+        K::RedstoneWire => "BlockRedstoneWire.isIndirectlyPoweringTo",
+        K::RedstoneTorch { .. } => "BlockRedstoneTorch.isIndirectlyPoweringTo",
+        K::PressurePlate { .. } => "BlockPressurePlate.isIndirectlyPoweringTo",
+        _ => return false,
+    };
+    untranscribed(world, what);
+    false
+}
+
+/// `randomDisplayTick(world, x, y, z, rand)`: client particles and sounds
+/// for a block near the player. `rand` is `World.randomDisplayUpdates`'s
+/// local `new Random()` (World.java:1999), not `World.rand`. Base: nothing.
+// src: Block.java:300-301
+pub fn random_display_tick(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    rand: &mut mc_core::java_random::JavaRandom,
+) {
+    let _ = (x, y, z, rand);
+    let Some(b) = block(id) else { return };
+    use BlockKind as K;
+    let what = match b.kind {
+        // src: BlockStairs.java:69-71: modelBlock.randomDisplayTick, and both
+        // model blocks keep the base (empty) body.
+        K::Stairs { .. } => return,
+        K::RedstoneOre { .. } => "BlockRedstoneOre.randomDisplayTick",
+        K::Fire => "BlockFire.randomDisplayTick",
+        K::RedstoneWire => "BlockRedstoneWire.randomDisplayTick",
+        K::RedstoneRepeater { .. } => "BlockRedstoneRepeater.randomDisplayTick",
+        K::Flowing | K::Stationary => "BlockFluid.randomDisplayTick",
+        K::Furnace { .. } => "BlockFurnace.randomDisplayTick",
+        K::Portal => "BlockPortal.randomDisplayTick",
+        K::RedstoneTorch { .. } => "BlockRedstoneTorch.randomDisplayTick",
+        K::Torch => "BlockTorch.randomDisplayTick",
+        _ => return,
+    };
+    untranscribed(world, what);
+}
+
+/// `playBlock(world, x, y, z, a, b)`: a block event (note block notes,
+/// piston moves). Base: nothing.
+// src: Block.java:576-577
+pub fn play_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, a: i32, b2: i32) {
+    let _ = (x, y, z, a, b2);
+    let Some(b) = block(id) else { return };
+    use BlockKind as K;
+    let what = match b.kind {
+        K::Note => "BlockNote.playBlock",
+        K::PistonBase { .. } => "BlockPistonBase.playBlock",
+        _ => return,
+    };
+    untranscribed(world, what);
+}

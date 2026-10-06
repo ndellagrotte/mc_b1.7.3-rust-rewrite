@@ -11,8 +11,9 @@
 //! |---|---|---|
 //! | [`block`] | `Block`, `Material`, `StepSound` + subclasses | const table [`block::BLOCKS`], `BlockKind` enum, behaviour in [`block::dispatch`] |
 //! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | item table done (WP-1.2): const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; item behaviour is WP-2.6; block texture lookups live in `block::block_texture` |
-//! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess` | lighting done (WP-1.3); [`world::World`] owns everything; client side effects are [`world::events`] |
-//! | [`tick`] | `World.tick` and its block systems | `impl World` |
+//! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess`, `MovingObjectPosition` | lighting done (WP-1.3); [`world::World`] owns everything; client side effects are [`world::events`] |
+//! | [`tick`] | `World.tick` and its block systems, `World.randomDisplayUpdates` | `impl World` |
+//! | [`spawner`] | `SpawnerAnimals`, `EnumCreatureType` | free functions over `&mut World` |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer` | layout only (WP-2.5) |
 //! | [`save`] | `ISaveHandler`, `IChunkLoader`, [`save::Storage`] (D9) | traits + `NoSave`; McRegion container in progress (WP-1.9) |
@@ -40,6 +41,7 @@ pub mod golden;
 pub mod inventory;
 pub mod item;
 pub mod save;
+pub mod spawner;
 pub mod tick;
 pub mod world;
 pub mod worldgen;

@@ -1,10 +1,36 @@
 //! The world (`World.java`): chunks, blocks, entities, tile entities,
 //! scheduled ticks and the RNGs (PLAN_v4 §3.2).
 //!
-//! Split by topic: this file has the struct, the constructor and block
-//! access; `world/entities.rs` the entity list and the take/put-back driver;
+//! Split by topic: this file has the struct, the constructors, block access,
+//! the redstone power queries and the spawn point; `world/entities.rs` the
+//! entity list, the take/put-back driver and the entity queries;
 //! [`chunk_provider`] chunk loading; [`lighting`] the light-update queue;
-//! `crate::tick` the per-tick `World.tick`.
+//! [`ray_trace`] `rayTraceBlocks*` and `getBlockDensity`; [`provider`] the
+//! `WorldProvider`s; `crate::tick` `World.tick` and `randomDisplayUpdates`;
+//! `crate::spawner` `SpawnerAnimals`.
+//!
+//! # Coverage of World.java (audit, WP-1.5)
+//!
+//! Every method of World.java is transcribed except the ones below. Partial
+//! ones record the missing call in [`World::skipped_systems`] /
+//! [`World::unimplemented_hits`] where it would run:
+//!
+//! | Java | State |
+//! |---|---|
+//! | `saveLevel` (:293-297) | the player NBT for `level.dat` is WP-2.5 (recorded when a player exists); `MapStorage.saveAllData` WP-2.6 |
+//! | `spawnPlayerWithLoadedChunks` (:256-276) | `EntityPlayer.readFromNBT` WP-2.5 (recorded) |
+//! | `addLoadedEntities` (:2077-2084) | entities read with a chunk arrive with the chunk loader, WP-1.9 (recorded) |
+//! | `wakeUpAllPlayers` (:2395-2407) | `EntityPlayer.wakeUpPlayer` WP-2.5 (recorded) |
+//! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded) |
+//! | `updateBlocksAndPlayCaveSounds` (:1868-1965) | the `EntityLightningBolt` constructor WP-2.4 (recorded; the draws before it are made) |
+//! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
+//! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
+//! | `createExplosion`, `newExplosion` (:1518-1528) | not ported: `Explosion` is WP-1.8 ([`World::get_block_density`] is here) |
+//! | `getPathToEntity`, `getEntityPathToXYZ` (:2116-2144) | not ported: `Pathfinder`, `ChunkCache`, WP-2.2 |
+//! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
+//! | `setItemData`, `loadItemData`, `getUniqueDataId` (:2462-2472) | not ported: `MapStorage`, WP-2.6 |
+//! | `addWorldAccess`, `removeWorldAccess` (:951-957) | replaced by [`World::events`] |
+//! | `emptyMethod1`, `func_4085_a` (:253, :1587) | not ported: empty / returns null, no caller |
 //!
 //! # Conventions
 //!
@@ -27,11 +53,13 @@
 pub mod chunk;
 pub mod chunk_provider;
 mod entities;
+pub use entities::{is_instance_of, java_class_chain};
 pub mod events;
 pub mod info;
 pub mod lighting;
 pub mod nibble;
 pub mod provider;
+pub mod ray_trace;
 pub mod tick_entry;
 pub mod tile_entity;
 
@@ -39,7 +67,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
-use mc_core::java_hash::{ChunkCoordIntPair, JavaHashSet};
+use mc_core::java_hash::{ChunkCoordIntPair, ChunkCoordinates, JavaHashSet};
 use mc_core::java_random::JavaRandom;
 use mc_core::math::{self, floor_double};
 use mc_core::{Aabb, Vec3D};
@@ -64,6 +92,10 @@ use self::tile_entity::{TileEntity, TileEntityRef};
 pub fn in_world_xz(x: i32, z: i32) -> bool {
     (-32000000..32000000).contains(&x) && (-32000000..=32000000).contains(&z)
 }
+
+/// Salt of [`World::display_random`]'s seed, so it is not the same stream
+/// as `World.rand` (any constant works; the stream is never traced).
+const DISPLAY_RANDOM_SALT: i64 = 0x5DEE_CE66_D1A5_7EED;
 
 /// `World`.
 pub struct World {
@@ -220,6 +252,21 @@ pub struct World {
     pub tile_entities: BTreeMap<TileEntityRef, TileEntity>,
     /// The next tile-entity handle.
     pub(crate) next_tile_entity_ref: u32,
+    /// `SpawnerAnimals.eligibleChunksForSpawning` (a static `HashSet` in
+    /// Java, SpawnerAnimals.java:9): cleared and refilled by every
+    /// `performSpawning`, then iterated, so Java `HashSet` order (PLAN_v4
+    /// §3.4 rule 4). Its table keeps the capacity it grew to, as the static
+    /// does; with one player that is 512 after the first call in both the
+    /// fresh and the reused case, and the iteration order of the 289 keys is
+    /// the same either way (checked with [`JavaHashSet`]), so a world-owned
+    /// set matches the oracle's JVM-wide one.
+    pub(crate) eligible_chunks_for_spawning: JavaHashSet<ChunkCoordIntPair>,
+    /// The `new Random()` that `randomDisplayUpdates` creates on every call
+    /// (World.java:1999) and hands to `Block.randomDisplayTick`. Vanilla seeds
+    /// it from the clock; it only drives particles and sounds (census.md §1,
+    /// World.java:1999), so the port keeps one stream, seeded from
+    /// [`WorldEnvironment::rand_seed`], instead of reading a clock (D9).
+    pub display_random: JavaRandom,
 
     // ---- diagnostics ----------------------------------------------------------
     /// World systems reached but not transcribed yet, by Java method, with hit
@@ -252,10 +299,86 @@ impl World {
     /// To match the oracle's worlds, call [`World::make_deterministic`] next.
     // src: World.java:62-100
     pub fn new(
-        mut save_handler: Box<dyn SaveHandler>,
+        save_handler: Box<dyn SaveHandler>,
         name: &str,
         provider: WorldProvider,
         seed: i64,
+        generator: ChunkGenerator,
+        env: WorldEnvironment,
+    ) -> World {
+        let mut w = World::construct(
+            save_handler,
+            provider,
+            WorldInfo::new(seed, name),
+            generator,
+            env,
+        );
+        // `field_28108_z = new MapStorage(saveHandler)` (World.java:96): WP-2.6.
+        // `worldProvider.registerWorld(this)` (World.java:97): done by
+        // `WorldProvider::new` (the surface biome manager is built on first
+        // use, see `provider`).
+        w.calculate_initial_skylight(); // src: World.java:99
+        w.func_27163_e(); // src: World.java:100
+        w
+    }
+
+    /// `new World(saveHandler, name, seed, provider)`, the loading constructor
+    /// (World.java:149-208): `WorldInfo` from `saveHandler.loadWorldInfo()`
+    /// (renamed to `name`), else a fresh `WorldInfo(seed, name)` and the
+    /// spawn-point search ([`World::get_initial_spawn_location`], which loads
+    /// and generates chunks and draws from `rand`). The provider defaults to
+    /// the saved dimension's (`WorldProvider.getProviderForDimension`,
+    /// World.java:184-190); the generator is the provider's for the world's
+    /// seed (`getChunkProvider`, World.java:201, :210-213).
+    ///
+    /// Reading `level.dat` is the save handler's (WP-1.9); with
+    /// [`crate::save::NoSave`] this is always the new-world path.
+    // src: World.java:149-208
+    pub fn new_from_save(
+        mut save_handler: Box<dyn SaveHandler>,
+        name: &str,
+        seed: i64,
+        provider: Option<WorldProvider>,
+        env: WorldEnvironment,
+    ) -> World {
+        // `field_28108_z = new MapStorage(var1)` (World.java:181): WP-2.6.
+        let loaded = save_handler.load_world_info(); // src: World.java:182
+        let is_new_world = loaded.is_none(); // src: World.java:183
+        // src: World.java:184-190
+        let provider = match provider {
+            Some(p) => p,
+            None => match &loaded {
+                Some(i) if i.dimension == -1 => WorldProvider::new(provider::Dimension::Hell),
+                _ => WorldProvider::new(provider::Dimension::Surface),
+            },
+        };
+        // src: World.java:192-198
+        let (info, var6) = match loaded {
+            None => (WorldInfo::new(seed, name), true),
+            Some(mut i) => {
+                i.level_name = name.to_string(); // WorldInfo.setWorldName (WorldInfo.java:175-177)
+                (i, false)
+            }
+        };
+        // src: World.java:200-201 (registerWorld, getChunkProvider)
+        let generator = provider.get_chunk_provider(info.random_seed);
+        let mut w = World::construct(save_handler, provider, info, generator, env);
+        w.is_new_world = is_new_world;
+        if var6 {
+            w.get_initial_spawn_location(); // src: World.java:202-204
+        }
+        w.calculate_initial_skylight(); // src: World.java:206
+        w.func_27163_e(); // src: World.java:207
+        w
+    }
+
+    /// The field initialisers shared by the constructors (World.java:63-92,
+    /// :150-179) plus `saveHandler`, `worldInfo`, `worldProvider` and the
+    /// caching `ChunkProvider` (World.java:210-213).
+    fn construct(
+        mut save_handler: Box<dyn SaveHandler>,
+        provider: WorldProvider,
+        world_info: WorldInfo,
         generator: ChunkGenerator,
         env: WorldEnvironment,
     ) -> World {
@@ -264,7 +387,7 @@ impl World {
         let sound_counter = rand.next_int_bounded(12000);
         // src: World.java:210-213 (getChunkProvider)
         let loader = save_handler.get_chunk_loader(&provider);
-        let mut w = World {
+        World {
             scheduled_updates_are_immediate: false,
             lighting_to_update: Vec::new(),
             loaded_entity_list: Vec::new(),
@@ -295,7 +418,7 @@ impl World {
             events: EventQueue::default(),
             chunk_provider: ChunkProviderCache::new(loader, generator),
             save_handler,
-            world_info: WorldInfo::new(seed, name),
+            world_info,
             finding_spawn_point: false,
             all_players_sleeping: false,
             field_31055_l: false,
@@ -313,15 +436,11 @@ impl World {
             block_statics: BlockStatics::default(),
             tile_entities: BTreeMap::new(),
             next_tile_entity_ref: 0,
+            eligible_chunks_for_spawning: JavaHashSet::new(),
+            display_random: JavaRandom::new(env.rand_seed ^ DISPLAY_RANDOM_SALT),
             skipped_systems: RefCell::new(BTreeMap::new()),
             unimplemented_hits: RefCell::new(BTreeMap::new()),
-        };
-        // `field_28108_z = new MapStorage(saveHandler)` (World.java:96): WP-2.6.
-        // `worldProvider.registerWorld(this)` (World.java:97): done by
-        // `WorldProvider::new`; the biome manager is WP-1.4.
-        w.calculate_initial_skylight(); // src: World.java:99
-        w.func_27163_e(); // src: World.java:100
-        w
+        }
     }
 
     /// The oracle's determinism protocol for a scenario seed (PLAN_v4 §4.2;
@@ -778,6 +897,202 @@ impl World {
         self.skylight_subtracted < 4
     }
 
+    // ---- redstone power queries (World.java:2146-2190) ------------------------------
+    //
+    // MCP's names are crossed here (vanilla, transcribed): the "providing"
+    // query asks the block's `isIndirectlyPoweringTo`, the "indirectly
+    // providing" one its `isPoweringTo`.
+
+    /// `isBlockProvidingPowerTo(x, y, z, side)`: the block's
+    /// `isIndirectlyPoweringTo` (strong power) toward `side`.
+    // src: World.java:2146-2149
+    pub fn is_block_providing_power_to(&mut self, x: i32, y: i32, z: i32, side: i32) -> bool {
+        let var5 = self.get_block_id(x, y, z);
+        if var5 == 0 {
+            false
+        } else {
+            block_dispatch::is_indirectly_powering_to(self, var5, x, y, z, side)
+        }
+    }
+
+    /// `isBlockGettingPowered(x, y, z)`: strong power from any neighbour, in
+    /// the order -y, +y, -z, +z, -x, +x (each with the side it faces).
+    // src: World.java:2151-2165
+    pub fn is_block_getting_powered(&mut self, x: i32, y: i32, z: i32) -> bool {
+        self.is_block_providing_power_to(x, y - 1, z, 0)
+            || self.is_block_providing_power_to(x, y + 1, z, 1)
+            || self.is_block_providing_power_to(x, y, z - 1, 2)
+            || self.is_block_providing_power_to(x, y, z + 1, 3)
+            || self.is_block_providing_power_to(x - 1, y, z, 4)
+            || self.is_block_providing_power_to(x + 1, y, z, 5)
+    }
+
+    /// `isBlockIndirectlyProvidingPowerTo(x, y, z, side)`: a normal cube
+    /// passes on the strong power it gets; any other block answers with its
+    /// `isPoweringTo` (weak power).
+    // src: World.java:2167-2174
+    pub fn is_block_indirectly_providing_power_to(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        side: i32,
+    ) -> bool {
+        if self.is_block_normal_cube(x, y, z) {
+            self.is_block_getting_powered(x, y, z)
+        } else {
+            let var5 = self.get_block_id(x, y, z);
+            if var5 == 0 {
+                false
+            } else {
+                block_dispatch::is_powering_to(self, var5, x, y, z, side)
+            }
+        }
+    }
+
+    /// `isBlockIndirectlyGettingPowered(x, y, z)`: any power from any
+    /// neighbour, in the order of [`World::is_block_getting_powered`].
+    // src: World.java:2176-2190
+    pub fn is_block_indirectly_getting_powered(&mut self, x: i32, y: i32, z: i32) -> bool {
+        self.is_block_indirectly_providing_power_to(x, y - 1, z, 0)
+            || self.is_block_indirectly_providing_power_to(x, y + 1, z, 1)
+            || self.is_block_indirectly_providing_power_to(x, y, z - 1, 2)
+            || self.is_block_indirectly_providing_power_to(x, y, z + 1, 3)
+            || self.is_block_indirectly_providing_power_to(x - 1, y, z, 4)
+            || self.is_block_indirectly_providing_power_to(x + 1, y, z, 5)
+    }
+
+    /// `playNoteAt(x, y, z, a, b)`: the block's `playBlock` (note blocks,
+    /// pistons).
+    // src: World.java:2369-2375
+    pub fn play_note_at(&mut self, x: i32, y: i32, z: i32, a: i32, b: i32) {
+        let var6 = self.get_block_id(x, y, z);
+        if var6 > 0 {
+            block_dispatch::play_block(self, var6, x, y, z, a, b);
+        }
+    }
+
+    /// `onBlockHit(player, x, y, z, side)`: a left click on a block face puts
+    /// out fire in front of it (the method later versions call
+    /// `extinguishFire`). `player` is the clicking player's entity id, passed
+    /// on to `playAuxSFXAtEntity`.
+    // src: World.java:1555-1585
+    pub fn on_block_hit(
+        &mut self,
+        player: Option<i32>,
+        mut x: i32,
+        mut y: i32,
+        mut z: i32,
+        side: i32,
+    ) {
+        if side == 0 {
+            y -= 1;
+        }
+        if side == 1 {
+            y += 1;
+        }
+        if side == 2 {
+            z -= 1;
+        }
+        if side == 3 {
+            z += 1;
+        }
+        if side == 4 {
+            x -= 1;
+        }
+        if side == 5 {
+            x += 1;
+        }
+        // Block.fire = 51; sound 1004 (fizz)
+        if self.get_block_id(x, y, z) == 51 {
+            self.play_aux_sfx_at_entity(player, 1004, x, y, z, 0);
+            self.set_block_with_notify(x, y, z, 0);
+        }
+    }
+
+    /// `func_6466_a(player, x, y, z)`: whether the player may mine the block
+    /// (later `canMineBlock`); always true in singleplayer. Name kept.
+    // src: World.java:2311-2313
+    pub fn func_6466_a(&self, player: i32, x: i32, y: i32, z: i32) -> bool {
+        let _ = (player, x, y, z);
+        true
+    }
+
+    /// `setEntityState(entity, state)`: empty in `World` (the multiplayer
+    /// client overrides it).
+    // src: World.java:2315-2316
+    pub fn set_entity_state(&mut self, entity: i32, state: i8) {
+        let _ = (entity, state);
+    }
+
+    // ---- spawn point (World.java:215-251, :2286-2292) ---------------------------------
+
+    /// `getFirstUncoveredBlock(x, z)`: the block under the first air block at
+    /// or above y = 64, scanning up from 63 (loads the chunk).
+    // src: World.java:245-251
+    pub fn get_first_uncovered_block(&mut self, x: i32, z: i32) -> i32 {
+        let mut var3 = 63;
+        while !self.is_air_block(x, var3 + 1, z) {
+            var3 += 1;
+        }
+        self.get_block_id(x, var3, z)
+    }
+
+    /// `getInitialSpawnLocation()`: a random walk from (0, 0) in steps of
+    /// `rand.nextInt(64) - rand.nextInt(64)` per axis until
+    /// `canCoordinateBeSpawn`; y is 64. Called by the loading constructor for
+    /// a new world.
+    // src: World.java:215-227
+    pub fn get_initial_spawn_location(&mut self) {
+        self.finding_spawn_point = true;
+        let mut var1 = 0i32;
+        let var2 = 64;
+        let mut var3 = 0i32;
+        while !self.can_coordinate_be_spawn(var1, var3) {
+            var1 =
+                var1.wrapping_add(self.rand.next_int_bounded(64) - self.rand.next_int_bounded(64));
+            var3 =
+                var3.wrapping_add(self.rand.next_int_bounded(64) - self.rand.next_int_bounded(64));
+        }
+        self.world_info.set_spawn(var1, var2, var3);
+        self.finding_spawn_point = false;
+    }
+
+    /// `setSpawnLocation()`: y defaults to 64; x and z random-walk in steps of
+    /// `rand.nextInt(8) - rand.nextInt(8)` until the first uncovered block is
+    /// not air. Called by the client when the player respawns
+    /// (Minecraft.respawn).
+    // src: World.java:229-243
+    pub fn set_spawn_location(&mut self) {
+        if self.world_info.spawn_y <= 0 {
+            self.world_info.spawn_y = 64;
+        }
+        let mut var1 = self.world_info.spawn_x;
+        let mut var2 = self.world_info.spawn_z;
+        while self.get_first_uncovered_block(var1, var2) == 0 {
+            var1 = var1.wrapping_add(self.rand.next_int_bounded(8) - self.rand.next_int_bounded(8));
+            var2 = var2.wrapping_add(self.rand.next_int_bounded(8) - self.rand.next_int_bounded(8));
+        }
+        self.world_info.spawn_x = var1;
+        self.world_info.spawn_z = var2;
+    }
+
+    /// `getSpawnPoint()`.
+    // src: World.java:2286-2288
+    pub fn get_spawn_point(&self) -> ChunkCoordinates {
+        ChunkCoordinates::new(
+            self.world_info.spawn_x,
+            self.world_info.spawn_y,
+            self.world_info.spawn_z,
+        )
+    }
+
+    /// `setSpawnPoint(coords)`.
+    // src: World.java:2290-2292
+    pub fn set_spawn_point(&mut self, c: ChunkCoordinates) {
+        self.world_info.set_spawn(c.pos_x, c.pos_y, c.pos_z);
+    }
+
     // ---- sounds and particles (IWorldAccess) ----------------------------------------
 
     /// `playSoundAtEntity(entity, name, volume, pitch)`: at the entity's feet.
@@ -1067,6 +1382,37 @@ impl World {
         false
     }
 
+    /// `isAABBInMaterial(box, material)`: a block of `material` whose fluid
+    /// surface (`y + 1 - meta / 8` for metadata below 8) is at or above
+    /// `box.minY`.
+    // src: World.java:1488-1516
+    pub fn is_aabb_in_material(&mut self, bb: &Aabb, material: Material) -> bool {
+        let var3 = floor_double(bb.min_x);
+        let var4 = floor_double(bb.max_x + 1.0);
+        let var5 = floor_double(bb.min_y);
+        let var6 = floor_double(bb.max_y + 1.0);
+        let var7 = floor_double(bb.min_z);
+        let var8 = floor_double(bb.max_z + 1.0);
+        for var9 in var3..var4 {
+            for var10 in var5..var6 {
+                for var11 in var7..var8 {
+                    let id = self.get_block_id(var9, var10, var11);
+                    if block::block(id).is_some_and(|b| b.block_material == material) {
+                        let var13 = self.get_block_metadata(var9, var10, var11);
+                        let mut var14 = (var10 + 1) as f64;
+                        if var13 < 8 {
+                            var14 = (var10 + 1) as f64 - var13 as f64 / 8.0;
+                        }
+                        if var14 >= bb.min_y {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// `isBlockOpaqueCube(x, y, z)`.
     // src: World.java:1639-1642
     pub fn is_block_opaque_cube(&mut self, x: i32, y: i32, z: i32) -> bool {
@@ -1106,8 +1452,8 @@ impl World {
         -1
     }
 
-    /// `canBlockBeRainedOn(x, y, z)`. The final biome test is a recorded stub
-    /// until biomes exist (WP-1.4): it answers false.
+    /// `canBlockBeRainedOn(x, y, z)`: raining, open to the sky, at or above
+    /// the top solid block, and a biome with rain but no snow.
     // src: World.java:2449-2460
     #[allow(clippy::if_same_then_else)] // the Java shape, kept
     pub fn can_block_be_rained_on(&mut self, x: i32, y: i32, z: i32) -> bool {
@@ -1118,8 +1464,12 @@ impl World {
         } else if self.find_top_solid_block(x, z) > y {
             false
         } else {
-            self.skip("BiomeGenBase (World.canBlockBeRainedOn)");
-            false
+            let var4 = self.get_world_chunk_manager().get_biome_gen_at(x, z);
+            if var4.get_enable_snow() {
+                false
+            } else {
+                var4.can_spawn_lightning_bolt()
+            }
         }
     }
 
@@ -1367,6 +1717,66 @@ impl World {
         let info = self.world_info.clone();
         self.save_handler.save_world_info_and_player(&info, None);
         // field_28108_z.saveAllData() (MapStorage): WP-2.6, nothing to save yet.
+    }
+}
+
+impl World {
+    /// `quickSaveWorld(i)`: the level (when `i == 0`) and up to 24 chunks.
+    // src: World.java:299-309
+    pub fn quick_save_world(&mut self, var1: i32) -> bool {
+        if !self.chunk_provider_can_save() {
+            true
+        } else {
+            if var1 == 0 {
+                self.save_level();
+            }
+            self.save_chunks(false)
+        }
+    }
+
+    /// `saveWorldIndirectly(progress)`: `saveWorld(true, progress)`.
+    // src: World.java:1653-1655
+    pub fn save_world_indirectly(&mut self) {
+        self.save_world(true);
+    }
+
+    /// `checkSessionLock()`. Vanilla throws `MinecraftException`; the error is
+    /// returned.
+    // src: World.java:2270-2272
+    pub fn check_session_lock(&mut self) -> Result<(), crate::save::StorageError> {
+        self.save_handler.check_session_lock()
+    }
+
+    /// `func_656_j()`: unloads chunks until the provider has nothing left to
+    /// unload. Name kept.
+    // src: World.java:2090-2094
+    pub fn func_656_j(&mut self) {
+        while self.unload_100_oldest_chunks() {}
+    }
+
+    /// `func_687_d()`: the debug-screen entity count. Name kept.
+    // src: World.java:1591-1593
+    pub fn func_687_d(&self) -> String {
+        format!("All: {}", self.loaded_entity_list.len())
+    }
+
+    /// `func_21119_g()`: the chunk provider's debug string. Name kept.
+    // src: World.java:1595-1597, ChunkProvider.java:184-186
+    pub fn func_21119_g(&self) -> String {
+        format!(
+            "ServerChunkCache: {} Drop: {}",
+            self.chunk_provider.chunk_map.len(),
+            self.chunk_provider.dropped_chunks_set.len()
+        )
+    }
+
+    /// `stopPrecipitation()`: clears both weather timers and flags.
+    // src: World.java:1861-1866
+    pub fn stop_precipitation(&mut self) {
+        self.world_info.rain_time = 0;
+        self.world_info.raining = false;
+        self.world_info.thunder_time = 0;
+        self.world_info.thundering = false;
     }
 }
 

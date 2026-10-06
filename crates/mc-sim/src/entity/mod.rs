@@ -69,6 +69,7 @@ pub mod dispatch;
 pub mod falling_sand;
 pub mod item;
 pub mod living;
+pub mod player;
 
 pub use base::EntityBase;
 pub use falling_sand::FallingSandData;
@@ -190,11 +191,34 @@ pub struct ArrowData {
     pub ticks_in_air: i32,
 }
 
-/// `EntityPlayer` (EntityPlayer.java). Only the inventory so far.
+/// `EntityPlayer` (EntityPlayer.java). Only the fields the world reads so
+/// far (construction: [`player::new_entity_player_sp`]).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PlayerData {
     /// `inventory` (EntityPlayer.java:7).
     pub inventory: InventoryPlayer,
+    /// `username` (EntityPlayer.java:16): null for a fresh `EntityPlayer`;
+    /// `EntityPlayerSP` copies the session's (client, EntityPlayerSP.java:18).
+    pub username: Option<String>,
+    /// `sleeping` (EntityPlayer.java:25, protected): `isPlayerSleeping()`.
+    pub sleeping: bool,
+    /// `sleepTimer` (EntityPlayer.java:27, private): `isPlayerFullyAsleep()`
+    /// needs 100.
+    pub sleep_timer: i32,
+}
+
+impl PlayerData {
+    /// `isPlayerSleeping()`.
+    // src: EntityPlayer.java:686-688
+    pub fn is_player_sleeping(&self) -> bool {
+        self.sleeping
+    }
+
+    /// `isPlayerFullyAsleep()`.
+    // src: EntityPlayer.java:690-692
+    pub fn is_player_fully_asleep(&self) -> bool {
+        self.sleeping && self.sleep_timer >= 100
+    }
 }
 
 /// One variant per concrete entity class (module docs). The tuple lists the

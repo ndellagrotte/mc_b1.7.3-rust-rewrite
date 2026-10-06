@@ -1,24 +1,32 @@
-//! `World.tick()` and the per-tick block systems (PLAN_v4 §3.3).
+//! `World.tick()` and the per-tick block systems (PLAN_v4 §3.3), plus the
+//! client-driven `randomDisplayUpdates`.
 //!
 //! Order, from World.java:1745-1780: `updateWeather` → all-players-asleep
 //! check → `SpawnerAnimals.performSpawning` → `unload100OldestChunks` →
 //! sky-light recalculation → `worldTime + 1` with autosave → `TickUpdates`
 //! (scheduled block ticks) → `updateBlocksAndPlayCaveSounds` (random ticks).
 //!
-//! Fully transcribed: `tick`, `updateWeather`, `TickUpdates`,
-//! `updateBlocksAndPlayCaveSounds` (except the parts below), the chunk-cache
-//! `unload100OldestChunks`, `saveWorld`.
-//! Recorded stubs ([`World::skipped_systems`]): `SpawnerAnimals.performSpawning`
-//! and `performSleepSpawning` (WP-2.3), `isAllPlayersFullyAsleep` /
-//! `wakeUpAllPlayers` (need `EntityPlayer`, WP-2.5), and the biome tests of
-//! lightning and snow/ice (WP-1.4; `EntityLightningBolt` is WP-2.4). Each stub sits exactly
-//! where its Java code runs and draws no random numbers, so the RNG streams
-//! stay aligned with vanilla whenever the stubbed branch would not have run.
+//! Fully transcribed: `tick`, `updateWeather`, `isAllPlayersFullyAsleep`,
+//! `wakeUpAllPlayers` (except `EntityPlayer.wakeUpPlayer`, below),
+//! `SpawnerAnimals.performSpawning` up to the mob constructors
+//! ([`crate::spawner`]), the chunk-cache `unload100OldestChunks`,
+//! `saveWorld`, `TickUpdates`, `updateBlocksAndPlayCaveSounds` (cave sounds,
+//! the lightning and snow/ice rolls with their biome tests, 80 random ticks
+//! per chunk) and `randomDisplayUpdates`.
+//!
+//! Recorded gaps ([`World::skipped_systems`] / [`World::unimplemented_hits`]),
+//! each where its Java code runs: `SpawnerAnimals.performSleepSpawning`
+//! (WP-2.3, needs the `Pathfinder`), `EntityPlayer.wakeUpPlayer` (WP-2.5),
+//! the `EntityLightningBolt` constructor (WP-2.4: the `World.rand` draws
+//! before it are made; the bolt's own `rand` draws, its fire placement and
+//! its entity id are not), the mob constructors of `performSpawning`
+//! ([`crate::spawner`] module docs).
 
 use mc_core::java_hash::ChunkCoordIntPair;
 use mc_core::math::floor_double;
 
 use crate::block::{self, dispatch as block_dispatch};
+use crate::spawner;
 use crate::world::World;
 use crate::world::chunk::block_index;
 use crate::world::events::WorldEvent;
@@ -34,23 +42,21 @@ impl World {
             // src: World.java:1748-1759 (sleep check)
             let mut var1 = false;
             if self.spawn_hostile_mobs && self.difficulty_setting >= 1 {
+                // SpawnerAnimals.performSleepSpawning (SpawnerAnimals.java:173-251):
+                // Pathfinder and beds, WP-2.3. Recorded; answers false.
                 self.skip("SpawnerAnimals.performSleepSpawning");
                 var1 = false;
             }
             if !var1 {
                 let var2 = self.world_info.world_time + 24000;
                 self.world_info.world_time = var2 - var2 % 24000;
-                self.skip("World.wakeUpAllPlayers");
+                self.wake_up_all_players();
             }
         }
 
-        // src: World.java:1761. Without players there are no eligible chunks
-        // and it draws nothing (SpawnerAnimals.java:19-38), so it is only a gap
-        // when a player exists.
-        if (self.spawn_hostile_mobs || self.spawn_peaceful_mobs) && !self.player_entities.is_empty()
-        {
-            self.skip("SpawnerAnimals.performSpawning");
-        }
+        // src: World.java:1761
+        let (hostile, peaceful) = (self.spawn_hostile_mobs, self.spawn_peaceful_mobs);
+        spawner::perform_spawning(self, hostile, peaceful);
         // src: World.java:1762
         self.unload_100_oldest_chunks();
         // src: World.java:1763-1770
@@ -71,16 +77,49 @@ impl World {
         self.update_blocks_and_play_cave_sounds();
     }
 
-    /// `isAllPlayersFullyAsleep()`: needs `EntityPlayer.isPlayerFullyAsleep`
-    /// (WP-2.5). `allPlayersSleeping` is only set by the player code, so with
-    /// no transcribed players it is false and this returns false, as vanilla
-    /// does for a world without sleeping players.
+    /// `isAllPlayersFullyAsleep()`: `allPlayersSleeping` (kept by
+    /// `updateAllPlayersSleepingFlag`) and every player fully asleep.
     // src: World.java:2409-2426
-    fn is_all_players_fully_asleep(&mut self) -> bool {
+    pub fn is_all_players_fully_asleep(&self) -> bool {
         if self.all_players_sleeping && !self.multiplayer_world {
-            self.skip("World.isAllPlayersFullyAsleep");
+            for &pid in &self.player_entities {
+                match self.entity(pid).and_then(|p| p.kind.player()) {
+                    Some(p) => {
+                        if !p.is_player_fully_asleep() {
+                            return false;
+                        }
+                    }
+                    None => {
+                        self.note_unimplemented(
+                            "World.isAllPlayersFullyAsleep over a taken-out player",
+                        );
+                        return false;
+                    }
+                }
+            }
+            true
+        } else {
+            false
         }
-        false
+    }
+
+    /// `wakeUpAllPlayers()`: clears the flag, wakes every sleeping player and
+    /// stops the rain. `EntityPlayer.wakeUpPlayer(false, false, true)`
+    /// (EntityPlayer.java, WP-2.5) is recorded per sleeping player.
+    // src: World.java:2395-2407
+    pub fn wake_up_all_players(&mut self) {
+        self.all_players_sleeping = false;
+        let players = self.player_entities.clone();
+        for pid in players {
+            let sleeping = self
+                .entity(pid)
+                .and_then(|p| p.kind.player())
+                .is_some_and(|p| p.is_player_sleeping());
+            if sleeping {
+                self.note_unimplemented("EntityPlayer.wakeUpPlayer (World.wakeUpAllPlayers)");
+            }
+        }
+        self.stop_precipitation();
     }
 
     /// `updateWeather()`: rain and thunder timers and strengths. Draws
@@ -294,21 +333,66 @@ impl World {
                 let var8 = var4 + (var6 >> 8 & 15);
                 let var9 = self.find_top_solid_block(var7, var8);
                 if self.can_block_be_rained_on(var7, var9, var8) {
-                    // addWeatherEffect(new EntityLightningBolt(…)); field_27168_F = 2 (WP-2.4).
-                    self.skip("EntityLightningBolt (World.updateBlocksAndPlayCaveSounds)");
-                    self.field_27168_f = 2;
+                    // addWeatherEffect(new EntityLightningBolt(this, x, y, z))
+                    // (World.java:1927): the bolt is WP-2.4. Not made: its
+                    // entity id, its own rand draws (EntityLightningBolt.java:14-15)
+                    // and the fire it places at difficulty >= 2 (:16-30).
+                    self.note_unimplemented(
+                        "EntityLightningBolt.<init> (World.updateBlocksAndPlayCaveSounds)",
+                    );
+                    self.field_27168_f = 2; // src: World.java:1928
                 }
             }
 
-            // Snow and ice (World.java:1933-1950). The first test is the biome's
-            // getEnableSnow(), a recorded stub (false) until WP-1.4; the rest
-            // draws no random numbers.
+            // Snow and ice (World.java:1933-1950). `var14` is the chunk object
+            // Java holds; it stays loaded for the whole iteration.
             if self.rand.next_int_bounded(16) == 0 {
                 let var6 = self.next_lcg() >> 2;
                 let var7 = var6 & 15;
                 let var8 = var6 >> 8 & 15;
-                let _var9 = self.find_top_solid_block(var7 + var3, var8 + var4);
-                self.skip("BiomeGenBase.getEnableSnow (World.updateBlocksAndPlayCaveSounds)");
+                let var9 = self.find_top_solid_block(var7 + var3, var8 + var4);
+                let snowy = self
+                    .get_world_chunk_manager()
+                    .get_biome_gen_at(var7 + var3, var8 + var4)
+                    .get_enable_snow();
+                if snowy
+                    && (0..128).contains(&var9)
+                    && self.chunk_mut(cx, cz).get_saved_light_value(
+                        EnumSkyBlock::Block,
+                        var7,
+                        var9,
+                        var8,
+                    ) < 10
+                {
+                    let var10 = self.chunk_mut(cx, cz).get_block_id(var7, var9 - 1, var8);
+                    let var15 = self.chunk_mut(cx, cz).get_block_id(var7, var9, var8);
+                    // Block.snow = 78, Block.ice = 79, Block.waterStill = 9.
+                    // `Block.blocksList[var10].blockMaterial` is read only for
+                    // var10 != 0 (short-circuit), so material_of is exact.
+                    if self.is_raining()
+                        && var15 == 0
+                        && block_dispatch::can_place_block_at(
+                            self,
+                            78,
+                            var7 + var3,
+                            var9,
+                            var8 + var4,
+                        )
+                        && var10 != 0
+                        && var10 != 79
+                        && block::material_of(var10).get_is_solid()
+                    {
+                        self.set_block_with_notify(var7 + var3, var9, var8 + var4, 78);
+                    }
+                    if var10 == 9
+                        && self
+                            .chunk_mut(cx, cz)
+                            .get_block_metadata(var7, var9 - 1, var8)
+                            == 0
+                    {
+                        self.set_block_with_notify(var7 + var3, var9 - 1, var8 + var4, 79);
+                    }
+                }
             }
 
             // Random ticks (World.java:1952-1962).
@@ -330,5 +414,31 @@ impl World {
                 }
             }
         }
+    }
+
+    /// `randomDisplayUpdates(x, y, z)`: the client asks 1000 random blocks
+    /// within 15 of the player (`x ± (nextInt(16) - nextInt(16))` per axis,
+    /// six `World.rand` draws each, 6000 per call) for `randomDisplayTick`
+    /// particles. Run by the client after `World.tick` (Minecraft.java:1167-1169).
+    /// Loads chunks it touches (`getBlockId`). The blocks get the
+    /// [`World::display_random`] stream where Java passes a fresh unseeded
+    /// `new Random()` (World.java:1999).
+    // src: World.java:1997-2011
+    pub fn random_display_updates(&mut self, var1: i32, var2: i32, var3: i32) {
+        let var4 = 16;
+        let mut var5 = std::mem::replace(
+            &mut self.display_random,
+            mc_core::java_random::JavaRandom::new(0),
+        );
+        for _var6 in 0..1000 {
+            let var7 = var1 + self.rand.next_int_bounded(var4) - self.rand.next_int_bounded(var4);
+            let var8 = var2 + self.rand.next_int_bounded(var4) - self.rand.next_int_bounded(var4);
+            let var9 = var3 + self.rand.next_int_bounded(var4) - self.rand.next_int_bounded(var4);
+            let var10 = self.get_block_id(var7, var8, var9);
+            if var10 > 0 {
+                block_dispatch::random_display_tick(self, var10, var7, var8, var9, &mut var5);
+            }
+        }
+        self.display_random = var5;
     }
 }

@@ -70,6 +70,11 @@ mixed-case originals).
 | `World.field_31055_L` | `World::field_31055_l` | True while `updateEntities` iterates `loadedTileEntityList` (World.java:1235, :1253) |
 | `World.func_27163_E` | `World::func_27163_e` | Starts rain/thunder strength at 1 if `WorldInfo` says it is raining (World.java:1782-1790) |
 | `World.func_698_b` | `World::func_698_b` | A tile entity's inventory changed: marks the chunk modified and notifies listeners (World.java:2053-2062; called from `TileEntity.onInventoryChanged`, TileEntity.java:70-74) |
+| `World.func_6466_a(EntityPlayer, int, int, int)` | `World::func_6466_a` | Whether the player may mine the block at x, y, z (later versions' `canMineBlock`): always `true` in `World` (World.java:2311-2313); its only caller, `ItemBucket.onItemRightClick`, returns early when it is false, before touching the targeted block (ItemBucket.java:36). Kept: one caller that only gates an interaction does not pin the meaning down |
+| `World.func_687_d` | `World::func_687_d` | Debug-screen string `"All: " + loadedEntityList.size()` (World.java:1591-1593) |
+| `World.func_21119_g` | `World::func_21119_g` | Debug-screen string: the chunk provider's `makeString()`, `"ServerChunkCache: <chunks> Drop: <dropped>"` (World.java:1595-1597, ChunkProvider.java:185-187) |
+| `World.func_656_j` | `World::func_656_j` | `while (chunkProvider.unload100OldestChunks());`: unloads until the provider has nothing to drop (World.java:2090-2094) |
+| `World.func_4085_a(Class)` | — (not ported) | Returns `null` (World.java:1587-1589); no caller in the client |
 | `World.field_28108_z` | — (not ported yet) | `MapStorage` for map items (World.java:46); WP-2.6 |
 | `BlockStep.field_22037_a` | `item::BLOCK_STEP_FIELD_22037_A` | `static final String[] {"stone", "sand", "wood", "cobble"}`: the slab type names by metadata, read only by `ItemSlab.getItemNameIS` as `"tile.stoneSlab." + field_22037_a[damage]` (BlockStep.java:6, ItemSlab.java:18-20). Kept because the block module may want it under its own name (WP-1.1); the item module needs it for item names |
 | `World.field_1012_M` | — (local `Vec`) | Scratch list returned by `getEntitiesWithinAABBExcludingEntity` (World.java:55, :2013-2029) |
@@ -115,6 +120,9 @@ Not obfuscated, listed because a reader searching for the Java name would miss t
 | `Entity.nextEntityID` (static) | `World::next_entity_id` | per-world, reset per scenario (PLAN_v4 §4.2) |
 | `NextTickListEntry.nextTickEntryID` (static) | `World::next_tick_entry_id` | as above |
 | `World.lightingUpdatesScheduled` (static) | `World::lighting_updates_scheduled` | as above |
+| `SpawnerAnimals.eligibleChunksForSpawning` (static) | `World::eligible_chunks_for_spawning` | per-world, like the other statics; same `HashSet` order (spawner module docs) |
+| `World.randomDisplayUpdates`' local `new Random()` | `World::display_random` | one world-owned stream instead of a clock-seeded `Random` per call (D9); particles only |
+| `Class` arguments of `getEntitiesWithinAABB` / `countEntities` | `&str` Java class or interface name, `world::is_instance_of` | no `Class` objects; the kind's class chain answers `isAssignableFrom` |
 | `Block.blocksList` | `block::BLOCKS` / `block::block(id)` | immutable table; run-time-mutable block state is `World::block_statics` |
 | `Item.itemsList` | `item::ITEMS` (ids 0..360), `item::RECORDS` (2256, 2257), `item::item(id)` | immutable table built at compile time (WP-1.2); the 32000-slot array is not materialised |
 | `Item` subclass instance fields (`ItemTool.toolMaterial`, `ItemFood.healAmount`, `ItemBlock.blockID`, …) | `item::ItemKind` variant fields (`ToolData`, `FoodData`, `block_id`, …) | one variant per instantiated class, as `BlockKind` |

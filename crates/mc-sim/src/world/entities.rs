@@ -14,7 +14,7 @@ use super::World;
 use super::chunk;
 use super::events::WorldEvent;
 use crate::block::dispatch as block_dispatch;
-use crate::entity::{Entity, EntitySlot, dispatch};
+use crate::entity::{Entity, EntityBase, EntityKindData, EntitySlot, dispatch};
 
 impl World {
     // ---- lookup ---------------------------------------------------------------------
@@ -94,17 +94,22 @@ impl World {
         if !var4 && !self.chunk_exists(var2, var3) {
             return false;
         }
+        let id = e.base.entity_id;
         if var4 {
-            self.player_entities.push(e.base.entity_id);
-            self.skip("World.updateAllPlayersSleepingFlag");
+            self.player_entities.push(id);
         }
         self.get_chunk_from_chunk_coords(var2, var3)
             .add_entity(&mut e.base);
-        let id = e.base.entity_id;
         self.loaded_entity_list.push(EntitySlot {
             entity_id: id,
             entity: Some(Box::new(e)),
         });
+        if var4 {
+            // src: World.java:910. Run after the list append (Java runs it
+            // before) so the scan finds the new player in its slot; the scan
+            // reads only `isPlayerSleeping`, so the order is not observable.
+            self.update_all_players_sleeping_flag();
+        }
         self.obtain_entity_skin(id);
         true
     }
@@ -165,7 +170,8 @@ impl World {
             if let Some(i) = self.player_entities.iter().position(|p| *p == id) {
                 self.player_entities.remove(i);
             }
-            self.skip("World.updateAllPlayersSleepingFlag");
+            // src: World.java:946 (the dead player has left playerEntities).
+            self.update_all_players_sleeping_flag();
         }
     }
 
@@ -653,5 +659,288 @@ impl World {
             }
         }
         var11
+    }
+
+    /// `getClosestPlayerToEntity(entity, maxDistance)`.
+    // src: World.java:2192-2194
+    pub fn get_closest_player_to_entity(&self, e: &EntityBase, max: f64) -> Option<i32> {
+        self.get_closest_player(e.pos_x, e.pos_y, e.pos_z, max)
+    }
+
+    /// `getPlayerEntityByName(name)`: the first player whose `username`
+    /// equals `name` (a null username never matches).
+    // src: World.java:2212-2220
+    pub fn get_player_entity_by_name(&self, name: &str) -> Option<i32> {
+        self.player_entities.iter().copied().find(|&pid| {
+            self.entity(pid)
+                .and_then(|p| p.kind.player())
+                .and_then(|p| p.username.as_deref())
+                == Some(name)
+        })
+    }
+
+    /// `getEntitiesWithinAABB(class, box)`: ids of the loaded entities that
+    /// are instances of `class` ([`is_instance_of`]) and intersect `box`, in
+    /// the chunk and section order of
+    /// [`World::get_entities_within_aabb_excluding_entity`]. Entities taken
+    /// out for an update are not seen ([`crate::entity`] module docs).
+    // src: World.java:2031-2047, Chunk.java:512-534
+    pub fn get_entities_within_aabb(&self, class: &str, bb: &Aabb) -> Vec<i32> {
+        let var3 = floor_double((bb.min_x - 2.0) / 16.0);
+        let var4 = floor_double((bb.max_x + 2.0) / 16.0);
+        let var5 = floor_double((bb.min_z - 2.0) / 16.0);
+        let var6 = floor_double((bb.max_z + 2.0) / 16.0);
+        let mut var7 = Vec::new();
+        for var8 in var3..=var4 {
+            for var9 in var5..=var6 {
+                let Some(c) = self.loaded_chunk(var8, var9) else {
+                    continue;
+                };
+                for section in c.entity_sections(bb.min_y, bb.max_y) {
+                    for &id in &c.entities[section] {
+                        match self.entity(id) {
+                            Some(o) => {
+                                if is_instance_of(&o.kind, class)
+                                    && o.base.bounding_box.intersects_with(bb)
+                                {
+                                    var7.push(id);
+                                }
+                            }
+                            None => {
+                                if self.entity_index(id).is_none() {
+                                    self.note_unimplemented(
+                                        "Chunk entity list holds an entity not in loadedEntityList",
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        var7
+    }
+
+    /// `countEntities(class)`: loaded entities that are instances of `class`
+    /// ([`is_instance_of`]).
+    // src: World.java:2064-2075
+    pub fn count_entities(&self, class: &str) -> i32 {
+        let mut var2 = 0;
+        for slot in &self.loaded_entity_list {
+            match slot.entity.as_deref() {
+                Some(e) => {
+                    if is_instance_of(&e.kind, class) {
+                        var2 += 1;
+                    }
+                }
+                None => self.note_unimplemented("World.countEntities over a taken-out entity"),
+            }
+        }
+        var2
+    }
+
+    /// `joinEntityInSurroundings(entity)`: loads the 5×5 chunks around the
+    /// entity and appends it to `loadedEntityList` unless it is already there
+    /// (`List.contains` uses `Entity.equals`, the entity id, Entity.java:121-127).
+    /// The client calls it for the player every 30 ticks
+    /// (Minecraft.java:1134-1139).
+    ///
+    /// The entity is named by id and must be in the list (the port cannot
+    /// append an entity it does not own); re-adding one that left is recorded
+    /// as a gap.
+    // src: World.java:2294-2309
+    pub fn join_entity_in_surroundings(&mut self, id: i32) {
+        let Some(e) = self.entity(id) else {
+            self.note_unimplemented("World.joinEntityInSurroundings of an entity not in the list");
+            return;
+        };
+        let var2 = floor_double(e.base.pos_x / 16.0);
+        let var3 = floor_double(e.base.pos_z / 16.0);
+        let var4 = 2;
+        for var5 in var2 - var4..=var2 + var4 {
+            for var6 in var3 - var4..=var3 + var4 {
+                self.get_chunk_from_chunk_coords(var5, var6);
+            }
+        }
+        // `if (!loadedEntityList.contains(var1)) loadedEntityList.add(var1)`:
+        // it is in the list (checked above).
+    }
+
+    /// `spawnPlayerWithLoadedChunks(player)`: applies the player NBT saved in
+    /// `level.dat` (once), then `entityJoinedWorld`. Reading the NBT is
+    /// `EntityPlayer.readFromNBT` (WP-2.5), recorded here; the
+    /// `ChunkProviderLoadOrGenerate` branch (World.java:264-269) never runs,
+    /// because no world in the game builds that provider.
+    // src: World.java:256-276
+    pub fn spawn_player_with_loaded_chunks(&mut self, player: Entity) -> bool {
+        if self.world_info.player_tag.is_some() {
+            self.skip("EntityPlayer.readFromNBT (World.spawnPlayerWithLoadedChunks)");
+            self.world_info.player_tag = None;
+        }
+        self.spawn_entity_in_world(player)
+    }
+
+    /// `updateAllPlayersSleepingFlag()`: true when there is a player and all
+    /// players sleep.
+    // src: World.java:2381-2393
+    pub fn update_all_players_sleeping_flag(&mut self) {
+        let mut flag = !self.player_entities.is_empty();
+        for &pid in &self.player_entities {
+            match self.entity(pid).and_then(|p| p.kind.player()) {
+                Some(p) => {
+                    if !p.is_player_sleeping() {
+                        flag = false;
+                        break;
+                    }
+                }
+                None => {
+                    self.note_unimplemented(
+                        "World.updateAllPlayersSleepingFlag over a taken-out player",
+                    );
+                    flag = false;
+                    break;
+                }
+            }
+        }
+        self.all_players_sleeping = flag;
+    }
+}
+
+/// `class.isAssignableFrom(entity.getClass())` for the Java class or
+/// interface named `class` (`"Entity"`, `"EntityLiving"`, `"EntityAnimal"`,
+/// `"IMob"`, `"EntityPlayer"`, …): the kind's class chain from
+/// [`EntityKindData::java_class`] up to `Entity`, plus the interfaces it
+/// implements (EntityMob.java:3, EntitySlime.java:3, EntityGhast.java:3:
+/// `IMob`; EntityMinecart.java:5: `IInventory`).
+pub fn is_instance_of(kind: &EntityKindData, class: &str) -> bool {
+    java_class_chain(kind).contains(&class)
+}
+
+/// The Java classes and interfaces an entity kind is an instance of (see
+/// [`is_instance_of`]); the oracle's player is `HarnessPlayer extends
+/// EntityPlayer`, the port's `EntityPlayerSP extends EntityPlayer`.
+// src: the `extends` / `implements` clauses of each Entity*.java
+pub fn java_class_chain(kind: &EntityKindData) -> &'static [&'static str] {
+    use EntityKindData as K;
+    match kind {
+        K::Item(..) => &["EntityItem", "Entity"],
+        K::Arrow(..) => &["EntityArrow", "Entity"],
+        K::Snowball(..) => &["EntitySnowball", "Entity"],
+        K::Egg(..) => &["EntityEgg", "Entity"],
+        K::Fireball(..) => &["EntityFireball", "Entity"],
+        K::Fish(..) => &["EntityFish", "Entity"],
+        K::Painting(..) => &["EntityPainting", "Entity"],
+        K::FallingSand(..) => &["EntityFallingSand", "Entity"],
+        K::TntPrimed(..) => &["EntityTNTPrimed", "Entity"],
+        K::Minecart(..) => &["EntityMinecart", "Entity", "IInventory"],
+        K::Boat(..) => &["EntityBoat", "Entity"],
+        K::LightningBolt(..) => &["EntityLightningBolt", "EntityWeatherEffect", "Entity"],
+        K::Mob(..) => &[
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Creeper(..) => &[
+            "EntityCreeper",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Skeleton(..) => &[
+            "EntitySkeleton",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Spider(..) => &[
+            "EntitySpider",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Zombie(..) => &[
+            "EntityZombie",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::PigZombie(..) => &[
+            "EntityPigZombie",
+            "EntityZombie",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::GiantZombie(..) => &[
+            "EntityGiantZombie",
+            "EntityMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Slime(..) => &["EntitySlime", "EntityLiving", "Entity", "IMob"],
+        K::Ghast(..) => &[
+            "EntityGhast",
+            "EntityFlying",
+            "EntityLiving",
+            "Entity",
+            "IMob",
+        ],
+        K::Pig(..) => &[
+            "EntityPig",
+            "EntityAnimal",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::Sheep(..) => &[
+            "EntitySheep",
+            "EntityAnimal",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::Cow(..) => &[
+            "EntityCow",
+            "EntityAnimal",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::Chicken(..) => &[
+            "EntityChicken",
+            "EntityAnimal",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::Wolf(..) => &[
+            "EntityWolf",
+            "EntityAnimal",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::Squid(..) => &[
+            "EntitySquid",
+            "EntityWaterMob",
+            "EntityCreature",
+            "EntityLiving",
+            "Entity",
+        ],
+        K::PlayerSp(..) => &["EntityPlayerSP", "EntityPlayer", "EntityLiving", "Entity"],
     }
 }
