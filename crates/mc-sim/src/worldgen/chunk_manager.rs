@@ -337,3 +337,54 @@ impl WorldChunkManager {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The noise is pointwise (`(x0 + i) * scale` with integers exact in f64),
+    /// so the 1×1 queries `populate` makes must agree with the 16×16 array
+    /// the `biome` fixtures check against the oracle.
+    #[test]
+    fn point_queries_agree_with_the_chunk_array() {
+        let seed = -4172144991579068934;
+        let (x0, z0) = (-48, 112);
+        let mut grid = WorldChunkManager::new(seed);
+        let biomes = grid.load_block_generator_data(Vec::new(), x0, z0, 16, 16);
+        let temps = grid.temperature.clone();
+        let mut point = WorldChunkManager::new(seed);
+        for i in 0..16 {
+            for j in 0..16 {
+                let k = (i * 16 + j) as usize;
+                assert_eq!(point.get_biome_gen_at(x0 + i, z0 + j), biomes[k]);
+                assert_eq!(point.temperature[0].to_bits(), temps[k].to_bits());
+            }
+        }
+        // getTemperatures is loadBlockGeneratorData's temperature without
+        // the humidity.
+        let t = point.get_temperatures(Vec::new(), x0, z0, 16, 16);
+        assert!(
+            t.iter()
+                .zip(&temps)
+                .all(|(a, b)| a.to_bits() == b.to_bits())
+        );
+        // A longer array is reused, not replaced; `func_4111_a` zeroes all of
+        // it and only the first 256 entries are written.
+        let t = point.get_temperatures(vec![7.0; 300], x0, z0, 16, 16);
+        assert_eq!(t.len(), 300);
+        assert!(t[256..].iter().all(|v| *v == 0.0));
+    }
+
+    #[test]
+    fn hell_manager_is_constant() {
+        let mut m = WorldChunkManager::new_hell(Biome::Hell, 1.0, 0.0);
+        assert_eq!(m.get_biome_gen_at(123, -456), Biome::Hell);
+        assert_eq!(m.get_temperature(0, 0), 1.0);
+        let b = m.load_block_generator_data(Vec::new(), 0, 0, 16, 16);
+        assert!(b.iter().all(|b| *b == Biome::Hell));
+        assert!(m.temperature.iter().all(|t| *t == 1.0));
+        assert!(m.humidity.iter().all(|h| *h == 0.0));
+        let t = m.get_temperatures(Vec::new(), 5, 5, 4, 4);
+        assert_eq!(t, vec![1.0; 16]);
+    }
+}
