@@ -5,7 +5,8 @@
 //! the redstone power queries and the spawn point; `world/entities.rs` the
 //! entity list, the take/put-back driver and the entity queries;
 //! [`chunk_provider`] chunk loading; [`lighting`] the light-update queue;
-//! [`ray_trace`] `rayTraceBlocks*` and `getBlockDensity`; [`provider`] the
+//! [`ray_trace`] `rayTraceBlocks*` and `getBlockDensity`; [`explosion`]
+//! `Explosion` with `createExplosion`/`newExplosion`; [`provider`] the
 //! `WorldProvider`s; `crate::tick` `World.tick` and `randomDisplayUpdates`;
 //! `crate::spawner` `SpawnerAnimals`.
 //!
@@ -25,7 +26,6 @@
 //! | `updateBlocksAndPlayCaveSounds` (:1868-1965) | the `EntityLightningBolt` constructor WP-2.4 (recorded; the draws before it are made) |
 //! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
-//! | `createExplosion`, `newExplosion` (:1518-1528) | not ported: `Explosion` is WP-1.8 ([`World::get_block_density`] is here) |
 //! | `getPathToEntity`, `getEntityPathToXYZ` (:2116-2144) | not ported: `Pathfinder`, `ChunkCache`, WP-2.2 |
 //! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
 //! | `setItemData`, `loadItemData`, `getUniqueDataId` (:2462-2472) | not ported: `MapStorage`, WP-2.6 |
@@ -55,6 +55,7 @@ pub mod chunk_provider;
 mod entities;
 pub use entities::{is_instance_of, java_class_chain};
 pub mod events;
+pub mod explosion;
 pub mod info;
 pub mod lighting;
 pub mod nibble;
@@ -460,6 +461,10 @@ impl World {
         self.next_entity_id = 0;
         self.next_tick_entry_id = 0;
         self.lighting_updates_scheduled = 0;
+        // The container blocks' singleton Randoms and BlockFurnace.keepFurnaceInventory
+        // (`HarnessWorld.resetStatics`, census §2 and §6).
+        self.block_statics.seed_container_randoms(seed);
+        self.block_statics.keep_furnace_inventory = false;
     }
 
     /// The seed of entity `id`'s `rand`: `mix(entity_rand_seed, id)`

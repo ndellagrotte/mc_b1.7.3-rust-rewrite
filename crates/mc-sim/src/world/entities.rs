@@ -363,11 +363,10 @@ impl World {
         }
     }
 
-    /// `TileEntity.updateEntity()` dispatch ([`super::tile_entity::update_entity`]:
-    /// `TileEntityPiston` transcribed, the WP-1.8 kinds recorded).
-    // src: TileEntity.java:42-43
+    /// `TileEntity.updateEntity()` dispatch ([`crate::tile_entity::update_entity`]).
+    // src: World.java:1239, TileEntity.java:42-43
     fn update_tile_entity(&mut self, r: super::tile_entity::TileEntityRef) {
-        super::tile_entity::update_entity(self, r);
+        crate::tile_entity::update_entity(self, r);
     }
 
     /// The entity in slot `i`; slots outside an update are never empty.

@@ -59,22 +59,29 @@ pub mod block_texture;
 pub mod button;
 pub mod cactus;
 pub mod cake;
+pub mod chest;
+pub mod container;
 pub mod crops;
 pub mod detector_rail;
 pub mod dispatch;
+pub mod dispenser;
 pub mod door;
 pub mod farmland;
 pub mod fence;
 pub mod fire;
 pub mod flower;
 pub mod fluid;
+pub mod furnace;
 pub mod grass;
+pub mod jukebox;
 pub mod ladder;
 pub mod leaves;
 pub mod lever;
 pub mod locked_chest;
 pub mod material;
 pub mod misc;
+pub mod mob_spawner;
+pub mod note;
 pub mod piston_base;
 pub mod piston_extension;
 pub mod piston_moving;
@@ -88,6 +95,7 @@ pub mod redstone_wire;
 pub mod repeater;
 pub mod sand;
 pub mod sapling;
+pub mod sign;
 pub mod snow;
 pub mod soul_sand;
 pub mod stairs;
@@ -1733,10 +1741,10 @@ pub static ABILITY_TO_CATCH_FIRE: [i32; 256] = table::FIRE_BURN_RATES.1;
 ///
 /// Every mutable instance field of a block singleton is here with the value
 /// the static initialiser leaves (pinned by `tests/golden/block/block-table`),
-/// except the singleton `Random`s the oracle reseeds (`BlockChest.random`,
-/// `BlockFurnace.furnaceRand`, `BlockDispenser.random`; census §2), which the
-/// tasks that use them add. Still to add with its behaviour (Phase 1), as a
-/// Java static: `BlockFurnace.keepFurnaceInventory`.
+/// including the singleton `Random`s the oracle reseeds (`BlockChest.random`,
+/// `BlockFurnace.furnaceRand`, `BlockDispenser.random`; census §2;
+/// [`BlockStatics::seed_container_randoms`]) and the Java statics
+/// `BlockFurnace.keepFurnaceInventory` and `BlockRedstoneTorch.torchUpdates`.
 #[derive(Clone, Debug)]
 pub struct BlockStatics {
     /// `minX`…`maxZ` of each block singleton, starting from
@@ -1801,6 +1809,27 @@ pub struct BlockStatics {
     /// starting empty, as the oracle clears it per scenario (census §6).
     // src: BlockRedstoneTorch.java:9
     pub redstone_torch_updates: Vec<redstone_torch::RedstoneUpdateInfo>,
+    /// `BlockChest.random` of `Block.chest` (clock-seeded in vanilla; the
+    /// oracle reseeds it with `mix(seed, -2)`): scatters a broken chest's
+    /// items.
+    // src: BlockChest.java:6
+    pub chest_random: JavaRandom,
+    /// `BlockFurnace.furnaceRand` of `Block.stoneOvenIdle` (61; `mix(seed, -3)`).
+    // src: BlockFurnace.java:6
+    pub stone_oven_idle_furnace_rand: JavaRandom,
+    /// `BlockFurnace.furnaceRand` of `Block.stoneOvenActive` (62; `mix(seed, -4)`).
+    // src: BlockFurnace.java:6
+    pub stone_oven_active_furnace_rand: JavaRandom,
+    /// `BlockDispenser.random` of `Block.dispenser` (`mix(seed, -5)`): a
+    /// broken dispenser's item scatter (a dispensed item's velocity uses the
+    /// `updateTick` `Random`, `World.rand`, BlockDispenser.java:124-130).
+    // src: BlockDispenser.java:6
+    pub dispenser_random: JavaRandom,
+    /// `BlockFurnace.keepFurnaceInventory` (a static): set while
+    /// `updateFurnaceBlockState` swaps the block, so the removal keeps the
+    /// items.
+    // src: BlockFurnace.java:8
+    pub keep_furnace_inventory: bool,
 }
 
 /// The per-instance scratch fields of a `BlockFlowing` singleton.
@@ -1847,6 +1876,28 @@ impl BlockStatics {
         }
     }
 
+    /// Seeds the container blocks' singleton `Random`s per the oracle's
+    /// protocol (tests/golden/README.md "Seeding"; `HarnessWorld.resetStatics`):
+    /// `mix(seed, -2)` chest, `-3` idle furnace, `-4` lit furnace, `-5`
+    /// dispenser. A new world's statics are seeded with seed 0.
+    pub fn seed_container_randoms(&mut self, seed: i64) {
+        use crate::entity::base::mix_seed;
+        self.chest_random = JavaRandom::new(mix_seed(seed, -2));
+        self.stone_oven_idle_furnace_rand = JavaRandom::new(mix_seed(seed, -3));
+        self.stone_oven_active_furnace_rand = JavaRandom::new(mix_seed(seed, -4));
+        self.dispenser_random = JavaRandom::new(mix_seed(seed, -5));
+    }
+
+    /// `furnaceRand` of the `BlockFurnace` singleton with this id (61 idle,
+    /// 62 lit).
+    pub fn furnace_rand_mut(&mut self, id: i32) -> Option<&mut JavaRandom> {
+        match id {
+            61 => Some(&mut self.stone_oven_idle_furnace_rand),
+            62 => Some(&mut self.stone_oven_active_furnace_rand),
+            _ => None,
+        }
+    }
+
     /// `ignoreUpdates` of the `BlockPistonBase` singleton with this id.
     pub fn piston_ignore_updates(&self, id: i32) -> Option<bool> {
         match id {
@@ -1865,7 +1916,7 @@ impl Default for BlockStatics {
                 bounds[id] = b.bounds;
             }
         }
-        BlockStatics {
+        let mut s = BlockStatics {
             bounds,
             graphics_level: false,
             leaves_block_index_in_texture: BLOCKS[ids::LEAVES as usize]
@@ -1885,7 +1936,15 @@ impl Default for BlockStatics {
             redstone_wire_blocks_needing_update: JavaHashSet::new(),
             // src: BlockRedstoneTorch.java:9
             redstone_torch_updates: Vec::new(),
-        }
+            chest_random: JavaRandom::new(0),
+            stone_oven_idle_furnace_rand: JavaRandom::new(0),
+            stone_oven_active_furnace_rand: JavaRandom::new(0),
+            dispenser_random: JavaRandom::new(0),
+            // src: BlockFurnace.java:8
+            keep_furnace_inventory: false,
+        };
+        s.seed_container_randoms(0);
+        s
     }
 }
 

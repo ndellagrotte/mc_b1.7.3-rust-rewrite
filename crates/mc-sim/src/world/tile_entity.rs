@@ -10,12 +10,13 @@
 //! becomes unreachable from every list in vanilla (`World.updateEntities` and
 //! `World.removeBlockTileEntity`).
 //!
-//! The seven concrete tile entities (furnace, chest, record player, dispenser,
-//! sign, mob spawner, note block) are WP-1.8; their data goes in
-//! [`TileEntityKindData`]. The moving piston's [`TileEntityPiston`] is piston
-//! behaviour and is transcribed here with the pistons (WP-1.6), with
-//! [`update_entity`], the per-class `updateEntity` dispatch that
-//! `World.updateEntities` calls (WP-1.8 replaces its recorded arm).
+//! The concrete classes' data is [`TileEntityKindData`], one variant per
+//! class; the behaviour, NBT and the `IInventory` methods of the seven WP-1.8
+//! classes (furnace, chest, record player, dispenser, sign, mob spawner, note
+//! block) are in [`crate::tile_entity`], whose `update_entity` is the
+//! per-class `updateEntity` dispatch that `World.updateEntities` calls. The
+//! moving piston's [`TileEntityPiston`] is piston behaviour and is transcribed
+//! here with the pistons (WP-1.6).
 
 use std::collections::BTreeMap;
 
@@ -23,26 +24,64 @@ use mc_nbt::Tag;
 
 use super::World;
 use crate::block::{piston_base, piston_moving};
+use crate::tile_entity::{
+    chest::TileEntityChest, dispenser::TileEntityDispenser, furnace::TileEntityFurnace,
+    mob_spawner::TileEntityMobSpawner, note::TileEntityNote, record_player::TileEntityRecordPlayer,
+    sign::TileEntitySign,
+};
 
 /// A handle to a tile entity in [`crate::world::World::tile_entities`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TileEntityRef(pub u32);
 
-/// Per-class data of a tile entity. The WP-1.8 kinds are still
-/// [`TileEntityKindData::Untranscribed`].
+/// Per-class data of a tile entity: one variant per concrete `TileEntity`
+/// subclass (TileEntity.java:100-109 lists them), in the order of
+/// `TileEntity`'s mapping table.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TileEntityKindData {
     /// A `TileEntity` whose subclass is not transcribed yet, with its Java
-    /// class name.
+    /// class name (none is left: every vanilla class has a variant).
     Untranscribed(&'static str),
+    /// `TileEntityFurnace` (`"Furnace"`).
+    Furnace(TileEntityFurnace),
+    /// `TileEntityChest` (`"Chest"`).
+    Chest(TileEntityChest),
+    /// `TileEntityRecordPlayer` (`"RecordPlayer"`, the jukebox).
+    RecordPlayer(TileEntityRecordPlayer),
+    /// `TileEntityDispenser` (`"Trap"`).
+    Dispenser(TileEntityDispenser),
+    /// `TileEntitySign` (`"Sign"`).
+    Sign(TileEntitySign),
+    /// `TileEntityMobSpawner` (`"MobSpawner"`).
+    MobSpawner(TileEntityMobSpawner),
+    /// `TileEntityNote` (`"Music"`, the note block).
+    Note(TileEntityNote),
     /// `TileEntityPiston`, the moving block's tile entity.
     Piston(TileEntityPiston),
+}
+
+impl TileEntityKindData {
+    /// The concrete Java class name (`getClass().getSimpleName()`).
+    pub fn java_class(&self) -> &'static str {
+        use TileEntityKindData as K;
+        match self {
+            K::Untranscribed(c) => c,
+            K::Furnace(_) => "TileEntityFurnace",
+            K::Chest(_) => "TileEntityChest",
+            K::RecordPlayer(_) => "TileEntityRecordPlayer",
+            K::Dispenser(_) => "TileEntityDispenser",
+            K::Sign(_) => "TileEntitySign",
+            K::MobSpawner(_) => "TileEntityMobSpawner",
+            K::Note(_) => "TileEntityNote",
+            K::Piston(_) => "TileEntityPiston",
+        }
+    }
 }
 
 /// `TileEntity`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TileEntity {
-    // `worldObj` (TileEntity.java:8): implicit, the owning world.
+    // `worldObj` (TileEntity.java:9): implicit, the owning world.
     /// `xCoord`.
     pub x_coord: i32,
     /// `yCoord`.
@@ -57,6 +96,19 @@ pub struct TileEntity {
 }
 
 impl TileEntity {
+    /// `new TileEntityXxx()`: the base fields at their defaults (coordinates
+    /// 0, valid) and the subclass data `kind`.
+    // src: TileEntity.java:9-13
+    pub fn new(kind: TileEntityKindData) -> TileEntity {
+        TileEntity {
+            x_coord: 0,
+            y_coord: 0,
+            z_coord: 0,
+            field_31007_h: false,
+            kind,
+        }
+    }
+
     /// `isInvalid()`.
     // src: TileEntity.java:88-90
     pub fn is_invalid(&self) -> bool {
@@ -389,20 +441,5 @@ pub fn piston_update_entity(world: &mut World, r: TileEntityRef) {
             let step = p.progress - p.last_progress + 0.0625;
             update_pushed_objects(world, r, progress, step);
         }
-    }
-}
-
-/// `updateEntity()` of the tile entity behind `r`, by class. The base body
-/// is empty (TileEntity.java:42-43); the WP-1.8 kinds record themselves.
-pub fn update_entity(world: &mut World, r: TileEntityRef) {
-    let Some(t) = world.tile_entities.get(&r) else {
-        return;
-    };
-    match t.kind {
-        TileEntityKindData::Untranscribed(_) => {
-            world.note_unimplemented("TileEntity*.updateEntity");
-        }
-        // src: TileEntityPiston.java:105-126
-        TileEntityKindData::Piston(_) => piston_update_entity(world, r),
     }
 }
