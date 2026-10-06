@@ -12,3 +12,8 @@ mc-nbt = { path = "../mc-nbt" }
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+# tests/golden_tick.rs: the golden-fixture runner and tick driver (a dev-only
+# cycle, mc-golden depends on mc-sim; cargo allows it for dev-dependencies).
+mc-golden = { path = "../mc-golden" }

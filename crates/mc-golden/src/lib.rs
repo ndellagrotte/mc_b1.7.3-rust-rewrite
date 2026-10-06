@@ -34,6 +34,11 @@
 //! - [`Bits32`] / [`Bits64`] / [`hex_bytes`] / [`blake3_hex`] — the encoding
 //!   rules (ADR-007 §5.2).
 //! - [`fixture_dir`], [`workspace_root`], [`read_sidecar`], [`all_fixture_dirs`].
+//! - [`tick_driver::drive`] — the drive closure for `kind: "tick"`
+//!   scenarios: builds an `mc_sim` world, applies the ops, runs the
+//!   oracle's per-tick sequence and emits the dumps. Ops and world types the
+//!   port cannot run yet fail with a [`GoldenError::Other`] naming the
+//!   missing Java code.
 //!
 //! ```no_run
 //! use mc_golden::{run, ScenarioKind, TraceLine};
@@ -58,6 +63,7 @@ pub mod error;
 mod io;
 pub mod runner;
 pub mod scenario;
+pub mod tick_driver;
 pub mod trace;
 
 pub use bits::{Bits32, Bits64, hex_bytes, parse_hex_bytes};

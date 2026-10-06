@@ -3540,6 +3540,7 @@ name = "mc-sim"
 version = "0.1.0"
 dependencies = [
  "mc-core",
+ "mc-golden",
  "mc-nbt",
 ]
 
