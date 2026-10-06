@@ -8,9 +8,11 @@
 //! `(World)` constructor, then `readFromNBT`. The port has those
 //! constructors for `EntityItem`, `EntityFallingSand`, `EntityArrow`,
 //! `EntitySnowball`, `EntityPainting`, `EntityTNTPrimed`, `EntityMinecart`
-//! and `EntityBoat` (WP-2.4), `EntityPig` (WP-2.2) and `EntitySheep`,
-//! `EntityCow`, `EntityChicken`, `EntityWolf` (WP-2.3); the other mobs are
-//! Phase 2. For the other names of the table, [`create_entity_from_nbt`]
+//! and `EntityBoat` (WP-2.4), `EntityPig` (WP-2.2), `EntitySheep`,
+//! `EntityCow`, `EntityChicken`, `EntityWolf` (WP-2.3a) and `EntityMob`,
+//! `EntityCreeper`, `EntitySkeleton`, `EntitySpider`, `EntityGiantZombie`,
+//! `EntityZombie`, `EntitySlime`, `EntityGhast`, `EntityPigZombie`
+//! (WP-2.3b); `EntitySquid` is WP-2.3c. For the other names of the table, [`create_entity_from_nbt`]
 //! returns [`FromNbt::Gap`]:
 //!
 //! - the side effects the Java constructor has on the world are made: the
@@ -42,15 +44,24 @@ use crate::entity::arrow::new_entity_arrow_empty;
 use crate::entity::boat::new_entity_boat_empty;
 use crate::entity::chicken::new_entity_chicken;
 use crate::entity::cow::new_entity_cow;
+use crate::entity::creeper::new_entity_creeper;
 use crate::entity::falling_sand::new_entity_falling_sand_empty;
+use crate::entity::ghast::new_entity_ghast;
+use crate::entity::giant_zombie::new_entity_giant_zombie;
 use crate::entity::item::new_entity_item_empty;
 use crate::entity::minecart::new_entity_minecart_empty;
+use crate::entity::mob::new_entity_mob;
 use crate::entity::painting::new_entity_painting_empty;
 use crate::entity::pig::new_entity_pig;
+use crate::entity::pig_zombie::new_entity_pig_zombie;
 use crate::entity::sheep::new_entity_sheep;
+use crate::entity::skeleton::new_entity_skeleton;
+use crate::entity::slime::new_entity_slime;
 use crate::entity::snowball::new_entity_snowball_empty;
+use crate::entity::spider::new_entity_spider;
 use crate::entity::tnt_primed::new_entity_tnt_primed_empty;
 use crate::entity::wolf::new_entity_wolf;
+use crate::entity::zombie::new_entity_zombie;
 use crate::entity::{Entity, EntityBase, EntityKindData, LivingData, nbt as entity_nbt};
 use crate::world::World;
 
@@ -184,6 +195,24 @@ fn construct(class: &str, world: &mut World) -> Option<Entity> {
         "EntityChicken" => Some(new_entity_chicken(world)),
         // src: EntityWolf.java:15-21
         "EntityWolf" => Some(new_entity_wolf(world)),
+        // src: EntityMob.java:6-9
+        "EntityMob" => Some(new_entity_mob(world)),
+        // src: EntityCreeper.java:7-10
+        "EntityCreeper" => Some(new_entity_creeper(world)),
+        // src: EntitySkeleton.java:6-9
+        "EntitySkeleton" => Some(new_entity_skeleton(world)),
+        // src: EntitySpider.java:4-9
+        "EntitySpider" => Some(new_entity_spider(world)),
+        // src: EntityGiantZombie.java:4-12
+        "EntityGiantZombie" => Some(new_entity_giant_zombie(world)),
+        // src: EntityZombie.java:4-9
+        "EntityZombie" => Some(new_entity_zombie(world)),
+        // src: EntitySlime.java:8-15 (its size and jump delay from rand)
+        "EntitySlime" => Some(new_entity_slime(world)),
+        // src: EntityGhast.java:13-18
+        "EntityGhast" => Some(new_entity_ghast(world)),
+        // src: EntityPigZombie.java:10-16
+        "EntityPigZombie" => Some(new_entity_pig_zombie(world)),
         _ => None,
     }
 }

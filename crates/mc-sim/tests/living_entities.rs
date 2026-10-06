@@ -136,14 +136,14 @@ fn pig_drop_item_id() {
 fn animal_can_spawn_on_lit_grass_only() {
     let mut w = world();
     w.set_block(2, 60, 2, 2);
-    let p = pig_at(&mut w, 2.5, 61.0, 2.5);
-    assert!(dispatch::get_can_spawn_here(&p, &mut w));
-    let p = pig_at(&mut w, 4.5, 61.0, 4.5);
-    assert!(!dispatch::get_can_spawn_here(&p, &mut w), "stone");
+    let mut p = pig_at(&mut w, 2.5, 61.0, 2.5);
+    assert!(dispatch::get_can_spawn_here(&mut p, &mut w));
+    let mut p = pig_at(&mut w, 4.5, 61.0, 4.5);
+    assert!(!dispatch::get_can_spawn_here(&mut p, &mut w), "stone");
     // A block in the box: the collision test fails.
     w.set_block(2, 61, 2, 1);
-    let p = pig_at(&mut w, 2.5, 61.0, 2.5);
-    assert!(!dispatch::get_can_spawn_here(&p, &mut w));
+    let mut p = pig_at(&mut w, 2.5, 61.0, 2.5);
+    assert!(!dispatch::get_can_spawn_here(&mut p, &mut w));
 }
 
 /// `heal`: only while alive, capped at 20, restarts half the window.

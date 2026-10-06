@@ -70,25 +70,35 @@ pub mod boat;
 pub mod chicken;
 pub mod cow;
 pub mod creature;
+pub mod creeper;
 pub mod data_watcher;
 pub mod dispatch;
 pub mod egg;
 pub mod falling_sand;
 pub mod fireball;
 pub mod fish;
+pub mod flying;
+pub mod ghast;
+pub mod giant_zombie;
 pub mod item;
 pub mod lightning_bolt;
 pub mod living;
 pub mod minecart;
+pub mod mob;
 pub mod nbt;
 pub mod painting;
 pub mod pathfinding;
 pub mod pig;
+pub mod pig_zombie;
 pub mod player;
 pub mod sheep;
+pub mod skeleton;
+pub mod slime;
 pub mod snowball;
+pub mod spider;
 pub mod tnt_primed;
 pub mod wolf;
+pub mod zombie;
 
 pub use animal::AnimalData;
 pub use arrow::ArrowData;
@@ -97,20 +107,30 @@ pub use boat::BoatData;
 pub use chicken::ChickenData;
 pub use cow::CowData;
 pub use creature::CreatureData;
+pub use creeper::CreeperData;
 pub use egg::EggData;
 pub use falling_sand::FallingSandData;
 pub use fireball::FireballData;
 pub use fish::FishData;
+pub use flying::FlyingData;
+pub use ghast::GhastData;
+pub use giant_zombie::GiantZombieData;
 pub use item::ItemData;
 pub use lightning_bolt::LightningBoltData;
 pub use living::LivingData;
 pub use minecart::MinecartData;
+pub use mob::MobData;
 pub use painting::{EnumArt, PaintingData};
 pub use pig::PigData;
+pub use pig_zombie::PigZombieData;
 pub use sheep::SheepData;
+pub use skeleton::SkeletonData;
+pub use slime::SlimeData;
 pub use snowball::{SnowballData, ThrowableData};
+pub use spider::SpiderData;
 pub use tnt_primed::TntPrimedData;
 pub use wolf::WolfData;
+pub use zombie::ZombieData;
 
 use crate::inventory::InventoryPlayer;
 
@@ -153,30 +173,10 @@ macro_rules! empty_level {
 }
 
 empty_level!(
-    /// `EntityMob` (EntityMob.java).
-    MobData,
     /// `EntityWaterMob` (EntityWaterMob.java).
     WaterMobData,
-    /// `EntityFlying` (EntityFlying.java).
-    FlyingData,
     /// `EntityWeatherEffect` (EntityWeatherEffect.java).
     WeatherEffectData,
-    /// `EntityCreeper` (EntityCreeper.java).
-    CreeperData,
-    /// `EntitySkeleton` (EntitySkeleton.java).
-    SkeletonData,
-    /// `EntitySpider` (EntitySpider.java).
-    SpiderData,
-    /// `EntityZombie` (EntityZombie.java).
-    ZombieData,
-    /// `EntityPigZombie` (EntityPigZombie.java).
-    PigZombieData,
-    /// `EntityGiantZombie` (EntityGiantZombie.java).
-    GiantZombieData,
-    /// `EntitySlime` (EntitySlime.java).
-    SlimeData,
-    /// `EntityGhast` (EntityGhast.java).
-    GhastData,
     /// `EntitySquid` (EntitySquid.java).
     SquidData,
     /// `EntityPlayerSP` (EntityPlayerSP.java).

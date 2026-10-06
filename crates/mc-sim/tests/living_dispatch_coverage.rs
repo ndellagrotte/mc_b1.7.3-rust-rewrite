@@ -144,6 +144,9 @@ fn living_kinds(w: &mut World) -> Vec<Entity> {
     let a = AnimalData::default;
     push(w, &|w, b| K::Mob(LivingData::new(w, b), c(), m()));
     push(w, &|w, b| {
+        // EntityCreeper.entityInit (EntityCreeper.java:12-16).
+        b.data_watcher.add_object(16, WatchValue::Byte(-1));
+        b.data_watcher.add_object(17, WatchValue::Byte(0));
         K::Creeper(LivingData::new(w, b), c(), m(), CreeperData::default())
     });
     push(w, &|w, b| {
@@ -168,9 +171,13 @@ fn living_kinds(w: &mut World) -> Vec<Entity> {
         K::GiantZombie(LivingData::new(w, b), c(), m(), GiantZombieData::default())
     });
     push(w, &|w, b| {
+        // EntitySlime.entityInit (EntitySlime.java:17-20).
+        b.data_watcher.add_object(16, WatchValue::Byte(1));
         K::Slime(LivingData::new(w, b), SlimeData::default())
     });
     push(w, &|w, b| {
+        // EntityGhast.entityInit (EntityGhast.java:20-23).
+        b.data_watcher.add_object(16, WatchValue::Byte(0));
         K::Ghast(
             LivingData::new(w, b),
             FlyingData::default(),

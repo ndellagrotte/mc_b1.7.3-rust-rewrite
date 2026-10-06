@@ -212,6 +212,11 @@ fn all_kinds(w: &mut World) -> Vec<Entity> {
         K::Mob(LivingData::new(w, b), c(), MobData::default())
     });
     push(w, &|w, b| {
+        // EntityCreeper.entityInit (EntityCreeper.java:12-16).
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(-1));
+        b.data_watcher
+            .add_object(17, mc_sim::entity::data_watcher::WatchValue::Byte(0));
         K::Creeper(
             LivingData::new(w, b),
             c(),
@@ -261,9 +266,15 @@ fn all_kinds(w: &mut World) -> Vec<Entity> {
         )
     });
     push(w, &|w, b| {
+        // EntitySlime.entityInit (EntitySlime.java:17-20).
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(1));
         K::Slime(LivingData::new(w, b), SlimeData::default())
     });
     push(w, &|w, b| {
+        // EntityGhast.entityInit (EntityGhast.java:20-23).
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(0));
         K::Ghast(
             LivingData::new(w, b),
             FlyingData::default(),

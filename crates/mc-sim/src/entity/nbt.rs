@@ -22,10 +22,14 @@
 //! | `EntityCow` (`super` only) | EntityCow.java:10-12 | EntityCow.java:14-16 |
 //! | `EntityChicken` (`super` only) | EntityChicken.java:54-56 | EntityChicken.java:58-60 |
 //! | `EntityWolf` | EntityWolf.java:42-52 | EntityWolf.java:54-64 |
+//! | `EntityMob`, `EntitySkeleton`, `EntitySpider` (`super` only); `EntityZombie`, `EntityGiantZombie`, `EntityFlying`, `EntityGhast` (none) | EntityMob.java:61-63, EntitySkeleton.java:55-57, EntitySpider.java:62-64 | EntityMob.java:65-67, EntitySkeleton.java:59-61, EntitySpider.java:66-68 |
+//! | `EntityCreeper` | EntityCreeper.java:18-24 | EntityCreeper.java:26-29 |
+//! | `EntityPigZombie` | EntityPigZombie.java:31-34 | EntityPigZombie.java:36-39 |
+//! | `EntitySlime` | EntitySlime.java:33-36 | EntitySlime.java:38-41 |
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
-//! Every other class's own level (`EntitySquid`'s, the monsters', …) is Phase 2; reaching it records
+//! Every other class's own level (`EntitySquid`'s, …) is Phase 2; reaching it records
 //! `"Entity*.writeEntityToNBT"` / `"Entity*.readEntityFromNBT"` in
 //! [`World::unimplemented_hits`] and writes/reads only the levels above it.
 //! Such entities cannot exist in a world yet (no constructor); a saved one
@@ -167,6 +171,32 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
                 "Owner",
                 Tag::String(super::wolf::get_wolf_owner(e).to_string()),
             );
+        }
+        // src: EntityMob.java:61-63, EntitySkeleton.java:55-57,
+        // EntitySpider.java:62-64 (`super` only); EntityZombie,
+        // EntityGiantZombie, EntityFlying and EntityGhast do not override it.
+        K::Mob(l, ..)
+        | K::Zombie(l, ..)
+        | K::GiantZombie(l, ..)
+        | K::Skeleton(l, ..)
+        | K::Spider(l, ..)
+        | K::Ghast(l, ..) => write_living(l, c),
+        K::Creeper(l, ..) => {
+            write_living(l, c);
+            // src: EntityCreeper.java:18-24
+            if super::creeper::get_powered(e) {
+                n::set_boolean(c, "powered", true);
+            }
+        }
+        K::PigZombie(l, .., d) => {
+            write_living(l, c);
+            // src: EntityPigZombie.java:31-34
+            n::set(c, "Anger", Tag::Short(d.anger_level as i16));
+        }
+        K::Slime(l, _) => {
+            write_living(l, c);
+            // src: EntitySlime.java:33-36
+            n::set(c, "Size", Tag::Int(super::slime::get_slime_size(e) - 1));
         }
         K::PlayerSp(l, p, _) => {
             write_living(l, c);
@@ -356,6 +386,23 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         }
         return Ok(());
     }
+    if let K::Creeper(l, ..) = &mut e.kind {
+        read_living(l, c)?;
+        // src: EntityCreeper.java:26-29
+        let powered = n::get_boolean(c, "powered")?;
+        e.base
+            .data_watcher
+            .update_object(17, super::data_watcher::WatchValue::Byte(i8::from(powered)));
+        return Ok(());
+    }
+    if let K::Slime(l, _) = &mut e.kind {
+        read_living(l, c)?;
+        // src: EntitySlime.java:38-41. vanilla bug (transcribed):
+        // setSlimeSize resets health to size², so a hurt slime reloads healed.
+        let size = n::get_integer(c, "Size")?.wrapping_add(1);
+        super::slime::set_slime_size(e, size);
+        return Ok(());
+    }
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     match &mut e.kind {
         K::Item(d) => {
@@ -378,6 +425,19 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         K::LightningBolt(..) => {}
         // src: EntityCow.java:14-16, EntityChicken.java:58-60 (super only)
         K::Cow(l, ..) | K::Chicken(l, ..) => read_living(l, c)?,
+        // src: EntityMob.java:65-67, EntitySkeleton.java:59-61,
+        // EntitySpider.java:66-68 (`super` only)
+        K::Mob(l, ..)
+        | K::Zombie(l, ..)
+        | K::GiantZombie(l, ..)
+        | K::Skeleton(l, ..)
+        | K::Spider(l, ..)
+        | K::Ghast(l, ..) => read_living(l, c)?,
+        K::PigZombie(l, .., d) => {
+            read_living(l, c)?;
+            // src: EntityPigZombie.java:36-39
+            d.anger_level = n::get_short(c, "Anger")? as i32;
+        }
         K::PlayerSp(l, p, _) => {
             read_living(l, c)?;
             read_player(p, c, (px, py, pz), world)?;
