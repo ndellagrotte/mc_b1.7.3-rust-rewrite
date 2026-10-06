@@ -161,7 +161,7 @@ impl ChunkCoordIntPair {
 }
 
 impl JavaHash for ChunkCoordIntPair {
-    // src: ChunkCoordIntPair.java:16
+    // src: ChunkCoordIntPair.java:16-18 (equals, derived: :20-23)
     fn java_hash(&self) -> i32 {
         Self::chunk_xz_to_int(self.chunk_x_pos, self.chunk_z_pos)
     }
@@ -186,7 +186,7 @@ impl ChunkPosition {
 }
 
 impl JavaHash for ChunkPosition {
-    // src: ChunkPosition.java:23
+    // src: ChunkPosition.java:23-25 (equals, derived: :14-21)
     fn java_hash(&self) -> i32 {
         self.x
             .wrapping_mul(8976890)
@@ -195,7 +195,10 @@ impl JavaHash for ChunkPosition {
     }
 }
 
-/// `ChunkCoordinates`, with vanilla's `hashCode`/`equals`. Its raw
+/// `ChunkCoordinates`, with vanilla's `hashCode`/`equals` (equals, derived:
+/// ChunkCoordinates.java:23-30). Only the `HashMap`-relevant parts are here;
+/// the constructors, `compareChunkCoordinate` and `getSqDistanceTo`
+/// (ChunkCoordinates.java:8-21, 36-55) arrive with their first user. Its raw
 /// `Comparable` (not `Comparable<ChunkCoordinates>`) does not count for
 /// `HashMap`, so [`JavaHash::java_compare`] is `None`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

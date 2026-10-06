@@ -60,7 +60,7 @@ impl JavaRandom {
         self.next_next_gaussian = None;
     }
 
-    /// The scrambled 48-bit state (`Random.seed`), for save/restore and tests.
+    /// The scrambled 48-bit state (`Random.seed`), for inspection and tests.
     pub fn state(&self) -> i64 {
         self.seed
     }

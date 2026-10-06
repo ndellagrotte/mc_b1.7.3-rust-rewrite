@@ -7,6 +7,10 @@
 //! the two Java factories is kept: [`Vec3D::create_vector_helper`] (the
 //! private constructor) turns `-0.0` into `0.0`, [`Vec3D::create_vector`]
 //! (the pool's `setComponents`) does not.
+//!
+//! No counterpart: the pool resets `func_28215_a` / `initialize`
+//! (Vec3D.java:17-24). Not transcribed: `toString` (Vec3D.java:137-139,
+//! `Double.toString` formatting; debug output only). Use `Debug`.
 
 use crate::math;
 
