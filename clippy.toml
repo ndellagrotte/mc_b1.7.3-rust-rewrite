@@ -1,0 +1,26 @@
+# PLAN_v4 D9: the simulation crates must compile for the browser and stay deterministic.
+#
+# This file applies to the whole workspace, which is intentional for now:
+# `mc-client` and `mc-app` add `#[allow(clippy::disallowed_types)]` /
+# `#[allow(clippy::disallowed_methods)]` at the few sites that legitimately
+# touch files or clocks (the native `Storage` implementation, the frame clock,
+# the build script). Every such site is therefore a visible, reviewed choice.
+#
+# The `HashMap`/`HashSet` entries exist because PLAN_v4 §3.4 rule 4 wants every
+# hash-iteration site to be a deliberate choice: lookup-only maps may be
+# allowed locally; anything Java iterates uses `mc_core::JavaHashMap`/`JavaHashSet`.
+disallowed-types = [
+    { path = "std::fs::File", reason = "simulation crates use the Storage trait (PLAN_v4 D9)" },
+    { path = "std::thread::JoinHandle", reason = "simulation is single-threaded (PLAN_v4 D9)" },
+    { path = "std::time::Instant", reason = "time is passed in by the client (PLAN_v4 D9)" },
+    { path = "std::time::SystemTime", reason = "time is passed in by the client (PLAN_v4 D9)" },
+    { path = "std::collections::HashMap", reason = "use BTreeMap, Vec, or mc_core::JavaHashMap where Java iterates (PLAN_v4 §3.4)" },
+    { path = "std::collections::HashSet", reason = "use BTreeSet, Vec, or mc_core::JavaHashSet where Java iterates (PLAN_v4 §3.4)" },
+]
+disallowed-methods = [
+    { path = "std::fs::read", reason = "Storage trait (PLAN_v4 D9)" },
+    { path = "std::fs::write", reason = "Storage trait (PLAN_v4 D9)" },
+    { path = "std::fs::read_dir", reason = "Storage trait (PLAN_v4 D9)" },
+    { path = "std::thread::spawn", reason = "single-threaded simulation (PLAN_v4 D9)" },
+    { path = "std::env::var", reason = "no environment access in simulation crates (PLAN_v4 D9)" },
+]
