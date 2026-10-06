@@ -205,7 +205,7 @@ fn get_flow_vector(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> Vec3D 
                 var11 = get_effective_flow_decay(world, id, var8, y - 1, var10);
                 if var11 >= 0 {
                     // src: BlockFluid.java:127-128
-                    let var12 = var11.wrapping_sub(var6 - 8);
+                    let var12 = var11 - (var6 - 8);
                     var5 = var5.add_vector(
                         (var8 - x).wrapping_mul(var12) as f64,
                         0.0, // (var3 - var3) * var12
@@ -390,6 +390,12 @@ fn check_for_harden(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         }
         if var5 {
             let var6 = world.get_block_metadata(x, y, z);
+            // Lava at metadata 5..7 (and falling lava, 8 and up) matches
+            // neither branch: it stays lava and still fizzes below. Not marked
+            // as a vanilla bug: later versions keep the same rule (only
+            // levels 0..4 harden), so it reads as intended. Pinned by
+            // tick/flat-lava-water-fizz.
+            // src: BlockFluid.java:272-279
             if var6 == 0 {
                 world.set_block_with_notify(x, y, z, OBSIDIAN_ID);
             } else if var6 <= 4 {
@@ -541,10 +547,10 @@ pub mod flowing {
             update_flow(world, id, x, y, z);
         }
 
-        // src: BlockFlowing.java:80-112. vanilla bug: when the block has just
-        // dried up above (var6 = -1, set to air), this still runs, and with a
-        // displaceable block below it places falling fluid of level
-        // -1 + 8 = 7 there.
+        // src: BlockFlowing.java:80-112
+        // vanilla bug: when the block has just dried up (var6 = -1, set to
+        // air above), this still runs, and with a displaceable block below it
+        // places falling fluid of level -1 + 8 = 7 there.
         if liquid_can_displace_block(world, id, x, y - 1, z) {
             if var6 >= 8 {
                 world.set_block_and_metadata_with_notify(x, y - 1, z, id, var6);
@@ -705,7 +711,8 @@ pub mod flowing {
     fn block_blocks_flow(world: &mut World, x: i32, y: i32, z: i32) -> bool {
         let var5 = world.get_block_id(x, y, z);
         // src: BlockFlowing.java:222; Block.doorWood 64, doorSteel 71,
-        // signPost 63, ladder 65, reed 83 (Block.java:655-675)
+        // signPost 63, ladder 65, reed 83 (Block.java:655-675). Pinned by
+        // tick/flat-water-blockers (ladder and reed are not solid materials).
         if var5 != 64 && var5 != 71 && var5 != 63 && var5 != 65 && var5 != 83 {
             if var5 == 0 {
                 false
@@ -805,6 +812,13 @@ pub mod stationary {
         // src: BlockStationary.java:28 (`this.tickRate()`: the still block's,
         // equal to the flowing one's)
         world.schedule_block_update(x, y, z, id - 1, dispatch::tick_rate(id));
+        // Cleared unconditionally, not restored. Not marked as a vanilla bug:
+        // every other `editingBlocks = true` site (BlockRedstoneWire.java:109,
+        // BlockPortal.java:74, ItemDoor.java:62, Teleporter.java:235) sets
+        // blocks without notification, and World.notifyBlockOfNeighborChange
+        // skips neighbours while it is set (World.java:515-520, the only
+        // caller of a fluid's onNeighborBlockChange), so this method never
+        // runs inside one.
         world.editing_blocks = false;
     }
 

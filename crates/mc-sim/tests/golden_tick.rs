@@ -75,6 +75,8 @@ fixtures! {
     tick_flat_lava_fire => "tick" / "flat-lava-fire";
     tick_flat_lava_flow => "tick" / "flat-lava-flow";
     tick_flat_lava_flow_nether => "tick" / "flat-lava-flow-nether";
+    tick_flat_lava_water_fizz => "tick" / "flat-lava-water-fizz";
+    tick_flat_water_blockers => "tick" / "flat-water-blockers";
     tick_flat_water_drain => "tick" / "flat-water-drain";
     tick_flat_water_item_push => "tick" / "flat-water-item-push";
     tick_flat_water_lava_mix => "tick" / "flat-water-lava-mix";

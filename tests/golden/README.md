@@ -674,6 +674,47 @@ see below), `tick/flat-flowing-water` (id 8), `tick/flat-sand-falls` (an
 `entity/flat-item-drop`, `entity/flat-pig-falls`. They exist so a port can verify one block
 and one entity before it has terrain generation.
 
+Fluids (WP-1.6a: `BlockFluid`, `BlockFlowing`, `BlockStationary`), empty world, seed 123,
+`"mob_spawning": "none"`, on the same platform unless stated; all dump `block_box` of the
+pen and `rng_state` every tick:
+
+- `tick/flat-lava-flow`: flowing lava (id 10) at (0, 61, 0), 300 ticks, source removed at
+  t = 100. Pins lava's overworld level step 2 (BlockFlowing.java:23-26), tick rate 30
+  (BlockFluid.java:187-193) and, while it drains, the `World.rand.nextInt(4)` stall on every
+  level rise (BlockFlowing.java:59-62).
+- `tick/flat-lava-flow-nether`: the same with `"dimension": "nether"`, 500 ticks, source
+  removed at t = 240: level step 1, so it spreads 7 blocks; the tick rate stays 30 (b1.7.3
+  has no dimension-dependent tick rate).
+- `tick/flat-water-lava-mix`: water and lava sources meeting, a lava source reached by water,
+  a flower washed out by lava and still lava under a cup that gets water above it at t = 20.
+  Pins `checkForHarden` (obsidian at level 0, cobblestone at 1..4, BlockFluid.java:247-284),
+  `flowIntoBlock`'s fizz for lava (BlockFlowing.java:116-130) and `triggerLavaMixEffects`'
+  2 `World.rand` and 16 `Math.random()` draws (BlockFluid.java:286-293).
+- `tick/flat-lava-water-fizz`: a lava source with still water placed silently 4 blocks away
+  on two sides; the level-6 lava that reaches the water fizzes without hardening
+  (BlockFluid.java:271-279), wakes the water (`setNotStationary`) and is fizzed again as the
+  water wraps it. The ring keeps the water off the inner lava, so nothing hardens and every
+  fizz in the `rng_state` stream comes from this path.
+- `tick/flat-water-drain`: water sources that settle into still water, a source pair over
+  stone that fills the cell between them (BlockFlowing.java:51-57), and two sources removed
+  (t = 40, 80): `setNotStationary` (BlockStationary.java:23-30) and the levels decaying.
+- `tick/flat-water-spread-holes`: a two-layer platform (y = 59, 60) with one-deep pits; the
+  flow-direction choice of `getOptimalFlowDirections` / `calculateFlowCost`
+  (BlockFlowing.java:132-218) with tied, unequal, adjacent and out-of-range (depth 4) pits.
+- `tick/flat-water-blockers`: the two-layer platform with a ladder, a reed (on dirt beside a
+  capped water pit), a wooden door, an iron door and a sign post in the path of a water source,
+  and a ladder set into the floor. Pins `blockBlocksFlow`'s id list (BlockFlowing.java:220-231):
+  the ladder and the reed are not solid materials, yet the water neither washes them out nor
+  falls into the floor ladder; no item is dropped (`rng_state` never moves).
+- `tick/flat-water-item-push` (Tier C): water washes a flower out as an item
+  (`flowIntoBlock` → `dropBlockAsItem`) and the flow pushes the `EntityItem`
+  (`velocityToAddToEntity` / `getFlowVector`, BlockFluid.java:98-185); `entity_state` every
+  tick.
+- `tick/flat-lava-fire`: still lava filling the pen, planks above part of it and a player
+  beside it (random ticks); `BlockStationary.updateTick` climbs and sets fire next to the
+  planks (BlockStationary.java:32-56). Ignored in the Rust runner until `BlockFire` lands:
+  the first difference is line 20 (BlockFire.onBlockAdded's scheduled tick).
+
 Lighting (WP-1.3), empty world, seed 123, only blocks that are inert here (stone, glass,
 glowstone; ice, leaves and still water placed silently and without a player). They use the
 existing `block_box`, `block` and `chunk_digest` dumps; `rng_state` at the end ties them to
