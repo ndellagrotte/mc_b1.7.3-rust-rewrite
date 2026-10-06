@@ -1,0 +1,11 @@
+{"name":"pig-fall-damage","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":100,"mob_spawning":"none",
+ "comment":"WP-2.2. Stone platform y = 60 over -8..8 with the one-high rim. Pig 0 dropped from 20 blocks (bottom at y 81, x 0.5): EntityLiving.fall on landing, ceil(fallDistance - 3) damage (17: dead), the landing sound, hurtTime 10, the death sound and onDeath (raw porkchops), deathTime to 20, setEntityDead. Pig 1 dropped from 8 blocks (y 69, x 4.5): ceil(8 - 3) = 5 damage, survives with 5 health and wanders. rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",81,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x4012000000000000",69,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

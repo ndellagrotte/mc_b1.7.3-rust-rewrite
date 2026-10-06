@@ -1,0 +1,8 @@
+{"name":"pig-drowning","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":500,"mob_spawning":"none",
+ "comment":"WP-2.2. A stone block y 55..61 over -8..8 with a closed 2-deep still-water pool (id 9) at y 59..60 over x, z -3..3 (stone roof at y 61: the pig cannot surface). A pig (id 0) starts on the pool floor at (0.5, 59, 0.5). In water: EntityLiving.updatePlayerActionState's 80 % swim-jump roll (motionY + 0.04), moveEntityWithHeading's water branch (moveFlying 0.02, drag 0.8, -0.02); its eyes stay in the water (isInsideOfMaterial), so air counts down from 300 and at -20 resets to 0 with 8 bubbles (6 rand floats each) and a 2-point hit (attackEntityFrom(null, 2): Math.random attackedAtYaw, the hurt sound's two rand floats), every 20 ticks; the fifth hit kills it, deathTime runs to 20, setEntityDead with 20 explode particles; dropFewItems (rand.nextInt(3)) of raw porkchops (not burning). A second pig (id 1) stands on the stone at (5.5, 62, 0.5) as a dry reference (air stays 300). rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":55,"z0":-8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-3,"y0":59,"z0":-3,"x1":3,"y1":60,"z1":3,"id":9},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",59,"0x3fe0000000000000"],"id":0},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x4016000000000000",62,"0x3fe0000000000000"],"id":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

@@ -63,6 +63,12 @@ fixtures! {
     #[ignore = "EntityPlayer.attackTargetEntityWithCurrentItem (WP-2.5): lines 1-25 match (the pig's and the player's EntityLiving updates, t=0..9); the driver stops at line 26 (t=10 op attack, via player: the player punch). The t=20 direct hit (EntityLiving.attackEntityFrom) is transcribed and pinned by entity/pig-knockback"]
     entity_pig_attacked => "entity" / "pig-attacked";
     entity_pig_falls => "entity" / "pig-falls";
+    entity_pig_wander => "entity" / "pig-wander";
+    entity_pig_drowning => "entity" / "pig-drowning";
+    entity_pig_burning => "entity" / "pig-burning";
+    entity_pig_fall_damage => "entity" / "pig-fall-damage";
+    entity_pig_knockback => "entity" / "pig-knockback";
+    entity_pig_ladder => "entity" / "pig-ladder";
     entity_snowball_egg_flight => "entity" / "snowball-egg-flight";
     entity_tnt_explode => "entity" / "tnt-explode";
 

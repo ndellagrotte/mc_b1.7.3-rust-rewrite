@@ -1,0 +1,11 @@
+{"name":"pig-wander","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":600,"mob_spawning":"none",
+ "comment":"WP-2.2. A pig in a fenced 15x15 pen: stone platform y = 60 over -8..8, its west half (x -8..-1) grass, fences (id 85, 1.5 high) at y = 61 on the rim. EntityCreature.updatePlayerActionState with no target: each tick a 1-in-100 roll leaves a path for EntityLiving's idle AI (2 % new target / random yaw speed, 5 % new yaw speed), and with no path a 1-in-80 (twice) roll runs updateWanderPath: ten random cells, getBlockPathWeight (EntityAnimal: 10 on grass, else the light brightness - 0.5), World.getEntityPathToXYZ (ChunkCache, Pathfinder) to the best; the pig turns at most 30 degrees a tick toward the next point and walks at moveSpeed 0.7 (moveEntityWithHeading, ground friction 0.546, moveFlying 0.1 * 0.16277136 / f^3), jumps when the next point is higher or it is blocked; the fences stop it (the path may lead over a fence: the cell above it is free). The living sound timer draws rand.nextInt(1000) every tick. rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":-1,"y1":60,"z1":8,"id":2},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":85},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":85},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":85},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":85},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",61,"0x3fe0000000000000"],"id":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}

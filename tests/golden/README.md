@@ -1015,7 +1015,7 @@ platform at y = 60 (none needs a player unless it says so):
   again by `doExplosionB` (no fire is left; their scheduled ticks are). Needs `BlockFire` (WP-1.6b, in).
 - `tick/mob-spawner-delay` (player): a mob spawner counting down its 20 ticks (three `World.rand`
   draws per tick); `tick/mob-spawner-spawn` continues into the spawn attempts (needs the
-  `EntityPig` constructor in a port).
+  `EntityPig` constructor, in since WP-2.2, and the spawner's spawn loop in a port).
 - `tick/sign-pops-off`: wall signs and a sign post losing their support (`BlockSign.onNeighborBlockChange`
   drops an `Item.sign`), a wall sign with metadata 0 dropping at the first neighbour change.
 - `save/tile-entities` (Tier S, player): one tile entity of each class in chunk (0, 0), the note
@@ -1061,6 +1061,34 @@ stone platform unless stated, `rng_state` and `entity_state` every tick:
   the harness kind `FishingHook`; the bobber flies into a 5-deep pool, floats and draws its
   bite rolls. `catchFish` needs the rod's right click (WP-2.6) and is unit-tested only
   (`crates/mc-sim/tests/non_living_entities.rs`).
+
+Living entities (WP-2.2: `EntityLiving`, `EntityCreature`, `EntityAnimal`, `EntityPig`,
+`Pathfinder`), empty world, seed 123, `"mob_spawning": "none"`, the stone platform unless
+stated, `rng_state` and `entity_state` every tick (`entity/flat-pig-falls` and
+`entity/pig-falls` above are the pig's first two):
+
+- `entity/pig-wander` (600 ticks): a pig in a fenced pen, half grass: the idle AI's draws,
+  `updateWanderPath` (`getBlockPathWeight` 10 on grass), `getEntityPathToXYZ` paths, walking
+  and jumping (`moveEntityWithHeading` on the ground), the living-sound timer.
+- `entity/pig-drowning`: a pig under a stone roof in a 2-deep pool: swimming, air down to
+  -20, the bubbles and 2-point hits every 20 ticks, death, the raw porkchop drop; a second
+  pig on dry stone keeps its air.
+- `entity/pig-burning`: three pigs in fire pits on netherrack: fire contact and the 10-tick
+  hurt-resistance window, death, cooked porkchops (`fire > 0`); the pig spawned inside the
+  fire never gets `fire = 300` (Entity.java:522-532), the two that fall in do.
+- `entity/pig-fall-damage`: pigs dropped 20 and 8 blocks: `EntityLiving.fall` (17 points:
+  dead, drops; 5 points: survives).
+- `entity/pig-knockback`: the `attack` op's direct branch on a pig, by another pig, by itself
+  (the `Math.random()` direction loop), with no attacker (`Math.random()` `attackedAtYaw`),
+  inside and after the resistance window, to death; a hit on the dying pig returns false.
+- `entity/pig-ladder`: a pig falls onto a ladder column: the ladder clamps of
+  `moveEntityWithHeading` (`fallDistance` reset, no fall damage).
+
+Not pinned by a fixture: `faceEntity` toward a player (`EntityLiving.updatePlayerActionState`'s
+2 % look-at roll reads the player's `getEyeHeight`, `EntityPlayer`'s override, WP-2.5;
+`entity/pig-attacked` diverges at its player punch before the pig looks at the player), and
+paths to an entity (`getPathToEntity`: no b1.7.3 animal has a target). `Pathfinder` is
+unit-tested on hand-built worlds (`crates/mc-sim/tests/pathfinding.rs`).
 
 Vanilla behaviour these fixtures pin down:
 

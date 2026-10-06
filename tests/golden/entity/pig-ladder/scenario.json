@@ -1,0 +1,12 @@
+{"name":"pig-ladder","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":200,"mob_spawning":"none",
+ "comment":"WP-2.2. Stone platform y = 60 over -8..8 with the one-high rim; a stone wall x -1..1, y 61..75, z 1 and a ladder column (id 65, meta 2: its 0.125 box against the wall at z + 1) at x 0, y 61..74, z 0. A pig (id 0) dropped at (0.5, 80, 0.4), just clear of the ladder box: it falls 5 blocks, then EntityLiving.isOnLadder (the block at the feet) holds in moveEntityWithHeading's air branch: motion clamped to +-0.15 horizontally and >= -0.15 down, fallDistance reset every tick, so it lands with no fall damage (EntityLiving.fall: ceil(0 - 3) <= 0); pushed into the wall while on the ladder (isCollidedHorizontally) it climbs (motionY = 0.2). Then it wanders off. rng_state and entity_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-8,"x1":8,"y1":61,"z1":-8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":8,"x1":8,"y1":61,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":61,"z0":-7,"x1":-8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":8,"y0":61,"z0":-7,"x1":8,"y1":61,"z1":7,"id":1},
+        {"t":0,"op":"fill","x0":-1,"y0":61,"z0":1,"x1":1,"y1":75,"z1":1,"id":1},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":0,"x1":0,"y1":74,"z1":0,"id":65,"meta":2},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",80,"0x3fd999999999999a"],"id":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"}]}
