@@ -1,5 +1,6 @@
-//! `ContainerChest` (ContainerChest.java): a chest's (or double chest's,
-//! or chest minecart's) window.
+//! `ContainerChest` (ContainerChest.java): a chest's (or double chest's)
+//! window. A chest minecart's window is not yet reachable: `InventoryRef`
+//! has no entity variant.
 //!
 //! Slots: the chest's `numRows * 9` first, then the main inventory
 //! (`InventoryPlayer` slots 9–35), then the hotbar (0–8).
@@ -14,7 +15,7 @@ use crate::world::World;
 /// `new ContainerChest(playerInventory, chestInventory)`: `numRows` is the
 /// chest inventory's size / 9; the player's rows are shifted down by
 /// `(numRows − 4) * 18` pixels.
-// src: ContainerChest.java:7-29
+// src: ContainerChest.java:7-30
 pub fn new_container_chest(world: &World, var2: InventoryRef) -> Container {
     let mut c = Container::empty(ContainerKind::Chest {
         lower_chest_inventory: var2.clone(),
@@ -62,7 +63,7 @@ impl Container {
     /// chest; the slot is emptied or `onSlotChanged`. Unlike the other
     /// containers it returns the copy even when nothing moved and never
     /// calls `onPickupFromSlot`.
-    // src: ContainerChest.java:31-56
+    // src: ContainerChest.java:36-56
     pub(crate) fn chest_get_stack_in_slot(
         &mut self,
         world: &mut World,

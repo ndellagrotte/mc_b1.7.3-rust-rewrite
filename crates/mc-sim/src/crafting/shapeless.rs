@@ -15,7 +15,7 @@ pub struct ShapelessRecipes {
 
 impl ShapelessRecipes {
     /// `new ShapelessRecipes(output, items)`.
-    // src: ShapelessRecipes.java:10-13
+    // src: ShapelessRecipes.java:11-14
     pub fn new(output: ItemStack, items: Vec<ItemStack>) -> ShapelessRecipes {
         ShapelessRecipes {
             recipe_output: output,
@@ -24,7 +24,7 @@ impl ShapelessRecipes {
     }
 
     /// `getRecipeOutput()`.
-    // src: ShapelessRecipes.java:15-17
+    // src: ShapelessRecipes.java:16-18
     pub fn get_recipe_output(&self) -> &ItemStack {
         &self.recipe_output
     }
@@ -35,7 +35,7 @@ impl ShapelessRecipes {
     /// (`ArrayList.remove(Object)`: `ItemStack` keeps `Object.equals`, so
     /// the element found is the one removed). A cell nothing takes, or an
     /// ingredient left over, fails.
-    // src: ShapelessRecipes.java:19-46
+    // src: ShapelessRecipes.java:20-47
     pub fn matches(&self, var1: &InventoryCrafting) -> bool {
         let mut var2: Vec<ItemStack> = self.recipe_items.clone();
         for var3 in 0..3 {
@@ -59,13 +59,13 @@ impl ShapelessRecipes {
     }
 
     /// `getCraftingResult(grid)`: `recipeOutput.copy()`.
-    // src: ShapelessRecipes.java:48-50
+    // src: ShapelessRecipes.java:49-51
     pub fn get_crafting_result(&self, _var1: &InventoryCrafting) -> ItemStack {
         self.recipe_output.copy()
     }
 
     /// `getRecipeSize()`: the ingredient count.
-    // src: ShapelessRecipes.java:52-54
+    // src: ShapelessRecipes.java:53-55
     pub fn get_recipe_size(&self) -> i32 {
         self.recipe_items.len() as i32
     }

@@ -198,7 +198,7 @@ impl Container {
             InventoryRef::CraftMatrix => {
                 let r = self.craft_matrix_mut().decr_stack_size(idx, n);
                 if r.is_some() {
-                    // src: InventoryCrafting.java:44, :52 (not on the null path)
+                    // src: InventoryCrafting.java:42, :50 (not on the null path)
                     self.on_craft_matrix_changed(world, player);
                 }
                 r
@@ -429,7 +429,7 @@ impl Container {
     /// copies of the slots whose stack changed (and would send them to the
     /// `crafters`, never any in singleplayer). `ContainerFurnace` then
     /// records the furnace's three timers.
-    // src: Container.java:22-36, ContainerFurnace.java:26-47
+    // src: Container.java:22-36, ContainerFurnace.java:28-49
     pub fn update_crafting_results(&mut self, world: &mut World, player: &mut Entity) {
         for var1 in 0..self.slots.len() {
             let var2 = self.slot_get_stack(world, player, var1);
@@ -685,7 +685,7 @@ impl Container {
     /// drops and clears its grid, and `ContainerWorkbench` (not on a
     /// multiplayer world) drops its grid's stacks without clearing it
     /// (vanilla: the container is discarded right after).
-    // src: Container.java:152-159, ContainerPlayer.java:48-59, ContainerWorkbench.java:39-50
+    // src: Container.java:152-159, ContainerPlayer.java:48-59, ContainerWorkbench.java:43-54
     pub fn on_craft_gui_closed(&mut self, world: &mut World, player: &mut Entity) {
         let var2 = inventory_of(player).get_item_stack();
         if var2.is_some() {
@@ -723,7 +723,7 @@ impl Container {
     /// `onCraftMatrixChanged(inventory)`: the player and workbench
     /// containers set their result to `CraftingManager.findMatchingRecipe`
     /// of their grid; the base method runs `updateCraftingResults`.
-    // src: Container.java:161-163, ContainerPlayer.java:44-46, ContainerWorkbench.java:35-37
+    // src: Container.java:161-163, ContainerPlayer.java:44-46, ContainerWorkbench.java:39-41
     pub fn on_craft_matrix_changed(&mut self, world: &mut World, player: &mut Entity) {
         match &mut self.kind {
             ContainerKind::Player {
@@ -771,7 +771,7 @@ impl Container {
     /// `updateProgressBar(id, value)`: empty, except `ContainerFurnace`,
     /// which writes the furnace's cook time (0), burn time (1) or current
     /// item burn time (2) (the network window-property packet).
-    // src: Container.java:176-177, ContainerFurnace.java:49-62
+    // src: Container.java:176-177, ContainerFurnace.java:51-64
     pub fn update_progress_bar(&mut self, world: &mut World, var1: i32, var2: i32) {
         if let ContainerKind::Furnace { furnace, .. } = self.kind
             && let Some(TileEntityKindData::Furnace(f)) =
@@ -800,8 +800,8 @@ impl Container {
     /// workbench while the block is still a workbench and the player within
     /// 8 blocks of its centre; the chest, furnace and dispenser through
     /// their inventory's `canInteractWith`.
-    // src: Container.java:190, ContainerPlayer.java:61-63, ContainerWorkbench.java:52-58,
-    // ContainerChest.java:27-29, ContainerFurnace.java:64-66, ContainerDispenser.java:23-25
+    // src: Container.java:190, ContainerPlayer.java:61-63, ContainerWorkbench.java:56-62,
+    // ContainerChest.java:32-34, ContainerFurnace.java:66-68, ContainerDispenser.java:29-31
     pub fn is_usable_by_player(&self, world: &mut World, player: &Entity) -> bool {
         match &self.kind {
             ContainerKind::Player { .. } => true,
@@ -905,7 +905,7 @@ impl Container {
 
     /// The shared body of the `getStackInSlot` overrides of the player,
     /// workbench and furnace containers (ContainerPlayer.java:65-95,
-    /// ContainerWorkbench.java:60-90, ContainerFurnace.java:68-98): `range`
+    /// ContainerWorkbench.java:64-94, ContainerFurnace.java:70-100): `range`
     /// picks `mergeItemStack`'s arguments from the slot number. The slot's
     /// object is moved by `mergeItemStack`; emptied, the slot gets
     /// `putStack(null)`, else `onSlotChanged`; nothing moved returns null,

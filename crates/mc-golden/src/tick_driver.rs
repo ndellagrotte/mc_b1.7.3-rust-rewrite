@@ -839,11 +839,21 @@ fn open_container<'h>(
         let (kind, pos) = spec
             .split_once(" at ")
             .ok_or_else(|| bad(&format!("unknown container {spec:?}")))?;
+        // TickScenario.java's AT regex takes each coordinate as
+        // `-?[0-9]+` only: refuse a leading '+' (or anything else
+        // `str::parse` would accept) so both harnesses reject the same specs.
         let xyz: Vec<i32> = pos
             .split(',')
-            .map(|v| v.parse::<i32>())
-            .collect::<Result<_, _>>()
-            .map_err(|_| bad(&format!("unknown container {spec:?}")))?;
+            .map(|v| {
+                let digits = v.strip_prefix('-').unwrap_or(v);
+                if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) {
+                    v.parse::<i32>().ok()
+                } else {
+                    None
+                }
+            })
+            .collect::<Option<_>>()
+            .ok_or_else(|| bad(&format!("unknown container {spec:?}")))?;
         let [x, y, z] = xyz[..] else {
             return Err(bad(&format!("unknown container {spec:?}")));
         };

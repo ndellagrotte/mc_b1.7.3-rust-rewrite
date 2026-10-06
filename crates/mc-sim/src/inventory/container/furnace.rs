@@ -14,7 +14,7 @@ use crate::world::World;
 use crate::world::tile_entity::TileEntityRef;
 
 /// `new ContainerFurnace(playerInventory, furnace)`.
-// src: ContainerFurnace.java:3-24
+// src: ContainerFurnace.java:9-26
 pub fn new_container_furnace(var2: TileEntityRef) -> Container {
     let mut c = Container::empty(ContainerKind::Furnace {
         furnace: var2,
@@ -50,7 +50,7 @@ impl Container {
     /// `ContainerFurnace.getStackInSlot(i)` (shift-click): the output to the
     /// player's slots from the end, the main inventory to the hotbar, the
     /// hotbar to the main inventory, input and fuel to both.
-    // src: ContainerFurnace.java:68-98
+    // src: ContainerFurnace.java:70-100
     pub(crate) fn furnace_get_stack_in_slot(
         &mut self,
         world: &mut World,

@@ -5,7 +5,7 @@
 //! (the container) is implicit: the methods here are the data part, and
 //! the container's `IInventory` dispatch runs
 //! `eventHandler.onCraftMatrixChanged(this)` after `decrStackSize` and
-//! `setInventorySlotContents`, as InventoryCrafting.java:44, :52, :61 do.
+//! `setInventorySlotContents`, as InventoryCrafting.java:42, :50, :60 do.
 
 use crate::item::ItemStack;
 

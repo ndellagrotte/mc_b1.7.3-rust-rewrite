@@ -10,7 +10,7 @@ use crate::inventory::slot::Slot;
 use crate::world::tile_entity::TileEntityRef;
 
 /// `new ContainerDispenser(playerInventory, dispenser)`.
-// src: ContainerDispenser.java:3-21
+// src: ContainerDispenser.java:6-27
 pub fn new_container_dispenser(var2: TileEntityRef) -> Container {
     let mut c = Container::empty(ContainerKind::Dispenser {
         tile_entity_dispenser: var2,

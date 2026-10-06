@@ -248,7 +248,7 @@ fn clicking_outside_the_window_drops() {
 /// `onCraftGuiClosed`: the held stack and (player container) the grid are
 /// dropped and the grid cleared, which recomputes the result
 /// (ContainerPlayer.java:48-59); the workbench drops its grid but keeps it
-/// (ContainerWorkbench.java:39-50).
+/// (ContainerWorkbench.java:43-54).
 #[test]
 fn closing_drops_the_grid() {
     let mut w = empty_world(3);

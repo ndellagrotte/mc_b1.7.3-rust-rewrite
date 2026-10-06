@@ -14,7 +14,7 @@ use crate::world::World;
 
 /// `new ContainerWorkbench(inventory, world, x, y, z)`: the slots, then
 /// `onCraftMatrixChanged` (the empty grid's result, null).
-// src: ContainerWorkbench.java:3-33
+// src: ContainerWorkbench.java:11-37
 pub fn new_container_workbench(var3: i32, var4: i32, var5: i32) -> Container {
     let mut c = Container::empty(ContainerKind::Workbench {
         craft_matrix: InventoryCrafting::new(3, 3),
@@ -45,7 +45,7 @@ pub fn new_container_workbench(var3: i32, var4: i32, var5: i32) -> Container {
     for var6 in 0..9 {
         c.add_slot(Slot::new(InventoryRef::Player, var6, 8 + var6 * 18, 142));
     }
-    // src: ContainerWorkbench.java:32: onCraftMatrixChanged(craftMatrix)
+    // src: ContainerWorkbench.java:36: onCraftMatrixChanged(craftMatrix)
     if let ContainerKind::Workbench {
         craft_matrix,
         craft_result,
@@ -61,7 +61,7 @@ pub fn new_container_workbench(var3: i32, var4: i32, var5: i32) -> Container {
 impl Container {
     /// `ContainerWorkbench.getStackInSlot(i)` (shift-click): as the player
     /// container's with the workbench's slot numbers.
-    // src: ContainerWorkbench.java:60-90
+    // src: ContainerWorkbench.java:64-94
     pub(crate) fn workbench_get_stack_in_slot(
         &mut self,
         world: &mut World,
