@@ -667,11 +667,14 @@ the seed for `check-sensitivity.sh`:
 - `light/skylight-column`: a 9×9 stone slab at y = 60 (`fill`, t = 0); a 4-high pillar on it
   at (2, 61..64, 2) placed at t = 5 and removed top down at t = 20 (`set_block`). The slab
   queues more light updates than one `updatingLighting` call runs (the port's replay:
-  631 left after t = 0, empty after t = 4), so the per-tick `block_box` dumps at t = 0…3 pin
-  the budget; `chunk_digest` with `full` on chunk (0, 0) at the end.
+  631 left after t = 0, empty after t = 4), so the per-tick `block_box` dumps at t = 0…3 show
+  that the queue does not drain in one tick (they do not pin the exact budget: 498 or 500
+  updates per call still pass here); `chunk_digest` with `full` on chunk (0, 0) at the end.
 - `light/blocklight-glowstone`: glowstone at (0, 62, 0) in a stone pen with a partition and a
   still-water wall (`set_block_silent` / `fill` of id 9), placed at t = 0 and removed at
-  t = 20; propagation and attenuation through air and water, and the light's removal.
+  t = 20; propagation and attenuation through air and water, and the light's removal. This is
+  the fixture that pins the exact 499-per-call budget: with 498 or 500 updates per call its
+  t = 0 `blocks_full` block light differs.
 - `light/chunk-border`: a stone roof over x = 14..18 at y = 64 and glowstone at (15, 62, 6):
   sky and block light across the chunk (0, 0) | (1, 0) edge; digests of both chunks (`full`
   for (1, 0)).
@@ -694,4 +697,6 @@ Vanilla behaviour these fixtures pin down:
   is first offered to the five newest queued updates of the same type, which may absorb it by
   growing their box (`MetadataChunkBlock.func_866_a`, World.java:1702-1713), and it is
   dropped when its box's centre column is not loaded (World.java:1696-1699). Light therefore
-  spreads over several ticks after large edits (`light/skylight-column`).
+  spreads over several ticks after large edits (`light/skylight-column` shows the queue
+  outliving one tick; `light/blocklight-glowstone` pins the exact budget, failing at 498 and
+  at 500 updates per call).

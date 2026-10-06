@@ -160,18 +160,20 @@ fn more_than_a_million_updates_clear_the_queue() {
     assert!(w.lighting_to_update().is_empty(), "size > 1000000 clears");
 }
 
-/// `tests/golden/light/skylight-column` pins the budget only if its t = 0
-/// fill leaves work for later ticks: replay the ops and check the queue
-/// after each tick; the fixture's t = 0 and t = 1 sky light dumps differ.
+/// `tests/golden/light/skylight-column` shows that the light queue does not
+/// drain in one tick (it does not pin the exact budget: 498 or 500 updates
+/// per call still match it; `light/blocklight-glowstone` is the fixture that
+/// fails at either). Replay the ops and check the queue after each tick; the
+/// fixture's t = 0 and t = 1 sky light dumps differ.
 #[test]
 fn skylight_column_fill_does_not_drain_in_one_tick() {
     let mut w = empty_world(Dimension::Surface, 123);
     for (x, z) in [(-4, -4), (4, 4)] {
         preload(&mut w, x, z);
     }
-    for (x, z) in [(2, 2); 8] {
-        preload(&mut w, x, z);
-    }
+    // The driver preloads around each op position; the eight pillar ops all
+    // sit at (2, y, 2), so one preload covers them.
+    preload(&mut w, 2, 2);
     for x in -4..=4 {
         for z in -4..=4 {
             w.set_block_and_metadata(x, 60, z, 1, 0);
