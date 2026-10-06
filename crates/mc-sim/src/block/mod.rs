@@ -1029,44 +1029,7 @@ mod ids {
     pub const TORCH_REDSTONE_ACTIVE: i32 = 76;
 }
 
-/// `Item.<field>.shiftedIndex` (`256 + id`, Item.java:124) of the items blocks
-/// drop. The item table itself is WP-1.2; these are its ids, cited.
-mod items {
-    /// `Item.coal` (Item.java:281).
-    pub const COAL: i32 = 256 + 7;
-    /// `Item.diamond` (Item.java:282).
-    pub const DIAMOND: i32 = 256 + 8;
-    /// `Item.silk` (Item.java:305).
-    pub const SILK: i32 = 256 + 31;
-    /// `Item.seeds` (Item.java:313).
-    pub const SEEDS: i32 = 256 + 39;
-    /// `Item.wheat` (Item.java:314).
-    pub const WHEAT: i32 = 256 + 40;
-    /// `Item.flint` (Item.java:336).
-    pub const FLINT: i32 = 256 + 62;
-    /// `Item.sign` (Item.java:341).
-    pub const SIGN: i32 = 256 + 67;
-    /// `Item.doorWood` (Item.java:342).
-    pub const DOOR_WOOD: i32 = 256 + 68;
-    /// `Item.doorSteel` (Item.java:348).
-    pub const DOOR_STEEL: i32 = 256 + 74;
-    /// `Item.redstone` (Item.java:349).
-    pub const REDSTONE: i32 = 256 + 75;
-    /// `Item.snowball` (Item.java:350).
-    pub const SNOWBALL: i32 = 256 + 76;
-    /// `Item.clay` (Item.java:355).
-    pub const CLAY: i32 = 256 + 81;
-    /// `Item.reed` (Item.java:356).
-    pub const REED: i32 = 256 + 82;
-    /// `Item.lightStoneDust` (Item.java:366).
-    pub const LIGHT_STONE_DUST: i32 = 256 + 92;
-    /// `Item.dyePowder` (Item.java:369).
-    pub const DYE_POWDER: i32 = 256 + 95;
-    /// `Item.bed` (Item.java:373).
-    pub const BED: i32 = 256 + 99;
-    /// `Item.redstoneRepeater` (Item.java:374).
-    pub const REDSTONE_REPEATER: i32 = 256 + 100;
-}
+use crate::item::ids as items;
 
 /// `idDropped(meta, rand)`: the item or block id a broken block drops; 0 or
 /// a negative id means nothing (`dropBlockAsItemWithChance` drops only ids

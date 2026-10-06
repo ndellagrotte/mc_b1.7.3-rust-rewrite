@@ -51,6 +51,46 @@ pub use tool_material::EnumToolMaterial;
 
 use crate::block::{BlockDef, Material};
 
+/// `Item.<field>.shiftedIndex` (`256 + id`, Item.java:124) of the items other
+/// modules name (the block drop table, `idDropped`). The full table is
+/// [`ITEMS`]; [`tests`] pins each value against it.
+pub mod ids {
+    /// `Item.coal` (Item.java:281).
+    pub const COAL: i32 = 256 + 7;
+    /// `Item.diamond` (Item.java:282).
+    pub const DIAMOND: i32 = 256 + 8;
+    /// `Item.silk` (Item.java:305).
+    pub const SILK: i32 = 256 + 31;
+    /// `Item.seeds` (Item.java:313).
+    pub const SEEDS: i32 = 256 + 39;
+    /// `Item.wheat` (Item.java:314).
+    pub const WHEAT: i32 = 256 + 40;
+    /// `Item.flint` (Item.java:336).
+    pub const FLINT: i32 = 256 + 62;
+    /// `Item.sign` (Item.java:341).
+    pub const SIGN: i32 = 256 + 67;
+    /// `Item.doorWood` (Item.java:342).
+    pub const DOOR_WOOD: i32 = 256 + 68;
+    /// `Item.doorSteel` (Item.java:348).
+    pub const DOOR_STEEL: i32 = 256 + 74;
+    /// `Item.redstone` (Item.java:349).
+    pub const REDSTONE: i32 = 256 + 75;
+    /// `Item.snowball` (Item.java:350).
+    pub const SNOWBALL: i32 = 256 + 76;
+    /// `Item.clay` (Item.java:355).
+    pub const CLAY: i32 = 256 + 81;
+    /// `Item.reed` (Item.java:356).
+    pub const REED: i32 = 256 + 82;
+    /// `Item.lightStoneDust` (Item.java:366).
+    pub const LIGHT_STONE_DUST: i32 = 256 + 92;
+    /// `Item.dyePowder` (Item.java:369).
+    pub const DYE_POWDER: i32 = 256 + 95;
+    /// `Item.bed` (Item.java:373).
+    pub const BED: i32 = 256 + 99;
+    /// `Item.redstoneRepeater` (Item.java:374).
+    pub const REDSTONE_REPEATER: i32 = 256 + 100;
+}
+
 /// A Java exception a data method can throw on some inputs (out-of-range
 /// damage values index name tables). Returned instead of a value so callers
 /// can reproduce exactly where vanilla would crash.
@@ -689,4 +729,38 @@ pub fn all_items() -> impl Iterator<Item = &'static ItemDef> {
 /// The highest id with a non-null `Item.itemsList` entry (2257, `recordCat`).
 pub fn max_item_id() -> i32 {
     table::RECORD_BASE + RECORDS.len() as i32 - 1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Each named id keeps the value `block::id_dropped` used before the
+    /// constants moved here, and is the `shiftedIndex` of a table row.
+    #[test]
+    fn named_ids_unchanged_and_in_table() {
+        let expected = [
+            (ids::COAL, 263),
+            (ids::DIAMOND, 264),
+            (ids::SILK, 287),
+            (ids::SEEDS, 295),
+            (ids::WHEAT, 296),
+            (ids::FLINT, 318),
+            (ids::SIGN, 323),
+            (ids::DOOR_WOOD, 324),
+            (ids::DOOR_STEEL, 330),
+            (ids::REDSTONE, 331),
+            (ids::SNOWBALL, 332),
+            (ids::CLAY, 337),
+            (ids::REED, 338),
+            (ids::LIGHT_STONE_DUST, 348),
+            (ids::DYE_POWDER, 351),
+            (ids::BED, 355),
+            (ids::REDSTONE_REPEATER, 356),
+        ];
+        for (id, value) in expected {
+            assert_eq!(id, value);
+            assert_eq!(item(id).map(|d| d.shifted_index), Some(id));
+        }
+    }
 }
