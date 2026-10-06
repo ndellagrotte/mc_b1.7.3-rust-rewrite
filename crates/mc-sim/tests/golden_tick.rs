@@ -65,7 +65,7 @@ fixtures! {
     tick_block_item_placement => "tick" / "block-item-placement";
     tick_cake_eat => "tick" / "cake-eat";
     tick_door_iron_powered => "tick" / "door-iron-powered";
-    #[ignore = "needs McRegionChunkLoader (WP-1.9b): the driver refuses \"save_format\": \"mcregion\" before line 1. The chest loot and spawner mob the save pins are checked against this fixture by tests/population.rs"]
+    // Tier S (a `save` op): listed in golden_save.rs's COVERED_IN_GOLDEN_TICK.
     tick_dungeon_chest_save => "tick" / "dungeon-chest-save";
     tick_door_support_removed => "tick" / "door-support-removed";
     tick_door_upper_powered => "tick" / "door-upper-powered";

@@ -4,7 +4,11 @@
 //!    `mc_golden::world_read_driver`), and every tick fixture with a `save`
 //!    op (`save/roundtrip-seed-123`, `save/tile-entities`, through
 //!    `mc_golden::tick_driver`); [`every_tier_s_fixture_has_a_test`] keeps
-//!    the list complete.
+//!    the list complete. `tick/dungeon-chest-save` (WP-1.7) is a tick-area
+//!    fixture with a `save` op, so its test is
+//!    `tests/golden_tick.rs::tick_dungeon_chest_save` (listed in
+//!    [`COVERED_IN_GOLDEN_TICK`]; one test per fixture, so two test binaries
+//!    never write the same `actual.jsonl`).
 //! 2. PLAN_v4 §4.4 item 4: `testWorld` opened through `SaveOldDir` on a
 //!    `Storage`, chunk (0, −4) digests equal to the oracle's `loaded` line,
 //!    the chest at (9, 64, −61) holds 2 planks and 4 sticks.
@@ -78,13 +82,16 @@ const COVERED: &[(&str, &str)] = &[
     ("save", "tile-entities"),
 ];
 
+/// Tier S fixtures in the `tick` area: `tests/golden_tick.rs` must list them
+/// (its own coverage check), so they are run there and not again here.
+const COVERED_IN_GOLDEN_TICK: &[(&str, &str)] = &[("tick", "dungeon-chest-save")];
+
 #[test]
 fn save_testworld() {
     check_world_read("testworld");
 }
 
 #[test]
-#[ignore = "needs population (WP-1.7): first diff line 10 (t=4 chunk_nbt 0,0, field Level.Blocks: the oracle's chunk (0,0) is populated); lines 1-9 (preload, op lines, level_dat, world_info, the four region headers) match"]
 fn save_roundtrip_seed_123() {
     check_tick("save", "roundtrip-seed-123");
 }
@@ -145,7 +152,7 @@ fn every_tier_s_fixture_has_a_test() {
             let area = dir.parent().unwrap().file_name().unwrap().to_str().unwrap();
             let name = dir.file_name().unwrap().to_str().unwrap();
             assert!(
-                COVERED.contains(&(area, name)),
+                COVERED.contains(&(area, name)) || COVERED_IN_GOLDEN_TICK.contains(&(area, name)),
                 "{area}/{name} has no test in golden_save.rs"
             );
         }

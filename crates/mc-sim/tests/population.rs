@@ -5,7 +5,7 @@
 //!    (`WorldGenDungeons.pickCheckLootItem`) and the spawner's mob
 //!    (`pickMobSpawner`), which reach the worldgen digest only as blocks,
 //!    against the `TileEntities` the oracle saved in `tick/dungeon-chest-save`
-//!    (whose own Rust test waits for the save path, WP-1.9b).
+//!    (whose own Rust test is `tests/golden_tick.rs::tick_dungeon_chest_save`).
 //! 2. The two `nether-seed-123-order-*` fixtures really pin the hellRNG
 //!    load-order quirk (their populated digests differ).
 //! 3. `BlockSand.fallInstantly` is set only during population.
