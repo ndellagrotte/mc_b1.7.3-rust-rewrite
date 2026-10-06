@@ -1175,8 +1175,11 @@ fn save_list_rename_delete() {
 /// A stored entity of a class the port cannot construct (the first living
 /// `EntityList` class without a constructor yet: the cow was until WP-2.3):
 /// its id and `EntityLiving`'s `Math.random()` draws are consumed, the gap
-/// recorded, and a re-save writes the compound back. Vacuous once every
-/// mob is constructible.
+/// recorded, and a re-save writes the compound back. Once every living
+/// class is constructible the gap path (`FromNbt::Gap`) is unreachable with
+/// a living id (an unknown id takes the `Skipped` path, EntityList.java:49,
+/// a different mechanism), so the test fails loudly to be rewritten or
+/// removed with that path.
 #[test]
 fn unconstructible_entities_are_kept() {
     let Some(name) = mc_sim::save::entity_list::MAPPINGS
@@ -1187,7 +1190,11 @@ fn unconstructible_entities_are_kept() {
             mc_sim::save::entity_list::create_entity_in_world(n, &mut empty_world()).is_none()
         })
     else {
-        return;
+        panic!(
+            "every living EntityList class is constructible: rewrite this test \
+             (a non-living class still without a constructor) or remove it with \
+             the FromNbt::Gap path"
+        );
     };
     let store = store_over(MemoryStorage::default());
     let mut a = build_saved_world(&store, "w");

@@ -723,6 +723,9 @@ pub fn find_player_to_attack(e: &Entity, world: &World) -> Option<i32> {
 // src: EntityWolf.java:304-324
 pub fn attack_entity(e: &mut Entity, world: &mut World, target: i32, var2: f32) {
     let Some(var1) = EntityView::of(world, target) else {
+        // EntityCreature calls this only with a live target in its slot;
+        // the Java's nextInt(10) below would be skipped here.
+        world.note_unimplemented("EntityWolf.attackEntity: the target is out of its slot");
         return;
     };
     if var2 > 2.0 && var2 < 6.0 && e.base.rand.next_int_bounded(10) == 0 {
