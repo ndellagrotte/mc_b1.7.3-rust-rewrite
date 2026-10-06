@@ -16,9 +16,9 @@
 //!   `World::unimplemented_hits` under `*.method`: nothing of its own when
 //!   the kind inherits `Entity`'s body or the pair is in
 //!   [`dispatch::TRANSCRIBED`], otherwise `"Class.method"`; in both cases it
-//!   may also record ancestors of that class that declare the method (the
-//!   partial `EntityLiving.onUpdate` / `onEntityUpdate`, which an arm reaches
-//!   through `super`), and nothing else.
+//!   may also record ancestors of that class that declare the method (an
+//!   arm reaches them through `super`), and nothing else. The methods
+//!   `EntityLiving` adds are checked by `living_dispatch_coverage.rs`.
 
 use std::collections::{BTreeMap, BTreeSet};
 

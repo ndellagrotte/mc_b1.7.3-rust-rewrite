@@ -17,11 +17,17 @@
 //! point, the call must record `"Class.method"` of the class that defines the
 //! override the kind inherits, unless that pair is in [`TRANSCRIBED`], in
 //! which case it must record nothing of its own; it may also record the
-//! partial bodies of that class's ancestors it runs (`EntityLiving.onUpdate`
-//! records the part of itself it does not transcribe yet). Kinds that inherit
+//! overrides of that class's ancestors it runs. Kinds that inherit
 //! `Entity`'s body record nothing. **A task that transcribes an override
 //! replaces its arm and adds the method to its class's row of
 //! [`TRANSCRIBED`]** (block dispatch convention, `crate::block::dispatch`).
+//!
+//! The methods `EntityLiving` and `EntityCreature` add (`onLivingUpdate`,
+//! `updatePlayerActionState`, the sound and drop hooks, …) follow the same
+//! scheme in the WP-2.2 section at the end of this file, with their own
+//! registries [`LIVING_TRANSCRIBED`] and [`LIVING_NOT_DISPATCHED`], checked
+//! by `tests/living_dispatch_coverage.rs` against
+//! `tests/data/living_overrides.txt` (`tests/data/gen_living_overrides.sh`).
 
 use mc_core::{Aabb, Vec3D};
 
