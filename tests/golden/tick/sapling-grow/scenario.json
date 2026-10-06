@@ -1,0 +1,13 @@
+{"name":"sapling-grow","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":2000,"mob_spawning":"none","comment":"BlockSapling (BlockSapling.java:12-55) and the tree generators (WorldGenTrees, WorldGenBigTree, WorldGenTaiga2, WorldGenForest): bands of oak, spruce and birch saplings (meta 8, 9, 10: the ready bit already set, so one success grows them; one oak row at meta 0 must set it first) fill a dirt platform over four chunks, so the 80 random ticks per chunk reach saplings often enough. A sapling in light 9 succeeds one time in 30: it sets the ready bit (8), or grows: Taiga2 for spruce, Forest for birch, Trees or one time in ten BigTree for oak (growTree; no biome is asked). A tree that does not fit (a neighbour's trunk in its crown space) puts the sapling back without the ready bit. chunk_digest of the four chunks every 100 ticks (blocks, metadata, light), rng_state every tick, block_box of the whole tree volume at the end.",
+ "ops":[{"t":0,"op":"fill","x0":-16,"y0":60,"z0":-16,"x1":15,"y1":60,"z1":15,"id":3},
+        {"t":0,"op":"player","x":"0xc02f000000000000","y":61,"z":"0xc02f000000000000"},
+        {"t":0,"op":"fill","x0":-14,"y0":61,"z0":-14,"x1":13,"y1":61,"z1":-1,"id":6,"meta":8},
+        {"t":0,"op":"fill","x0":-14,"y0":61,"z0":1,"x1":13,"y1":61,"z1":6,"id":6,"meta":9},
+        {"t":0,"op":"fill","x0":-14,"y0":61,"z0":8,"x1":13,"y1":61,"z1":13,"id":6,"meta":10},
+        {"t":0,"op":"fill","x0":-14,"y0":61,"z0":-10,"x1":13,"y1":61,"z1":-10,"id":6,"meta":0}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":100,"what":"chunk_digest","x":-1,"z":-1},
+          {"every":100,"what":"chunk_digest","x":0,"z":-1},
+          {"every":100,"what":"chunk_digest","x":-1,"z":0},
+          {"every":100,"what":"chunk_digest","x":0,"z":0},
+          {"t":1999,"what":"block_box","x0":-16,"y0":60,"z0":-16,"x1":15,"y1":80,"z1":15}]}

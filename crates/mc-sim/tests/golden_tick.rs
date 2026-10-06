@@ -60,21 +60,29 @@ fixtures! {
     light_skylight_column => "light" / "skylight-column";
 
     // ---- tests/golden/tick -------------------------------------------------------
-    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then BlockSapling.growTree (WP-1.6, WP-1.7), population (WP-1.7)"]
+    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then population (WP-1.7); BlockSapling.growTree is in (WP-1.6)"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
+    tick_cactus_reed_growth => "tick" / "cactus-reed-growth";
+    tick_crops_growth => "tick" / "crops-growth";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
+    tick_fire_burnout_stone => "tick" / "fire-burnout-stone";
+    tick_fire_spread_planks => "tick" / "fire-spread-planks";
     #[ignore = "BlockFlowing.onBlockAdded/updateTick (fluids task of WP-1.6): first diff line 9 (t=4 scheduled_ticks count 0, expected 5). Lighting (WP-1.3) is in"]
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
     tick_flat_sand_falls => "tick" / "flat-sand-falls";
     tick_flat_torch_light => "tick" / "flat-torch-light";
     tick_flat_water_flow => "tick" / "flat-water-flow";
+    tick_grass_spread => "tick" / "grass-spread";
+    tick_leaves_decay => "tick" / "leaves-decay";
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
     tick_ray_trace_platform => "tick" / "ray-trace-platform";
+    tick_sapling_grow => "tick" / "sapling-grow";
     tick_spawning_draws => "tick" / "spawning-draws";
     tick_use_item_noop => "tick" / "use-item-noop";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4, field blocks); then BlockSapling/BlockGrass random ticks (WP-1.6), the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3)"]
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4: blocks, data, light, height map all differ); then the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3). BlockSapling/BlockGrass random ticks are in (WP-1.6)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
+    tick_snow_ice => "tick" / "snow-ice";
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 7 (t=4 scheduled_ticks, 2557 expected: populated liquids schedule ticks); then BlockFlowing (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
     tick_weather_time => "tick" / "weather-time";

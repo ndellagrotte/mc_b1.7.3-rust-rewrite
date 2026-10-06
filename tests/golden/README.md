@@ -788,6 +788,46 @@ Redstone (WP-1.6 task c), empty world, seed 123, the stone platform at y = 60; e
   from items (`onBlockPlaced`, `onBlockPlacedBy`). The port's test is ignored until
   `Item.onItemUse` lands (WP-2.6).
 
+Fire, plants, crops, leaves, snow and ice (WP-1.6 task b), empty world, seed 123,
+`"mob_spawning": "none"`, a standing player for random ticks; `rng_state` every tick in all
+of them. Random ticks and the snow roll pick positions from the LCG and `World.rand`, so
+which blocks change is deterministic. No block in them notifies still water (the fluids are
+another task), and none dumps the player's `entity_state` (WP-2.5):
+
+- `tick/fire-spread-planks`: fire set on a plank floor (against a leaves hedge, between wool
+  and a plank wall) and in the gap to a plank pillar; 300 ticks of `BlockFire.updateTick`
+  (scheduled every 40 and random), `tryToCatchBlockOnFire`, air ignition next to flammable
+  blocks; `block_box` and `scheduled_ticks` every 10.
+- `tick/fire-burnout-stone`: fires of ages 0, 2, 3, 4, 14 and 15 on stone burn out; on
+  netherrack forever; on obsidian `onBlockAdded` asks `BlockPortal.tryToCreatePortal` (no
+  frame: false; the Rust port records it as a gap and answers false); on glass and in the
+  air removed at once.
+- `tick/grass-spread`: grass stripes and single blocks spread to lit dirt and die under stone;
+  grass in a closed box neither; a dandelion in the dark and a dead bush on dirt drop;
+  mushrooms in sunlight stay until a neighbour changes (`BlockMushroom.updateTick` does not
+  call `checkFlowerChange`); `set_time` 14000 at t = 600 stops the spreading.
+- `tick/crops-growth`: a 9×9 wet farmland field kept wet by still water in a stone ring, crops
+  growing by `getGrowthRate`; dry farmland reverting to dirt unless crops stand on it; ripe
+  crops on dirt dropping wheat and seeds on a neighbour change (`entity_state` of the drops);
+  stone on farmland.
+- `tick/sapling-grow`: 1024 oak, spruce and birch saplings (most with the ready bit set) over
+  four chunks; 2000 ticks grow `WorldGenTrees`, `WorldGenBigTree`, `WorldGenTaiga2` and
+  `WorldGenForest` trees, and saplings whose tree does not fit are put back;
+  `chunk_digest` of the four chunks every 100, the tree volume at the end.
+- `tick/leaves-decay`: a trunk removed under its canopy (`BlockLog.onBlockRemoval` marks the
+  leaves within 4) and the decay search over `adjacentTreeBlocks`; a second tree's marked
+  leaves find their log and stay.
+- `tick/snow-ice`: the Taiga platform of `weather-snow` with rain: snow layers on stone and on
+  leaves (`isOpaqueCube` is `!graphicsLevel`, true in the oracle), none on glass or ice;
+  isolated water cells freeze; around a glowstone ice melts to still water and a snow layer
+  melts, a snow block (opaque: block light 0) stays; a snow layer on glass breaks on a
+  neighbour change. With `BlockSnow.canPlaceBlockAt` transcribed, `weather-snow` and
+  `weather-ice` still pass unchanged.
+- `tick/cactus-reed-growth`: cacti on sand and sugar cane beside still water at metadata 14
+  and 15 grow a block per 16 random ticks up to three high; a cactus with a solid neighbour
+  and a cane without water break (drops in `entity_state`); every growth step's
+  `setBlockMetadataWithNotify` schedules the sand below (`scheduled_ticks`).
+
 Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
 past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
 would need the one-in-100000 roll on a platform column of a rainy biome, and
