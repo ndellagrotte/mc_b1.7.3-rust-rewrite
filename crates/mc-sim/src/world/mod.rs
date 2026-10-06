@@ -25,7 +25,6 @@
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
 //! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
-//! | `getPathToEntity`, `getEntityPathToXYZ` (:2116-2144) | not ported: `Pathfinder`, `ChunkCache`, WP-2.2 |
 //! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
 //! | `setItemData`, `loadItemData`, `getUniqueDataId` (:2462-2472) | not ported: `MapStorage`, WP-2.6 |
 //! | `addWorldAccess`, `removeWorldAccess` (:951-957) | replaced by [`World::events`] |
@@ -1039,6 +1038,59 @@ impl World {
     // src: World.java:2315-2316
     pub fn set_entity_state(&mut self, entity: i32, state: i8) {
         let _ = (entity, state);
+    }
+
+    // ---- pathfinding (World.java:2116-2144, WP-2.2) -------------------------------------
+
+    /// `getPathToEntity(entity, target, range)`: a [`Pathfinder`] over a
+    /// [`ChunkCache`] of `range + 16` blocks around the entity's block (whose
+    /// constructor loads the chunks of that window; reads outside it see
+    /// air), to the target's `(posX, boundingBox.minY, posZ)`.
+    ///
+    /// [`Pathfinder`]: crate::entity::pathfinding::Pathfinder
+    /// [`ChunkCache`]: crate::entity::pathfinding::ChunkCache
+    // src: World.java:2116-2129
+    pub fn get_path_to_entity(
+        &mut self,
+        e: &EntityBase,
+        target: &EntityBase,
+        var3: f32,
+    ) -> Option<crate::entity::pathfinding::PathEntity> {
+        use crate::entity::pathfinding::{ChunkCache, Pathfinder};
+        let var4 = floor_double(e.pos_x);
+        let var6 = floor_double(e.pos_z);
+        let var7 = (var3 + 16.0) as i32;
+        let var8 = var4 - var7;
+        let var10 = var6 - var7;
+        let var11 = var4 + var7;
+        let var13 = var6 + var7;
+        // The y bounds (`floor(posY) -+ var7`) are unused by ChunkCache.
+        let var14 = ChunkCache::new(self, var8, var10, var11, var13);
+        Pathfinder::new(&var14).create_entity_path_to_entity(e, target, var3)
+    }
+
+    /// `getEntityPathToXYZ(entity, x, y, z, range)`: as
+    /// [`World::get_path_to_entity`] with a window of `range + 8` blocks, to
+    /// the centre of block `(x, y, z)`.
+    // src: World.java:2131-2144
+    pub fn get_entity_path_to_xyz(
+        &mut self,
+        e: &EntityBase,
+        var2: i32,
+        var3: i32,
+        var4: i32,
+        var5: f32,
+    ) -> Option<crate::entity::pathfinding::PathEntity> {
+        use crate::entity::pathfinding::{ChunkCache, Pathfinder};
+        let var6 = floor_double(e.pos_x);
+        let var8 = floor_double(e.pos_z);
+        let var9 = (var5 + 8.0) as i32;
+        let var10 = var6 - var9;
+        let var12 = var8 - var9;
+        let var13 = var6 + var9;
+        let var15 = var8 + var9;
+        let var16 = ChunkCache::new(self, var10, var12, var13, var15);
+        Pathfinder::new(&var16).create_entity_path_to_xyz(e, var2, var3, var4, var5)
     }
 
     // ---- spawn point (World.java:215-251, :2286-2292) ---------------------------------

@@ -55,14 +55,13 @@ fixtures! {
     entity_fireball_explode => "entity" / "fireball-explode";
     entity_fishing_hook => "entity" / "fishing-hook";
     entity_flat_item_drop => "entity" / "flat-item-drop";
-    #[ignore = "EntityPig(World) constructor not transcribed: first diff line 7 (t=0 op spawn kind Pig); then EntityLiving.onLivingUpdate / EntityCreature.updatePlayerActionState wander AI (WP-2.2)"]
+    // WP-2.2 (EntityLiving, EntityCreature, EntityAnimal, EntityPig, Pathfinder).
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
     entity_item_drop => "entity" / "item-drop";
     entity_lightning_strike => "entity" / "lightning-strike";
     entity_painting_art => "entity" / "painting-art";
-    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5); population is in (WP-1.7)"]
+    #[ignore = "EntityPlayer.attackTargetEntityWithCurrentItem (WP-2.5): lines 1-25 match (the pig's and the player's EntityLiving updates, t=0..9); the driver stops at line 26 (t=10 op attack, via player: the player punch). The t=20 direct hit (EntityLiving.attackEntityFrom) is transcribed and pinned by entity/pig-knockback"]
     entity_pig_attacked => "entity" / "pig-attacked";
-    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig: expected the op line with kind EntityPig); line 1 (preload) matches. Then EntityPig (WP-2.3); the Entity base and water physics are in (WP-2.1), population is in (WP-1.7)"]
     entity_pig_falls => "entity" / "pig-falls";
     entity_snowball_egg_flight => "entity" / "snowball-egg-flight";
     entity_tnt_explode => "entity" / "tnt-explode";
@@ -104,7 +103,7 @@ fixtures! {
     tick_explosion_fire => "tick" / "explosion-fire";
     tick_furnace_idle => "tick" / "furnace-idle";
     tick_mob_spawner_delay => "tick" / "mob-spawner-delay";
-    #[ignore = "EntityPig(World) constructor (WP-2.3; TileEntityMobSpawner records EntityList.createEntityInWorld and returns): first diff line 25 (t=20 rng_state, field math_random: EntityLiving's constructor draws); lines 1-24 (the count-down) match"]
+    #[ignore = "TileEntityMobSpawner.updateEntity's spawn loop (tile_entity/mob_spawner.rs) still records EntityList.createEntityInWorld and returns; EntityList.createEntityInWorld(\"Pig\"), getCanSpawnHere (dispatch::get_can_spawn_here) and spawnExplosionParticle exist since WP-2.2 but the spawner does not call them yet: first diff line 25 (t=20 rng_state, field math_random: EntityLiving's constructor draws); lines 1-24 (the count-down) match"]
     tick_mob_spawner_spawn => "tick" / "mob-spawner-spawn";
     tick_note_jukebox_activate => "tick" / "note-jukebox-activate";
     tick_sign_pops_off => "tick" / "sign-pops-off";

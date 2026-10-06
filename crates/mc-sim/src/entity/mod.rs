@@ -63,8 +63,10 @@
 //! `EntityFX` and its subclasses (particles) belong to the client (WP-3.7).
 //! `EntityClientPlayerMP` and `EntityOtherPlayerMP` are multiplayer (D3).
 
+pub mod animal;
 pub mod arrow;
 pub mod base;
+pub mod creature;
 pub mod data_watcher;
 pub mod dispatch;
 pub mod egg;
@@ -76,12 +78,16 @@ pub mod lightning_bolt;
 pub mod living;
 pub mod nbt;
 pub mod painting;
+pub mod pathfinding;
+pub mod pig;
 pub mod player;
 pub mod snowball;
 pub mod tnt_primed;
 
+pub use animal::AnimalData;
 pub use arrow::ArrowData;
 pub use base::EntityBase;
+pub use creature::CreatureData;
 pub use egg::EggData;
 pub use falling_sand::FallingSandData;
 pub use fireball::FireballData;
@@ -90,6 +96,7 @@ pub use item::ItemData;
 pub use lightning_bolt::LightningBoltData;
 pub use living::LivingData;
 pub use painting::{EnumArt, PaintingData};
+pub use pig::PigData;
 pub use snowball::{SnowballData, ThrowableData};
 pub use tnt_primed::TntPrimedData;
 
@@ -134,10 +141,6 @@ macro_rules! empty_level {
 }
 
 empty_level!(
-    /// `EntityCreature` (EntityCreature.java).
-    CreatureData,
-    /// `EntityAnimal` (EntityAnimal.java).
-    AnimalData,
     /// `EntityMob` (EntityMob.java).
     MobData,
     /// `EntityWaterMob` (EntityWaterMob.java).
@@ -166,8 +169,6 @@ empty_level!(
     SlimeData,
     /// `EntityGhast` (EntityGhast.java).
     GhastData,
-    /// `EntityPig` (EntityPig.java).
-    PigData,
     /// `EntitySheep` (EntitySheep.java).
     SheepData,
     /// `EntityCow` (EntityCow.java).

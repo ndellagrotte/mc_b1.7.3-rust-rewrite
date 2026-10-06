@@ -97,7 +97,8 @@ fn save_roundtrip_seed_123() {
 }
 
 #[test]
-#[ignore = "needs the player's update (EntityPlayer/EntityLiving/Entity.onUpdate, WP-2.2/WP-2.5): first diff line 18 (t=5 level_dat, Data.Player.Fire/Motion/OnGround: the oracle's HarnessPlayer has run Entity.onEntityUpdate and fallen onto the platform). Every other field of level_dat, world_info, the four region headers, chunk_nbt (0,0) and the ten tile_entity lines match (save_tile_entities_matches_except_the_player)"]
+// The player compound matches since WP-2.2 (EntityLiving.onUpdate: the
+// player falls onto the platform as the oracle's HarnessPlayer does).
 fn save_tile_entities() {
     check_tick("save", "tile-entities");
 }
@@ -118,13 +119,13 @@ fn strip_player(line: &mut Value) {
     }
 }
 
-/// `save/tile-entities` with the one known gap (the player compound, see the
-/// ignored fixture test) taken out of both traces: everything else must
-/// match exactly.
+/// `save/tile-entities` with the player compound (a gap until WP-2.2) taken
+/// out of both traces: everything else must match exactly. Kept beside the
+/// full fixture test, which now passes, as the narrower check.
 #[test]
 fn save_tile_entities_matches_except_the_player() {
     let dir = fixture_dir("save", "tile-entities");
-    // Runs the driver (writes actual.jsonl); the mismatch is expected.
+    // Runs the driver (writes actual.jsonl).
     let _ = mc_golden::run(&dir, tick_driver::drive);
     let mut expected = jsonl(&dir.join("expected.jsonl"));
     let mut actual = jsonl(&target_dir().join("golden/save/tile-entities/actual.jsonl"));
@@ -1167,7 +1168,7 @@ fn save_list_rename_delete() {
     ));
 }
 
-/// A stored entity of a class the port cannot construct (a pig): its id and
+/// A stored entity of a class the port cannot construct (a cow; the pig is constructible since WP-2.2): its id and
 /// `EntityLiving`'s `Math.random()` draws are consumed, the gap recorded, and
 /// a re-save writes the compound back.
 #[test]
@@ -1176,16 +1177,16 @@ fn unconstructible_entities_are_kept() {
     let mut a = build_saved_world(&store, "w");
     a.try_save_world(true).unwrap();
     drop(a);
-    let mut pig = BTreeMap::new();
-    pig.insert("id".to_string(), Tag::String("Pig".into()));
-    pig.insert(
+    let mut cow = BTreeMap::new();
+    cow.insert("id".to_string(), Tag::String("Cow".into()));
+    cow.insert(
         "Pos".to_string(),
         Tag::List {
             elem: TagType::Double,
             items: vec![Tag::Double(1.5), Tag::Double(61.0), Tag::Double(1.5)],
         },
     );
-    pig.insert("Saddle".to_string(), Tag::Byte(1));
+    cow.insert("Health".to_string(), Tag::Short(7));
     let mut mob = BTreeMap::new();
     mob.insert("id".to_string(), Tag::String("Mob".into()));
     let tree = {
@@ -1193,7 +1194,7 @@ fn unconstructible_entities_are_kept() {
         let Some(Tag::List { items, .. }) = level_mut(&mut t).get_mut("Entities") else {
             panic!()
         };
-        items.push(Tag::Compound(pig.clone()));
+        items.push(Tag::Compound(cow.clone()));
         items.push(Tag::Compound(mob));
         t
     };
@@ -1210,7 +1211,7 @@ fn unconstructible_entities_are_kept() {
     b.make_deterministic(5);
     let math_before = b.math_random.state();
     b.get_chunk_from_chunk_coords(0, 0);
-    // Item, sand (both built), pig (id 2 consumed); "Mob" is abstract: skipped.
+    // Item, sand (both built), cow (id 2 consumed); "Mob" is abstract: skipped.
     assert_eq!(b.next_entity_id, 3);
     assert_eq!(b.loaded_entity_list.len(), 2);
     assert_ne!(b.math_random.state(), math_before);
@@ -1229,9 +1230,9 @@ fn unconstructible_entities_are_kept() {
     assert_eq!(
         items.len(),
         3,
-        "item, sand, then the kept pig; the Mob is dropped"
+        "item, sand, then the kept cow; the Mob is dropped"
     );
-    assert_eq!(items[2], Tag::Compound(pig));
+    assert_eq!(items[2], Tag::Compound(cow));
 }
 
 /// vanilla bug: a chunk stored under the wrong position stays wrong

@@ -51,6 +51,7 @@
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook` and a `Painting` with `direction`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
+//! | `attack` | `attack`: `target.attackEntityFrom(attacker or null, damage)` through [`mc_sim::entity::dispatch::attack_entity_from`] (target out of its slot, attacker a copy) → `target_id`, `via` `"direct"`, `result` |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
 //! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
@@ -64,8 +65,9 @@
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
-//! `spawn` of the mobs, `Minecart` and `Boat` (their `(World)` constructors),
-//! `attack` (`attackEntityFrom` of living entities, the player). `use_item` runs, but every item's `onItemUse` /
+//! `spawn` of the mobs other than `Pig`, `Minecart` and `Boat` (their
+//! `(World)` constructors), `attack` with the player as the attacker
+//! (`EntityPlayer.attackTargetEntityWithCurrentItem`, WP-2.5). `use_item` runs, but every item's `onItemUse` /
 //! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
 //! item does something diverges at the first block or inventory dump after
 //! the op.
@@ -613,14 +615,11 @@ fn apply(
                 .with("used", used)
                 .with("stack", stack_json(stack))
         }
-        OpKind::Attack { .. } => {
-            return Err(unsupported(
-                t,
-                "attack",
-                "EntityPlayer.attackTargetEntityWithCurrentItem and \
-                 EntityLiving.attackEntityFrom are not transcribed (WP-2.2, WP-2.5)",
-            ));
-        }
+        OpKind::Attack {
+            target_id,
+            attacker_id,
+            damage,
+        } => attack(world, h, t, target_id, attacker_id, damage)?,
         OpKind::Explode {
             x,
             y,
@@ -661,6 +660,50 @@ fn apply(
     };
     w.push(out);
     Ok(())
+}
+
+/// `TickScenario.attack`: the target (and the attacker, if given) found in
+/// `loadedEntityList` by id. Attacker = the player: `swingItem`, then
+/// `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814) — not
+/// transcribed yet (WP-2.5), an error. Otherwise
+/// `target.attackEntityFrom(attacker or null, damage)` through the entity
+/// dispatch, with the target taken out of its slot and the attacker passed
+/// as a copy (as `EntityArrow` passes its shooter, `entity::arrow`) → `via`
+/// `"direct"`, `result`.
+fn attack(
+    world: &mut World,
+    h: &Harness,
+    t: u32,
+    target_id: i32,
+    attacker_id: Option<i32>,
+    damage: Option<i32>,
+) -> Result<TraceLine, GoldenError> {
+    loaded_entity(world, t, "attack", target_id)?;
+    let attacker = match attacker_id {
+        Some(a) => Some(loaded_entity(world, t, "attack", a)?.clone()),
+        None => None,
+    };
+    let line = TraceLine::op(t as i64, "attack").with("target_id", target_id);
+    if attacker.is_some() && attacker_id == h.player {
+        return Err(unsupported(
+            t,
+            "attack",
+            "attacker = the player: EntityPlayer.attackTargetEntityWithCurrentItem is not \
+             transcribed (WP-2.5)",
+        ));
+    }
+    let Some(damage) = damage else {
+        return Err(GoldenError::other(format!(
+            "t={t}: attack: \"damage\" is required unless the attacker is the player"
+        )));
+    };
+    // src: Entity.java:746-749, EntityLiving.java:307-365 (TickScenario.attack)
+    let result = world
+        .with_entity_mut(target_id, |w, target| {
+            mc_sim::entity::dispatch::attack_entity_from(target, w, attacker.as_ref(), damage)
+        })
+        .ok_or_else(|| unsupported(t, "attack", "the target is taken out of its slot"))?;
+    Ok(line.with("via", "direct").with("result", result))
 }
 
 /// Whether the `spawn` op places the entity with `setLocationAndAngles`
@@ -706,7 +749,8 @@ fn construct(
     direction: Option<i32>,
 ) -> Result<mc_sim::entity::Entity, GoldenError> {
     use mc_sim::entity::{
-        arrow, egg, falling_sand, fireball, fish, lightning_bolt, painting, snowball, tnt_primed,
+        arrow, egg, falling_sand, fireball, fish, lightning_bolt, painting, pig, snowball,
+        tnt_primed,
     };
     let e = match kind {
         "Item" => {
@@ -777,6 +821,7 @@ fn construct(
                 "EntityPainting" => painting::new_entity_painting_empty(world),
                 "EntityTNTPrimed" => tnt_primed::new_entity_tnt_primed_empty(world),
                 "EntityFallingSand" => falling_sand::new_entity_falling_sand_empty(world),
+                "EntityPig" => pig::new_entity_pig(world),
                 _ => {
                     return Err(unsupported(
                         t,

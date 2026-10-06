@@ -272,6 +272,9 @@ fn all_kinds(w: &mut World) -> Vec<Entity> {
     });
     let a = AnimalData::default;
     push(w, &|w, b| {
+        // EntityPig.entityInit (EntityPig.java:10-12): the saddle byte.
+        b.data_watcher
+            .add_object(16, mc_sim::entity::data_watcher::WatchValue::Byte(0));
         K::Pig(LivingData::new(w, b), c(), a(), PigData::default())
     });
     push(w, &|w, b| {

@@ -14,10 +14,12 @@
 //! | `EntityPainting` | EntityPainting.java:214-220 | EntityPainting.java:222-243 |
 //! | `EntityLightningBolt` | EntityLightningBolt.java:82-83 (empty) | EntityLightningBolt.java:79-80 (empty) |
 //! | `EntityLiving` | EntityLiving.java:557-562 | EntityLiving.java:564-573 |
+//! | `EntityAnimal` (`super` only) | EntityAnimal.java:12-14 | EntityAnimal.java:16-18 |
+//! | `EntityPig` | EntityPig.java:14-17 | EntityPig.java:19-22 |
 //! | `EntityPlayer` (+ `InventoryPlayer`) | EntityPlayer.java:326-337, InventoryPlayer.java:199-221 | EntityPlayer.java:308-324, InventoryPlayer.java:223-241 |
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
-//! Every other class's own level (`EntityPig`'s `Saddle`, …) is Phase 2; reaching it records
+//! Every other class's own level (`EntitySheep`'s `Sheared`, …) is Phase 2; reaching it records
 //! `"Entity*.writeEntityToNBT"` / `"Entity*.readEntityFromNBT"` in
 //! [`World::unimplemented_hits`] and writes/reads only the levels above it.
 //! Such entities cannot exist in a world yet (no constructor); a saved one
@@ -128,6 +130,11 @@ fn write_entity_to_nbt(e: &Entity, world: &World, c: &mut Compound) {
         K::Painting(d) => super::painting::write_entity_to_nbt(d, c, world),
         // src: EntityLightningBolt.java:82-83 (empty)
         K::LightningBolt(..) => {}
+        K::Pig(l, ..) => {
+            write_living(l, c);
+            // src: EntityPig.java:14-17 (EntityAnimal adds nothing, :12-14)
+            n::set_boolean(c, "Saddle", super::pig::get_saddled(e));
+        }
         K::PlayerSp(l, p, _) => {
             write_living(l, c);
             write_player(p, c);
@@ -285,6 +292,13 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
     if let K::Painting(..) = e.kind {
         // src: EntityPainting.java:222-243 (it calls setDirection on itself)
         return super::painting::read_entity_from_nbt(e, c, world);
+    }
+    if let K::Pig(l, ..) = &mut e.kind {
+        read_living(l, c)?;
+        // src: EntityPig.java:19-22 (EntityAnimal adds nothing, :16-18)
+        let saddle = n::get_boolean(c, "Saddle")?;
+        super::pig::set_saddled(e, saddle);
+        return Ok(());
     }
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     match &mut e.kind {
