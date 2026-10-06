@@ -1,8 +1,12 @@
 //! `scenario.json`: the one input both engines replay (ADR-007 §5.1,
 //! `tests/golden/README.md` "Tier A scenarios").
 //!
-//! Unknown `kind`s are an error; unknown extra fields are tolerated so the
-//! oracle side can add documentation fields without breaking the Rust side.
+//! Parsing is two-stage: the common fields (`name`, `tier`, `kind`) first, then
+//! the kind-specific fields. An unknown `kind` is an error for tier `A` and
+//! becomes [`ScenarioKind::Unsupported`] (raw JSON kept) for tiers B/C/S/D,
+//! whose kinds later work packages define. Unknown extra fields are tolerated
+//! so the oracle side can add documentation fields without breaking the Rust
+//! side.
 
 use std::path::Path;
 
@@ -11,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Bits64, GoldenError};
 
 /// One fixture's scenario.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Scenario {
     /// Fixture name, normally equal to its directory name.
     pub name: String,
@@ -20,6 +24,38 @@ pub struct Scenario {
     /// What to run; the JSON `"kind"` field selects the variant.
     #[serde(flatten)]
     pub kind: ScenarioKind,
+}
+
+/// Stage one of parsing: the common fields, everything else left raw.
+#[derive(Deserialize)]
+struct RawScenario {
+    name: String,
+    tier: Tier,
+    kind: String,
+    #[serde(flatten)]
+    rest: serde_json::Map<String, serde_json::Value>,
+}
+
+impl<'de> Deserialize<'de> for Scenario {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let RawScenario {
+            name,
+            tier,
+            kind,
+            mut rest,
+        } = RawScenario::deserialize(d)?;
+        rest.insert("kind".into(), kind.clone().into());
+        let raw = serde_json::Value::Object(rest);
+        let kind = if ScenarioKind::KNOWN.contains(&kind.as_str()) {
+            serde_json::from_value(raw).map_err(D::Error::custom)?
+        } else if tier == Tier::A {
+            return Err(D::Error::custom(format!("unknown Tier A kind `{kind}`")));
+        } else {
+            ScenarioKind::Unsupported { kind, raw }
+        };
+        Ok(Self { name, tier, kind })
+    }
 }
 
 /// PLAN_v4 §4.3 tiers.
@@ -62,6 +98,9 @@ pub enum ScenarioKind {
         /// the exact shape; read it through [`ScenarioKind::edge_cases_for`].
         #[serde(default)]
         edge_cases: serde_json::Value,
+        /// Call `java.lang.StrictMath` (fdlibm) instead of `Math`.
+        #[serde(default)]
+        strict: bool,
     },
     /// Chunk generation, population and biomes.
     Terrain {
@@ -72,6 +111,63 @@ pub enum ScenarioKind {
         /// Chunks in processing order.
         chunks: Vec<ChunkSel>,
     },
+    /// Vanilla NBT writer on a typed tree.
+    NbtWrite {
+        /// The root node (a named compound).
+        root: NbtNode,
+    },
+    /// Vanilla NBT reader on a sidecar file.
+    NbtRead {
+        /// Sidecar file name, relative to the scenario directory.
+        file: String,
+        /// `gzip` or `none`.
+        compressed: String,
+    },
+    /// `java.util.HashSet` iteration order.
+    JavaHashOrder {
+        /// `ChunkCoordIntPair`, `ChunkPosition`, `ChunkCoordinates`,
+        /// `Integer` or `String`.
+        key_type: String,
+        /// Operations in order.
+        ops: Vec<HashOp>,
+        /// Op counts after which the set is dumped.
+        #[serde(default)]
+        dump_after: Vec<usize>,
+    },
+    /// A kind of tier B/C/S/D that a later work package defines; never
+    /// produced for tier A and never serialized.
+    #[serde(skip)]
+    Unsupported {
+        /// The `kind` string.
+        kind: String,
+        /// The whole scenario-specific JSON object (including `kind`).
+        raw: serde_json::Value,
+    },
+}
+
+/// A typed NBT node (README `nbt_write`). `value` stays raw JSON; the NBT
+/// crate interprets it by `ty`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NbtNode {
+    /// `byte`, `short`, `int`, `long`, `float`, `double`, `byte_array`,
+    /// `string`, `list` or `compound`.
+    #[serde(rename = "type")]
+    pub ty: String,
+    /// Tag name; present on the root only.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The payload, shaped by `ty`.
+    pub value: serde_json::Value,
+}
+
+/// One `java_hash_order` operation.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HashOp {
+    /// `add`, `remove` or `clear`.
+    pub op: String,
+    /// Array of ints, an int or a string, by `key_type`; absent for `clear`.
+    #[serde(default)]
+    pub key: Option<serde_json::Value>,
 }
 
 /// One `java_random` draw group.
@@ -128,6 +224,17 @@ impl Scenario {
 }
 
 impl ScenarioKind {
+    /// Kinds that deserialize into a typed variant.
+    const KNOWN: [&'static str; 7] = [
+        "java_random",
+        "sine_table",
+        "math_sweep",
+        "terrain",
+        "nbt_write",
+        "nbt_read",
+        "java_hash_order",
+    ];
+
     /// The `math_sweep` edge-case inputs for `function`, as `f64` bit
     /// patterns in document order (for two-argument functions, consecutive
     /// `x`, `y` pairs).
@@ -207,6 +314,7 @@ mod tests {
     #[test]
     fn unknown_kind_and_bad_fields_rejected() {
         assert!(Scenario::parse(r#"{"name":"x","tier":"A","kind":"pistons"}"#).is_err());
+        assert!(Scenario::parse(r#"{"name":"x","tier":"B","kind":"terrain"}"#).is_err());
         assert!(Scenario::parse(r#"{"name":"x","tier":"A"}"#).is_err());
         assert!(Scenario::parse(r#"{"name":"x","tier":"Q","kind":"sine_table"}"#).is_err());
         assert!(
@@ -247,5 +355,51 @@ mod tests {
         )
         .unwrap();
         assert!(bad.kind.edge_cases_for("sin").is_err());
+    }
+
+    #[test]
+    fn new_kinds_and_unsupported() {
+        let s = Scenario::parse(
+            r#"{"name":"m","tier":"A","kind":"math_sweep","seed":1,"count":2,
+             "functions":["sin"],"edge_cases":{"sin":[]},"strict":true}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            s.kind,
+            ScenarioKind::MathSweep { strict: true, .. }
+        ));
+        let s = Scenario::parse(
+            r#"{"name":"n","tier":"A","kind":"nbt_write","root":{"type":"compound","name":"","value":{}}}"#,
+        )
+        .unwrap();
+        let ScenarioKind::NbtWrite { root } = s.kind else {
+            panic!()
+        };
+        assert_eq!(
+            (root.ty.as_str(), root.name.as_deref()),
+            ("compound", Some(""))
+        );
+        let s = Scenario::parse(
+            r#"{"name":"r","tier":"A","kind":"nbt_read","file":"level.dat","compressed":"gzip"}"#,
+        )
+        .unwrap();
+        assert!(matches!(s.kind, ScenarioKind::NbtRead { .. }));
+        let s = Scenario::parse(
+            r#"{"name":"h","tier":"A","kind":"java_hash_order","key_type":"Integer",
+             "ops":[{"op":"add","key":5},{"op":"clear"}]}"#,
+        )
+        .unwrap();
+        let ScenarioKind::JavaHashOrder {
+            ops, dump_after, ..
+        } = s.kind
+        else {
+            panic!()
+        };
+        assert_eq!((ops[1].key.is_none(), dump_after.len()), (true, 0));
+        let s = Scenario::parse(r#"{"name":"p","tier":"B","kind":"pistons","ticks":3}"#).unwrap();
+        let ScenarioKind::Unsupported { kind, raw } = s.kind else {
+            panic!()
+        };
+        assert_eq!((kind.as_str(), raw["ticks"].as_i64()), ("pistons", Some(3)));
     }
 }

@@ -15,7 +15,10 @@
 //! - [`TraceLine`] and its event constructors ([`TraceLine::rng`],
 //!   [`TraceLine::sine_table`], [`TraceLine::math`],
 //!   [`TraceLine::chunk_digest`], [`TraceLine::chunk_full`],
-//!   [`TraceLine::biome`]) — emit exactly the documented line shapes.
+//!   [`TraceLine::biome`], [`TraceLine::nbt_bytes`], [`TraceLine::nbt_tree`],
+//!   [`TraceLine::nbt_roundtrip`], [`TraceLine::nbt_gzip`],
+//!   [`TraceLine::nbt_file`], [`TraceLine::hash_codes`],
+//!   [`TraceLine::hash_order`]) — emit exactly the documented line shapes.
 //! - [`compare()`] / [`Mismatch`] — first-difference report with floats
 //!   decoded (PLAN_v4 §4.4 item 3).
 //! - [`Bits32`] / [`Bits64`] / [`hex_bytes`] / [`blake3_hex`] — the encoding
@@ -52,7 +55,7 @@ pub use compare::{Mismatch, MismatchKind, compare};
 pub use digest::blake3_hex;
 pub use error::GoldenError;
 pub use runner::{all_fixture_dirs, fixture_dir, read_sidecar, run, target_dir, workspace_root};
-pub use scenario::{ChunkSel, Dimension, Draw, Scenario, ScenarioKind, Tier};
+pub use scenario::{ChunkSel, Dimension, Draw, HashOp, NbtNode, Scenario, ScenarioKind, Tier};
 pub use trace::{
     ChunkArrays, RngValue, Stage, TraceLine, TraceParseError, TraceWriter, parse_jsonl,
 };

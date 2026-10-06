@@ -27,7 +27,15 @@ fn int_of(l: &TraceLine, k: &str) -> i64 {
 
 /// Rebuilds a line through the public constructors, or `None` when the line
 /// cannot be rebuilt from its own fields.
-fn rebuild(l: &TraceLine, prev: Option<&TraceLine>, dir: &std::path::Path) -> Option<TraceLine> {
+/// Bytes of the first `nbt_bytes` line yielded by `it`.
+fn first_nbt_bytes<'a>(mut it: impl Iterator<Item = &'a TraceLine>) -> Option<Vec<u8>> {
+    let b = it.find(|x| x.e() == "nbt_bytes")?;
+    Some(parse_hex_bytes(b.get("bytes")?.as_str()?).unwrap())
+}
+
+fn rebuild(lines: &[TraceLine], i: usize, dir: &std::path::Path) -> Option<TraceLine> {
+    let l = &lines[i];
+    let prev = i.checked_sub(1).map(|p| &lines[p]);
     Some(match l.e() {
         "rng" => {
             let call = str_of(l, "call");
@@ -80,6 +88,44 @@ fn rebuild(l: &TraceLine, prev: Option<&TraceLine>, dir: &std::path::Path) -> Op
             );
             TraceLine::chunk_full(x, z, stage, &a)
         }
+        "nbt_bytes" => TraceLine::nbt_bytes(&parse_hex_bytes(str_of(l, "bytes")).unwrap()),
+        "nbt_tree" => TraceLine::nbt_tree(l.get("root")?.clone()),
+        "nbt_roundtrip" if l.get("reread").is_none() => {
+            TraceLine::nbt_roundtrip(l.get("equal")?.as_bool()?)
+        }
+        // The re-written bytes are the same bytes as the `nbt_bytes` line.
+        "nbt_gzip" => TraceLine::nbt_gzip(&first_nbt_bytes(lines[..i].iter().rev())?),
+        "nbt_file" => {
+            let raw = read_sidecar(dir, l.file()?).unwrap();
+            // README: for the committed fixtures the gunzipped content is
+            // what `nbt_bytes` re-writes.
+            let unc = first_nbt_bytes(lines[i..].iter())?;
+            TraceLine::nbt_file(l.file()?, str_of(l, "compressed"), &raw, &unc)
+        }
+        "hash_codes" => {
+            let samples = l
+                .get("samples")?
+                .as_array()?
+                .iter()
+                .map(|s| (s["key"].clone(), s["hash"].as_i64().unwrap() as i32))
+                .collect();
+            TraceLine::hash_codes(str_of(l, "key_type"), samples)
+        }
+        "hash_order" => {
+            let ints = |k: &str| -> Vec<i32> {
+                l.get(k)
+                    .unwrap()
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_i64().unwrap() as i32)
+                    .collect()
+            };
+            let keys = l.get("keys")?.as_array()?.clone();
+            let hashes = ints("hashes");
+            assert_eq!(int_of(l, "size") as usize, hashes.len());
+            TraceLine::hash_order(int_of(l, "after") as usize, &hashes, &keys)
+        }
         _ => return None,
     })
 }
@@ -93,8 +139,7 @@ fn constructors_rebuild_oracle_lines() {
         };
         let lines = parse_jsonl(&text).unwrap();
         for (i, line) in lines.iter().enumerate() {
-            let prev = i.checked_sub(1).map(|p| &lines[p]);
-            if let Some(ours) = rebuild(line, prev, &dir) {
+            if let Some(ours) = rebuild(&lines, i, &dir) {
                 assert_eq!(&ours, line, "{}:{}", dir.display(), line.line());
                 rebuilt += 1;
             }

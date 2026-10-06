@@ -2,7 +2,7 @@
 //! (`tests/golden/README.md`): scenarios deserialize, every trace line is a
 //! record, every `"0x…"` string is a strict bit pattern, every `blake3` field
 //! is a 64-digit lower-case digest, and every sidecar exists and matches the
-//! `blake3` on its line.
+//! `blake3` on its line (lines with both `file` and `blake3`).
 
 use std::path::Path;
 
@@ -99,6 +99,8 @@ fn all_fixtures_parse() {
                 .for_each(|(k, v)| check_value(k, v, &at));
             if let Some(file) = line.file() {
                 let bytes = read_sidecar(dir, file).unwrap_or_else(|e| panic!("{at}: {e}"));
+                // `blake3` on a line with `file` is over the sidecar's bytes
+                // (for `nbt_file`: the raw file as stored).
                 if let Some(Value::String(digest)) = line.get("blake3") {
                     assert_eq!(
                         &mc_golden::blake3_hex(&bytes),

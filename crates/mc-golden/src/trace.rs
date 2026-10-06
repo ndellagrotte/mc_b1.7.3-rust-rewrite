@@ -309,6 +309,67 @@ impl TraceLine {
             .with("temperature", blake3_hex(&f64_le(temperature)))
             .with("humidity", blake3_hex(&f64_le(humidity)))
     }
+
+    /// `nbt_bytes`: `{"len":..,"blake3":..,"bytes":"<hex>"}`.
+    pub fn nbt_bytes(bytes: &[u8]) -> Self {
+        Self::new(0, "nbt_bytes")
+            .with("len", bytes.len() as u64)
+            .with("blake3", blake3_hex(bytes))
+            .with("bytes", hex_bytes(bytes))
+    }
+
+    /// `nbt_tree`: `{"root":<canonical tree>}`.
+    pub fn nbt_tree(root: Value) -> Self {
+        Self::new(0, "nbt_tree").with("root", root)
+    }
+
+    /// `nbt_roundtrip`: `{"equal":<bool>}`. (The oracle adds `"reread"` when
+    /// `false`; use [`TraceLine::with`] for that.)
+    pub fn nbt_roundtrip(equal: bool) -> Self {
+        Self::new(0, "nbt_roundtrip").with("equal", equal)
+    }
+
+    /// `nbt_gzip`: digest and length of the gzip-round-tripped tree written
+    /// uncompressed; `uncompressed` is those bytes.
+    pub fn nbt_gzip(uncompressed: &[u8]) -> Self {
+        Self::new(0, "nbt_gzip")
+            .with(
+                "blake3_of_uncompressed_after_gunzip",
+                blake3_hex(uncompressed),
+            )
+            .with("len", uncompressed.len() as u64)
+    }
+
+    /// `nbt_file`: the file as stored (`raw`) and its decompressed content.
+    pub fn nbt_file(file: &str, compressed: &str, raw: &[u8], uncompressed: &[u8]) -> Self {
+        Self::new(0, "nbt_file")
+            .with("file", file)
+            .with("compressed", compressed)
+            .with("len", raw.len() as u64)
+            .with("blake3", blake3_hex(raw))
+            .with("uncompressed_len", uncompressed.len() as u64)
+            .with("uncompressed_blake3", blake3_hex(uncompressed))
+    }
+
+    /// `hash_codes`: `{"key_type":..,"samples":[{"key":..,"hash":..},..]}`.
+    pub fn hash_codes(key_type: &str, samples: Vec<(Value, i32)>) -> Self {
+        let samples: Vec<Value> = samples
+            .into_iter()
+            .map(|(key, hash)| serde_json::json!({"key": key, "hash": hash}))
+            .collect();
+        Self::new(0, "hash_codes")
+            .with("key_type", key_type)
+            .with("samples", samples)
+    }
+
+    /// `hash_order`: set contents after `after` ops, in iteration order.
+    pub fn hash_order(after: usize, hashes: &[i32], keys: &[Value]) -> Self {
+        Self::new(0, "hash_order")
+            .with("after", after as u64)
+            .with("size", hashes.len() as u64)
+            .with("hashes", hashes.to_vec())
+            .with("keys", keys.to_vec())
+    }
 }
 
 #[cfg(test)]
@@ -337,6 +398,34 @@ mod tests {
         assert!(parse_jsonl("{\"t\":0.5,\"e\":\"a\"}").is_err());
         assert!(parse_jsonl("[1]").is_err());
         assert!(parse_jsonl("").unwrap().is_empty());
+    }
+
+    #[test]
+    fn nbt_and_hash_shapes() {
+        let s = |l: TraceLine| Value::Object(l.fields).to_string();
+        assert_eq!(
+            s(TraceLine::nbt_bytes(&[0, 255])),
+            format!(
+                r#"{{"blake3":"{}","bytes":"00ff","e":"nbt_bytes","len":2,"t":0}}"#,
+                blake3_hex(&[0, 255])
+            )
+        );
+        assert_eq!(
+            s(TraceLine::nbt_roundtrip(false)),
+            r#"{"e":"nbt_roundtrip","equal":false,"t":0}"#
+        );
+        assert_eq!(
+            s(TraceLine::hash_order(
+                2,
+                &[1, -2],
+                &[serde_json::json!([0, 1]), serde_json::json!([2, 3])]
+            )),
+            r#"{"after":2,"e":"hash_order","hashes":[1,-2],"keys":[[0,1],[2,3]],"size":2,"t":0}"#
+        );
+        assert_eq!(
+            s(TraceLine::hash_codes("Integer", vec![(5.into(), 5)])),
+            r#"{"e":"hash_codes","key_type":"Integer","samples":[{"hash":5,"key":5}],"t":0}"#
+        );
     }
 
     #[test]
