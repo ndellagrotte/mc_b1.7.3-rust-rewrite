@@ -85,6 +85,16 @@ pub enum RandomSource {
 /// "Coverage"). A transcriber adds to its class's row (or adds the row) in
 /// the same change that replaces the recorded arm.
 pub const TRANSCRIBED: &[(&str, &[&str])] = &[
+    // src: BlockBed.java:14-83, :117-135, :194-199
+    (
+        "BlockBed",
+        &[
+            "blockActivated",
+            "dropBlockAsItemWithChance",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+        ],
+    ),
     // src: BlockBreakable.java:15-18
     ("BlockBreakable", &["shouldSideBeRendered"]),
     // src: BlockButton.java (super::button)
@@ -120,8 +130,37 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateTick",
         ],
     ),
+    // src: BlockCake.java:11-39, :67-104
+    (
+        "BlockCake",
+        &[
+            "blockActivated",
+            "canBlockStay",
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "getSelectedBoundingBoxFromPool",
+            "onBlockClicked",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+            "setBlockBoundsForItemRender",
+        ],
+    ),
     // src: BlockCrops.java:18-31, :89-105
     ("BlockCrops", &["dropBlockAsItemWithChance", "updateTick"]),
+    // src: BlockDoor.java:50-194
+    (
+        "BlockDoor",
+        &[
+            "blockActivated",
+            "canPlaceBlockAt",
+            "collisionRayTrace",
+            "getCollisionBoundingBoxFromPool",
+            "getSelectedBoundingBoxFromPool",
+            "onBlockClicked",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+        ],
+    ),
     // src: BlockFarmland.java:14-92
     (
         "BlockFarmland",
@@ -131,6 +170,11 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "onNeighborBlockChange",
             "updateTick",
         ],
+    ),
+    // src: BlockFence.java:8-18
+    (
+        "BlockFence",
+        &["canPlaceBlockAt", "getCollisionBoundingBoxFromPool"],
     ),
     // src: BlockFire.java:31-264
     (
@@ -183,6 +227,17 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
         "BlockIce",
         &["harvestBlock", "shouldSideBeRendered", "updateTick"],
     ),
+    // src: BlockLadder.java:10-52, :66-124
+    (
+        "BlockLadder",
+        &[
+            "canPlaceBlockAt",
+            "getCollisionBoundingBoxFromPool",
+            "getSelectedBoundingBoxFromPool",
+            "onBlockPlaced",
+            "onNeighborBlockChange",
+        ],
+    ),
     // src: BlockLeaves.java:15-192
     (
         "BlockLeaves",
@@ -215,10 +270,27 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "setBlockBoundsBasedOnState",
         ],
     ),
+    // src: BlockLockedChest.java:11-40, :52-58
+    (
+        "BlockLockedChest",
+        &["canPlaceBlockAt", "getBlockTexture", "updateTick"],
+    ),
     // src: BlockLog.java:19-42
     ("BlockLog", &["harvestBlock", "onBlockRemoval"]),
     // src: BlockMushroom.java:13-39
     ("BlockMushroom", &["canBlockStay", "updateTick"]),
+    // src: BlockPortal.java:10-27, :87-184
+    (
+        "BlockPortal",
+        &[
+            "getCollisionBoundingBoxFromPool",
+            "onEntityCollidedWithBlock",
+            "onNeighborBlockChange",
+            "randomDisplayTick",
+            "setBlockBoundsBasedOnState",
+            "shouldSideBeRendered",
+        ],
+    ),
     // src: BlockPressurePlate.java (super::pressure_plate)
     (
         "BlockPressurePlate",
@@ -344,17 +416,38 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ),
     // src: BlockSponge.java:9-34
     ("BlockSponge", &["onBlockAdded", "onBlockRemoval"]),
-    // src: BlockStairs.java:18-20, :69-71, :129-131
+    // src: BlockStairs.java:18-184
     (
         "BlockStairs",
         &[
+            "blockActivated",
             "canCollideCheck",
+            "canPlaceBlockAt",
+            "dropBlockAsItemWithChance",
+            "getBlockBrightness",
+            "getBlockTexture",
+            "getCollidingBoundingBoxes",
+            "getCollisionBoundingBoxFromPool",
+            "getExplosionResistance",
+            "getSelectedBoundingBoxFromPool",
+            "onBlockAdded",
+            "onBlockClicked",
+            "onBlockDestroyedByExplosion",
+            "onBlockDestroyedByPlayer",
+            "onBlockPlacedBy",
+            "onBlockRemoval",
+            "onEntityWalking",
             "randomDisplayTick",
             "setBlockBoundsBasedOnState",
+            "shouldSideBeRendered",
+            "updateTick",
+            "velocityToAddToEntity",
         ],
     ),
     // src: BlockStationary.java:15-21, :32-52
     ("BlockStationary", &["onNeighborBlockChange", "updateTick"]),
+    // src: BlockStep.java:43-58, :76-90
+    ("BlockStep", &["onBlockAdded", "shouldSideBeRendered"]),
     // src: BlockTNT.java:18-68 (the EntityTNTPrimed spawn is WP-2.4, recorded
     // as "EntityTNTPrimed.<init>" by super::tnt)
     (
@@ -384,6 +477,22 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateTick",
         ],
     ),
+    // src: BlockTrapDoor.java:28-178
+    (
+        "BlockTrapDoor",
+        &[
+            "blockActivated",
+            "canPlaceBlockOnSide",
+            "collisionRayTrace",
+            "getCollisionBoundingBoxFromPool",
+            "getSelectedBoundingBoxFromPool",
+            "onBlockClicked",
+            "onBlockPlaced",
+            "onNeighborBlockChange",
+            "setBlockBoundsBasedOnState",
+            "setBlockBoundsForItemRender",
+        ],
+    ),
     // src: BlockWeb.java:10-20
     (
         "BlockWeb",
@@ -392,6 +501,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "onEntityCollidedWithBlock",
         ],
     ),
+    // src: BlockWorkbench.java:19-26
+    ("BlockWorkbench", &["blockActivated"]),
 ];
 
 /// `Block` methods whose every override is a constant, a field read or a
@@ -442,6 +553,10 @@ pub fn render_as_normal_block(id: i32) -> bool {
 
 /// `updateTick(world, x, y, z, rand)`. Base: nothing.
 // src: Block.java:297-298
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: RandomSource) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
@@ -470,7 +585,8 @@ pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: Ran
         K::Torch => return super::torch::update_tick(world, id, x, y, z),
         // src: BlockFire.java:55-113
         K::Fire => return super::fire::update_tick(world, id, x, y, z, rand),
-        K::Stairs { .. } => "BlockStairs.updateTick",
+        // src: BlockStairs.java:154-156 (modelBlock.updateTick)
+        K::Stairs { model_block } => return update_tick(world, model_block, x, y, z, rand),
         // src: BlockCrops.java:18-31
         K::Crops => return super::crops::update_tick(world, id, x, y, z, rand),
         // src: BlockFarmland.java:34-48
@@ -497,7 +613,8 @@ pub fn update_tick(world: &mut World, id: i32, x: i32, y: i32, z: i32, rand: Ran
         K::RedstoneRepeater {
             is_repeater_powered,
         } => return super::repeater::update_tick(world, x, y, z, is_repeater_powered),
-        K::LockedChest => "BlockLockedChest.updateTick",
+        // src: BlockLockedChest.java:56-58 (`rand` unused)
+        K::LockedChest => return super::locked_chest::update_tick(world, x, y, z),
         _ => return,
     };
     untranscribed(world, what);
@@ -524,14 +641,18 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Rail { .. } | K::DetectorRail => "BlockRail.onBlockAdded",
         K::PistonBase { .. } => "BlockPistonBase.onBlockAdded",
         K::PistonMoving => "BlockPistonMoving.onBlockAdded",
-        K::Step { .. } => "BlockStep.onBlockAdded",
+        // src: BlockStep.java:43-58
+        K::Step { .. } => return super::step::on_block_added(world, id, x, y, z),
         // src: BlockTNT.java:18-25
         K::Tnt => return super::tnt::on_block_added(world, x, y, z),
         // src: BlockTorch.java:78-92
         K::Torch => return super::torch::on_block_added(world, id, x, y, z),
         // src: BlockFire.java:191-199
         K::Fire => return super::fire::on_block_added(world, id, x, y, z),
-        K::Stairs { .. } => "BlockStairs.onBlockAdded",
+        // src: BlockStairs.java:137-140
+        K::Stairs { model_block } => {
+            return super::stairs::on_block_added(world, id, model_block, x, y, z);
+        }
         // src: BlockRedstoneWire.java:185-220
         K::RedstoneWire => return super::redstone_wire::on_block_added(world, id, x, y, z),
         K::Furnace { .. } => "BlockFurnace.onBlockAdded",
@@ -552,6 +673,10 @@ pub fn on_block_added(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
 
 /// `onBlockRemoval(world, x, y, z)`. Base: nothing.
 // src: Block.java:316-317
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn on_block_removal(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
@@ -566,7 +691,8 @@ pub fn on_block_removal(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
         K::Note | K::MobSpawner | K::Sign { .. } => "BlockContainer.onBlockRemoval",
         K::PistonExtension => "BlockPistonExtension.onBlockRemoval",
         K::PistonMoving => "BlockPistonMoving.onBlockRemoval",
-        K::Stairs { .. } => "BlockStairs.onBlockRemoval",
+        // src: BlockStairs.java:142-144 (modelBlock.onBlockRemoval)
+        K::Stairs { model_block } => return on_block_removal(world, model_block, x, y, z),
         K::Chest => "BlockChest.onBlockRemoval",
         // src: BlockRedstoneWire.java:222-257
         K::RedstoneWire => return super::redstone_wire::on_block_removal(world, id, x, y, z),
@@ -618,7 +744,8 @@ pub fn on_neighbor_block_change(
         }
         K::Dispenser => "BlockDispenser.onNeighborBlockChange",
         K::Note => "BlockNote.onNeighborBlockChange",
-        K::Bed => "BlockBed.onNeighborBlockChange",
+        // src: BlockBed.java:121-135
+        K::Bed => return super::bed::on_neighbor_block_change(world, id, x, y, z),
         K::Rail { .. } | K::DetectorRail => "BlockRail.onNeighborBlockChange",
         K::PistonBase { .. } => "BlockPistonBase.onNeighborBlockChange",
         K::PistonExtension => "BlockPistonExtension.onNeighborBlockChange",
@@ -636,8 +763,12 @@ pub fn on_neighbor_block_change(
         // src: BlockFarmland.java:85-92
         K::Farmland => return super::farmland::on_neighbor_block_change(world, x, y, z),
         K::Sign { .. } => "BlockSign.onNeighborBlockChange",
-        K::Door => "BlockDoor.onNeighborBlockChange",
-        K::Ladder => "BlockLadder.onNeighborBlockChange",
+        // src: BlockDoor.java:134-169
+        K::Door => {
+            return super::door::on_neighbor_block_change(world, id, x, y, z, neighbor_id);
+        }
+        // src: BlockLadder.java:99-124
+        K::Ladder => return super::ladder::on_neighbor_block_change(world, id, x, y, z),
         // src: BlockLever.java:85-119
         K::Lever => return super::lever::on_neighbor_block_change(world, id, x, y, z),
         // src: BlockPressurePlate.java:40-51
@@ -656,8 +787,10 @@ pub fn on_neighbor_block_change(
         K::Cactus => return super::cactus::on_neighbor_block_change(world, id, x, y, z),
         // src: BlockReed.java:50-52
         K::Reed => return super::cactus::reed_on_neighbor_block_change(world, id, x, y, z),
-        K::Portal => "BlockPortal.onNeighborBlockChange",
-        K::Cake => "BlockCake.onNeighborBlockChange",
+        // src: BlockPortal.java:87-118
+        K::Portal => return super::portal::on_neighbor_block_change(world, id, x, y, z),
+        // src: BlockCake.java:94-100
+        K::Cake => return super::cake::on_neighbor_block_change(world, id, x, y, z),
         // src: BlockRedstoneRepeater.java:86-101
         K::RedstoneRepeater {
             is_repeater_powered,
@@ -671,7 +804,10 @@ pub fn on_neighbor_block_change(
                 is_repeater_powered,
             );
         }
-        K::TrapDoor => "BlockTrapDoor.onNeighborBlockChange",
+        // src: BlockTrapDoor.java:94-126
+        K::TrapDoor => {
+            return super::trap_door::on_neighbor_block_change(world, id, x, y, z, neighbor_id);
+        }
         _ => return,
     };
     untranscribed(world, what);
@@ -719,7 +855,8 @@ pub fn get_collision_bounding_box_from_pool(
         K::Torch | K::RedstoneTorch { .. } => return None,
         // src: BlockFire.java:31-33
         K::Fire => return super::fire::get_collision_bounding_box_from_pool(),
-        K::Stairs { .. } => "BlockStairs.getCollisionBoundingBoxFromPool",
+        // src: BlockStairs.java:22-24 (super)
+        K::Stairs { .. } => return Some(base_collision_box(world, id, x, y, z)),
         // src: BlockRedstoneWire.java:21-23
         K::RedstoneWire => return None,
         // src: BlockFarmland.java:14-16
@@ -729,8 +866,16 @@ pub fn get_collision_bounding_box_from_pool(
             ));
         }
         K::Sign { .. } => "BlockSign.getCollisionBoundingBoxFromPool",
-        K::Door => "BlockDoor.getCollisionBoundingBoxFromPool",
-        K::Ladder => "BlockLadder.getCollisionBoundingBoxFromPool",
+        // src: BlockDoor.java:55-58
+        K::Door => {
+            super::door::set_block_bounds_based_on_state(world, id, x, y, z);
+            return Some(base_collision_box(world, id, x, y, z));
+        }
+        // src: BlockLadder.java:10-30
+        K::Ladder => {
+            super::ladder::set_bounds_from_metadata(world, id, x, y, z);
+            return Some(base_collision_box(world, id, x, y, z));
+        }
         // src: BlockLever.java:8-10, BlockPressurePlate.java:21-23, BlockButton.java:11-13
         K::Lever | K::PressurePlate { .. } | K::Button => return None,
         // src: BlockSnow.java:12-15
@@ -739,12 +884,23 @@ pub fn get_collision_bounding_box_from_pool(
         K::Cactus => return Some(super::cactus::get_collision_bounding_box_from_pool(x, y, z)),
         // src: BlockReed.java:66-68
         K::Reed => return None,
-        K::Fence => "BlockFence.getCollisionBoundingBoxFromPool",
+        // src: BlockFence.java:16-18
+        K::Fence => return Some(super::fence::get_collision_bounding_box_from_pool(x, y, z)),
         // src: BlockSoulSand.java:8-11
         K::SoulSand => return super::soul_sand::get_collision_bounding_box_from_pool(x, y, z),
-        K::Portal => "BlockPortal.getCollisionBoundingBoxFromPool",
-        K::Cake => "BlockCake.getCollisionBoundingBoxFromPool",
-        K::TrapDoor => "BlockTrapDoor.getCollisionBoundingBoxFromPool",
+        // src: BlockPortal.java:10-12
+        K::Portal => return None,
+        // src: BlockCake.java:25-31
+        K::Cake => {
+            return Some(super::cake::get_collision_bounding_box_from_pool(
+                world, x, y, z,
+            ));
+        }
+        // src: BlockTrapDoor.java:33-36
+        K::TrapDoor => {
+            super::trap_door::set_block_bounds_based_on_state(world, id, x, y, z);
+            return Some(base_collision_box(world, id, x, y, z));
+        }
         _ => return Some(base_collision_box(world, id, x, y, z)),
     };
     untranscribed(world, what);
@@ -768,7 +924,10 @@ pub fn get_colliding_bounding_boxes(
     let what = match b.kind {
         K::PistonBase { .. } => Some("BlockPistonBase.getCollidingBoundingBoxes"),
         K::PistonExtension => Some("BlockPistonExtension.getCollidingBoundingBoxes"),
-        K::Stairs { .. } => Some("BlockStairs.getCollidingBoundingBoxes"),
+        // src: BlockStairs.java:42-67
+        K::Stairs { .. } => {
+            return super::stairs::get_colliding_bounding_boxes(world, id, x, y, z, mask, list);
+        }
         _ => None,
     };
     if let Some(what) = what {
@@ -800,12 +959,15 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         }
         // src: BlockFire.java:181-183
         K::Fire => return super::fire::can_place_block_at(world, x, y, z),
-        K::Stairs { .. } => Some("BlockStairs.canPlaceBlockAt"),
+        // src: BlockStairs.java:133-135 (modelBlock.canPlaceBlockAt)
+        K::Stairs { model_block } => return can_place_block_at(world, model_block, x, y, z),
         K::Chest => Some("BlockChest.canPlaceBlockAt"),
         // src: BlockRedstoneWire.java:41-43
         K::RedstoneWire => return super::redstone_wire::can_place_block_at(world, x, y, z),
-        K::Door => Some("BlockDoor.canPlaceBlockAt"),
-        K::Ladder => Some("BlockLadder.canPlaceBlockAt"),
+        // src: BlockDoor.java:188-194
+        K::Door => return super::door::can_place_block_at(world, x, y, z),
+        // src: BlockLadder.java:66-76
+        K::Ladder => return super::ladder::can_place_block_at(world, x, y, z),
         // src: BlockLever.java:38-50
         K::Lever => return super::lever::can_place_block_at(world, x, y, z),
         // src: BlockPressurePlate.java:33-35
@@ -820,13 +982,16 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         K::Cactus => return super::cactus::can_place_block_at(world, id, x, y, z),
         // src: BlockReed.java:33-48
         K::Reed => return super::cactus::reed_can_place_block_at(world, id, x, y, z),
-        K::Fence => Some("BlockFence.canPlaceBlockAt"),
+        // src: BlockFence.java:8-14
+        K::Fence => return super::fence::can_place_block_at(world, id, x, y, z),
         // src: BlockPumpkin.java:50-53
         K::Pumpkin { .. } => return super::pumpkin::can_place_block_at(world, x, y, z),
-        K::Cake => Some("BlockCake.canPlaceBlockAt"),
+        // src: BlockCake.java:90-92
+        K::Cake => return super::cake::can_place_block_at(world, x, y, z),
         // src: BlockRedstoneRepeater.java:20-22
         K::RedstoneRepeater { .. } => return super::repeater::can_place_block_at(world, x, y, z),
-        K::LockedChest => Some("BlockLockedChest.canPlaceBlockAt"),
+        // src: BlockLockedChest.java:52-54
+        K::LockedChest => return super::locked_chest::can_place_block_at(),
         _ => None,
     };
     if let Some(what) = what {
@@ -855,7 +1020,8 @@ pub fn can_place_block_on_side(
         K::Lever => return super::lever::can_place_block_on_side(world, x, y, z, side),
         // src: BlockButton.java:27-37
         K::Button => return super::button::can_place_block_on_side(world, x, y, z, side),
-        K::TrapDoor => Some("BlockTrapDoor.canPlaceBlockOnSide"),
+        // src: BlockTrapDoor.java:154-178
+        K::TrapDoor => return super::trap_door::can_place_block_on_side(world, x, y, z, side),
         _ => None,
     };
     if let Some(what) = what {
@@ -874,22 +1040,25 @@ pub fn block_activated(
     z: i32,
     player: &mut Entity,
 ) -> bool {
-    let _ = (x, y, z, player);
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
     let what = match b.kind {
         K::Dispenser => "BlockDispenser.blockActivated",
         K::Note => "BlockNote.blockActivated",
-        K::Bed => "BlockBed.blockActivated",
+        // src: BlockBed.java:14-83
+        K::Bed => return super::bed::block_activated(world, id, x, y, z, player),
         K::PistonBase { .. } => "BlockPistonBase.blockActivated",
         K::PistonMoving => "BlockPistonMoving.blockActivated",
         // src: BlockTNT.java:66-68
         K::Tnt => return super::tnt::block_activated(),
-        K::Stairs { .. } => "BlockStairs.blockActivated",
+        // src: BlockStairs.java:158-160 (modelBlock.blockActivated)
+        K::Stairs { model_block } => return block_activated(world, model_block, x, y, z, player),
         K::Chest => "BlockChest.blockActivated",
-        K::Workbench => "BlockWorkbench.blockActivated",
+        // src: BlockWorkbench.java:19-26
+        K::Workbench => return super::workbench::block_activated(world),
         K::Furnace { .. } => "BlockFurnace.blockActivated",
-        K::Door => "BlockDoor.blockActivated",
+        // src: BlockDoor.java:89-111
+        K::Door => return super::door::block_activated(world, id, x, y, z, player),
         // src: BlockLever.java:153-178
         K::Lever => return super::lever::block_activated(world, id, x, y, z),
         // src: BlockRedstoneOre.java:31-34
@@ -897,10 +1066,12 @@ pub fn block_activated(
         // src: BlockButton.java:148-174
         K::Button => return super::button::block_activated(world, id, x, y, z),
         K::JukeBox => "BlockJukeBox.blockActivated",
-        K::Cake => "BlockCake.blockActivated",
+        // src: BlockCake.java:67-70
+        K::Cake => return super::cake::block_activated(world, x, y, z, player),
         // src: BlockRedstoneRepeater.java:119-125
         K::RedstoneRepeater { .. } => return super::repeater::block_activated(world, x, y, z),
-        K::TrapDoor => "BlockTrapDoor.blockActivated",
+        // src: BlockTrapDoor.java:74-83
+        K::TrapDoor => return super::trap_door::block_activated(world, id, x, y, z, player),
         _ => return false,
     };
     untranscribed(world, what);
@@ -909,22 +1080,24 @@ pub fn block_activated(
 
 /// `onEntityWalking(world, x, y, z, entity)`. Base: nothing.
 // src: Block.java:510-511
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn on_entity_walking(world: &mut World, id: i32, x: i32, y: i32, z: i32, e: &mut Entity) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockLeaves.java:190-192 (only `super`)
-        K::Leaves => return super::leaves::on_entity_walking(),
-        K::Stairs { .. } => "BlockStairs.onEntityWalking",
+        K::Leaves => super::leaves::on_entity_walking(),
+        // src: BlockStairs.java:150-152 (modelBlock.onEntityWalking)
+        K::Stairs { model_block } => on_entity_walking(world, model_block, x, y, z, e),
         // src: BlockFarmland.java:50-55
-        K::Farmland => return super::farmland::on_entity_walking(world, x, y, z, e),
+        K::Farmland => super::farmland::on_entity_walking(world, x, y, z, e),
         // src: BlockRedstoneOre.java:26-29
-        K::RedstoneOre { .. } => {
-            return super::redstone_ore::on_entity_walking(world, id, x, y, z);
-        }
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::RedstoneOre { .. } => super::redstone_ore::on_entity_walking(world, id, x, y, z),
+        _ => {}
+    }
 }
 
 /// `onEntityCollidedWithBlock(world, x, y, z, entity)`. Base: nothing.
@@ -959,7 +1132,8 @@ pub fn on_entity_collided_with_block(
         K::Cactus => return super::cactus::on_entity_collided_with_block(world, e),
         // src: BlockSoulSand.java:13-16
         K::SoulSand => return super::soul_sand::on_entity_collided_with_block(e),
-        K::Portal => "BlockPortal.onEntityCollidedWithBlock",
+        // src: BlockPortal.java:150-155
+        K::Portal => return super::portal::on_entity_collided_with_block(world, e),
         _ => return,
     };
     untranscribed(world, what);
@@ -968,6 +1142,10 @@ pub fn on_entity_collided_with_block(
 /// `velocityToAddToEntity(world, x, y, z, entity, vec)`: fluids push.
 /// Base: nothing.
 // src: Block.java:519-520
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn velocity_to_add_to_entity(
     world: &mut World,
     id: i32,
@@ -979,15 +1157,15 @@ pub fn velocity_to_add_to_entity(
 ) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockFluid.java:180-185
         K::Flowing | K::Stationary => {
-            return super::fluid::velocity_to_add_to_entity(world, id, x, y, z, e, v);
+            super::fluid::velocity_to_add_to_entity(world, id, x, y, z, e, v)
         }
-        K::Stairs { .. } => "BlockStairs.velocityToAddToEntity",
-        _ => return,
-    };
-    untranscribed(world, what);
+        // src: BlockStairs.java:121-123 (modelBlock.velocityToAddToEntity)
+        K::Stairs { model_block } => velocity_to_add_to_entity(world, model_block, x, y, z, e, v),
+        _ => {}
+    }
 }
 
 // ---- entry points added for World's queries (WP-1.5) ----------------------------
@@ -1013,7 +1191,6 @@ pub fn can_collide_check(id: i32, meta: i32, stop_on_liquid: bool) -> bool {
 /// metadata. Base: nothing.
 // src: Block.java:522-523
 pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
-    let _ = (x, y, z);
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
@@ -1022,15 +1199,18 @@ pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i3
             world.block_statics.bounds[(id & 255) as usize] = super::BlockBounds::FULL;
             return;
         }
-        K::Bed => "BlockBed.setBlockBoundsBasedOnState",
+        // src: BlockBed.java:117-119
+        K::Bed => return super::bed::set_block_bounds_based_on_state(world, id),
         // src: BlockButton.java:120-142
         K::Button => return super::button::set_block_bounds_based_on_state(world, id, x, y, z),
         K::Rail { .. } | K::DetectorRail => "BlockRail.setBlockBoundsBasedOnState",
         K::PistonBase { .. } => "BlockPistonBase.setBlockBoundsBasedOnState",
         // src: BlockSnow.java:25-29
         K::Snow => return super::snow::set_block_bounds_based_on_state(world, id, x, y, z),
-        K::Door => "BlockDoor.setBlockBoundsBasedOnState",
-        K::Cake => "BlockCake.setBlockBoundsBasedOnState",
+        // src: BlockDoor.java:60-62
+        K::Door => return super::door::set_block_bounds_based_on_state(world, id, x, y, z),
+        // src: BlockCake.java:11-17
+        K::Cake => return super::cake::set_block_bounds_based_on_state(world, id, x, y, z),
         K::PistonExtension => "BlockPistonExtension.setBlockBoundsBasedOnState",
         // src: BlockLever.java:131-147
         K::Lever => return super::lever::set_block_bounds_based_on_state(world, id, x, y, z),
@@ -1040,8 +1220,12 @@ pub fn set_block_bounds_based_on_state(world: &mut World, id: i32, x: i32, y: i3
         K::PressurePlate { .. } => {
             return super::pressure_plate::set_block_bounds_based_on_state(world, id, x, y, z);
         }
-        K::Portal => "BlockPortal.setBlockBoundsBasedOnState",
-        K::TrapDoor => "BlockTrapDoor.setBlockBoundsBasedOnState",
+        // src: BlockPortal.java:14-27
+        K::Portal => return super::portal::set_block_bounds_based_on_state(world, id, x, y, z),
+        // src: BlockTrapDoor.java:38-40
+        K::TrapDoor => {
+            return super::trap_door::set_block_bounds_based_on_state(world, id, x, y, z);
+        }
         _ => return,
     };
     untranscribed(world, what);
@@ -1158,9 +1342,17 @@ pub fn collision_ray_trace(
     let b = block(id)?;
     use BlockKind as K;
     let what = match b.kind {
-        K::Door => Some("BlockDoor.collisionRayTrace"),
+        // src: BlockDoor.java:179-182 (bounds from the state, then super)
+        K::Door => {
+            super::door::set_block_bounds_based_on_state(world, id, x, y, z);
+            None
+        }
         K::Rail { .. } | K::DetectorRail => Some("BlockRail.collisionRayTrace"),
-        K::TrapDoor => Some("BlockTrapDoor.collisionRayTrace"),
+        // src: BlockTrapDoor.java:128-131 (bounds from the metadata, then super)
+        K::TrapDoor => {
+            super::trap_door::set_block_bounds_based_on_state(world, id, x, y, z);
+            None
+        }
         // src: BlockTorch.java:136-153: the bounds for the metadata, then
         // `super.collisionRayTrace` (the base below)
         K::Torch | K::RedstoneTorch { .. } => {
@@ -1301,7 +1493,8 @@ pub fn random_display_tick(
             return super::repeater::random_display_tick(world, x, y, z, rand, is_repeater_powered);
         }
         K::Furnace { .. } => "BlockFurnace.randomDisplayTick",
-        K::Portal => "BlockPortal.randomDisplayTick",
+        // src: BlockPortal.java:157-184
+        K::Portal => return super::portal::random_display_tick(world, id, x, y, z, rand),
         // src: BlockRedstoneTorch.java:151-172
         K::RedstoneTorch { torch_active } => {
             return super::redstone_torch::random_display_tick(world, x, y, z, rand, torch_active);
@@ -1346,14 +1539,13 @@ pub fn get_block_brightness(world: &mut World, id: i32, x: i32, y: i32, z: i32) 
         return base(world);
     };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockFluid.java:195-199
-        K::Flowing | K::Stationary => return super::fluid::get_block_brightness(world, x, y, z),
-        K::Stairs { .. } => "BlockStairs.getBlockBrightness",
-        _ => return base(world),
-    };
-    untranscribed(world, what);
-    base(world)
+        K::Flowing | K::Stationary => super::fluid::get_block_brightness(world, x, y, z),
+        // src: BlockStairs.java:81-83 (modelBlock.getBlockBrightness)
+        K::Stairs { model_block } => get_block_brightness(world, model_block, x, y, z),
+        _ => base(world),
+    }
 }
 
 /// `shouldSideBeRendered(blockAccess, x, y, z, side)`: whether face `side`
@@ -1373,46 +1565,45 @@ pub fn should_side_be_rendered(
         return base_should_side_be_rendered(world, id, x, y, z, side);
     };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockFluid.java:71-80 (super: the base body)
-        K::Flowing | K::Stationary => {
-            return super::fluid::should_side_be_rendered(
-                world,
-                id,
-                x,
-                y,
-                z,
-                side,
-                base_should_side_be_rendered,
-            );
-        }
+        K::Flowing | K::Stationary => super::fluid::should_side_be_rendered(
+            world,
+            id,
+            x,
+            y,
+            z,
+            side,
+            base_should_side_be_rendered,
+        ),
         // src: BlockLeavesBase.java:15-18
-        K::Leaves => return super::leaves::should_side_be_rendered(world, id, x, y, z, side),
+        K::Leaves => super::leaves::should_side_be_rendered(world, id, x, y, z, side),
         // src: BlockBreakable.java:15-18
-        K::Glass { .. } => {
-            return super::misc::breakable_should_side_be_rendered(
-                world,
-                id,
-                x,
-                y,
-                z,
-                side,
-                base_should_side_be_rendered,
-            );
-        }
-        K::Step { .. } => "BlockStep.shouldSideBeRendered",
-        K::Stairs { .. } => "BlockStairs.shouldSideBeRendered",
+        K::Glass { .. } => super::misc::breakable_should_side_be_rendered(
+            world,
+            id,
+            x,
+            y,
+            z,
+            side,
+            base_should_side_be_rendered,
+        ),
+        // src: BlockStep.java:76-90
+        K::Step { .. } => super::step::should_side_be_rendered(world, id, x, y, z, side, |w| {
+            base_should_side_be_rendered(w, id, x, y, z, side)
+        }),
+        // src: BlockStairs.java:38-40 (super)
+        K::Stairs { .. } => base_should_side_be_rendered(world, id, x, y, z, side),
         // src: BlockSnow.java:79-81
-        K::Snow => return super::snow::should_side_be_rendered(world, id, x, y, z, side),
+        K::Snow => super::snow::should_side_be_rendered(world, id, x, y, z, side),
         // src: BlockIce.java:16-18
-        K::Ice => return super::snow::ice_should_side_be_rendered(world, id, x, y, z, side),
-        K::Portal => "BlockPortal.shouldSideBeRendered",
+        K::Ice => super::snow::ice_should_side_be_rendered(world, id, x, y, z, side),
+        // src: BlockPortal.java:120-140
+        K::Portal => super::portal::should_side_be_rendered(world, id, x, y, z, side),
         // src: BlockRedstoneRepeater.java:53-55
-        K::RedstoneRepeater { .. } => return super::repeater::should_side_be_rendered(side),
-        _ => return base_should_side_be_rendered(world, id, x, y, z, side),
-    };
-    untranscribed(world, what);
-    base_should_side_be_rendered(world, id, x, y, z, side)
+        K::RedstoneRepeater { .. } => super::repeater::should_side_be_rendered(side),
+        _ => base_should_side_be_rendered(world, id, x, y, z, side),
+    }
 }
 
 /// The base `shouldSideBeRendered`, reading the singleton's live bounds.
@@ -1478,10 +1669,14 @@ pub fn get_block_texture(
         // src: BlockGrass.java:12-21
         K::Grass => return Some(super::grass::get_block_texture(world, x, y, z, side)),
         K::Dispenser => "BlockDispenser.getBlockTexture",
-        K::Stairs { .. } => "BlockStairs.getBlockTexture",
+        // src: BlockStairs.java:109-111 (modelBlock.getBlockTexture)
+        K::Stairs { model_block } => return get_block_texture(world, model_block, x, y, z, side),
         K::Chest => "BlockChest.getBlockTexture",
         K::Furnace { .. } => "BlockFurnace.getBlockTexture",
-        K::LockedChest => "BlockLockedChest.getBlockTexture",
+        // src: BlockLockedChest.java:11-40
+        K::LockedChest => {
+            return Some(super::locked_chest::get_block_texture(world, x, y, z, side));
+        }
         _ => return base(world),
     };
     untranscribed(world, what);
@@ -1504,14 +1699,30 @@ pub fn get_selected_bounding_box_from_pool(
     };
     use BlockKind as K;
     let what = match b.kind {
-        K::Stairs { .. } => "BlockStairs.getSelectedBoundingBoxFromPool",
+        // src: BlockStairs.java:117-119 (modelBlock.getSelectedBoundingBoxFromPool)
+        K::Stairs { model_block } => {
+            return get_selected_bounding_box_from_pool(world, model_block, x, y, z);
+        }
         K::Sign { .. } => "BlockSign.getSelectedBoundingBoxFromPool",
-        K::Door => "BlockDoor.getSelectedBoundingBoxFromPool",
-        K::Ladder => "BlockLadder.getSelectedBoundingBoxFromPool",
+        // src: BlockDoor.java:50-53
+        K::Door => {
+            super::door::set_block_bounds_based_on_state(world, id, x, y, z);
+            return base_collision_box(world, id, x, y, z);
+        }
+        // src: BlockLadder.java:32-52
+        K::Ladder => {
+            super::ladder::set_bounds_from_metadata(world, id, x, y, z);
+            return base_collision_box(world, id, x, y, z);
+        }
         // src: BlockCactus.java:35-38
         K::Cactus => return super::cactus::get_selected_bounding_box_from_pool(x, y, z),
-        K::Cake => "BlockCake.getSelectedBoundingBoxFromPool",
-        K::TrapDoor => "BlockTrapDoor.getSelectedBoundingBoxFromPool",
+        // src: BlockCake.java:33-39
+        K::Cake => return super::cake::get_selected_bounding_box_from_pool(world, x, y, z),
+        // src: BlockTrapDoor.java:28-31
+        K::TrapDoor => {
+            super::trap_door::set_block_bounds_based_on_state(world, id, x, y, z);
+            return base_collision_box(world, id, x, y, z);
+        }
         // src: Block.java:269-271 (the same expression as Block.java:281-283)
         _ => return base_collision_box(world, id, x, y, z),
     };
@@ -1523,16 +1734,22 @@ pub fn get_selected_bounding_box_from_pool(
 /// the block (PlayerController.java:28; `meta` is the metadata it had).
 /// Base: nothing.
 // src: Block.java:303-304
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn on_block_destroyed_by_player(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockTNT.java:45-56
-        K::Tnt => return super::tnt::on_block_destroyed_by_player(world, x, y, z, meta),
-        K::Stairs { .. } => "BlockStairs.onBlockDestroyedByPlayer",
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::Tnt => super::tnt::on_block_destroyed_by_player(world, x, y, z, meta),
+        // src: BlockStairs.java:77-79 (modelBlock.onBlockDestroyedByPlayer)
+        K::Stairs { model_block } => {
+            on_block_destroyed_by_player(world, model_block, x, y, z, meta)
+        }
+        _ => {}
+    }
 }
 
 /// `dropBlockAsItem(world, x, y, z, meta)` (final):
@@ -1561,9 +1778,18 @@ pub fn drop_block_as_item_with_chance(
     let Some(b) = block(id) else { return };
     use BlockKind as K;
     let what = match b.kind {
-        K::Bed => Some("BlockBed.dropBlockAsItemWithChance"),
+        // src: BlockBed.java:194-199: Block's body unless isBlockFootOfBed
+        K::Bed => {
+            if super::bed::is_block_foot_of_bed(meta) {
+                return;
+            }
+            None
+        }
         K::PistonMoving => Some("BlockPistonMoving.dropBlockAsItemWithChance"),
-        K::Stairs { .. } => Some("BlockStairs.dropBlockAsItemWithChance"),
+        // src: BlockStairs.java:146-148 (modelBlock.dropBlockAsItemWithChance)
+        K::Stairs { model_block } => {
+            return drop_block_as_item_with_chance(world, model_block, x, y, z, meta, chance);
+        }
         // src: BlockCrops.java:89-105
         K::Crops => {
             return super::crops::drop_block_as_item_with_chance(world, id, x, y, z, meta, chance);
@@ -1641,31 +1867,38 @@ pub fn block_strength(world: &mut World, id: i32, player: &Entity) -> f32 {
 /// `blockResistance / 5.0F` ([`super::BlockDef::get_explosion_resistance`]).
 /// 0 for an id with no block. `world` only records untranscribed overrides.
 // src: Block.java:371-373
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn get_explosion_resistance(world: &World, id: i32, exploder: Option<&Entity>) -> f32 {
-    let _ = exploder;
     let Some(b) = block(id) else { return 0.0 };
     use BlockKind as K;
-    let what = match b.kind {
-        K::Stairs { .. } => "BlockStairs.getExplosionResistance",
-        _ => return b.get_explosion_resistance(),
-    };
-    untranscribed(world, what);
-    b.get_explosion_resistance()
+    match b.kind {
+        // src: BlockStairs.java:85-87: modelBlock.getExplosionResistance, so the
+        // stairs' own setResistance (BlockStairs.java:13) is never read.
+        K::Stairs { model_block } => get_explosion_resistance(world, model_block, exploder),
+        _ => b.get_explosion_resistance(),
+    }
 }
 
 /// `onBlockDestroyedByExplosion(world, x, y, z)`: after an explosion removed
 /// the block (Explosion.java:160). Base: nothing.
 // src: Block.java:490-491
+#[allow(
+    clippy::only_used_in_recursion,
+    reason = "the BlockStairs arm forwards the parameters to the model block's entry point"
+)]
 pub fn on_block_destroyed_by_explosion(world: &mut World, id: i32, x: i32, y: i32, z: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockTNT.java:39-43
-        K::Tnt => return super::tnt::on_block_destroyed_by_explosion(world, x, y, z),
-        K::Stairs { .. } => "BlockStairs.onBlockDestroyedByExplosion",
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::Tnt => super::tnt::on_block_destroyed_by_explosion(world, x, y, z),
+        // src: BlockStairs.java:162-164 (modelBlock.onBlockDestroyedByExplosion)
+        K::Stairs { model_block } => on_block_destroyed_by_explosion(world, model_block, x, y, z),
+        _ => {}
+    }
 }
 
 /// `onBlockPlaced(world, x, y, z, side)`: an item placed the block against
@@ -1675,20 +1908,19 @@ pub fn on_block_destroyed_by_explosion(world: &mut World, id: i32, x: i32, y: i3
 pub fn on_block_placed(world: &mut World, id: i32, x: i32, y: i32, z: i32, side: i32) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockTorch.java:45-68
-        K::Torch | K::RedstoneTorch { .. } => {
-            return super::torch::on_block_placed(world, x, y, z, side);
-        }
-        K::Ladder => "BlockLadder.onBlockPlaced",
+        K::Torch | K::RedstoneTorch { .. } => super::torch::on_block_placed(world, x, y, z, side),
+        // src: BlockLadder.java:78-97
+        K::Ladder => super::ladder::on_block_placed(world, x, y, z, side),
         // src: BlockLever.java:52-83
-        K::Lever => return super::lever::on_block_placed(world, id, x, y, z, side),
+        K::Lever => super::lever::on_block_placed(world, id, x, y, z, side),
         // src: BlockButton.java:51-68
-        K::Button => return super::button::on_block_placed(world, x, y, z, side),
-        K::TrapDoor => "BlockTrapDoor.onBlockPlaced",
-        _ => return,
-    };
-    untranscribed(world, what);
+        K::Button => super::button::on_block_placed(world, x, y, z, side),
+        // src: BlockTrapDoor.java:133-152
+        K::TrapDoor => super::trap_door::on_block_placed(world, x, y, z, side),
+        _ => {}
+    }
 }
 
 /// `onBlockClicked(world, x, y, z, player)`: left-click on the block
@@ -1701,8 +1933,10 @@ pub fn on_block_clicked(world: &mut World, id: i32, x: i32, y: i32, z: i32, play
         K::Note => "BlockNote.onBlockClicked",
         // src: BlockTNT.java:58-64
         K::Tnt => return super::tnt::on_block_clicked(world, x, y, z, player),
-        K::Stairs { .. } => "BlockStairs.onBlockClicked",
-        K::Door => "BlockDoor.onBlockClicked",
+        // src: BlockStairs.java:73-75 (modelBlock.onBlockClicked)
+        K::Stairs { model_block } => return on_block_clicked(world, model_block, x, y, z, player),
+        // src: BlockDoor.java:85-87
+        K::Door => return super::door::on_block_clicked(world, id, x, y, z, player),
         // src: BlockLever.java:149-151
         K::Lever => return super::lever::on_block_clicked(world, id, x, y, z),
         // src: BlockRedstoneOre.java:21-24
@@ -1711,8 +1945,10 @@ pub fn on_block_clicked(world: &mut World, id: i32, x: i32, y: i32, z: i32, play
         }
         // src: BlockButton.java:144-146
         K::Button => return super::button::on_block_clicked(world, id, x, y, z),
-        K::Cake => "BlockCake.onBlockClicked",
-        K::TrapDoor => "BlockTrapDoor.onBlockClicked",
+        // src: BlockCake.java:72-74
+        K::Cake => return super::cake::on_block_clicked(world, x, y, z, player),
+        // src: BlockTrapDoor.java:70-72
+        K::TrapDoor => return super::trap_door::on_block_clicked(world, id, x, y, z, player),
         _ => return,
     };
     untranscribed(world, what);
@@ -1801,8 +2037,10 @@ pub fn set_block_bounds_for_item_render(world: &mut World, id: i32) {
         }
         // src: BlockButton.java:250-255
         K::Button => return super::button::set_block_bounds_for_item_render(world, id),
-        K::Cake => "BlockCake.setBlockBoundsForItemRender",
-        K::TrapDoor => "BlockTrapDoor.setBlockBoundsForItemRender",
+        // src: BlockCake.java:19-23
+        K::Cake => return super::cake::set_block_bounds_for_item_render(world, id),
+        // src: BlockTrapDoor.java:42-45
+        K::TrapDoor => return super::trap_door::set_block_bounds_for_item_render(world, id),
         _ => return,
     };
     untranscribed(world, what);
@@ -1857,24 +2095,23 @@ fn base_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: 
 pub fn can_block_stay(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
     let Some(b) = block(id) else { return true };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockFlower.java:39-41
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Crops => {
-            return super::flower::can_block_stay(world, id, x, y, z);
+            super::flower::can_block_stay(world, id, x, y, z)
         }
         // src: BlockMushroom.java:33-39
-        K::Mushroom => return super::flower::mushroom_can_block_stay(world, id, x, y, z),
+        K::Mushroom => super::flower::mushroom_can_block_stay(world, id, x, y, z),
         // src: BlockCactus.java:72-85
-        K::Cactus => return super::cactus::can_block_stay(world, id, x, y, z),
+        K::Cactus => super::cactus::can_block_stay(world, id, x, y, z),
         // src: BlockReed.java:62-64
-        K::Reed => return super::cactus::reed_can_block_stay(world, id, x, y, z),
-        K::Cake => "BlockCake.canBlockStay",
+        K::Reed => super::cactus::reed_can_block_stay(world, id, x, y, z),
+        // src: BlockCake.java:102-104
+        K::Cake => super::cake::can_block_stay(world, x, y, z),
         // src: BlockRedstoneRepeater.java:24-26
-        K::RedstoneRepeater { .. } => return super::repeater::can_block_stay(world, x, y, z),
-        _ => return true,
-    };
-    untranscribed(world, what);
-    true
+        K::RedstoneRepeater { .. } => super::repeater::can_block_stay(world, x, y, z),
+        _ => true,
+    }
 }
 
 /// `onBlockPlacedBy(world, x, y, z, placer)`: after an item placed the
@@ -1887,7 +2124,8 @@ pub fn on_block_placed_by(world: &mut World, id: i32, x: i32, y: i32, z: i32, pl
     let what = match b.kind {
         K::Dispenser => "BlockDispenser.onBlockPlacedBy",
         K::PistonBase { .. } => "BlockPistonBase.onBlockPlacedBy",
-        K::Stairs { .. } => "BlockStairs.onBlockPlacedBy",
+        // src: BlockStairs.java:166-184
+        K::Stairs { .. } => return super::stairs::on_block_placed_by(world, x, y, z, placer),
         K::Furnace { .. } => "BlockFurnace.onBlockPlacedBy",
         // src: BlockPumpkin.java:55-58
         K::Pumpkin { .. } => return super::pumpkin::on_block_placed_by(world, x, y, z, placer),

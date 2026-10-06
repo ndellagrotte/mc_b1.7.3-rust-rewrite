@@ -54,20 +54,27 @@
 //! `setNeighborNotifyOnMetadataChange` in this tree (Block.java:23); the Java
 //! name is kept.
 
+pub mod bed;
 pub mod block_texture;
 pub mod button;
 pub mod cactus;
+pub mod cake;
 pub mod crops;
 pub mod dispatch;
+pub mod door;
 pub mod farmland;
+pub mod fence;
 pub mod fire;
 pub mod flower;
 pub mod fluid;
 pub mod grass;
+pub mod ladder;
 pub mod leaves;
 pub mod lever;
+pub mod locked_chest;
 pub mod material;
 pub mod misc;
+pub mod portal;
 pub mod pressure_plate;
 pub mod pumpkin;
 pub mod redstone_ore;
@@ -78,10 +85,14 @@ pub mod sand;
 pub mod sapling;
 pub mod snow;
 pub mod soul_sand;
+pub mod stairs;
+pub mod step;
 mod table;
 pub mod tnt;
 pub mod torch;
+pub mod trap_door;
 pub mod web;
+pub mod workbench;
 
 pub use material::{MapColor, Material};
 
