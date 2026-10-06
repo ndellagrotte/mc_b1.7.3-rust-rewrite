@@ -55,7 +55,7 @@ use mc_core::math::{self, floor_double};
 use super::creature::{self, CreatureData};
 use super::data_watcher::WatchValue;
 use super::living::{self, EntityView, lv, lv_mut};
-use super::{AnimalData, Entity, EntityBase, EntityKindData, LivingData, base, cow, dispatch};
+use super::{AnimalData, Entity, EntityBase, EntityKindData, LivingData, base, dispatch};
 use crate::item;
 use crate::world::World;
 
@@ -836,7 +836,7 @@ fn eat_held_item(player: &mut Entity) {
         .expect("the held stack is in slot currentItem");
     s.stack_size = s.stack_size.wrapping_sub(1);
     if s.stack_size <= 0 {
-        cow::set_inventory_slot_contents(&mut p.inventory, slot, None);
+        p.inventory.set_inventory_slot_contents(slot, None);
     }
 }
 

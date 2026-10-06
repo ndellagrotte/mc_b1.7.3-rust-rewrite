@@ -7,14 +7,8 @@
 //! | 18-32 | `getLivingSound`, `getHurtSound`, `getDeathSound`, `getSoundVolume` (0.4) | [`super::dispatch`] |
 //! | 34-36 | `getDropItemId` (leather) | [`get_drop_item_id`] |
 //! | 38-46 | `interact` (milking) | [`interact`] |
-//!
-//! Also here: `InventoryPlayer.setInventorySlotContents`
-//! ([`set_inventory_slot_contents`]), which the milking and
-//! `EntityWolf.interact` write through; `crate::inventory` has no setter yet
-//! (WP-2.5 owns it).
 
 use super::{AnimalData, CreatureData, Entity, EntityBase, EntityKindData, LivingData};
-use crate::inventory::InventoryPlayer;
 use crate::item::ItemStack;
 use crate::world::World;
 
@@ -76,40 +70,10 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
         let slot = p.inventory.current_item;
         // src: ItemStack.java:21-23, :33-38 (new ItemStack(Item): count 1,
         // damage 0)
-        set_inventory_slot_contents(
-            &mut p.inventory,
-            slot,
-            Some(ItemStack::new(BUCKET_MILK, 1, 0)),
-        );
+        p.inventory
+            .set_inventory_slot_contents(slot, Some(ItemStack::new(BUCKET_MILK, 1, 0)));
         true
     } else {
         false
-    }
-}
-
-/// `InventoryPlayer.setInventorySlotContents(slot, stack)`: slots from 36
-/// are the armour slots. Panics where Java throws
-/// `ArrayIndexOutOfBoundsException` (a slot outside 0..=39).
-// src: InventoryPlayer.java:180-188
-pub(crate) fn set_inventory_slot_contents(
-    inv: &mut InventoryPlayer,
-    var1: i32,
-    var2: Option<ItemStack>,
-) {
-    let main_len = inv.main_inventory.len() as i32;
-    let slot = if var1 >= main_len {
-        usize::try_from(var1 - main_len)
-            .ok()
-            .and_then(|i| inv.armor_inventory.get_mut(i))
-    } else {
-        usize::try_from(var1)
-            .ok()
-            .and_then(|i| inv.main_inventory.get_mut(i))
-    };
-    match slot {
-        Some(s) => *s = var2,
-        None => panic!(
-            "InventoryPlayer.setInventorySlotContents({var1}): ArrayIndexOutOfBoundsException"
-        ),
     }
 }
