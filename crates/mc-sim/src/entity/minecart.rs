@@ -38,7 +38,10 @@
 //!
 //! `interact` of a chest cart opens its GUI (`displayGUIChest`, a client
 //! screen and `ContainerChest`, WP-2.5): recorded as
-//! `"EntityPlayer.displayGUIChest"`.
+//! `"EntityPlayerSP.displayGUIChest"`. Only EntityPlayerSP opens the
+//! GuiChest (EntityPlayerSP.java:117-119); EntityPlayer's version is empty
+//! (EntityPlayer.java:340-341), so the oracle's HarnessPlayer (an
+//! EntityPlayer) does nothing here, as the Rust side does.
 
 use mc_core::Vec3D;
 use mc_core::math::{self, floor_double, jmath};
@@ -1008,8 +1011,11 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
     } else if ty == 1 {
         if !world.multiplayer_world {
             // src: EntityMinecart.java:774 (`var1.displayGUIChest(this)`:
-            // EntityPlayerSP opens GuiChest over a ContainerChest, WP-2.5)
-            world.note_unimplemented("EntityPlayer.displayGUIChest");
+            // EntityPlayerSP opens GuiChest over a ContainerChest,
+            // EntityPlayerSP.java:117-119, WP-2.5). EntityPlayer's version
+            // is empty (EntityPlayer.java:340-341), so the oracle's
+            // HarnessPlayer does nothing here.
+            world.note_unimplemented("EntityPlayerSP.displayGUIChest");
         }
     } else if ty == 2 {
         if let Some(p) = var1.kind.player_mut() {

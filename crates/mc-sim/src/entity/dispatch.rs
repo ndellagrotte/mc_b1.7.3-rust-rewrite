@@ -45,7 +45,7 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup's
     // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
     ("EntityArrow", &["onCollideWithPlayer", "onUpdate"]),
-    // src: EntityBoat.java:29-31, :36-46, :59-61, :63-120, :318-324, :332-346
+    // src: EntityBoat.java:29-31, :36-46, :59-61, :63-316, :318-324, :332-346
     // (super::boat)
     (
         "EntityBoat",
