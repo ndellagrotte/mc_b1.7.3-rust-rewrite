@@ -36,6 +36,7 @@ final class TierA {
         HarnessMath.seed(sc.containsKey("seed") ? seed(sc) : 0L);
         switch (kind) {
             case "item_table": return ItemTable.run(sc); // WP-1.2
+            case "recipe_table": return RecipeTable.run(sc); // WP-2.5
             case "java_random": return javaRandom(sc);
             case "sine_table": return sineTable();
             case "math_sweep": return mathSweep(sc);

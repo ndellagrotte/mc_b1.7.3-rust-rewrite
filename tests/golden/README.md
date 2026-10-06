@@ -33,7 +33,7 @@ depends on another: the oracle reseeds its `Math.random()` replacement stream
 (`HarnessMath`, see `tools/oracle/README.md`) from the scenario `seed` (0 when there
 is none) at the start of every scenario. A scenario without a `seed` is allowed only
 for the kinds whose output is a pure function of the scenario file: `sine_table`,
-`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`, `item_table`
+`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`, `item_table`, `recipe_table`
 (`tools/oracle/check-sensitivity.sh` enforces this).
 
 ### `kind: "java_random"` — `java.util.Random` sequences
@@ -472,6 +472,39 @@ non-null item may appear in `stacks` (a null item is a `NullPointerException` th
 port does not model).
 
 Scenario: `item/item-table`.
+
+### `kind: "recipe_table"` — `CraftingManager`'s recipe list (WP-2.5)
+
+```json
+{"name":"recipe-table","tier":"A","kind":"recipe_table"}
+```
+No seed and no fields: the output is `CraftingManager.getInstance().getRecipeList()`
+after the static initialisers (`Block` first, as for `item_table`), i.e. the recipes in
+registration order (CraftingManager.java:16-80) after `Collections.sort` with
+`RecipeSorter` (stable: shaped before shapeless, larger `getRecipeSize()` first).
+`mc-golden` models the kind as a unit variant; the Rust side is
+`crates/mc-sim/tests/golden_recipe_table.rs`. Stacks are `{"id","count","damage"}` or
+`null` (the op-line form, `Dumps.stack`). Trace, in this order:
+
+1. `{"t":0,"e":"recipe_count","count":151}`.
+2. One line per recipe, `i` its index in the sorted list:
+   - shaped: `{"e":"recipe","i","kind":"shaped","width","height","size","input","output",
+     "output_item_id","craft","craft_mirrored","craft_2x2"?}`: `input` is the private
+     `recipeItems` (`width × height` entries, row-major, `null` for a blank, damage −1 for
+     a `Block` ingredient, which matches any damage), `size` is `getRecipeSize()`,
+     `output` `getRecipeOutput()`, `output_item_id` the public `recipeOutputItemID`.
+   - shapeless: `{"e":"recipe","i","kind":"shapeless","size","input","output","craft",
+     "craft_2x2"?}`: `input` is the private `recipeItems` list in argument order.
+   - Probes, each `findMatchingRecipe` (the first matching recipe's
+     `getCraftingResult`, or `null`) over a new grid filled with
+     `setInventorySlotContents`, every ingredient as `new ItemStack(id, 1, damage)` with
+     damage −1 replaced by 0: `craft`, a 3×3 grid with the pattern at the top left (cell
+     `(col, row)` is slot `col + 3·row`; shapeless: ingredient `k` in slot `k`);
+     `craft_mirrored` (shaped), the same with each row reversed; `craft_2x2`, present only
+     for a shaped recipe at most 2×2 or a shapeless one of at most 4 ingredients, the
+     pattern in a 2×2 grid (slot `col + 2·row`; shapeless: slot `k`).
+
+Scenario: `recipe/recipe-table`.
 
 ## Tier B/C/S scenarios (WP-0.4)
 

@@ -11,14 +11,14 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `rewrite-math-random.sh` | Copies `src/minecraft` to `build/oracle-src`, rewrites `Math.random()` |
 | `regen.sh` | `build.sh`, runs the harness into `build/golden-out`, copies the results into `tests/golden`, prints `git status --short tests/golden` |
 | `check-reproducible.sh` | Three harness runs, byte-compared (§4.4 item 1) |
-| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table` may lack a seed (§4.4 item 2) |
+| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace` and `power`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace` and `power`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
-`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1), `item_table` (WP-1.2). Tier B/C/S kinds (WP-0.4):
+`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1), `item_table` (WP-1.2), `recipe_table` (WP-2.5). Tier B/C/S kinds (WP-0.4):
 `tick` (a world ticked under ops and dumps; tiers B, C, S) and `world_read` (S).
 
 ## Use
@@ -238,3 +238,15 @@ effects on shared state (`getStrVsBlock`/`canHarvestBlock` read block singletons
 restore, so `ItemTable` calls `setBlockBoundsForItemRender()` on both first (full
 cube, the static-init state) in case an earlier tick scenario in the same JVM left
 a piston extended.
+
+## `recipe_table` (WP-2.5)
+
+`RecipeTable` dumps `CraftingManager.getInstance().getRecipeList()` after
+`HarnessWorld.resetStatics(0)` (Block before Item, as for `item_table`; the singleton
+is immutable once built, so a tick scenario that built it earlier in the same JVM,
+through a player's `ContainerPlayer`, changes nothing). The private fields of
+`ShapedRecipes` (`recipeWidth`, `recipeHeight`, `recipeItems`) and `ShapelessRecipes`
+(`recipeItems`) are read by reflection. The `findMatchingRecipe` probes use an
+`InventoryCrafting` whose event handler is an anonymous `Container` with an empty slot
+list (its `onCraftMatrixChanged` → `updateCraftingResults` does nothing); the tick
+harness's `craft` op builds its grid the same way.

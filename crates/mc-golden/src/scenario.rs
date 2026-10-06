@@ -154,6 +154,10 @@ pub enum ScenarioKind {
     /// samples (WP-1.2; README "`kind: \"item_table\"`"). The kind-specific
     /// fields (`stacks`) are read by `mc-sim/tests/golden_item_table.rs`.
     ItemTable,
+    /// `CraftingManager`'s recipe list in its sorted order, with
+    /// `findMatchingRecipe` probes (WP-2.5; README "`kind: \"recipe_table\"`"). No
+    /// fields; the Rust side is `mc-sim/tests/golden_recipe_table.rs`.
+    RecipeTable,
     /// A kind of tier B/C/S/D that a later work package defines; never
     /// produced for tier A and never serialized.
     #[serde(skip)]
@@ -820,7 +824,7 @@ impl Scenario {
 
 impl ScenarioKind {
     /// Kinds that deserialize into a typed variant.
-    const KNOWN: [&'static str; 11] = [
+    const KNOWN: [&'static str; 12] = [
         "java_random",
         "sine_table",
         "math_sweep",
@@ -832,6 +836,7 @@ impl ScenarioKind {
         "tick",
         "world_read",
         "item_table",
+        "recipe_table",
     ];
 
     /// The `math_sweep` edge-case inputs for `function`, as `f64` bit
