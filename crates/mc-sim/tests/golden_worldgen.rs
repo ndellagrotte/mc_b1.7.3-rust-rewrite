@@ -14,7 +14,8 @@ use mc_golden::{
 };
 
 /// `(value of "stage", reason)` of the trace lines not compared yet.
-const SKIPPED_STAGES: &[(&str, &str)] = &[("populated", "population: WP-1.7")];
+/// Empty since WP-1.7 (population): every stage is compared.
+const SKIPPED_STAGES: &[(&str, &str)] = &[];
 
 /// Why `line` is not compared, if it is not.
 fn skip_reason(line: &TraceLine) -> Option<&'static str> {
@@ -100,6 +101,9 @@ fixtures! {
     nether_seed_neg_4172144991579068934 => "nether-seed--4172144991579068934";
     nether_seed_8675309 => "nether-seed-8675309";
     nether_seed_42_spread => "nether-seed-42-spread";
+    overworld_seed_123_dungeon => "overworld-seed-123-dungeon";
+    nether_seed_123_order_ab => "nether-seed-123-order-ab";
+    nether_seed_123_order_ba => "nether-seed-123-order-ba";
 }
 
 /// Every `tests/golden/worldgen/<name>` with a `scenario.json` has a test.

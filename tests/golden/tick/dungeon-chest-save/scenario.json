@@ -1,0 +1,9 @@
+{"name":"dungeon-chest-save","tier":"S","kind":"tick","seed":123,"dimension":"overworld","save_format":"mcregion","ticks":1,
+ "comment":"WP-1.7: the dungeon of worldgen/overworld-seed-123-dungeon through the save path. Preloading the 3x3 around chunk (1,1) populates it (WorldGenDungeons: mob spawner at (31,13,28), chests at (29,13,28) and (30,13,30)); the save writes the chests' loot (pickCheckLootItem draws on the generator's Random) and the spawner's EntityId (pickMobSpawner) as TileEntities, so the tile_entity lines pin the loot and mob draws. The Rust save path is WP-1.9b.",
+ "ops":[{"t":0,"op":"preload","cx":1,"cz":1,"radius":1},
+        {"t":0,"op":"save","chunks":[{"x":1,"z":1}]}],
+ "dumps":[{"t":0,"what":"chunk_digest","x":1,"z":1},
+          {"t":0,"what":"block","x":31,"y":13,"z":28},
+          {"t":0,"what":"block","x":29,"y":13,"z":28},
+          {"t":0,"what":"block","x":30,"y":13,"z":30},
+          {"t":0,"what":"rng_state"}]}

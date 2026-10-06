@@ -1,0 +1,12 @@
+{
+  "name": "nether-seed-123-order-ab",
+  "tier": "A",
+  "kind": "terrain",
+  "seed": 123,
+  "dimension": "nether",
+  "comment": "WP-1.7: the hellRNG load-order quirk (ChunkProviderHell.populate never reseeds hellRNG). Chunks (0,0) then (2,0): their 3x3 neighbourhoods share the x = 1 column, so each population runs after a different provideChunk than in nether-seed-123-order-ba (the same list reversed), and the populated digests differ between the two.",
+  "chunks": [
+    {"x":0,"z":0},
+    {"x":2,"z":0}
+  ]
+}

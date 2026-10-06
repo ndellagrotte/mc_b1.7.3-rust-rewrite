@@ -1,0 +1,11 @@
+{
+  "name": "overworld-seed-123-dungeon",
+  "tier": "A",
+  "kind": "terrain",
+  "seed": 123,
+  "dimension": "overworld",
+  "comment": "WP-1.7: chunk (1,1) of seed 123 gets a dungeon from its own population (WorldGenDungeons): mob spawner at (31,13,28), chests at (29,13,28) and (30,13,30). The chest loot and the spawner's mob reach this trace only as blocks; tick/dungeon-chest-save saves the tile entities.",
+  "chunks": [
+    {"x":1,"z":1,"full":true}
+  ]
+}

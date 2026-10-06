@@ -35,22 +35,20 @@ macro_rules! fixtures {
 }
 
 fixtures! {
-    // "world": "generated" fixtures run on the WP-1.4 terrain generator;
-    // population is a recorded stub (WP-1.7), so they diverge at the first
-    // dump that sees populated terrain or the draws population makes. Each
-    // reason names the first differing line and what comes after it.
+    // "world": "generated" fixtures run on the WP-1.4 terrain generator and
+    // the WP-1.7 population. Each reason names the first differing line and
+    // what comes after it.
 
     // ---- tests/golden/entity -----------------------------------------------------
-    #[ignore = "EntityArrow(World) constructor (WP-2.4): the driver stops at line 2 (t=0 op spawn kind Arrow); line 1 matches. Then EntityArrow.onUpdate; generated terrain is in (WP-1.4), population is not (WP-1.7)"]
+    #[ignore = "EntityArrow(World) constructor (WP-2.4): the driver stops at line 2 (t=0 op spawn kind Arrow); line 1 matches. Then EntityArrow.onUpdate; generated and populated terrain is in (WP-1.4, WP-1.7)"]
     entity_arrow_flight => "entity" / "arrow-flight";
     entity_flat_item_drop => "entity" / "flat-item-drop";
     #[ignore = "EntityPig(World) constructor not transcribed: first diff line 7 (t=0 op spawn kind Pig); then EntityLiving.onLivingUpdate / EntityCreature.updatePlayerActionState wander AI (WP-2.2)"]
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 3 (t=0 entity, motionX/rotationYaw): the oracle's population reaches Math.random() sites (BlockFluid lava/water mixing) before the EntityItem constructor draws, the stubbed population does not"]
     entity_item_drop => "entity" / "item-drop";
-    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5), population (WP-1.7)"]
+    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5); population is in (WP-1.7)"]
     entity_pig_attacked => "entity" / "pig-attacked";
-    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig); line 1 matches. Then EntityPig and water physics, population (WP-1.7: generated sand)"]
+    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig: expected the op line with kind EntityPig); line 1 (preload) matches. Then EntityPig and water physics (WP-2.1, WP-2.3); population is in (WP-1.7)"]
     entity_pig_falls => "entity" / "pig-falls";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
@@ -67,6 +65,8 @@ fixtures! {
     tick_block_item_placement => "tick" / "block-item-placement";
     tick_cake_eat => "tick" / "cake-eat";
     tick_door_iron_powered => "tick" / "door-iron-powered";
+    #[ignore = "needs McRegionChunkLoader (WP-1.9b): the driver refuses \"save_format\": \"mcregion\" before line 1. The chest loot and spawner mob the save pins are checked against this fixture by tests/population.rs"]
+    tick_dungeon_chest_save => "tick" / "dungeon-chest-save";
     tick_door_support_removed => "tick" / "door-support-removed";
     tick_door_upper_powered => "tick" / "door-upper-powered";
     tick_door_toggle => "tick" / "door-toggle";
@@ -77,7 +77,7 @@ fixtures! {
     tick_portal_frame => "tick" / "portal-frame";
     tick_portal_ignite => "tick" / "portal-ignite";
     tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
-    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. Then population (WP-1.7); BlockSapling.growTree is in (WP-1.6)"]
+    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. BlockSapling.growTree (WP-1.6) and population (WP-1.7) are in"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     tick_cactus_reed_growth => "tick" / "cactus-reed-growth";
     tick_chest_double_and_break => "tick" / "chest-double-and-break";
@@ -92,7 +92,6 @@ fixtures! {
     tick_mob_spawner_spawn => "tick" / "mob-spawner-spawn";
     tick_note_jukebox_activate => "tick" / "note-jukebox-activate";
     tick_sign_pops_off => "tick" / "sign-pops-off";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
     tick_fire_burnout_stone => "tick" / "fire-burnout-stone";
     tick_fire_farmland_rain => "tick" / "fire-farmland-rain";
@@ -129,10 +128,9 @@ fixtures! {
     #[ignore = "needs EntityTNTPrimed (WP-2.4): first diff line 170 (t=79 rng_state math_random: the fire reaches the TNT and the EntityTNTPrimed constructor draws Math.random(); the port records EntityTNTPrimed.<init>); lines 1-169 match, BlockFire (WP-1.6b) is in. Then the primed TNT entity and Explosion (WP-1.8)"]
     tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4: blocks, data, light, height map all differ); then the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3). BlockSapling/BlockGrass random ticks are in (WP-1.6)"]
+    #[ignore = "SpawnerAnimals mob constructors (EntityChicken, EntitySheep, EntitySquid, EntityCow: WP-2.3): the oracle spawns animals in tick 0, whose EntityLiving constructors draw Math.random() (with rng_state every tick: math_random differs from t=0, world_rand and lcg from t=1, while the scheduled ticks of population still match). Here the first diff is line 4 (t=99 chunk_digest -2,-4: blocks, data; sky light and height map match); then the player's own update (EntityPlayer, WP-2.5: entity_state posY). Population (WP-1.7) and the BlockSapling/BlockGrass random ticks (WP-1.6) are in"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     tick_snow_ice => "tick" / "snow-ice";
-    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=4 block -26,68,-58: expected air, the port has falling water); lines 1-3 match. The oracle's population schedules thousands of liquid ticks (2557 pending at t=4) ahead of the source's, and TickUpdates runs at most 1000 a tick, so the source has not flowed yet; BlockFlowing/BlockStationary are in (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
     tick_weather_time => "tick" / "weather-time";
     tick_weather_snow => "tick" / "weather-snow";

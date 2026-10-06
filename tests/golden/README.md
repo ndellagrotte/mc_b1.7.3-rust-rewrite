@@ -177,9 +177,15 @@ Committed terrain scenarios: three chunks × three seeds × both dimensions
 chunks at least four apart (so every `generated` stage is pure generator output
 and no two share a `chunkXZ2Int` key), up to ±1874999, including chunk
 `(784426, 0)`, where the density noise's `(int)` casts saturate (the Far
-Lands), dumped in full. Rust side: `crates/mc-golden/src/terrain_driver.rs`,
-run by `crates/mc-sim/tests/golden_worldgen.rs`, which leaves the `populated`
-lines out of the comparison until population lands (WP-1.7).
+Lands), dumped in full. WP-1.7 adds `overworld-seed-123-dungeon` (chunk (1, 1),
+whose own population places a dungeon: spawner at (31, 13, 28), chests at
+(29, 13, 28) and (30, 13, 30); dumped in full; the loot and the mob are saved by
+`tick/dungeon-chest-save`) and the pair `nether-seed-123-order-ab` /
+`nether-seed-123-order-ba` (chunks (0, 0) and (2, 0), whose 3×3 neighbourhoods
+share a column, in both orders: the `hellRNG` quirk above makes chunk (0, 0)'s
+populated digest differ between them). Rust side:
+`crates/mc-golden/src/terrain_driver.rs`, run by
+`crates/mc-sim/tests/golden_worldgen.rs`, which compares every line.
 
 ### `kind: "nbt_write"` — vanilla NBT writer
 
@@ -668,7 +674,9 @@ ticks), `tick/bonemeal-sapling` (`use_item` bone meal grows a tree; `set_time`,
 `set_block_silent`), `entity/pig-falls` (into the sea at (8.5, 90, 8.5); `"all"` includes the
 generated sand that falls in the first ticks), `entity/item-drop`, `entity/arrow-flight`,
 `entity/pig-attacked` (player punch and a direct hit; `set_rotation`, `set_pos`),
-`save/roundtrip-seed-123`, `save/testworld`.
+`save/roundtrip-seed-123`, `save/testworld`, `tick/dungeon-chest-save` (WP-1.7, Tier S:
+preload the 3×3 around chunk (1, 1) and save it at t = 0; its `TileEntities` hold the
+dungeon's spawner and the two chests' loot drawn on the generator's `Random`).
 
 Empty world (`"world": "empty"`), stone platform at y = 60 over −8…8 with a one-high rim at
 y = 61, built by `fill` at t = 0: `tick/flat-water-flow` (still water, id 9: it never flows,

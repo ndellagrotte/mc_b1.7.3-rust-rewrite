@@ -1,0 +1,12 @@
+{
+  "name": "nether-seed-123-order-ba",
+  "tier": "A",
+  "kind": "terrain",
+  "seed": 123,
+  "dimension": "nether",
+  "comment": "WP-1.7: nether-seed-123-order-ab with the chunk list reversed: (2,0) then (0,0). Pins the hellRNG load-order dependence of nether population.",
+  "chunks": [
+    {"x":2,"z":0},
+    {"x":0,"z":0}
+  ]
+}
