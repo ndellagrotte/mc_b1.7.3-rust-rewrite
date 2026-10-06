@@ -13,10 +13,10 @@
 //! return the matching `JavaException`.
 
 use mc_golden::{Bits32, GoldenError, Scenario, TraceLine, TraceWriter, fixture_dir};
-use mc_sim::block::{self, Material};
-use mc_sim::item::block_texture::{
+use mc_sim::block::block_texture::{
     get_block_texture_from_side, get_block_texture_from_side_and_metadata,
 };
+use mc_sim::block::{self, Material};
 use mc_sim::item::{
     EnumToolMaterial, ItemDef, ItemKind, ItemStack, JavaException, item, max_item_id,
 };

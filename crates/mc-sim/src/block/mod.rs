@@ -54,6 +54,7 @@
 //! `setNeighborNotifyOnMetadataChange` in this tree (Block.java:23); the Java
 //! name is kept.
 
+pub mod block_texture;
 pub mod dispatch;
 pub mod fluid;
 pub mod material;

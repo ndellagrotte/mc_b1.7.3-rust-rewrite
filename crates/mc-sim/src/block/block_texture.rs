@@ -5,8 +5,8 @@
 //! The item table needs them: every `ItemBlock` constructor sets its icon to
 //! `getBlockTextureFromSide(2)` of its block (ItemBlock.java:9), and the
 //! log, sapling, wool, slab and leaves items look their icons up per damage
-//! value. They belong to the block module; they live here until the block
-//! side has them (reported by WP-1.2), and the `item/item-table` golden
+//! value. They belong to the block module (moved here from `item/` in the
+//! WP-1.2 integration step), and the `item/item-table` golden
 //! fixture checks every block, side and metadata 0–15 against the oracle.
 //!
 //! Java dispatch: `Block.getBlockTextureFromSideAndMetadata` calls the
@@ -24,7 +24,7 @@
 
 use crate::block::{BLOCKS, BlockDef, BlockKind};
 
-use super::JavaException;
+use crate::item::JavaException;
 
 /// `PistonBlockTextures.faceToSide`.
 // src: PistonBlockTextures.java:4

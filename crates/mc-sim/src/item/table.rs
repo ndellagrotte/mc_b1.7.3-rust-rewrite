@@ -310,7 +310,7 @@ const fn item_reed(id: i32, block_id: i32) -> ItemDef {
 /// `kind` carries `blockID = id + 256` (built by the caller).
 const fn item_block(id: i32, kind: ItemKind) -> ItemDef {
     let block_id = id + 256;
-    ItemDef::new(id, kind).set_icon_index(super::block_texture::get_block_texture_from_side(
+    ItemDef::new(id, kind).set_icon_index(crate::block::block_texture::get_block_texture_from_side(
         block_id, 2,
     ))
 }

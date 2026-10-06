@@ -10,7 +10,7 @@
 //! | Module | Vanilla | Shape |
 //! |---|---|---|
 //! | [`block`] | `Block`, `Material`, `StepSound` + subclasses | const table [`block::BLOCKS`], `BlockKind` enum, behaviour in [`block::dispatch`] |
-//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; block texture lookups in `item::block_texture` |
+//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; block texture lookups live in `block::block_texture` |
 //! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess` | [`world::World`] owns everything; client side effects are [`world::events`] |
 //! | [`tick`] | `World.tick` and its block systems | `impl World` |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |

@@ -21,7 +21,7 @@
 //!   `onCreated`) is WP-2.6 and not here.
 //! - [`ItemStack`] ([`stack`]): the value type with its NBT form.
 //! - [`EnumToolMaterial`] ([`tool_material`]).
-//! - [`block_texture`]: `Block.getBlockTextureFromSide(AndMetadata)`, which
+//! - [`crate::block::block_texture`]: `Block.getBlockTextureFromSide(AndMetadata)`, which
 //!   the `ItemBlock` icons are computed from.
 //!
 //! # Ids
@@ -41,7 +41,6 @@
 //! initialisation (leaves 52, full bounds), which is what the oracle sees and
 //! what every `ItemBlock` constructor saw.
 
-pub mod block_texture;
 pub mod stack;
 mod table;
 pub mod tool_material;
@@ -413,7 +412,7 @@ impl ItemDef {
     // src: Item.java:147-149, ItemDye.java:13-15, ItemLog.java:10-12,
     // src: ItemSapling.java:14-16, ItemCloth.java:10-12, ItemSlab.java:10-12, ItemLeaves.java:14-16
     pub fn get_icon_from_damage(&self, damage: i32) -> i32 {
-        use block_texture::get_block_texture_from_side_and_metadata as tex;
+        use crate::block::block_texture::get_block_texture_from_side_and_metadata as tex;
         let checked = |r: Result<i32, JavaException>| r.expect("texture lookup in range");
         match self.kind {
             ItemKind::Dye => self.icon_index + damage % 8 * 16 + damage / 8,
