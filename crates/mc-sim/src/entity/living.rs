@@ -1124,11 +1124,13 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
 /// `faceEntity(target, maxYawStep, maxPitchStep)`: turns toward `target`'s
 /// eyes (a living target) or box centre (any other).
 ///
-/// vanilla bug (transcribed): the height difference has opposite signs in
-/// the two cases (`this - target` for a living target, `target - this`
-/// otherwise), and the result is stored negated
-/// (`rotationPitch = -updateRotation(rotationPitch, …)`), so the pitch
-/// flips sign on every call.
+/// vanilla bug (transcribed): the target pitch is stepped toward from the
+/// stored pitch and the result stored negated
+/// (`rotationPitch = -updateRotation(rotationPitch, …)`), so toward a target
+/// off level the pitch alternates between two values instead of settling;
+/// and the height difference has opposite signs in the two cases (`this -
+/// target` for a living target, `target - this` otherwise), so a non-living
+/// target above is first looked at downward.
 // src: EntityLiving.java:732-748
 pub fn face_entity(e: &mut Entity, world: &World, var1: &EntityView, var2: f32, var3: f32) {
     let var4 = var1.pos_x - e.base.pos_x;
