@@ -132,6 +132,16 @@ fixtures! {
     tick_redstone_wire_line => "tick" / "redstone-wire-line";
     tick_repeater_delays => "tick" / "repeater-delays";
     tick_torch_placement => "tick" / "torch-placement";
+    // ---- rails (WP-1.6 task e) ---------------------------------------------------
+    tick_rail_shapes => "tick" / "rail-shapes";
+    tick_rail_remove_support => "tick" / "rail-remove-support";
+    tick_detector_rail_idle => "tick" / "detector-rail-idle";
+    tick_detector_rail_random_tick => "tick" / "detector-rail-random-tick";
+    tick_powered_rail_detector => "tick" / "powered-rail-detector";
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 29 (t=2 blocks_full, field metas: the rail next to the torch stays 1, expected 9); lines 1-28 match"]
+    tick_powered_rail_chain => "tick" / "powered-rail-chain";
+    #[ignore = "needs BlockLever (WP-1.6c): first diff line 21 (t=3 op use_item, field placed: BlockLever.blockActivated); lines 1-20 match"]
+    tick_powered_rail_lever => "tick" / "powered-rail-lever";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test
