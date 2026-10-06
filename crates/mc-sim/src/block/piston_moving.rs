@@ -124,10 +124,14 @@ pub fn get_new_tile_entity(
 }
 
 /// `getCollisionBoundingBoxFromPool(world, x, y, z)`: the stored block's
-/// collision box, shifted back along the move by what is left of it
-/// (`1 - progress` while extending, `progress` while retracting, at partial
-/// tick 0); `None` without a tile entity.
+/// collision box, shifted by `-offset * (1 - progress)` while extending
+/// (back along the move) and by `-offset * progress` while retracting, at
+/// partial tick 0; `None` without a tile entity.
 // src: BlockPistonMoving.java:80-92
+// vanilla bug: a retracting block comes from the cell `+offset` (the
+// renderer draws it at `(1 - progress) * offset`, TileEntityPiston.java:56-66),
+// but its box starts at the cell and moves toward `-offset`, away from it
+// (pinned by tick/piston-retract-entity).
 pub fn get_collision_bounding_box_from_pool(
     world: &mut World,
     x: i32,

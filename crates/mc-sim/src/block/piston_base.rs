@@ -1087,6 +1087,90 @@ mod tests {
         );
     }
 
+    /// A moving block at (x, y, z) (meta `meta`) carrying `stored`, with
+    /// its tile entity advanced by two updates (`field_31020_l` 0.5,
+    /// `field_31022_k` 1).
+    fn moving_half_way(
+        w: &mut World,
+        (x, y, z): (i32, i32, i32),
+        meta: i32,
+        stored: (i32, i32),
+        facing: i32,
+        extending: bool,
+    ) -> TileEntityRef {
+        w.set_block_and_metadata(x, y, z, PISTON_MOVING_ID, meta);
+        let r = piston_moving::get_new_tile_entity(w, stored.0, stored.1, facing, extending, false);
+        w.set_block_tile_entity(x, y, z, r);
+        crate::world::tile_entity::piston_update_entity(w, r);
+        crate::world::tile_entity::piston_update_entity(w, r);
+        let t = piston(w, r).unwrap();
+        assert_eq!((t.last_progress, t.progress), (0.5, 1.0));
+        r
+    }
+
+    /// `BlockPistonMoving.setBlockBoundsBasedOnState` and
+    /// `getCollisionBoundingBoxFromPool` half way through a move: the stored
+    /// block's bounds (after its own `setBlockBoundsBasedOnState` at the
+    /// cell) and box shifted by `-offset * (1 - progress)` while extending,
+    /// `-offset * progress` while retracting (BlockPistonMoving.java:80-117).
+    #[test]
+    fn moving_block_bounds_and_box_half_way() {
+        let mut w = world();
+        let moving = PISTON_MOVING_ID as usize;
+
+        // Extending stone facing +x: shifted back 0.5 toward -x.
+        moving_half_way(&mut w, (2, 61, 0), 0, (STONE, 0), 5, true);
+        piston_moving::set_block_bounds_based_on_state(&mut w, 2, 61, 0);
+        assert_eq!(
+            w.block_statics.bounds[moving],
+            BlockBounds {
+                min_x: -0.5,
+                max_x: 0.5,
+                ..BlockBounds::FULL
+            }
+        );
+        let b = piston_moving::get_collision_bounding_box_from_pool(&mut w, 2, 61, 0).unwrap();
+        assert_eq!((b.min_x, b.max_x, b.min_y, b.max_y), (1.5, 2.5, 61.0, 62.0));
+
+        // Retracting stone pulled toward a piston facing up: shifted by
+        // -1 * progress in y (down, the cell below), not toward where it
+        // comes from.
+        moving_half_way(&mut w, (4, 62, 0), 0, (STONE, 0), 1, false);
+        piston_moving::set_block_bounds_based_on_state(&mut w, 4, 62, 0);
+        assert_eq!(
+            w.block_statics.bounds[moving],
+            BlockBounds {
+                min_y: -0.5,
+                max_y: 0.5,
+                ..BlockBounds::FULL
+            }
+        );
+        let b = piston_moving::get_collision_bounding_box_from_pool(&mut w, 4, 62, 0).unwrap();
+        assert_eq!((b.min_y, b.max_y, b.min_x, b.max_x), (61.5, 62.5, 4.0, 5.0));
+
+        // An extending head facing +x (cell meta 5): the head's plate bounds
+        // (BlockPistonExtension.setBlockBoundsBasedOnState reads the cell's
+        // meta), then shifted.
+        moving_half_way(&mut w, (6, 61, 0), 5, (PISTON_EXTENSION_ID, 5), 5, true);
+        piston_moving::set_block_bounds_based_on_state(&mut w, 6, 61, 0);
+        let plate = BlockBounds::from_floats(0.75, 0.0, 0.0, 1.0, 1.0, 1.0);
+        assert_eq!(
+            w.block_statics.bounds[moving],
+            BlockBounds {
+                min_x: plate.min_x - 0.5,
+                max_x: plate.max_x - 0.5,
+                ..plate
+            }
+        );
+
+        // Carrying itself (or air): the bounds are left as they were.
+        let before = w.block_statics.bounds[moving];
+        moving_half_way(&mut w, (8, 61, 0), 0, (PISTON_MOVING_ID, 0), 5, true);
+        piston_moving::set_block_bounds_based_on_state(&mut w, 8, 61, 0);
+        assert_eq!(w.block_statics.bounds[moving], before);
+        assert!(piston_moving::get_collision_bounding_box_from_pool(&mut w, 8, 61, 0).is_none());
+    }
+
     #[test]
     fn orientation_from_the_placer() {
         let mut w = world();

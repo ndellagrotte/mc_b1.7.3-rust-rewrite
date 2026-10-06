@@ -105,13 +105,14 @@ fixtures! {
     tick_leaves_decay => "tick" / "leaves-decay";
     #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 33 (t=1 blocks_full ids: no torch power, so the pumpkin row does not extend). Then the chest row on the same line needs TileEntityChest (BlockContainer.onBlockAdded, WP-1.6 containers task / WP-1.8): without it the chest is pushed. With a stand-in torch and obsidian for the chest the rest of the trace matched the oracle (WP-1.6d report)"]
     tick_piston_immovable => "tick" / "piston-immovable";
-    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 47 (t=8 block 0,61,0: no torch power, no extension)"]
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 47 (t=8 block 0,61,0, field blocklight: expected 0, actual 6; without torch power the piston does not extend, so the torch's block light is spread in that tick, unlike the oracle). With a stand-in torch the whole trace matched the oracle (WP-1.6d review)"]
     tick_piston_moving_block_tick => "tick" / "piston-moving-block-tick";
     tick_piston_orphan_blocks => "tick" / "piston-orphan-blocks";
     #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 11 (t=1 blocks_full ids: no torch power, no extension)"]
     tick_piston_push_limit => "tick" / "piston-push-limit";
-    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 14 (t=1 blocks_full: no torch power, no extension)"]
+    #[ignore = "needs BlockRedstoneTorch (WP-1.6c): first diff line 14 (t=1 blocks_full, field blocklight: the oracle keeps the y=61 torch cells at 0 while the pistons move in that tick; without torch power no piston moves, so the torches' block light is spread, up to 7). With a stand-in torch the whole trace matched the oracle (WP-1.6d review)"]
     tick_piston_push_stone => "tick" / "piston-push-stone";
+    tick_piston_retract_entity => "tick" / "piston-retract-entity";
     tick_piston_retract_unpowered => "tick" / "piston-retract-unpowered";
     tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
     tick_ray_trace_platform => "tick" / "ray-trace-platform";
