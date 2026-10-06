@@ -1,5 +1,5 @@
 {"name":"portal-ignite","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":6,
- "comment":"BlockPortal.tryToCreatePortal: fire (id 51) set at t=2 on the bottom obsidian inside an empty frame (inside 2 wide, 3 high). BlockFire.onBlockAdded calls Block.portal.tryToCreatePortal (BlockFire.java:196), which fills the inside with portal blocks with editingBlocks set. Needs BlockFire (fire task of WP-1.6).",
+ "comment":"BlockPortal.tryToCreatePortal: fire (id 51) set at t=2 on the bottom obsidian inside an empty frame (inside 2 wide, 3 high). BlockFire.onBlockAdded calls Block.portal.tryToCreatePortal (BlockFire.java:192), which fills the inside with portal blocks with editingBlocks set. Needs BlockFire (fire task of WP-1.6).",
  "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
         {"t":0,"op":"fill","x0":1,"y0":61,"z0":2,"x1":2,"y1":61,"z1":2,"id":49},
         {"t":0,"op":"fill","x0":1,"y0":65,"z0":2,"x1":2,"y1":65,"z1":2,"id":49},

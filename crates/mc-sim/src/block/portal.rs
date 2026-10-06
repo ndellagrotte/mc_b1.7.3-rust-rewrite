@@ -3,7 +3,7 @@
 //!
 //! Transcribed: `getCollisionBoundingBoxFromPool` (always null: the dispatch
 //! arm returns `None`), `setBlockBoundsBasedOnState`, `tryToCreatePortal`
-//! (called by `BlockFire.onBlockAdded`, BlockFire.java:196, the fire task of
+//! (called by `BlockFire.onBlockAdded`, BlockFire.java:192, the fire task of
 //! WP-1.6), `onNeighborBlockChange`, `shouldSideBeRendered`,
 //! `onEntityCollidedWithBlock`, `randomDisplayTick`. Data methods
 //! (`isOpaqueCube`, `renderAsNormalBlock`, `quantityDropped`,
