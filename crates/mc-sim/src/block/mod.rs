@@ -55,11 +55,19 @@
 //! name is kept.
 
 pub mod block_texture;
+pub mod button;
 pub mod dispatch;
 pub mod fluid;
+pub mod lever;
 pub mod material;
+pub mod pressure_plate;
+pub mod redstone_ore;
+pub mod redstone_torch;
+pub mod redstone_wire;
+pub mod repeater;
 pub mod sand;
 mod table;
+pub mod torch;
 
 pub use material::{MapColor, Material};
 
@@ -1693,9 +1701,8 @@ pub static ABILITY_TO_CATCH_FIRE: [i32; 256] = table::FIRE_BURN_RATES.1;
 /// the static initialiser leaves (pinned by `tests/golden/block/block-table`),
 /// except the singleton `Random`s the oracle reseeds (`BlockChest.random`,
 /// `BlockFurnace.furnaceRand`, `BlockDispenser.random`; census §2), which the
-/// tasks that use them add. Still to add with their behaviour (Phase 1), as
-/// Java statics: `BlockFurnace.keepFurnaceInventory`,
-/// `BlockRedstoneTorch.torchUpdates`.
+/// tasks that use them add. Still to add with its behaviour (Phase 1), as a
+/// Java static: `BlockFurnace.keepFurnaceInventory`.
 #[derive(Clone, Debug)]
 pub struct BlockStatics {
     /// `minX`…`maxZ` of each block singleton, starting from
@@ -1747,6 +1754,14 @@ pub struct BlockStatics {
     /// [`JavaHashSet`].
     // src: BlockRedstoneWire.java:10
     pub redstone_wire_blocks_needing_update: JavaHashSet<ChunkPosition>,
+    /// `BlockRedstoneTorch.torchUpdates` (a static `ArrayList` of
+    /// `RedstoneUpdateInfo`): the burnout history, one entry per turn-off of
+    /// a powered torch with the world time, oldest first; entries older than
+    /// 100 ticks are dropped from the front by every torch tick
+    /// ([`redstone_torch`]). Shared by every world in Java; per world here,
+    /// starting empty, as the oracle clears it per scenario (census §6).
+    // src: BlockRedstoneTorch.java:9
+    pub redstone_torch_updates: Vec<redstone_torch::RedstoneUpdateInfo>,
 }
 
 /// The per-instance scratch fields of a `BlockFlowing` singleton.
@@ -1829,6 +1844,8 @@ impl Default for BlockStatics {
             // src: BlockRedstoneWire.java:9
             redstone_wire_wires_provide_power: true,
             redstone_wire_blocks_needing_update: JavaHashSet::new(),
+            // src: BlockRedstoneTorch.java:9
+            redstone_torch_updates: Vec::new(),
         }
     }
 }
