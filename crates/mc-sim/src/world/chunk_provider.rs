@@ -38,6 +38,7 @@
 
 use std::collections::BTreeMap;
 
+use mc_core::JavaRandom;
 use mc_core::java_hash::{ChunkCoordIntPair, JavaHashSet};
 
 use super::World;
@@ -45,6 +46,7 @@ use super::chunk::{self, CHUNK_VOLUME, Chunk};
 use crate::save::ChunkLoader;
 use crate::worldgen::generate::ChunkProviderGenerate;
 use crate::worldgen::hell::ChunkProviderHell;
+use crate::worldgen::populate;
 
 /// The generator half of `IChunkProvider` (IChunkProvider.java). The cache
 /// half (`provideChunk` with loading, `saveChunks`, …) is on [`World`].
@@ -121,17 +123,17 @@ impl ChunkGenerator {
     }
 
     /// `populate(provider, x, z)` of the generator. See the module docs for
-    /// why this takes the world rather than `&mut self`.
-    ///
-    /// The two terrain generators' `populate` (ChunkProviderGenerate.java:310-603,
-    /// ChunkProviderHell.java:302-359) is WP-1.7; until then it is recorded in
-    /// [`World::skipped_systems`] and changes nothing.
+    /// why this takes the world rather than `&mut self`: the features draw
+    /// from the generator's `Random` through
+    /// [`RandomSource::ChunkProviderRand`](crate::block::dispatch::RandomSource::ChunkProviderRand)
+    /// ([`ChunkProviderCache::generator_rand`]) one draw at a time, so a chunk
+    /// generated in the middle reseeds the same instance.
+    // src: ChunkProviderGenerate.java:310-603, ChunkProviderHell.java:302-359
     pub fn populate(world: &mut World, x: i32, z: i32) {
-        let _ = (x, z);
         match world.chunk_provider.generator.as_ref() {
             Some(ChunkGenerator::Empty(_)) => {}
-            Some(ChunkGenerator::Generate(_)) => world.skip("ChunkProviderGenerate.populate"),
-            Some(ChunkGenerator::Hell(_)) => world.skip("ChunkProviderHell.populate"),
+            Some(ChunkGenerator::Generate(_)) => populate::populate_generate(world, x, z),
+            Some(ChunkGenerator::Hell(_)) => populate::populate_hell(world, x, z),
             None => panic!("ChunkGenerator::populate re-entered during provide_chunk"),
         }
     }
@@ -164,6 +166,24 @@ impl std::fmt::Debug for dyn ChunkLoader {
 }
 
 impl ChunkProviderCache {
+    /// The terrain generator's own `Random` (`ChunkProviderGenerate.rand`,
+    /// `ChunkProviderHell.hellRNG`), which
+    /// [`World::random`]`(RandomSource::ChunkProviderRand)` returns. Only
+    /// population draws it, and population never runs while the generator is
+    /// lent out to `provide_chunk`; the empty generator has none (its
+    /// `populate` does nothing).
+    // src: ChunkProviderGenerate.java:6, ChunkProviderHell.java:6
+    pub fn generator_rand(&mut self) -> &mut JavaRandom {
+        match self.generator.as_mut() {
+            Some(ChunkGenerator::Generate(g)) => &mut g.rand,
+            Some(ChunkGenerator::Hell(g)) => &mut g.hell_rng,
+            Some(ChunkGenerator::Empty(_)) => {
+                panic!("the empty chunk generator has no Random")
+            }
+            None => panic!("generator_rand while the generator is lent out to provide_chunk"),
+        }
+    }
+
     /// `new ChunkProvider(world, loader, generator)`.
     // src: ChunkProvider.java:20-25
     pub fn new(chunk_loader: Option<Box<dyn ChunkLoader>>, generator: ChunkGenerator) -> Self {

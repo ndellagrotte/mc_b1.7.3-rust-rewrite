@@ -30,7 +30,8 @@
 //! Spawn lists are data: `(entity class name, weight)` as `SpawnListEntry`
 //! holds them (`SpawnerAnimals`, WP-2.3, turns the name into an entity).
 //! `getRandomWorldGenForTrees` returns which `WorldGen*` class vanilla would
-//! instantiate ([`WorldGenTreeKind`]); the generators themselves are WP-1.7.
+//! instantiate ([`WorldGenTreeKind`]); `super::trees::WorldGen::new` builds
+//! it and population (`super::populate`) runs it.
 
 use mc_core::JavaRandom;
 
@@ -114,8 +115,8 @@ pub enum EnumCreatureType {
     WaterCreature,
 }
 
-/// The `WorldGenerator` subclass `getRandomWorldGenForTrees` instantiates.
-/// The generators are WP-1.7.
+/// The `WorldGenerator` subclass `getRandomWorldGenForTrees` instantiates
+/// (built by [`super::trees::WorldGen::new`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WorldGenTreeKind {
     /// `WorldGenTrees`.

@@ -515,6 +515,7 @@ impl World {
     pub fn random(&mut self, src: block_dispatch::RandomSource) -> &mut JavaRandom {
         match src {
             block_dispatch::RandomSource::WorldRand => &mut self.rand,
+            block_dispatch::RandomSource::ChunkProviderRand => self.chunk_provider.generator_rand(),
         }
     }
 

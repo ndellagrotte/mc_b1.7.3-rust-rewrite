@@ -13,16 +13,19 @@
 //! [`crate::block::BlockKind`] is for blocks); the variant holds the
 //! instance fields, so a `WorldGen` value is one Java instance and keeps its
 //! state between calls (`WorldGenBigTree.field_878_e` survives a second
-//! `generate` on the same instance, as in Java). WP-1.7 adds the other
-//! `WorldGen*` classes as variants.
+//! `generate` on the same instance, as in Java). The other `WorldGen*`
+//! classes are plain structs in [`super::features`] (WP-1.7): population
+//! always names their class, so they need no enum.
 //!
 //! Every `generate` has the uniform signature
 //! `generate(&mut self, world, rand, x, y, z) -> bool`. `rand` is the
 //! [`RandomSource`] the Java caller passes, drawn through
 //! [`World::random`] (as block callbacks do, `block::dispatch` module docs):
 //! `BlockSapling.growTree` passes `World.rand` (BlockSapling.java:20, :51);
-//! the population callers pass the provider's `Random`, which WP-1.7 adds as
-//! a source.
+//! population passes the provider's `Random`
+//! ([`RandomSource::ChunkProviderRand`], ChunkProviderGenerate.java:449-451),
+//! after picking the class with the biome's `getRandomWorldGenForTrees`
+//! (`super::populate`).
 //!
 //! `WorldGenBigTree` keeps the world in a field (`worldObj`) for its helper
 //! methods; here the helpers take the world as a parameter instead.

@@ -1,10 +1,11 @@
 //! Terrain generation (PLAN_v4 Phase 1).
 //!
-//! WP-1.4 (this module today): noise ([`perlin`], [`octaves`], [`simplex`]),
-//! biomes ([`biome`], [`chunk_manager`]), caves ([`caves`]) and the two
-//! generators up to `provideChunk` ([`generate`] = `ChunkProviderGenerate`,
-//! [`hell`] = `ChunkProviderHell`). WP-1.7 adds `WorldGen*` and the
-//! providers' `populate`.
+//! WP-1.4: noise ([`perlin`], [`octaves`], [`simplex`]), biomes
+//! ([`biome`], [`chunk_manager`]), caves ([`caves`]) and the two generators
+//! up to `provideChunk` ([`generate`] = `ChunkProviderGenerate`, [`hell`] =
+//! `ChunkProviderHell`). WP-1.6b: the tree generators ([`trees`]). WP-1.7:
+//! the other `WorldGen*` classes ([`features`]) and the providers'
+//! `populate` ([`populate`]).
 //!
 //! Both generators are variants of
 //! [`crate::world::chunk_provider::ChunkGenerator`], built by
@@ -24,10 +25,12 @@
 pub mod biome;
 pub mod caves;
 pub mod chunk_manager;
+pub mod features;
 pub mod generate;
 pub mod hell;
 pub mod octaves;
 pub mod perlin;
+pub mod populate;
 pub mod simplex;
 pub mod trees;
 

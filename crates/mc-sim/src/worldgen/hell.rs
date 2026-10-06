@@ -2,9 +2,8 @@
 //! `provideChunk` (terrain shape, surface, caves). Unlike the overworld it
 //! builds the `Chunk` without `generateSkylightMap()`
 //! (ChunkProviderHell.java:180-188), so height map and sky light stay zero.
-//! `populate` is WP-1.7 and is recorded as skipped
-//! ([`crate::world::chunk_provider::ChunkGenerator::populate`]); note for it
-//! that `populate` never reseeds `hellRNG` (tests/golden/README.md).
+//! `populate` is [`super::populate::populate_hell`] (WP-1.7), which never
+//! reseeds `hellRNG` (tests/golden/README.md).
 
 use mc_core::JavaRandom;
 use mc_core::jmath;

@@ -1091,6 +1091,25 @@ pub mod ids {
     pub const ORE_DIAMOND: i32 = 56;
     pub const STONE_OVEN_IDLE: i32 = 61;
     pub const TORCH_REDSTONE_ACTIVE: i32 = 76;
+    // The blocks population places or tests (WP-1.7).
+    pub const ORE_GOLD: i32 = 14; // Block.java:606
+    pub const ORE_IRON: i32 = 15; // Block.java:607
+    pub const TALL_GRASS: i32 = 31; // Block.java:623
+    pub const DEAD_BUSH: i32 = 32; // Block.java:624
+    pub const PLANT_YELLOW: i32 = 37; // dandelion, Block.java:629
+    pub const PLANT_RED: i32 = 38; // rose, Block.java:630
+    pub const MUSHROOM_BROWN: i32 = 39; // Block.java:631
+    pub const MUSHROOM_RED: i32 = 40; // Block.java:632
+    pub const COBBLESTONE_MOSSY: i32 = 48; // Block.java:640
+    pub const MOB_SPAWNER: i32 = 52; // Block.java:644
+    pub const CHEST: i32 = 54; // Block.java:646
+    pub const ORE_REDSTONE: i32 = 73; // Block.java:665
+    pub const SNOW: i32 = 78; // the snow layer, Block.java:670
+    pub const CACTUS: i32 = 81; // Block.java:673
+    pub const BLOCK_CLAY: i32 = 82; // Block.java:674
+    pub const REED: i32 = 83; // Block.java:675
+    pub const PUMPKIN: i32 = 86; // Block.java:678
+    pub const GLOW_STONE: i32 = 89; // Block.java:681
 }
 
 use crate::item::ids as items;

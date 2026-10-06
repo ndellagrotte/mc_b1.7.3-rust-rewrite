@@ -1,7 +1,6 @@
 //! `ChunkProviderGenerate` (ChunkProviderGenerate.java): the overworld
 //! generator up to `provideChunk` (terrain shape, biome surface, caves, sky
-//! light). `populate` is WP-1.7 and is recorded as skipped
-//! ([`crate::world::chunk_provider::ChunkGenerator::populate`]).
+//! light). `populate` is [`super::populate::populate_generate`] (WP-1.7).
 //!
 //! The noise arrays are fields reused across calls, as in vanilla; each use
 //! zeroes the whole array first, so their history is unobservable.

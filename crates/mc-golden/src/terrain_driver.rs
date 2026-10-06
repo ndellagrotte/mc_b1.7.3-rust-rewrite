@@ -26,9 +26,8 @@
 //!      [`WorldChunkManager::new`]`(seed)`'s `loadBlockGeneratorData(null,
 //!      x*16, z*16, 16, 16)`, hashed over the first 256 entries.
 //!
-//! Population of the two generators is WP-1.7 (a recorded no-op until then),
-//! so the `populated` lines cannot match yet; `tests/golden_worldgen.rs`
-//! filters them by stage.
+//! Population of the two generators is in since WP-1.7, so
+//! `tests/golden_worldgen.rs` compares every stage.
 
 use mc_sim::save::NoSave;
 use mc_sim::world::provider::{Dimension as SimDimension, WorldProvider};

@@ -24,7 +24,9 @@
 //!   (World.java:1159, :1960, :1988), so behaviour takes a
 //!   [`RandomSource`] and draws through [`World::random`]. The two
 //!   population callers (WorldGenLiquids.java:57, WorldGenHellLava.java:63)
-//!   pass the generator's `Random`; WP-1.7 adds that source.
+//!   pass the generator's `Random`: [`RandomSource::ChunkProviderRand`]
+//!   (WP-1.7), which the population features and the tree generators draw
+//!   through as well.
 //! - Signatures beyond the base rule: a Java `IBlockAccess` parameter is the
 //!   `World` (the only `IBlockAccess` the simulation has; the client's
 //!   `ChunkCache` reads the same data). Methods Java declares without a world
@@ -82,6 +84,17 @@ use crate::world::World;
 pub enum RandomSource {
     /// `World.rand`.
     WorldRand,
+    /// The world's terrain generator's own `Random`: `ChunkProviderGenerate.rand`
+    /// (ChunkProviderGenerate.java:6) or `ChunkProviderHell.hellRNG`
+    /// (ChunkProviderHell.java:6), which `populate` passes to every
+    /// `WorldGenerator.generate` and, through `WorldGenLiquids` /
+    /// `WorldGenHellLava`, to `BlockFlowing.updateTick`
+    /// (WorldGenLiquids.java:57, WorldGenHellLava.java:63). One instance per
+    /// generator, shared with its `provideChunk` (which reseeds it), so a
+    /// chunk generated in the middle of a population reseeds the Random the
+    /// population is drawing from, as in vanilla
+    /// ([`crate::world::chunk_provider::ChunkProviderCache::generator_rand`]).
+    ChunkProviderRand,
 }
 
 /// Overrides already transcribed, by the class that defines them: one row per
