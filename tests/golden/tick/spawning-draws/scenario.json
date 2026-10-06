@@ -1,0 +1,9 @@
+{"name":"spawning-draws","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":100,
+ "mob_spawning":"default","difficulty":0,
+ "comment":"The random-ticks-stone-platform world with natural spawning on (difficulty 0: setAllowedMobSpawns(false, true), creatures and water creatures). There is no grass and no water, and every spot with a normal cube below lies within 24 blocks of the player, so SpawnerAnimals.performSpawning never reaches a mob constructor; it still draws from World.rand for every eligible chunk (biome pick, spawn point, 72 jitter draws for air) and loads the chunks it probes. Pins those draws.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x3fe0000000000000"},
+        {"t":0,"op":"fill","x0":3,"y0":61,"z0":3,"x1":3,"y1":63,"z1":3,"id":12},
+        {"t":0,"op":"set_block","x":5,"y":61,"z":-5,"id":89}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":25,"what":"world_time"}]}

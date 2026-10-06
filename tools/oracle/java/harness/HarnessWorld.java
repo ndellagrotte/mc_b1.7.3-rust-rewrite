@@ -47,6 +47,13 @@ final class HarnessWorld {
     HarnessPlayer player;
     /** Minecraft.joinPlayerCounter (Minecraft.java:1135-1139). */
     int joinPlayerCounter;
+    /**
+     * Scenario field {@code "mob_spawning": "none"} (a Tier B isolation knob,
+     * tests/golden/README.md): {@code setAllowedMobSpawns(false, false)} instead of the client's
+     * {@code (difficulty > 0, true)}, so {@code SpawnerAnimals.performSpawning} returns at once
+     * (SpawnerAnimals.java:20-21).
+     */
+    boolean noMobSpawning;
 
     private HarnessWorld(World world, long seed, Path saveRoot, int difficulty) {
         this.world = world;
@@ -213,7 +220,11 @@ final class HarnessWorld {
         world.difficultySetting = difficulty; // src: Minecraft.java:1142 (gameSettings.difficulty)
         if (world.field_27172_i > 0) --world.field_27172_i; // src: Minecraft.java:1155-1157
         world.updateEntities(); // src: Minecraft.java:1159; World.java:1178-1276
-        world.setAllowedMobSpawns(difficulty > 0, true); // src: Minecraft.java:1163
+        if (noMobSpawning) {
+            world.setAllowedMobSpawns(false, false); // "mob_spawning": "none"
+        } else {
+            world.setAllowedMobSpawns(difficulty > 0, true); // src: Minecraft.java:1163
+        }
         world.tick(); // src: Minecraft.java:1164; World.java:1745-1780
         if (player != null) {
             // src: Minecraft.java:1167-1169. Draws 6000 world.rand values per tick

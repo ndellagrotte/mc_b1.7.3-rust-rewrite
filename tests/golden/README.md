@@ -495,6 +495,7 @@ nondeterminism census behind it in `tools/oracle/census.md`.
 | `ticks` | number of ticks, ≥ 1; ticks are numbered 0 … ticks−1 |
 | `world` | `generated` (default; the dimension's terrain generator) \| `empty` (every chunk all air) |
 | `save_format` | `none` (default; `SaveHandlerMP`, nothing on disk) \| `mcregion` (`SaveOldDir` on a fresh temp directory; needed by `save`) |
+| `mob_spawning` | `default` (default) \| `none`. A Tier B isolation knob: `none` makes the tick loop call `setAllowedMobSpawns(false, false)` instead of `(difficulty > 0, true)` (step 6 below), so `SpawnerAnimals.performSpawning` returns before drawing anything (SpawnerAnimals.java:20-21). For scenarios about blocks that need a player for random ticks but must not depend on the spawner |
 | `difficulty` | 0–3, default **0**; `world.difficultySetting` every tick and `setAllowedMobSpawns(difficulty > 0, true)` (Minecraft.java:1142, :1163). Not GameSettings' default 2: hostile spawn checks draw from an unseeded `Entity.rand` (census §3), so hostile spawning is not reproducible; the oracle warns when a scenario with a player sets it above 0 |
 | `ops` | list of `{"t": tick, "op": name, …}`; applied in file order within a tick |
 | `dumps` | list of `{"what": name, "every": N}` (due when `(t + 1) % N == 0`, i.e. after every N ticks) or `{"what": name, "t": T}`; due dumps run in list order |
@@ -532,7 +533,7 @@ Singletons: `Item.itemRand` = `mix(seed, -1)`, `Block.chest`'s = `mix(seed, -2)`
 3. If there is a player: `if (++joinPlayerCounter == 30) { joinPlayerCounter = 0; world.joinEntityInSurroundings(player); }` (Minecraft.java:1134-1139).
 4. `world.difficultySetting = difficulty`; `if (world.field_27172_i > 0) --world.field_27172_i` (Minecraft.java:1142, :1155-1157).
 5. `world.updateEntities()` (World.java:1178-1276).
-6. `world.setAllowedMobSpawns(difficulty > 0, true)`; `world.tick()` (World.java:1745-1780).
+6. `world.setAllowedMobSpawns(difficulty > 0, true)` (`(false, false)` with `"mob_spawning": "none"`); `world.tick()` (World.java:1745-1780).
 7. If there is a player: `world.randomDisplayUpdates(floor(posX), floor(posY), floor(posZ))` (Minecraft.java:1167-1169; 6000 `world.rand` draws, World.java:1997-2011).
 8. `world.updatingLighting()` once (Minecraft.java:553: once per frame, at most 500 updates; the harness runs one frame per tick).
 9. The dumps due at `t`.
@@ -582,6 +583,8 @@ were not loaded yet (population and moving entities may load more).
 | `entity_state` | `which`: `"all"` \| `[id, …]` | one `entity` line per entity in `loadedEntityList` order (filtered to `which`), then `{"e":"entity_absent","id"}` for each requested id not in the list |
 | `world_time` | — | `{"e":"world_time","time"}` (`getWorldTime`) |
 | `rng_state` | — | `{"e":"rng_state","world_rand","lcg","math_random"}`: the 48-bit state of `World.rand`, `field_9437_g`, the 48-bit state of the `Math.random()` stream — the fastest first-divergence signal |
+| `ray_trace` | `from:[x,y,z]`, `to:[x,y,z]` (f64: integer or bit pattern), `stop_on_liquid?` (false) | `{"e":"ray_trace","from","to","stop_on_liquid","hit"}`: `World.rayTraceBlocks_do(Vec3D.createVector(from), Vec3D.createVector(to), stop_on_liquid)` (World.java:708-861). `from`/`to` echo the inputs as f64 bit strings. `hit` is `null` or the `MovingObjectPosition`: `{"type":"TILE","x","y","z","side","hit_vec":[3 f64 bit strings],"entity":null}` (`blockX/Y/Z`, `sideHit`, `hitVec`, `entityHit`; MovingObjectPosition.java:12-19). Every chunk of the block box spanned by `from` and `to` (x and z) must be loaded |
+| `power` | `x,y,z` | `{"e":"power","x","y","z","powered","indirectly_powered"}`: `World.isBlockGettingPowered`, then `World.isBlockIndirectlyGettingPowered` (World.java:2151-2190). They read blocks up to two away horizontally; those chunks must be loaded |
 
 `entity` line: `idx` (list index), `id` (`entityId`), `kind` (Java class simple name, e.g.
 `EntityPig`, `HarnessPlayer`), `posX/Y/Z`, `prevPosX/Y/Z`, `motionX/Y/Z` (f64 bits),
@@ -690,6 +693,32 @@ the seed for `check-sensitivity.sh`:
   for (1, 0)).
 - `light/occlusion`: 3-high columns of ice, leaves, still water and glass and a leaves canopy
   under open sky; `block_box` dumps per column.
+
+World block access and ticks (WP-1.5), empty world, seed 123. They need no block or
+entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
+`EntityFallingSand`, and do not dump `entity_state` (the player's own update is Phase 2):
+
+- `tick/random-ticks-stone-platform` (`"mob_spawning": "none"`): a player standing on a
+  17×17 stone platform at y = 60 with a sand column, a gravel column, glowstone, glass and
+  obsidian, 200 ticks; a gravel block set in the air at t = 50 falls. `rng_state` every
+  tick pins `World.rand` (6000 `randomDisplayUpdates` draws a tick, the lightning and
+  snow rolls of 361 chunks) and the random-tick LCG; `scheduled_ticks` (full) and
+  `world_time` every 10, `block_box` of the platform at the end.
+- `tick/spawning-draws` (`"mob_spawning": "default"`, difficulty 0): the same platform with
+  natural spawning on for 100 ticks. No grass and no water, and every spot with a normal
+  cube below is within 24 blocks of the player, so `performSpawning` never reaches a mob
+  constructor but makes all its `World.rand` draws (per eligible chunk: the weighted pick,
+  the spawn point, 72 pack draws where the point is air) and loads the chunks it probes;
+  `rng_state` every tick.
+- `tick/ray-trace-platform` (`"mob_spawning": "none"`): `ray_trace` dumps against stone,
+  glass, a still water source and still water at meta 3 (straight, diagonal, through glass,
+  along the water row with and without `stop_on_liquid` and in both directions, from inside
+  a block, from below, ending in the start block) and `power` dumps on stone and air (all
+  false: no power source is transcribed yet, so they pin the traversal only).
+- `tick/weather-time`: no chunks, no player, 2000 ticks; `set_time` 23990 (across a day
+  boundary), 0 at t = 40 and 11950 at t = 1000 (dusk, where `skylightSubtracted` changes);
+  `world_time` and `rng_state` every 10 ticks. Pins the clock, the autosave cadence and
+  `updateWeather`'s first-tick timer draws (both timers start at 0); nothing else draws.
 
 Vanilla behaviour these fixtures pin down:
 

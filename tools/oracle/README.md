@@ -14,7 +14,7 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace` and `power`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
@@ -147,8 +147,18 @@ vanilla code — hostile mob spawn checks (`EntityMob`, `EntityGhast`, `EntitySl
 `getCanSpawnHere`), heading jitter of arrows/snowballs/eggs/fish/fireballs constructed by
 mobs, players and dispensers, painting art, lightning bolts — plus
 `TileEntityDispenser.dispenserRandom` and `Explosion.ExplosionRNG` (flaming explosions).
-Hence the `difficulty` default of 0 and the warning for a player scenario that raises it.
-Closing these needs a second scripted rewrite (Entity.java:96), proposed in census §3.
+Hence the `difficulty` default of 0 and the warning for a player scenario that raises it
+(not given with `"mob_spawning": "none"`, which turns natural spawning off altogether:
+`HarnessWorld.runTick` calls `setAllowedMobSpawns(false, false)` instead of the client's
+`(difficulty > 0, true)`, so `SpawnerAnimals.performSpawning` returns before any draw; a
+Tier B isolation knob for scenarios about blocks). Closing these needs a second scripted
+rewrite (Entity.java:96), proposed in census §3.
+
+`SpawnerAnimals.eligibleChunksForSpawning` is a JVM-wide static `HashSet` that keeps its
+table capacity between scenarios. It is not reset: with one player every call fills it with
+the same 289 keys, the table is 512 wide from the first call on whether it grew there in this
+scenario or an earlier one, and the iteration order of the keys is the same either way
+(checked with `mc_core::JavaHashSet`, WP-1.5); `regen.sh` and subset runs agree.
 
 `rng_state` dumps read `java.util.Random` state through its serial form (`Rng`, no
 `--add-opens`; self-tested at start-up against `new Random(42)`).

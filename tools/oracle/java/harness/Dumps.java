@@ -15,7 +15,10 @@ import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EnumSkyBlock;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
+import net.minecraft.src.MathHelper;
+import net.minecraft.src.MovingObjectPosition;
 import net.minecraft.src.NextTickListEntry;
+import net.minecraft.src.Vec3D;
 import net.minecraft.src.World;
 
 /**
@@ -55,6 +58,56 @@ final class Dumps {
         t.add(line(tick, "rng_state").put("world_rand", Rng.state(w.rand))
                 .put("lcg", Reflect.getInt(World.class, "field_9437_g", w))
                 .put("math_random", HarnessMath.state()));
+    }
+
+    // ---- ray_trace, power -----------------------------------------------------
+
+    /** Every chunk of the inclusive block box (x0..x1, z0..z1) must be loaded. */
+    static void requireChunksLoaded(World w, int x0, int z0, int x1, int z1, String what) {
+        for (int cx = Math.min(x0, x1) >> 4; cx <= Math.max(x0, x1) >> 4; cx++) {
+            for (int cz = Math.min(z0, z1) >> 4; cz <= Math.max(z0, z1) >> 4; cz++) {
+                if (!chunkLoaded(w, cx, cz)) {
+                    throw new IllegalStateException(what + ": chunk " + cx + "," + cz + " not loaded (dumps never load chunks)");
+                }
+            }
+        }
+    }
+
+    static String vec(double x, double y, double z) {
+        return "[\"" + Hex.f64(x) + "\",\"" + Hex.f64(y) + "\",\"" + Hex.f64(z) + "\"]";
+    }
+
+    /**
+     * {@code World.rayTraceBlocks_do(from, to, stopOnLiquid)} (World.java:708-861) on fresh
+     * vectors; the result as {@code hit}: null, or type, blockX/Y/Z, sideHit, hitVec bits and the
+     * entity (always null for a block trace; MovingObjectPosition.java:12-19). Every chunk the
+     * segment's block box touches must be loaded (the trace itself would load them).
+     */
+    static void rayTrace(Trace t, long tick, World w, double[] from, double[] to, boolean stopOnLiquid) {
+        requireChunksLoaded(w, MathHelper.floor_double(from[0]), MathHelper.floor_double(from[2]),
+                MathHelper.floor_double(to[0]), MathHelper.floor_double(to[2]), "ray_trace");
+        MovingObjectPosition m = w.rayTraceBlocks_do(Vec3D.createVector(from[0], from[1], from[2]),
+                Vec3D.createVector(to[0], to[1], to[2]), stopOnLiquid);
+        String hit = "null";
+        if (m != null) {
+            hit = new Json.Line().put("type", m.typeOfHit.name()).put("x", m.blockX).put("y", m.blockY)
+                    .put("z", m.blockZ).put("side", m.sideHit)
+                    .raw("hit_vec", vec(m.hitVec.xCoord, m.hitVec.yCoord, m.hitVec.zCoord))
+                    .raw("entity", m.entityHit == null ? "null" : String.valueOf(m.entityHit.entityId)).toString();
+        }
+        t.add(line(tick, "ray_trace").raw("from", vec(from[0], from[1], from[2])).raw("to", vec(to[0], to[1], to[2]))
+                .put("stop_on_liquid", stopOnLiquid).raw("hit", hit));
+    }
+
+    /**
+     * {@code isBlockGettingPowered} and {@code isBlockIndirectlyGettingPowered} (World.java:2151-2190)
+     * at a block; they read up to two blocks away horizontally, whose chunks must be loaded.
+     */
+    static void power(Trace t, long tick, World w, int x, int y, int z) {
+        requireChunksLoaded(w, x - 2, z - 2, x + 2, z + 2, "power");
+        t.add(line(tick, "power").put("x", x).put("y", y).put("z", z)
+                .put("powered", w.isBlockGettingPowered(x, y, z))
+                .put("indirectly_powered", w.isBlockIndirectlyGettingPowered(x, y, z)));
     }
 
     // ---- block, blocks_full ---------------------------------------------------

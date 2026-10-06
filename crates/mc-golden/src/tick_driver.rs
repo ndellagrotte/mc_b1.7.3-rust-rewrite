@@ -14,11 +14,11 @@
 //! 1. Validate the scenario as the oracle does (`ticks >= 1`, op ticks in
 //!    range, `difficulty` 0..=3, dumps have exactly one of `every`/`t`).
 //! 2. Build the world (`HarnessWorld.create`): `World::new` with
-//!    [`EmptyChunkProvider`] for `"world": "empty"`, then
+//!    [`EmptyChunkProvider`] for `"world": "empty"`, or the dimension's
+//!    generator (`WorldProvider::get_chunk_provider(seed)`, WP-1.4; population
+//!    is still a recorded stub, WP-1.7) for `"world": "generated"`, then
 //!    [`World::make_deterministic`] (`makeDeterministic` + `resetStatics`).
-//!    `"world": "generated"` and `"save_format": "mcregion"` are errors: the
-//!    terrain generator (WP-1.4/1.7) and McRegion saving (WP-1.9) are not
-//!    transcribed yet.
+//!    `"save_format": "mcregion"` is an error: McRegion saving is WP-1.9.
 //! 3. The implicit preload (`TickScenario.implicitPreload`) and its
 //!    `preload` line.
 //! 4. For each tick `t`: the ops with this `t` in file order (a stable sort
@@ -27,13 +27,14 @@
 //!    due at `t` in scenario order.
 //!
 //! `runTick` (HarnessWorld.java, Minecraft.java:1133-1174) as implemented in
-//! `run_tick`: `difficultySetting = difficulty`; `field_27172_i`
-//! countdown; `updateEntities`; `setAllowedMobSpawns(difficulty > 0, true)`;
-//! `tick`. The player-only steps (`joinPlayerCounter` /
-//! `joinEntityInSurroundings`, `randomDisplayUpdates`) never run, because the
-//! `player` op is not supported yet (below); the frame-start pool resets
-//! (`AxisAlignedBB.clearBoundingBoxPool`, `Vec3D.initialize`) have no
-//! observable state in the port.
+//! `run_tick`: with a player, `joinPlayerCounter` and every 30th tick
+//! `joinEntityInSurroundings(player)`; `difficultySetting = difficulty`;
+//! `field_27172_i` countdown; `updateEntities`;
+//! `setAllowedMobSpawns(difficulty > 0, true)`, or `(false, false)` for
+//! `"mob_spawning": "none"`; `tick`; with a player,
+//! `randomDisplayUpdates(floor(posX), floor(posY), floor(posZ))`. The
+//! frame-start pool resets (`AxisAlignedBB.clearBoundingBoxPool`,
+//! `Vec3D.initialize`) have no observable state in the port.
 //!
 //! # Ops and dumps
 //!
@@ -44,6 +45,7 @@
 //! | `fill` | `set_block_and_metadata` over the box, x outer, z middle, y inner → `changed` |
 //! | `set_time` | [`World::set_world_time`] |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
+//! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `spawn` `Item` | [`new_entity_item`], `delayBeforeCanPickup = pickup_delay` (10), [`World::spawn_entity_in_world`] → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
 //! | `chunk_digest` | [`World::chunk_arrays`] → [`TraceLine::chunk_digest_tick`] (+ [`TraceLine::chunk_full_tick`]) |
@@ -51,9 +53,10 @@
 //! | `scheduled_ticks` | [`World::scheduled_ticks`] |
 //! | `entity_state` | [`mc_sim::golden::entity_state_fields`] in `loadedEntityList` order |
 //! | `world_time` / `rng_state` | [`World::get_world_time`] / [`World::rng_state`] |
+//! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
+//! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
-//! `player` (`EntityPlayerSP`/`HarnessPlayer` construction, WP-2.5),
 //! `spawn` of any kind but `Item` (the `Entity<kind>(World)` constructors),
 //! `use_item` (`PlayerController`, items), `attack` (`attackEntityFrom` of
 //! living entities, the player), `save` (Tier S, WP-1.9).
@@ -67,16 +70,18 @@
 //! `HarnessPlayer` ([`trace_kind`]).
 
 use mc_sim::entity::item::new_entity_item;
+use mc_sim::entity::player::new_entity_player_sp;
 use mc_sim::golden::{StateValue, entity_state_fields};
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::provider::{Dimension as SimDimension, WorldProvider};
+use mc_sim::world::ray_trace::EnumMovingObjectType;
 use mc_sim::world::{World, WorldEnvironment};
 use serde_json::{Map, Value};
 
 use crate::scenario::{
-    Dimension, Dump, DumpKind, EntityWhich, Op, OpKind, TickScenario, WorldSource,
+    Dimension, Dump, DumpKind, EntityWhich, MobSpawning, Op, OpKind, TickScenario, WorldSource,
 };
 use crate::trace::{ChunkArrays, EntityLine, ScheduledTick};
 use crate::{GoldenError, Scenario, ScenarioKind, TraceLine, TraceWriter, blake3_hex};
@@ -91,6 +96,12 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
     };
     validate(sc)?;
     let mut world = build_world(sc)?;
+    let mut h = Harness {
+        player: None,
+        join_player_counter: 0,
+        difficulty: sc.difficulty,
+        mob_spawning: sc.mob_spawning.unwrap_or_default(),
+    };
 
     implicit_preload(&mut world, &sc.ops, w);
 
@@ -103,10 +114,10 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         // Frame start (Minecraft.java:519-520): AxisAlignedBB.clearBoundingBoxPool()
         // and Vec3D.initialize() reset object pools, which the port does not have.
         while next < ops.len() && ops[next].t == t {
-            apply(&mut world, ops[next], w)?;
+            apply(&mut world, &mut h, ops[next], w)?;
             next += 1;
         }
-        run_tick(&mut world, sc.difficulty);
+        run_tick(&mut world, &mut h);
         // Once per frame after the tick, Minecraft.java:553 (at most 500 updates).
         world.updating_lighting();
         for d in &sc.dumps {
@@ -198,14 +209,17 @@ fn validate(sc: &TickScenario) -> Result<(), GoldenError> {
 /// `HarnessWorld.create`: `new World(handler, "harness", provider, seed)`,
 /// then `makeDeterministic` / `resetStatics`.
 fn build_world(sc: &TickScenario) -> Result<World, GoldenError> {
+    let dimension = match sc.dimension {
+        Dimension::Overworld => SimDimension::Surface,
+        Dimension::Nether => SimDimension::Hell,
+    };
+    let provider = WorldProvider::new(dimension);
     let generator = match sc.world {
         WorldSource::Empty => ChunkGenerator::Empty(EmptyChunkProvider),
-        WorldSource::Generated => {
-            return Err(GoldenError::other(
-                "\"world\": \"generated\": worldgen not transcribed (Phase 1: \
-                 ChunkProviderGenerate WP-1.4, ChunkProviderHell WP-1.7)",
-            ));
-        }
+        // `World.getChunkProvider` (World.java:210-213): the provider's
+        // generator for the world seed. Population is still a recorded stub
+        // (WP-1.7), see `ChunkGenerator::populate`.
+        WorldSource::Generated => provider.get_chunk_provider(sc.seed),
     };
     match sc.save_format.as_deref().unwrap_or("none") {
         "none" => {}
@@ -216,14 +230,10 @@ fn build_world(sc: &TickScenario) -> Result<World, GoldenError> {
         }
         other => return Err(GoldenError::other(format!("unknown save_format {other}"))),
     }
-    let dimension = match sc.dimension {
-        Dimension::Overworld => SimDimension::Surface,
-        Dimension::Nether => SimDimension::Hell,
-    };
     let mut world = World::new(
         Box::new(NoSave),
         "harness",
-        WorldProvider::new(dimension),
+        provider,
         sc.seed,
         generator,
         // Overwritten by make_deterministic; vanilla draws these unseeded.
@@ -287,18 +297,52 @@ fn preload_square(world: &mut World, cx: i32, cz: i32, r: i32) -> u64 {
     loaded
 }
 
-/// `HarnessWorld.runTick` without a player (module docs).
+/// The harness's per-scenario state besides the world (`HarnessWorld`'s
+/// fields).
+struct Harness {
+    /// `HarnessWorld.player`: the entity id of the `player` op's player.
+    player: Option<i32>,
+    /// `HarnessWorld.joinPlayerCounter` (Minecraft.joinPlayerCounter).
+    join_player_counter: i32,
+    /// The scenario's `difficulty`.
+    difficulty: i32,
+    /// The scenario's `mob_spawning`.
+    mob_spawning: MobSpawning,
+}
+
+/// `HarnessWorld.runTick` (module docs).
 // src: HarnessWorld.java runTick; Minecraft.java:1133-1174
-fn run_tick(world: &mut World, difficulty: i32) {
-    // No player: Minecraft.java:1134-1139 (joinPlayerCounter) does not run.
-    world.difficulty_setting = difficulty; // src: Minecraft.java:1142
+fn run_tick(world: &mut World, h: &mut Harness) {
+    if let Some(pid) = h.player {
+        // src: Minecraft.java:1134-1139
+        h.join_player_counter += 1;
+        if h.join_player_counter == 30 {
+            h.join_player_counter = 0;
+            world.join_entity_in_surroundings(pid);
+        }
+    }
+    world.difficulty_setting = h.difficulty; // src: Minecraft.java:1142
     if world.field_27172_i > 0 {
         world.field_27172_i -= 1; // src: Minecraft.java:1155-1157
     }
     world.update_entities(); // src: Minecraft.java:1159
-    world.set_allowed_mob_spawns(difficulty > 0, true); // src: Minecraft.java:1163
+    match h.mob_spawning {
+        // src: Minecraft.java:1163
+        MobSpawning::Default => world.set_allowed_mob_spawns(h.difficulty > 0, true),
+        MobSpawning::None => world.set_allowed_mob_spawns(false, false),
+    }
     world.tick(); // src: Minecraft.java:1164
-    // No player: randomDisplayUpdates (Minecraft.java:1167-1169) does not run.
+    if let Some(pid) = h.player
+        && let Some(p) = world.entity(pid)
+    {
+        // src: Minecraft.java:1167-1169
+        let (x, y, z) = (
+            floor_double(p.base.pos_x),
+            floor_double(p.base.pos_y),
+            floor_double(p.base.pos_z),
+        );
+        world.random_display_updates(x, y, z);
+    }
 }
 
 // ---- ops ------------------------------------------------------------------------
@@ -308,7 +352,12 @@ fn unsupported(t: u32, op: &str, why: &str) -> GoldenError {
 }
 
 /// One op and its `op` line (`TickScenario.apply`).
-fn apply(world: &mut World, op: &Op, w: &mut TraceWriter) -> Result<(), GoldenError> {
+fn apply(
+    world: &mut World,
+    h: &mut Harness,
+    op: &Op,
+    w: &mut TraceWriter,
+) -> Result<(), GoldenError> {
     let t = op.t;
     let line = |name: &str| TraceLine::op(t as i64, name);
     let out = match op.kind {
@@ -355,13 +404,29 @@ fn apply(world: &mut World, op: &Op, w: &mut TraceWriter) -> Result<(), GoldenEr
         OpKind::Preload { cx, cz, radius } => {
             line("preload").with("loaded", preload_square(world, cx, cz, radius))
         }
-        OpKind::Player { .. } => {
-            return Err(unsupported(
-                t,
-                "player",
-                "HarnessPlayer / EntityPlayerSP(World) construction and EntityPlayer are not \
-                 transcribed (WP-2.5)",
-            ));
+        OpKind::Player {
+            x,
+            y,
+            z,
+            yaw,
+            pitch,
+        } => {
+            if h.player.is_some() {
+                return Err(GoldenError::other(format!("t={t}: only one player op")));
+            }
+            // `new HarnessPlayer(world)`: the pure EntityPlayer constructor
+            // chain (mc_sim::entity::player); its `rand` is seeded with
+            // mix(seed, id) at construction (`seedAfterConstruction`).
+            let mut e = new_entity_player_sp(world);
+            // `place`: setLocationAndAngles (Entity.java:669-676), yaw/pitch
+            // defaulting to the constructor's.
+            let yaw = yaw.unwrap_or(e.base.rotation_yaw);
+            let pitch = pitch.unwrap_or(e.base.rotation_pitch);
+            e.base.set_location_and_angles(x, y, z, yaw, pitch);
+            let eid = e.id();
+            let joined = world.spawn_entity_in_world(e); // src: World.java:896-918
+            h.player = Some(eid);
+            line("player").with("id", eid).with("joined", joined)
         }
         OpKind::Spawn {
             ref kind,
@@ -584,12 +649,91 @@ fn dump(world: &mut World, d: &Dump, t: u32, w: &mut TraceWriter) -> Result<(), 
         }
         DumpKind::EntityState { ref which } => entity_state(world, which, ti, w)?,
         DumpKind::WorldTime => w.push(TraceLine::world_time(ti, world.get_world_time())),
+        DumpKind::RayTrace {
+            from,
+            to,
+            stop_on_liquid,
+        } => {
+            require_chunks_loaded(
+                world,
+                [floor_double(from[0]), floor_double(from[2])],
+                [floor_double(to[0]), floor_double(to[2])],
+                "ray_trace",
+            )?;
+            // `World.rayTraceBlocks_do` on fresh vectors (Dumps.rayTrace).
+            let m = world.ray_trace_between(from, to, stop_on_liquid);
+            let hit = match m {
+                None => Value::Null,
+                Some(m) => serde_json::json!({
+                    "type": match m.type_of_hit {
+                        EnumMovingObjectType::Tile => "TILE",
+                        EnumMovingObjectType::Entity => "ENTITY",
+                    },
+                    "x": m.block_x,
+                    "y": m.block_y,
+                    "z": m.block_z,
+                    "side": m.side_hit,
+                    "hit_vec": vec3_bits(m.hit_vec.x_coord, m.hit_vec.y_coord, m.hit_vec.z_coord),
+                    "entity": m.entity_hit,
+                }),
+            };
+            w.push(
+                TraceLine::new(ti, "ray_trace")
+                    .with("from", vec3_bits(from[0], from[1], from[2]))
+                    .with("to", vec3_bits(to[0], to[1], to[2]))
+                    .with("stop_on_liquid", stop_on_liquid)
+                    .with("hit", hit),
+            );
+        }
+        DumpKind::Power { x, y, z } => {
+            require_chunks_loaded(world, [x - 2, z - 2], [x + 2, z + 2], "power")?;
+            // Java evaluates the two in this order (Dumps.power).
+            let powered = world.is_block_getting_powered(x, y, z);
+            let indirectly = world.is_block_indirectly_getting_powered(x, y, z);
+            w.push(
+                TraceLine::new(ti, "power")
+                    .with("x", x)
+                    .with("y", y)
+                    .with("z", z)
+                    .with("powered", powered)
+                    .with("indirectly_powered", indirectly),
+            );
+        }
         DumpKind::RngState => {
             let r = world.rng_state();
             w.push(TraceLine::rng_state(ti, r.world_rand, r.lcg, r.math_random));
         }
     }
     Ok(())
+}
+
+/// `Dumps.requireChunksLoaded`: every chunk of the block box spanned by the
+/// two `[x, z]` corners is loaded.
+fn require_chunks_loaded(
+    world: &World,
+    a: [i32; 2],
+    b: [i32; 2],
+    what: &str,
+) -> Result<(), GoldenError> {
+    for cx in (a[0].min(b[0]) >> 4)..=(a[0].max(b[0]) >> 4) {
+        for cz in (a[1].min(b[1]) >> 4)..=(a[1].max(b[1]) >> 4) {
+            if !world.chunk_exists(cx, cz) {
+                return Err(GoldenError::other(format!(
+                    "{what}: chunk {cx},{cz} not loaded (dumps never load chunks)"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// `Dumps.vec`: three `f64` bit-pattern strings.
+fn vec3_bits(x: f64, y: f64, z: f64) -> Value {
+    Value::Array(vec![
+        crate::Bits64::from(x).into(),
+        crate::Bits64::from(y).into(),
+        crate::Bits64::from(z).into(),
+    ])
 }
 
 /// `Dumps.entityState`: `entity` lines in `loadedEntityList` order, filtered

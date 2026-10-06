@@ -35,21 +35,22 @@ macro_rules! fixtures {
 }
 
 fixtures! {
-    // Every "world": "generated" fixture stops before its first line (the
-    // implicit `preload` line): tick_driver returns "worldgen not transcribed".
-    // What it needs after worldgen is listed for planning, from its ops.
+    // "world": "generated" fixtures run on the WP-1.4 terrain generator;
+    // population is a recorded stub (WP-1.7), so they diverge at the first
+    // dump that sees populated terrain or the draws population makes. Each
+    // reason names the first differing line and what comes after it.
 
     // ---- tests/golden/entity -----------------------------------------------------
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then EntityArrow(World) + EntityArrow.onUpdate"]
+    #[ignore = "EntityArrow(World) constructor (WP-2.4): the driver stops at line 2 (t=0 op spawn kind Arrow); line 1 matches. Then EntityArrow.onUpdate; generated terrain is in (WP-1.4), population is not (WP-1.7)"]
     entity_arrow_flight => "entity" / "arrow-flight";
     entity_flat_item_drop => "entity" / "flat-item-drop";
     #[ignore = "EntityPig(World) constructor not transcribed: first diff line 7 (t=0 op spawn kind Pig); then EntityLiving.onLivingUpdate / EntityCreature.updatePlayerActionState wander AI (WP-2.2)"]
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then lands on generated grass"]
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 3 (t=0 entity, motionX/rotationYaw): the oracle's population reaches Math.random() sites (BlockFluid lava/water mixing) before the EntityItem constructor draws, the stubbed population does not"]
     entity_item_drop => "entity" / "item-drop";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then HarnessPlayer/EntityPlayerSP (WP-2.5), EntityPig, EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom"]
+    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 3 (t=0 op spawn kind Pig); lines 1-2 (preload, player) match. Then EntityPlayer.attackTargetEntityWithCurrentItem, EntityLiving.attackEntityFrom (WP-2.2, WP-2.5), population (WP-1.7)"]
     entity_pig_attacked => "entity" / "pig-attacked";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then EntityPig and water physics, generated sand (BlockSand/EntityFallingSand)"]
+    #[ignore = "EntityPig(World) constructor (WP-2.3): the driver stops at line 2 (t=0 op spawn kind Pig); line 1 matches. Then EntityPig and water physics, population (WP-1.7: generated sand)"]
     entity_pig_falls => "entity" / "pig-falls";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
@@ -59,19 +60,23 @@ fixtures! {
     light_skylight_column => "light" / "skylight-column";
 
     // ---- tests/golden/tick -------------------------------------------------------
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then use_item: HarnessPlayer, PlayerController.sendPlaceBlock, ItemDye.onItemUse, BlockSapling.growTree"]
+    #[ignore = "use_item (PlayerController.sendPlaceBlock, ItemDye.onItemUse; WP-2.5, WP-2.6): the driver stops at line 7 (t=1 op use_item); lines 1-6 match. Then BlockSapling.growTree (WP-1.6, WP-1.7), population (WP-1.7)"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace)"]
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 12 (t=19 chunk_digest 0,0, field blocks); lines 1-11 (world time, RNG state, scheduled ticks) match"]
     tick_empty_world_20 => "tick" / "empty-world-20";
     #[ignore = "BlockFlowing.onBlockAdded/updateTick (fluids task of WP-1.6): first diff line 9 (t=4 scheduled_ticks count 0, expected 5). Lighting (WP-1.3) is in"]
     tick_flat_flowing_water => "tick" / "flat-flowing-water";
     tick_flat_sand_falls => "tick" / "flat-sand-falls";
     tick_flat_torch_light => "tick" / "flat-torch-light";
     tick_flat_water_flow => "tick" / "flat-water-flow";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then HarnessPlayer (WP-2.5), BlockSapling random ticks, SpawnerAnimals.performSpawning (WP-2.3)"]
+    tick_random_ticks_stone_platform => "tick" / "random-ticks-stone-platform";
+    tick_ray_trace_platform => "tick" / "ray-trace-platform";
+    tick_spawning_draws => "tick" / "spawning-draws";
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 4 (t=99 chunk_digest -2,-4, field blocks); then BlockSapling/BlockGrass random ticks (WP-1.6), the player's own update (EntityPlayer, WP-2.5: entity_state posY), SpawnerAnimals mob constructors (WP-2.3)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
-    #[ignore = "worldgen: ChunkProviderGenerate (WP-1.4), first diff line 1 (no trace); then BlockFlowing (fluids task of WP-1.6)"]
+    #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 7 (t=4 scheduled_ticks, 2557 expected: populated liquids schedule ticks); then BlockFlowing (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
+    tick_weather_time => "tick" / "weather-time";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test

@@ -1,0 +1,11 @@
+{"name":"weather-time","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":2000,
+ "comment":"No chunks, no player: World.tick's time and weather alone. The first tick's updateWeather draws both timers (thunderTime and rainTime are 0 in a new WorldInfo); set_time puts the clock just before a day boundary (23990), back to 0, and before dusk (11950), where calculateSkylightSubtracted changes. world_time and rng_state every 10 ticks pin the clock (autosave cadence, world time + 1 per tick) and that nothing else draws from World.rand.",
+ "ops":[{"t":0,"op":"set_time","time":23990},
+        {"t":40,"op":"set_time","time":0},
+        {"t":1000,"op":"set_time","time":11950}],
+ "dumps":[{"t":0,"what":"world_time"},
+          {"t":0,"what":"rng_state"},
+          {"t":9,"what":"world_time"},
+          {"t":10,"what":"world_time"},
+          {"every":10,"what":"world_time"},
+          {"every":10,"what":"rng_state"}]}

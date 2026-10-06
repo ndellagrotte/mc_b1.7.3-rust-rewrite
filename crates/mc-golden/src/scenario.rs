@@ -224,6 +224,17 @@ pub enum WorldSource {
     Empty,
 }
 
+/// `mob_spawning` of a `tick` scenario.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MobSpawning {
+    /// `setAllowedMobSpawns(difficulty > 0, true)` (Minecraft.java:1163).
+    #[default]
+    Default,
+    /// `setAllowedMobSpawns(false, false)`.
+    None,
+}
+
 /// A chunk coordinate pair (`{"x":..,"z":..}`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChunkPos {
@@ -252,6 +263,12 @@ pub struct TickScenario {
     /// `none` (default when absent) or `mcregion`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub save_format: Option<String>,
+    /// Tier B isolation knob (tests/golden/README.md): `default` (absent)
+    /// runs `setAllowedMobSpawns(difficulty > 0, true)` before each
+    /// `World.tick`, `none` runs `setAllowedMobSpawns(false, false)`, so
+    /// `SpawnerAnimals.performSpawning` returns before any draw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mob_spawning: Option<MobSpawning>,
     /// Scripted operations, applied in file order within a tick.
     #[serde(default)]
     pub ops: Vec<Op>,
@@ -585,6 +602,28 @@ pub enum DumpKind {
     WorldTime,
     /// `rng_state` line.
     RngState,
+    /// `ray_trace` line: `World.rayTraceBlocks_do(from, to, stop_on_liquid)`.
+    RayTrace {
+        /// Start point.
+        #[serde(with = "flex::vec3")]
+        from: [f64; 3],
+        /// End point.
+        #[serde(with = "flex::vec3")]
+        to: [f64; 3],
+        /// `stopOnLiquid` (default false).
+        #[serde(default)]
+        stop_on_liquid: bool,
+    },
+    /// `power` line: `isBlockGettingPowered` and
+    /// `isBlockIndirectlyGettingPowered` at a block.
+    Power {
+        /// Block x.
+        x: i32,
+        /// Block y.
+        y: i32,
+        /// Block z.
+        z: i32,
+    },
 }
 
 /// Scenario floats: a JSON integer or number, or a bit-pattern string.

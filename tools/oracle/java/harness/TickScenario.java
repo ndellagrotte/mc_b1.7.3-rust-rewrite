@@ -35,7 +35,7 @@ final class TickScenario {
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "preload",
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
-            "entity_state", "world_time", "rng_state");
+            "entity_state", "world_time", "rng_state", "ray_trace", "power");
 
     @SuppressWarnings("unchecked")
     static Trace run(Map<String, Object> sc, Path dir) throws Exception {
@@ -50,6 +50,10 @@ final class TickScenario {
         // EntitySlime.java:134-137, called at SpawnerAnimals.java:130), so they are not reproducible.
         int difficulty = sc.containsKey("difficulty") ? Math.toIntExact(num(sc, "difficulty")) : 0;
         if (difficulty < 0 || difficulty > 3) throw new IllegalArgumentException("difficulty must be 0..3");
+        String mobSpawning = sc.containsKey("mob_spawning") ? str(sc, "mob_spawning") : "default";
+        if (!mobSpawning.equals("default") && !mobSpawning.equals("none")) {
+            throw new IllegalArgumentException("mob_spawning must be \"default\" or \"none\"");
+        }
 
         List<Map<String, Object>> ops = new ArrayList<>();
         for (Object o : list(sc, "ops")) {
@@ -62,7 +66,7 @@ final class TickScenario {
             }
             ops.add(op);
         }
-        if (difficulty > 0 && ops.stream().anyMatch(o -> "player".equals(o.get("op")))) {
+        if (difficulty > 0 && !mobSpawning.equals("none") && ops.stream().anyMatch(o -> "player".equals(o.get("op")))) {
             System.err.println("harness: warning: " + sc.get("name") + ": difficulty " + difficulty
                     + " with a player enables hostile mob spawning, which is not reproducible (tools/oracle/census.md)");
         }
@@ -80,6 +84,7 @@ final class TickScenario {
         // Every vanilla Math.random() draws from HarnessMath: one stream per scenario.
         HarnessMath.seed(seed);
         HarnessWorld hw = HarnessWorld.create(seed, dimension, worldType, saveFormat, difficulty);
+        hw.noMobSpawning = mobSpawning.equals("none");
         Trace trace = new Trace();
         try {
             implicitPreload(hw, ops, trace);
@@ -424,6 +429,10 @@ final class TickScenario {
             case "entity_state": Dumps.entityState(trace, t, w, d.get("which")); break;
             case "world_time": Dumps.worldTime(trace, t, w); break;
             case "rng_state": Dumps.rngState(trace, t, w); break;
+            case "ray_trace":
+                Dumps.rayTrace(trace, t, w, Num.vec3(d.get("from")), Num.vec3(d.get("to")), Main.Scenario.flag(d, "stop_on_liquid"));
+                break;
+            case "power": Dumps.power(trace, t, w, i(d, "x"), i(d, "y"), i(d, "z")); break;
             default: throw new IllegalArgumentException("unknown dump " + d.get("what"));
         }
     }
