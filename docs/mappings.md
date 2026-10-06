@@ -18,6 +18,8 @@ mixed-case originals).
 | `StepSound.field_1677_b` | `StepSound::step_sound_volume` | Returned by `getVolume()` (StepSound.java:14-16); callers pass it as a sound volume (Entity.java:493, EntityLiving.java:448) |
 | `StepSound.field_1679_c` | `StepSound::step_sound_pitch` | Returned by `getPitch()` (StepSound.java:18-20); passed as the pitch (Entity.java:493) |
 | `MetadataChunkBlock.field_1298_b`, `field_1304_c`, `field_1303_d`, `field_1302_e`, `field_1301_f`, `field_1300_g` | `MetadataChunkBlock::bounds[0..6]` | Assigned from the constructor's x0, y0, z0, x1, y1, z1 in that order (MetadataChunkBlock.java:12-20); `func_4127_a` uses them as box min/max (`field_1302_e - field_1298_b + 1`, :22-25). Grouped into one array; WP-1.3 may split them when it transcribes `func_4127_a` |
+| `BlockStep.field_22037_a` | `block::STEP_TYPE_NAMES` | Static `{"stone", "sand", "wood", "cobble"}` (BlockStep.java:6), indexed by slab metadata: `ItemSlab.getItemNameIS` returns `super.getItemName() + "." + field_22037_a[damage]` (ItemSlab.java:18-20), and the four entries match the four slab textures of `BlockStep.getBlockTextureFromSideAndMetadata` (BlockStep.java:19-33). Static, so not in the `block_table` dump |
+| `BlockRedstoneRepeater.field_22023_b` | `block::REPEATER_DELAYS` | Static `{1, 2, 3, 4}` (BlockRedstoneRepeater.java:7), indexed by the delay setting `(meta & 12) >> 2`; the scheduled tick delay is twice the entry (BlockRedstoneRepeater.java:36-37, :93-97); the redstone task of WP-1.6 reads it |
 
 ## Kept (meaning documented)
 
@@ -38,8 +40,6 @@ mixed-case originals).
 | `EntityItem.field_803_e` | `ItemData::field_803_e` | Incremented every tick (EntityItem.java:71), never read |
 | `EntityLiving.field_9365_p`, `field_9363_r`, `field_9362_u`, `field_9361_v`, `field_9360_w`, `field_9359_x`, `field_9358_y`, `field_9355_A`, `field_9349_D`, `field_9345_F`, `field_9326_T`, `field_9325_U`, `field_9348_ae`, `field_9346_af` | `LivingData::` same, snake_case | Fields only in WP-0.5 (EntityLiving.java:7-49). `field_9325_U` and `field_9363_r`, `field_9365_p` draw `Math.random()` at construction (:38, :63, :65); `field_9362_u`/`field_9361_v` are reset by `updateRidden` (:187-191). WP-2.2 names them from their uses |
 | `BlockRedstoneOre.field_468_a` | `BlockKind::RedstoneOre { field_468_a }` | True for the glowing ore (id 74): the constructor enables random ticks only then (BlockRedstoneOre.java:8-15); pinned per block by `block/block-table` (`fields.field_468_a`) |
-| `BlockStep.field_22037_a` | — (not ported yet) | Static `{"stone", "sand", "wood", "cobble"}`, the slab type names by metadata (BlockStep.java:6); read by `ItemSlab` for item names (WP-1.2). Static, so not in the `block_table` dump |
-| `BlockRedstoneRepeater.field_22023_b` | — (not ported yet) | Static `{1, 2, 3, 4}`: repeater delay setting by `(meta & 12) >> 2`; the scheduled tick delay is twice the entry (BlockRedstoneRepeater.java:7, :36-37, :93-97); redstone task of WP-1.6 |
 | `TileEntity.field_31007_h` | `TileEntity::field_31007_h` | The "invalid" flag: `isInvalid()` returns it, `invalidate()`/`validate()` set it (TileEntity.java:88-98) |
 | `MetadataChunkBlock.field_1299_a` | `MetadataChunkBlock::field_1299_a` | Which light (`EnumSkyBlock`) the update is for (MetadataChunkBlock.java:4, :13) |
 

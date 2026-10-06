@@ -80,7 +80,7 @@ impl MapColor {
         color_value: 6837042,
     };
 
-    /// `mapColorArray` (MapColor.java:3): each constructor stores itself at
+    /// `mapColorArray` (MapColor.java:4): each constructor stores itself at
     /// its `colorIndex` (MapColor.java:22-26); slots 14 and 15 stay null.
     pub const MAP_COLOR_ARRAY: [Option<MapColor>; 16] = [
         Some(Self::AIR_COLOR),

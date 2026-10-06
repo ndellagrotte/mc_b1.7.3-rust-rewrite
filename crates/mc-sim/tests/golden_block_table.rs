@@ -44,7 +44,10 @@ fn fields(def: &BlockDef, st: &BlockStatics) -> Value {
         assert!(m.insert(k.to_string(), v).is_none(), "field {k} twice");
     };
     // Block (Block.java:120-136)
-    put("blockIndexInTexture", def.block_index_in_texture.into());
+    put(
+        "blockIndexInTexture",
+        block::block_index_in_texture(def, st).into(),
+    );
     put("blockID", def.block_id.into());
     put("blockHardness", f32v(def.block_hardness));
     put("blockResistance", f32v(def.block_resistance));
@@ -169,7 +172,7 @@ fn block_line(id: i32, st: &BlockStatics) -> TraceLine {
         .map(|m| block::damage_dropped(def, m).into())
         .collect();
     let side: Vec<Value> = (0..6)
-        .map(|s| block::get_block_texture_from_side(def, s).into())
+        .map(|s| block::get_block_texture_from_side(def, s, st).into())
         .collect();
     let mut tex = Vec::new();
     for s in 0..6 {

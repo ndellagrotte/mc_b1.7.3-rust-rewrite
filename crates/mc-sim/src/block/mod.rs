@@ -670,7 +670,11 @@ impl BlockDef {
     /// `BlockLeaves.baseIndexInPNG` (BlockLeaves.java:6): the leaves'
     /// constructor stores its texture argument there as well as in
     /// `blockIndexInTexture` (BlockLeaves.java:10-11), so it is the texture
-    /// index the row was built with. `None` for other classes.
+    /// index the row was built with. Never written afterwards, unlike the
+    /// singleton's `blockIndexInTexture`, which `setGraphicsLevel` rewrites
+    /// (see [`BlockStatics::leaves_block_index_in_texture`]); the row's
+    /// `block_index_in_texture` is the constructor value, so this reads it.
+    /// `None` for other classes.
     pub const fn base_index_in_png(&self) -> Option<i32> {
         match self.kind {
             BlockKind::Leaves => Some(self.block_index_in_texture),
@@ -948,9 +952,12 @@ pub const fn get_render_type(kind: BlockKind) -> i32 {
     }
 }
 
-/// The stairs' `modelBlock` row (BlockStairs.java:7).
-fn model_of(model_block: i32) -> &'static BlockDef {
-    block(model_block).expect("BlockStairs.modelBlock is a vanilla block")
+/// The row of a vanilla block id that another block's method refers to:
+/// `BlockStairs.modelBlock` (BlockStairs.java:7), `Block.dirt` (grass and
+/// farmland `idDropped`), `Block.planks` (bed and workbench textures),
+/// `Block.redstoneWire` (the redstone torch's top).
+fn block_row(id: i32) -> &'static BlockDef {
+    block(id).expect("a vanilla block id")
 }
 
 /// `getRenderBlockPass()`: 1 for blocks drawn in the translucent pass.
@@ -968,7 +975,7 @@ pub fn get_render_block_pass(def: &BlockDef) -> i32 {
         // src: BlockIce.java:12-14, BlockPortal.java:146-148
         BlockKind::Ice | BlockKind::Portal => 1,
         // src: BlockStairs.java:89-91
-        BlockKind::Stairs { model_block } => get_render_block_pass(model_of(model_block)),
+        BlockKind::Stairs { model_block } => get_render_block_pass(block_row(model_block)),
         // src: BlockGlass.java:14-16 returns 0 explicitly
         _ => 0,
     }
@@ -981,7 +988,7 @@ pub fn is_collidable(def: &BlockDef) -> bool {
         // src: BlockFire.java:168-170
         BlockKind::Fire => false,
         // src: BlockStairs.java:125-127
-        BlockKind::Stairs { model_block } => is_collidable(model_of(model_block)),
+        BlockKind::Stairs { model_block } => is_collidable(block_row(model_block)),
         _ => true,
     }
 }
@@ -1006,6 +1013,7 @@ mod ids {
     pub const COBBLESTONE: i32 = 4;
     pub const DIRT: i32 = 3;
     pub const PLANKS: i32 = 5;
+    pub const LEAVES: i32 = 18;
     pub const SAPLING: i32 = 6;
     pub const ORE_COAL: i32 = 16;
     pub const WOOD: i32 = 17;
@@ -1103,7 +1111,7 @@ pub fn id_dropped(def: &BlockDef, meta: i32, rand: &mut JavaRandom) -> i32 {
             }
         }
         // src: BlockFarmland.java:94-96, BlockGrass.java:51-53: Block.dirt.idDropped(0, rand)
-        K::Farmland | K::Grass => id_dropped(model_of(ids::DIRT), 0, rand),
+        K::Farmland | K::Grass => id_dropped(block_row(ids::DIRT), 0, rand),
         // src: BlockFurnace.java:16-18
         K::Furnace { .. } => ids::STONE_OVEN_IDLE,
         // src: BlockGlowStone.java:14-16
@@ -1147,7 +1155,7 @@ pub fn id_dropped(def: &BlockDef, meta: i32, rand: &mut JavaRandom) -> i32 {
         // src: BlockSnow.java:63-65, BlockSnowBlock.java:11-13
         K::Snow | K::SnowBlock => items::SNOWBALL,
         // src: BlockStairs.java:93-95
-        K::Stairs { model_block } => id_dropped(model_of(model_block), meta, rand),
+        K::Stairs { model_block } => id_dropped(block_row(model_block), meta, rand),
         // src: BlockStep.java:60-62
         K::Step { .. } => ids::STAIR_SINGLE,
         // src: BlockStone.java:10-12
@@ -1210,7 +1218,7 @@ pub fn quantity_dropped(def: &BlockDef, rand: &mut JavaRandom) -> i32 {
         // src: BlockRedstoneOre.java:55-57
         K::RedstoneOre { .. } => 4 + rand.next_int_bounded(2),
         // src: BlockStairs.java:97-99
-        K::Stairs { model_block } => quantity_dropped(model_of(model_block), rand),
+        K::Stairs { model_block } => quantity_dropped(block_row(model_block), rand),
         // src: BlockStep.java:64-66 (`blockType ? 2 : 1`)
         K::Step { block_type: true } => 2,
         // The single slab (BlockStep.java:65), BlockCrops.java:111-113,
@@ -1232,6 +1240,25 @@ const BED_DIRECTION: [[i32; 6]; 4] = [
 /// `PistonBlockTextures.faceToSide` (PistonBlockTextures.java:4): the
 /// opposite side.
 pub const FACE_TO_SIDE: [i32; 6] = [1, 0, 3, 2, 5, 4];
+
+/// `BlockStep.field_22037_a`: the slab type names by metadata, appended to
+/// the slab item's name (`super.getItemName() + "." + name`, ItemSlab.java:18-20).
+/// A Java static, so outside the `block_table` dump; pinned by the unit test.
+// src: BlockStep.java:6
+pub const STEP_TYPE_NAMES: [&str; 4] = ["stone", "sand", "wood", "cobble"];
+
+/// `BlockRedstoneRepeater.field_22023_b`: the repeater delay setting by
+/// `(meta & 12) >> 2`; the scheduled tick delay is twice the entry
+/// (BlockRedstoneRepeater.java:36-37, :93-97). A Java static, so outside the
+/// `block_table` dump.
+// src: BlockRedstoneRepeater.java:7
+pub const REPEATER_DELAYS: [i32; 4] = [1, 2, 3, 4];
+
+/// `BlockRedstoneRepeater.repeaterTorchOffset`: the sliding torch's offset by
+/// delay setting, read by the redstone particles (BlockRedstoneRepeater.java:184-193)
+/// and the renderer (RenderBlocks.java:323-335). A Java static.
+// src: BlockRedstoneRepeater.java:6
+pub const REPEATER_TORCH_OFFSET: [f64; 4] = [-0.0625, 0.0625, 0.1875, 0.3125];
 
 /// `BlockRedstoneRepeater.getBlockTextureFromSideAndMetadata` (meta unused).
 // src: BlockRedstoneRepeater.java:43-51
@@ -1267,12 +1294,24 @@ const fn step_texture(side: i32, meta: i32) -> i32 {
     }
 }
 
+/// The live `blockIndexInTexture` of a block singleton: the row's value,
+/// except for `Block.leaves`, whose `setGraphicsLevel` rewrites it at run time
+/// (BlockLeaves.java:185-188; [`BlockStatics::leaves_block_index_in_texture`]).
+/// No other block writes the field after its constructor.
+pub fn block_index_in_texture(def: &BlockDef, statics: &BlockStatics) -> i32 {
+    match def.kind {
+        BlockKind::Leaves => statics.leaves_block_index_in_texture,
+        _ => def.block_index_in_texture,
+    }
+}
+
 /// `getBlockTextureFromSide(side)`: the terrain.png index of a side with no
 /// metadata (item icons and the base of
-/// [`get_block_texture_from_side_and_metadata`]).
+/// [`get_block_texture_from_side_and_metadata`]). `statics` supplies the
+/// leaves' live `blockIndexInTexture` ([`block_index_in_texture`]).
 // src: Block.java:265-267 and the overrides listed per arm
-pub fn get_block_texture_from_side(def: &BlockDef, side: i32) -> i32 {
-    let t = def.block_index_in_texture;
+pub fn get_block_texture_from_side(def: &BlockDef, side: i32, statics: &BlockStatics) -> i32 {
+    let t = block_index_in_texture(def, statics);
     use BlockKind as K;
     match def.kind {
         // src: BlockBookshelf.java:10-12
@@ -1368,7 +1407,9 @@ pub fn get_block_texture_from_side(def: &BlockDef, side: i32) -> i32 {
             }
         }
         // src: BlockStairs.java:105-107
-        K::Stairs { model_block } => get_block_texture_from_side(model_of(model_block), side),
+        K::Stairs { model_block } => {
+            get_block_texture_from_side(block_row(model_block), side, statics)
+        }
         // src: BlockStep.java:35-37
         K::Step { .. } => step_texture(side, 0),
         // src: BlockTNT.java:10-16
@@ -1386,7 +1427,7 @@ pub fn get_block_texture_from_side(def: &BlockDef, side: i32) -> i32 {
             if side == 1 {
                 t - 16
             } else if side == 0 {
-                get_block_texture_from_side(model_of(ids::PLANKS), 0)
+                get_block_texture_from_side(block_row(ids::PLANKS), 0, statics)
             } else if side != 2 && side != 4 {
                 t
             } else {
@@ -1401,7 +1442,8 @@ pub fn get_block_texture_from_side(def: &BlockDef, side: i32) -> i32 {
 
 /// `getBlockTextureFromSideAndMetadata(side, meta)`: the terrain.png index of
 /// a side (a negative index means "mirrored", BlockDoor). `statics` supplies
-/// the singleton state two pistons read (bounds, `headTexture`).
+/// the singleton state two pistons read (bounds, `headTexture`) and the
+/// leaves' live `blockIndexInTexture`.
 ///
 /// `None` where vanilla throws `ArrayIndexOutOfBoundsException`: a side
 /// outside 0..=5 for the bed, and the piston extension with `meta & 7` of 6
@@ -1414,14 +1456,14 @@ pub fn get_block_texture_from_side_and_metadata(
     meta: i32,
     statics: &BlockStatics,
 ) -> Option<i32> {
-    let t = def.block_index_in_texture;
+    let t = block_index_in_texture(def, statics);
     use BlockKind as K;
     Some(match def.kind {
         // src: BlockBed.java:85-103; getDirectionFromMetadata = meta & 3 (:145-147),
         // isBlockFootOfBed = (meta & 8) != 0 (:149-151)
         K::Bed => {
             if side == 0 {
-                model_of(ids::PLANKS).block_index_in_texture
+                block_row(ids::PLANKS).block_index_in_texture
             } else {
                 let var3 = meta & 3;
                 let var4 = *BED_DIRECTION[var3 as usize].get(usize::try_from(side).ok()?)?;
@@ -1605,13 +1647,13 @@ pub fn get_block_texture_from_side_and_metadata(
         K::RedstoneTorch { .. } => {
             if side == 1 {
                 return get_block_texture_from_side_and_metadata(
-                    model_of(ids::REDSTONE_WIRE),
+                    block_row(ids::REDSTONE_WIRE),
                     side,
                     meta,
                     statics,
                 );
             }
-            get_block_texture_from_side(def, side)
+            get_block_texture_from_side(def, side, statics)
         }
         // src: BlockSapling.java:27-34; super (BlockFlower has no override) is
         // Block's, getBlockTextureFromSide
@@ -1622,13 +1664,13 @@ pub fn get_block_texture_from_side_and_metadata(
             } else if var2 == 2 {
                 79
             } else {
-                get_block_texture_from_side(def, side)
+                get_block_texture_from_side(def, side, statics)
             }
         }
         // src: BlockStairs.java:101-103
         K::Stairs { model_block } => {
             return get_block_texture_from_side_and_metadata(
-                model_of(model_block),
+                block_row(model_block),
                 side,
                 meta,
                 statics,
@@ -1648,7 +1690,7 @@ pub fn get_block_texture_from_side_and_metadata(
                 t
             }
         }
-        _ => get_block_texture_from_side(def, side),
+        _ => get_block_texture_from_side(def, side, statics),
     })
 }
 
@@ -1685,7 +1727,16 @@ pub struct BlockStatics {
     /// `BlockLeavesBase.graphicsLevel` of `Block.leaves` (the only
     /// `BlockLeavesBase` instance). Set by the client's fancy-graphics option
     /// (RenderGlobal); false in the oracle, which has no renderer.
+    /// Written together with [`Self::leaves_block_index_in_texture`] by
+    /// [`Self::set_leaves_graphics_level`].
     pub graphics_level: bool,
+    /// `blockIndexInTexture` of `Block.leaves`: the constructor's 52
+    /// (Block.java:610, BlockLeaves.java:9-11) until `setGraphicsLevel`
+    /// rewrites it to `baseIndexInPNG + (fancy ? 0 : 1)`. Client-only (the
+    /// renderer calls it, RenderGlobal.java:187); the texture methods read it
+    /// through [`block_index_in_texture`].
+    // src: BlockLeaves.java:185-188
+    pub leaves_block_index_in_texture: i32,
     /// `BlockSand.fallInstantly` (a static): sand and gravel move down at
     /// once instead of spawning an `EntityFallingSand`. The terrain
     /// generators set it during population (ChunkProviderGenerate.java:311,
@@ -1742,6 +1793,19 @@ impl FlowingScratch {
 }
 
 impl BlockStatics {
+    /// `BlockLeaves.setGraphicsLevel(fancy)` on `Block.leaves`: stores the
+    /// flag (read by `isOpaqueCube` and the renderer) and swaps the leaves
+    /// texture between the fancy and the fast tile.
+    // src: BlockLeaves.java:185-188
+    pub fn set_leaves_graphics_level(&mut self, fancy: bool) {
+        self.graphics_level = fancy;
+        let base = BLOCKS[ids::LEAVES as usize]
+            .as_ref()
+            .and_then(BlockDef::base_index_in_png)
+            .expect("Block.leaves is a BlockLeaves");
+        self.leaves_block_index_in_texture = base + if fancy { 0 } else { 1 };
+    }
+
     /// The scratch fields of the `BlockFlowing` singleton with this id.
     pub fn flowing_scratch(&self, id: i32) -> Option<&FlowingScratch> {
         match id {
@@ -1772,6 +1836,10 @@ impl Default for BlockStatics {
         BlockStatics {
             bounds,
             graphics_level: false,
+            leaves_block_index_in_texture: BLOCKS[ids::LEAVES as usize]
+                .as_ref()
+                .expect("Block.leaves")
+                .block_index_in_texture,
             fall_instantly: false,
             water_moving: FlowingScratch::NEW,
             lava_moving: FlowingScratch::NEW,
@@ -1867,11 +1935,37 @@ mod tests {
             get_block_texture_from_side_and_metadata(ext, 0, 6, &st),
             None
         );
+        // setGraphicsLevel swaps the leaves tile (BlockLeaves.java:185-188);
+        // baseIndexInPNG stays the constructor's 52.
+        let leaves = block(18).unwrap();
+        let mut fast = st.clone();
+        fast.set_leaves_graphics_level(false);
+        assert_eq!(get_block_texture_from_side(leaves, 2, &fast), 53);
+        assert_eq!(
+            get_block_texture_from_side_and_metadata(leaves, 2, 1, &fast),
+            Some(53 + 80)
+        );
+        assert_eq!(leaves.base_index_in_png(), Some(52));
+        fast.set_leaves_graphics_level(true);
+        assert_eq!(fast.leaves_block_index_in_texture, 52);
+        assert!(!is_opaque_cube(leaves.kind, fast.graphics_level));
         // Crops: meta < 0 reads as 7 (BlockCrops.java:78-80).
         assert_eq!(
             get_block_texture_from_side_and_metadata(block(59).unwrap(), 2, -1, &st),
             Some(88 + 7)
         );
+    }
+
+    #[test]
+    fn subclass_statics() {
+        assert_eq!(STEP_TYPE_NAMES, ["stone", "sand", "wood", "cobble"]);
+        assert_eq!(REPEATER_DELAYS, [1, 2, 3, 4]);
+        // -0.0625D etc. are exact binary fractions.
+        assert_eq!(
+            REPEATER_TORCH_OFFSET[0].to_bits(),
+            (-1.0f64 / 16.0).to_bits()
+        );
+        assert_eq!(REPEATER_TORCH_OFFSET[3], 5.0 / 16.0);
     }
 
     #[test]
