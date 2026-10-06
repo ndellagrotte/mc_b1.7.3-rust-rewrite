@@ -1,56 +1,24 @@
 //! `TileEntityMobSpawner` (TileEntityMobSpawner.java): with a player within
 //! 16 blocks, counts `delay` down and then tries to spawn four mobs.
 //!
-//! The mobs are `EntityList.createEntityInWorld(mobID, world)` (Phase 2:
-//! the living-entity constructors are WP-2.3). The port makes every draw
-//! of `updateEntity` up to the first construction and records
-//! `"EntityList.createEntityInWorld"` there, then returns as Java does for
-//! an unknown id; from the first spawn attempt on (the tick after `delay`
-//! reaches 0) it therefore diverges from vanilla.
+//! The mobs are `EntityList.createEntityInWorld(mobID, world)`
+//! ([`entity_list::create_entity_in_world`]). For a mob whose `(World)`
+//! constructor the port does not have yet, `createEntityInWorld` makes the
+//! constructor's world side effects (entity id, `Math.random()` draws),
+//! records the gap and answers `None`, and the update returns as Java does
+//! for an unknown id; from that attempt on it diverges from vanilla.
 
 use std::collections::BTreeMap;
 
+use mc_core::Aabb;
 use mc_nbt::Tag;
 
 use super::{get_short, get_string};
+use crate::entity::{dispatch, living};
 use crate::item::JavaException;
+use crate::save::entity_list;
 use crate::world::World;
 use crate::world::tile_entity::{TileEntityKindData, TileEntityRef};
-
-/// `EntityList`'s name table (EntityList.java:83-106): the ids
-/// `createEntityInWorld` can construct.
-// src: EntityList.java:83-106
-const ENTITY_LIST_NAMES: [&str; 24] = [
-    "Arrow",
-    "Snowball",
-    "Item",
-    "Painting",
-    "Mob",
-    "Monster",
-    "Creeper",
-    "Skeleton",
-    "Spider",
-    "Giant",
-    "Zombie",
-    "Slime",
-    "Ghast",
-    "PigZombie",
-    "Pig",
-    "Sheep",
-    "Cow",
-    "Chicken",
-    "Squid",
-    "Wolf",
-    "PrimedTnt",
-    "FallingSand",
-    "Minecart",
-    "Boat",
-];
-
-/// The one `EntityList` id whose class is abstract (`EntityLiving`, "Mob"):
-/// `createEntityInWorld` returns null for it.
-// src: EntityList.java:87, EntityLiving.java:5
-const ABSTRACT_ENTITY_LIST_NAME: &str = "Mob";
 
 /// The fields `TileEntityMobSpawner` declares.
 #[derive(Clone, Debug, PartialEq)]
@@ -176,28 +144,81 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
             d.delay -= 1;
             return;
         }
-        // src: TileEntityMobSpawner.java:48-50: four attempts, each
+        // src: TileEntityMobSpawner.java:48-82: four attempts, each
         // constructing the mob first.
         let mob_id = data(world, r).map(|d| d.mob_id.clone()).unwrap_or_default();
-        // `var9 == null` (an id EntityList does not know): return. "Mob" maps
-        // to the abstract `EntityLiving` (EntityList.java:87,
-        // EntityLiving.java:5): `newInstance` throws `InstantiationException`,
-        // which `createEntityInWorld` catches (EntityList.java:27-29), so it
-        // returns null too, before any constructor runs.
-        // src: EntityList.java:19-32
-        //
-        // The ids that are not `EntityLiving` (Arrow, Snowball, Item,
-        // Painting, PrimedTnt, FallingSand, Minecart, Boat) are constructed
-        // and then throw `ClassCastException` at the `(EntityLiving)` cast
-        // (TileEntityMobSpawner.java:51) in vanilla; that is unreachable from
-        // `WorldGenDungeons.pickMobSpawner` (Skeleton/Zombie/Spider only), and
-        // the port records the same gap for them.
-        if ENTITY_LIST_NAMES.contains(&mob_id.as_str()) && mob_id != ABSTRACT_ENTITY_LIST_NAME {
-            // src: TileEntityMobSpawner.java:51 (`EntityList.createEntityInWorld`,
-            // then `getEntitiesWithinAABB`, the placement draws, `getCanSpawnHere`,
-            // `entityJoinedWorld`, 20 particle pairs, `spawnExplosionParticle`,
-            // `updateDelay`, :56-80): the mob constructors are WP-2.3.
-            world.note_unimplemented("EntityList.createEntityInWorld");
+        for _var8 in 0..4 {
+            // `var9 == null`: an id EntityList does not know, or "Mob", the
+            // abstract `EntityLiving` (`newInstance` throws
+            // `InstantiationException`, caught by createEntityInWorld,
+            // EntityList.java:27-29), or a class the port cannot construct
+            // yet (recorded by entity_list).
+            // src: TileEntityMobSpawner.java:51-54
+            let Some(mut var9) = entity_list::create_entity_in_world(&mob_id, world) else {
+                return;
+            };
+            if var9.kind.living().is_none() {
+                // The `(EntityLiving)` cast throws `ClassCastException` in
+                // vanilla for Arrow, Snowball, Item, Painting, PrimedTnt,
+                // FallingSand, Minecart and Boat (out of the tile entity's
+                // update, World.updateEntities); unreachable from
+                // `WorldGenDungeons.pickMobSpawner` (Skeleton/Zombie/Spider).
+                world.note_unimplemented(
+                    "TileEntityMobSpawner.updateEntity: ClassCastException (a non-living EntityList id)",
+                );
+                return;
+            }
+            // src: TileEntityMobSpawner.java:56-60 (`getClass()`: instances of
+            // the mob's own class)
+            let bb = Aabb::new(
+                x as f64,
+                y as f64,
+                z as f64,
+                (x + 1) as f64,
+                (y + 1) as f64,
+                (z + 1) as f64,
+            )
+            .expand(8.0, 4.0, 8.0);
+            let var10 = world
+                .get_entities_within_aabb(var9.kind.java_class(), &bb, None)
+                .len();
+            if var10 >= 6 {
+                update_delay(world, r);
+                return;
+            }
+            // src: TileEntityMobSpawner.java:62-66
+            let var11 = x as f64 + (world.rand.next_double() - world.rand.next_double()) * 4.0;
+            let var13 = (y + world.rand.next_int_bounded(3) - 1) as f64;
+            let var15 = z as f64 + (world.rand.next_double() - world.rand.next_double()) * 4.0;
+            let yaw = world.rand.next_float() * 360.0;
+            var9.base
+                .set_location_and_angles(var11, var13, var15, yaw, 0.0);
+            // src: TileEntityMobSpawner.java:67-80
+            if dispatch::get_can_spawn_here(&var9, world) {
+                let id = var9.base.entity_id;
+                world.spawn_entity_in_world(var9);
+                for _var17 in 0..20 {
+                    let var1 = x as f64 + 0.5 + (world.rand.next_float() as f64 - 0.5) * 2.0;
+                    let var3 = y as f64 + 0.5 + (world.rand.next_float() as f64 - 0.5) * 2.0;
+                    let var5 = z as f64 + 0.5 + (world.rand.next_float() as f64 - 0.5) * 2.0;
+                    world.spawn_particle("smoke", var1, var3, var5, 0.0, 0.0, 0.0);
+                    world.spawn_particle("flame", var1, var3, var5, 0.0, 0.0, 0.0);
+                }
+                // `var9.spawnExplosionParticle()`: on the joined mob (its
+                // `rand`, reseeded by the join). A mob whose chunk is not
+                // loaded did not join and is dropped here; vanilla still
+                // draws its 20 particles from its own `rand`, which nothing
+                // reads afterwards.
+                if world
+                    .with_entity_mut(id, |w, e| living::spawn_explosion_particle(e, w))
+                    .is_none()
+                {
+                    world.note_unimplemented(
+                        "TileEntityMobSpawner.updateEntity: spawnExplosionParticle on a mob that did not join",
+                    );
+                }
+                update_delay(world, r);
+            }
         }
     }
     // super.updateEntity() (TileEntityMobSpawner.java:85): empty.

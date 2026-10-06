@@ -5,15 +5,14 @@
 //! # Kinds the port cannot construct yet (recorded gap)
 //!
 //! `createEntityFromNBT` instantiates the class saved under `id` with its
-//! `(World)` constructor, then `readFromNBT`. The port has those
-//! constructors for `EntityItem`, `EntityFallingSand`, `EntityArrow`,
-//! `EntitySnowball`, `EntityPainting`, `EntityTNTPrimed`, `EntityMinecart`
-//! and `EntityBoat` (WP-2.4), `EntityPig` (WP-2.2), `EntitySheep`,
-//! `EntityCow`, `EntityChicken`, `EntityWolf` (WP-2.3a) and `EntityMob`,
-//! `EntityCreeper`, `EntitySkeleton`, `EntitySpider`, `EntityGiantZombie`,
-//! `EntityZombie`, `EntitySlime`, `EntityGhast`, `EntityPigZombie`
-//! (WP-2.3b); `EntitySquid` is WP-2.3c. For the other names of the table, [`create_entity_from_nbt`]
-//! returns [`FromNbt::Gap`]:
+//! `(World)` constructor, then `readFromNBT`. The port's `(World)`
+//! constructors are the rows of [`CONSTRUCTORS`] (one line per class: a
+//! task that transcribes a constructor adds its row, and every caller —
+//! [`create_entity_in_world`], [`create_entity_from_nbt`],
+//! [`new_instance`] for `SpawnerAnimals`, the mob spawner, the golden
+//! driver's `spawn` op — picks it up). For the other names of the table,
+//! [`create_entity_from_nbt`] returns [`FromNbt::Gap`] (the classes still
+//! missing: [`missing_constructors`]):
 //!
 //! - the side effects the Java constructor has on the world are made: the
 //!   entity id is consumed (`Entity.nextEntityID++`, Entity.java:76) and,
@@ -59,6 +58,7 @@ use crate::entity::skeleton::new_entity_skeleton;
 use crate::entity::slime::new_entity_slime;
 use crate::entity::snowball::new_entity_snowball_empty;
 use crate::entity::spider::new_entity_spider;
+use crate::entity::squid::new_entity_squid;
 use crate::entity::tnt_primed::new_entity_tnt_primed_empty;
 use crate::entity::wolf::new_entity_wolf;
 use crate::entity::zombie::new_entity_zombie;
@@ -166,82 +166,135 @@ pub enum FromNbt {
     Skipped,
 }
 
+/// A Java `(World)` constructor: `new <class>(world)`.
+pub type Constructor = fn(&mut World) -> Entity;
+
+/// The `(World)` constructors the port has, by Java class: what
+/// `Class.getConstructor(World.class).newInstance(world)` runs for the
+/// classes of [`MAPPINGS`]. One row per class; a task that transcribes a
+/// constructor adds its row here and nothing else.
+pub const CONSTRUCTORS: &[(&str, Constructor)] = &[
+    // src: EntityArrow.java:18-21
+    ("EntityArrow", new_entity_arrow_empty),
+    // src: EntitySnowball.java:16-19
+    ("EntitySnowball", new_entity_snowball_empty),
+    // src: EntityItem.java:27-31
+    ("EntityItem", new_entity_item_empty),
+    // src: EntityPainting.java:14-20
+    ("EntityPainting", new_entity_painting_empty),
+    // src: EntityPig.java:4-8
+    ("EntityPig", new_entity_pig),
+    // src: EntitySheep.java:8-12
+    ("EntitySheep", new_entity_sheep),
+    // src: EntityCow.java:4-8
+    ("EntityCow", new_entity_cow),
+    // src: EntityChicken.java:12-18
+    ("EntityChicken", new_entity_chicken),
+    // src: EntityWolf.java:15-21
+    ("EntityWolf", new_entity_wolf),
+    // src: EntityMob.java:6-9
+    ("EntityMob", new_entity_mob),
+    // src: EntityCreeper.java:7-10
+    ("EntityCreeper", new_entity_creeper),
+    // src: EntitySkeleton.java:6-9
+    ("EntitySkeleton", new_entity_skeleton),
+    // src: EntitySpider.java:4-9
+    ("EntitySpider", new_entity_spider),
+    // src: EntityGiantZombie.java:4-12
+    ("EntityGiantZombie", new_entity_giant_zombie),
+    // src: EntityZombie.java:4-9
+    ("EntityZombie", new_entity_zombie),
+    // src: EntitySlime.java:8-15 (its size and jump delay from rand)
+    ("EntitySlime", new_entity_slime),
+    // src: EntityGhast.java:13-18
+    ("EntityGhast", new_entity_ghast),
+    // src: EntityPigZombie.java:10-16
+    ("EntityPigZombie", new_entity_pig_zombie),
+    // src: EntitySquid.java:19-24
+    ("EntitySquid", new_entity_squid),
+    // src: EntityTNTPrimed.java:6-12
+    ("EntityTNTPrimed", new_entity_tnt_primed_empty),
+    // src: EntityFallingSand.java:7-9
+    ("EntityFallingSand", new_entity_falling_sand_empty),
+    // src: EntityMinecart.java:26-36
+    ("EntityMinecart", new_entity_minecart_empty),
+    // src: EntityBoat.java:19-27
+    ("EntityBoat", new_entity_boat_empty),
+];
+
+/// The port's `(World)` constructor of `class`, if it has one.
+pub fn constructor(class: &str) -> Option<Constructor> {
+    CONSTRUCTORS
+        .iter()
+        .find(|(c, _)| *c == class)
+        .map(|(_, f)| *f)
+}
+
+/// The `EntityList` names whose class is concrete but has no row in
+/// [`CONSTRUCTORS`] yet, in `MAPPINGS` order (the remaining gaps; empty
+/// once every entity constructor is transcribed).
+pub fn missing_constructors() -> Vec<&'static str> {
+    MAPPINGS
+        .iter()
+        .filter(|m| m.concrete && constructor(m.class).is_none())
+        .map(|m| m.name)
+        .collect()
+}
+
+/// `classToStringMapping`'s key side: the row of the Java class `class`.
+// src: EntityList.java:8, :14
+pub fn by_class(class: &str) -> Option<&'static EntityMapping> {
+    MAPPINGS.iter().find(|m| m.class == class)
+}
+
 /// `new <class>(world)` for the classes the port has, `None` otherwise.
 fn construct(class: &str, world: &mut World) -> Option<Entity> {
-    match class {
-        // src: EntityItem.java:27-31
-        "EntityItem" => Some(new_entity_item_empty(world)),
-        // src: EntityFallingSand.java:7-9
-        "EntityFallingSand" => Some(new_entity_falling_sand_empty(world)),
-        // src: EntityArrow.java:18-21
-        "EntityArrow" => Some(new_entity_arrow_empty(world)),
-        // src: EntitySnowball.java:16-19
-        "EntitySnowball" => Some(new_entity_snowball_empty(world)),
-        // src: EntityPainting.java:14-20
-        "EntityPainting" => Some(new_entity_painting_empty(world)),
-        // src: EntityTNTPrimed.java:6-12
-        "EntityTNTPrimed" => Some(new_entity_tnt_primed_empty(world)),
-        // src: EntityMinecart.java:26-36
-        "EntityMinecart" => Some(new_entity_minecart_empty(world)),
-        // src: EntityBoat.java:19-27
-        "EntityBoat" => Some(new_entity_boat_empty(world)),
-        // src: EntityPig.java:4-8
-        "EntityPig" => Some(new_entity_pig(world)),
-        // src: EntitySheep.java:8-12
-        "EntitySheep" => Some(new_entity_sheep(world)),
-        // src: EntityCow.java:4-8
-        "EntityCow" => Some(new_entity_cow(world)),
-        // src: EntityChicken.java:12-18
-        "EntityChicken" => Some(new_entity_chicken(world)),
-        // src: EntityWolf.java:15-21
-        "EntityWolf" => Some(new_entity_wolf(world)),
-        // src: EntityMob.java:6-9
-        "EntityMob" => Some(new_entity_mob(world)),
-        // src: EntityCreeper.java:7-10
-        "EntityCreeper" => Some(new_entity_creeper(world)),
-        // src: EntitySkeleton.java:6-9
-        "EntitySkeleton" => Some(new_entity_skeleton(world)),
-        // src: EntitySpider.java:4-9
-        "EntitySpider" => Some(new_entity_spider(world)),
-        // src: EntityGiantZombie.java:4-12
-        "EntityGiantZombie" => Some(new_entity_giant_zombie(world)),
-        // src: EntityZombie.java:4-9
-        "EntityZombie" => Some(new_entity_zombie(world)),
-        // src: EntitySlime.java:8-15 (its size and jump delay from rand)
-        "EntitySlime" => Some(new_entity_slime(world)),
-        // src: EntityGhast.java:13-18
-        "EntityGhast" => Some(new_entity_ghast(world)),
-        // src: EntityPigZombie.java:10-16
-        "EntityPigZombie" => Some(new_entity_pig_zombie(world)),
-        _ => None,
-    }
+    constructor(class).map(|f| f(world))
 }
 
 /// The world side effects of `new <class>(world)` for a class the port
-/// cannot construct (module docs).
-fn construct_gap(m: &EntityMapping, world: &mut World) {
+/// cannot construct (module docs), and the record `what`.
+fn construct_gap(m: &EntityMapping, world: &mut World, what: &'static str) {
     // src: Entity.java:75-113 (the id), EntityLiving.java:6-68 (the draws)
     let mut b = EntityBase::new(world);
     if m.living {
         let _ = LivingData::new(world, &mut b);
     }
-    world.note_unimplemented("EntityList.createEntityFromNBT: the entity class's (World) constructor and readFromNBT (Phase 2)");
+    world.note_unimplemented(what);
+}
+
+/// The record of a construction the port cannot make outside
+/// `createEntityFromNBT`.
+const NEW_INSTANCE_GAP: &str = "EntityList: the entity class's (World) constructor (Phase 2; SpawnerAnimals, TileEntityMobSpawner)";
+
+/// `entityClass.getConstructor(World.class).newInstance(world)` for the
+/// concrete class `class` of [`MAPPINGS`] (`SpawnerAnimals` holds classes,
+/// not names: SpawnerAnimals.java:231, :329). `None` for a class the port
+/// cannot construct yet: the constructor's world side effects are made
+/// (module docs) and the gap is recorded.
+pub fn new_instance(class: &str, world: &mut World) -> Option<Entity> {
+    if let Some(e) = construct(class, world) {
+        return Some(e);
+    }
+    match by_class(class).filter(|m| m.concrete) {
+        Some(m) => construct_gap(m, world, NEW_INSTANCE_GAP),
+        None => world.note_unimplemented("EntityList: a class outside EntityList's table"),
+    }
+    None
 }
 
 /// `EntityList.createEntityInWorld(name, world)`: a new entity of the class
-/// saved as `name`, `None` for an unknown name or a class the port cannot
-/// construct yet (recorded).
+/// saved as `name`, `None` for an unknown name, the abstract `"Mob"`
+/// (`newInstance` throws `InstantiationException`, caught) or a class the
+/// port cannot construct yet (its constructor's side effects made, and
+/// recorded).
 // src: EntityList.java:19-32
 pub fn create_entity_in_world(name: &str, world: &mut World) -> Option<Entity> {
     let m = by_name(name)?;
     if !m.concrete {
         return None;
     }
-    let e = construct(m.class, world);
-    if e.is_none() {
-        construct_gap(m, world);
-    }
-    e
+    new_instance(m.class, world)
 }
 
 /// `EntityList.createEntityFromNBT(compound, world)`. `Err` where the Java
@@ -261,7 +314,11 @@ pub fn create_entity_from_nbt(c: &Compound, world: &mut World) -> Result<FromNbt
             Ok(FromNbt::Created(Box::new(e)))
         }
         None => {
-            construct_gap(m, world);
+            construct_gap(
+                m,
+                world,
+                "EntityList.createEntityFromNBT: the entity class's (World) constructor and readFromNBT (Phase 2)",
+            );
             Ok(FromNbt::Gap { class: m.class })
         }
     }
