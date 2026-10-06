@@ -155,6 +155,8 @@ pub fn attack_entity_from(
 ) -> bool {
     if living::attack_entity_from(e, world, var1, var2) {
         let a = var1.map(|a| a.base.entity_id);
+        // vanilla bug: reference comparisons, so a null attacker passes
+        // when the mob has both a rider and a mount, and clears the target.
         if e.base.ridden_by_entity != a && e.base.riding_entity != a {
             if a != Some(e.base.entity_id) {
                 creature::creature_mut(&mut e.kind)

@@ -157,6 +157,8 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
             let d = gd(e);
             (d.waypoint_x, d.waypoint_y, d.waypoint_z)
         };
+        // vanilla bug: var1/var3/var5/var7 still describe the old waypoint
+        // when one was just drawn above (EntityGhast.java:38-58).
         if is_course_traversable(e, world, wx, wy, wz, var7) {
             let b = &mut e.base;
             b.motion_x += var1 / var7 * 0.1;
@@ -230,8 +232,9 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
                 let mut var17 = fireball::new_entity_fireball_shot(world, e, var11, var13, var15);
                 let var18 = 4.0;
                 let var20 = living::get_look(e, 1.0);
-                // Plain field writes: the box stays where the constructor
-                // put it (at the ghast).
+                // vanilla bug: plain field writes, the box stays where the
+                // constructor put it (at the ghast) until the fireball's
+                // first onUpdate moves it (EntityFireball.java:61-174).
                 var17.base.pos_x = e.base.pos_x + var20.x_coord * var18;
                 var17.base.pos_y = e.base.pos_y + (e.base.height / 2.0) as f64 + 0.5;
                 var17.base.pos_z = e.base.pos_z + var20.z_coord * var18;

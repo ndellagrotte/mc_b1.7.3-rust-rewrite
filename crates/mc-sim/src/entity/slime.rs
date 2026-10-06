@@ -210,6 +210,8 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
 // src: EntitySlime.java:98-112
 pub fn set_entity_dead(e: &mut Entity, world: &mut World) {
     let var1 = get_slime_size(e);
+    // vanilla bug: `health == 0`, so a slime killed by more damage than it
+    // had left (health below 0) does not split.
     if !world.multiplayer_world && var1 > 1 && lv(e).health == 0 {
         for var2 in 0..4 {
             let var3 = ((var2 % 2) as f32 - 0.5) * var1 as f32 / 4.0;

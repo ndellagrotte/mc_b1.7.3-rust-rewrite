@@ -397,8 +397,9 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
     }
     if let K::Slime(l, _) = &mut e.kind {
         read_living(l, c)?;
-        // src: EntitySlime.java:38-41. vanilla bug (transcribed):
-        // setSlimeSize resets health to size², so a hurt slime reloads healed.
+        // src: EntitySlime.java:38-41
+        // vanilla bug: setSlimeSize resets health to size², so a hurt slime
+        // reloads healed.
         let size = n::get_integer(c, "Size")?.wrapping_add(1);
         super::slime::set_slime_size(e, size);
         return Ok(());

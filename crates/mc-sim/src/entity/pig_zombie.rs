@@ -14,8 +14,8 @@
 //! | 73-87 | the sounds; `getDropItemId` (cooked porkchop) | [`super::dispatch`] |
 //! | 89-91 | `getHeldItem` (render data) | [`get_held_item`] |
 //!
-//! b1.7.3 never lowers `angerLevel` (no decrement anywhere in the tree):
-//! once angry, a pigman stays angry until it is saved with `Anger` 0.
+//! vanilla bug: b1.7.3 never lowers `angerLevel` (no decrement anywhere in
+//! the tree): once angry, a pigman stays angry for good (`Anger` is saved).
 
 use super::{
     Entity, EntityBase, EntityKindData, LivingData, creature, dispatch, living, mob, zombie,
