@@ -89,11 +89,30 @@ fn entity_class_queries() {
     assert_eq!(w.count_entities("Entity"), 2);
     assert_eq!(w.count_entities("EntityAnimal"), 0);
     assert_eq!(w.player_entities, vec![pid]);
-    let all = w.get_entities_within_aabb("Entity", &Aabb::new(-5.0, 0.0, -5.0, 5.0, 70.0, 5.0));
+    let bb = Aabb::new(-5.0, 0.0, -5.0, 5.0, 70.0, 5.0);
+    let all = w.get_entities_within_aabb("Entity", &bb, None);
     assert_eq!(all.len(), 2);
-    let players =
-        w.get_entities_within_aabb("EntityPlayer", &Aabb::new(-5.0, 0.0, -5.0, 5.0, 70.0, 5.0));
+    let players = w.get_entities_within_aabb("EntityPlayer", &bb, None);
     assert_eq!(players, vec![pid]);
+    // An entity out of its slot for its update (a player on a pressure plate,
+    // BlockPressurePlate.java:93) is found when passed in hand, at its place
+    // in the chunk scan; without it the miss is recorded.
+    let in_hand = w
+        .with_entity_mut(pid, |w, p| {
+            (
+                w.get_entities_within_aabb("Entity", &bb, Some(p)),
+                w.get_entities_within_aabb("EntityPlayer", &bb, None),
+            )
+        })
+        .unwrap();
+    assert_eq!(in_hand.0, all);
+    assert!(in_hand.1.is_empty());
+    assert_eq!(
+        w.unimplemented_hits
+            .borrow()
+            .get("World.getEntitiesWithinAABB over a taken-out entity"),
+        Some(&1)
+    );
     assert_eq!(w.get_closest_player(0.0, 0.0, 0.0, -1.0), Some(pid));
     assert_eq!(w.get_player_entity_by_name("Player"), None);
 }

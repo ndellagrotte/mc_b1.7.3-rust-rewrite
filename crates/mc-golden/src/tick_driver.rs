@@ -44,6 +44,7 @@
 //! | `set_block_silent` | [`World::set_block_and_metadata`] → `ok` |
 //! | `fill` | `set_block_and_metadata` over the box, x outer, z middle, y inner → `changed` |
 //! | `set_time` | [`World::set_world_time`] |
+//! | `set_weather` | the given fields of [`World::world_info`] (`rain_time`, `raining`, `thunder_time`, `thundering`) |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
 //! | `player` | [`new_entity_player_sp`] (the pure `EntityPlayer` constructor chain; its update is recorded as not transcribed, WP-2.5), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `spawn` `Item` | [`new_entity_item`], `delayBeforeCanPickup = pickup_delay` (10), [`World::spawn_entity_in_world`] → `id`, `kind`, `joined` |
@@ -53,6 +54,7 @@
 //! | `scheduled_ticks` | [`World::scheduled_ticks`] |
 //! | `entity_state` | [`mc_sim::golden::entity_state_fields`] in `loadedEntityList` order |
 //! | `world_time` / `rng_state` | [`World::get_world_time`] / [`World::rng_state`] |
+//! | `weather` | [`World::world_info`] timers and flags, the `World` rain/thunder strengths |
 //! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
 //! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
 //!
@@ -101,6 +103,7 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         join_player_counter: 0,
         difficulty: sc.difficulty,
         mob_spawning: sc.mob_spawning.unwrap_or_default(),
+        player_pos: None,
     };
 
     implicit_preload(&mut world, &sc.ops, w);
@@ -308,6 +311,10 @@ struct Harness {
     difficulty: i32,
     /// The scenario's `mob_spawning`.
     mob_spawning: MobSpawning,
+    /// The player's position when `run_tick` last found it in
+    /// `loadedEntityList`: the oracle keeps the `HarnessPlayer` object after
+    /// it leaves the list and still centres `randomDisplayUpdates` on it.
+    player_pos: Option<(f64, f64, f64)>,
 }
 
 /// `HarnessWorld.runTick` (module docs).
@@ -332,16 +339,22 @@ fn run_tick(world: &mut World, h: &mut Harness) {
         MobSpawning::None => world.set_allowed_mob_spawns(false, false),
     }
     world.tick(); // src: Minecraft.java:1164
-    if let Some(pid) = h.player
-        && let Some(p) = world.entity(pid)
-    {
+    if let Some(pid) = h.player {
         // src: Minecraft.java:1167-1169
-        let (x, y, z) = (
-            floor_double(p.base.pos_x),
-            floor_double(p.base.pos_y),
-            floor_double(p.base.pos_z),
-        );
-        world.random_display_updates(x, y, z);
+        match world.entity(pid) {
+            Some(p) => h.player_pos = Some((p.base.pos_x, p.base.pos_y, p.base.pos_z)),
+            None => {
+                // The oracle reads the removed player's fields, which may have
+                // moved during the update that removed it; the port only has
+                // the position from the end of the previous tick.
+                world.note_unimplemented(
+                    "HarnessWorld.runTick randomDisplayUpdates around a player no longer in loadedEntityList",
+                );
+            }
+        }
+        if let Some((x, y, z)) = h.player_pos {
+            world.random_display_updates(floor_double(x), floor_double(y), floor_double(z));
+        }
     }
 }
 
@@ -400,6 +413,28 @@ fn apply(
         OpKind::SetTime { time } => {
             world.set_world_time(time); // src: World.java:2274-2276
             line("set_time")
+        }
+        OpKind::SetWeather {
+            rain_time,
+            raining,
+            thunder_time,
+            thundering,
+        } => {
+            // src: WorldInfo.java:195-221 (plain setters)
+            let info = &mut world.world_info;
+            if let Some(v) = rain_time {
+                info.rain_time = v;
+            }
+            if let Some(v) = raining {
+                info.raining = v;
+            }
+            if let Some(v) = thunder_time {
+                info.thunder_time = v;
+            }
+            if let Some(v) = thundering {
+                info.thundering = v;
+            }
+            line("set_weather")
         }
         OpKind::Preload { cx, cz, radius } => {
             line("preload").with("loaded", preload_square(world, cx, cz, radius))
@@ -697,6 +732,21 @@ fn dump(world: &mut World, d: &Dump, t: u32, w: &mut TraceWriter) -> Result<(), 
                     .with("z", z)
                     .with("powered", powered)
                     .with("indirectly_powered", indirectly),
+            );
+        }
+        DumpKind::Weather => {
+            // Dumps.weather: WorldInfo's timers and flags, World's strengths.
+            let i = &world.world_info;
+            w.push(
+                TraceLine::new(ti, "weather")
+                    .with("rain_time", i.rain_time)
+                    .with("raining", i.raining)
+                    .with("thunder_time", i.thunder_time)
+                    .with("thundering", i.thundering)
+                    .with_f32("prev_rain_strength", world.prev_raining_strength)
+                    .with_f32("rain_strength", world.raining_strength)
+                    .with_f32("prev_thunder_strength", world.prev_thundering_strength)
+                    .with_f32("thunder_strength", world.thundering_strength),
             );
         }
         DumpKind::RngState => {

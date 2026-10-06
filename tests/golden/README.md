@@ -562,6 +562,7 @@ were not loaded yet (population and moving entities may load more).
 | `set_block_silent` | same | `World.setBlockAndMetadata` (World.java:370-384): as above without `notifyBlockChange`; `onBlockAdded` still runs | `ok` |
 | `fill` | `x0,y0,z0,x1,y1,z1,id,meta?` | `set_block_silent` over the box, x outer, z middle, y inner | `changed` (count of `true` returns) |
 | `set_time` | `time` | `World.setWorldTime` (World.java:2274) | — |
+| `set_weather` | `rain_time?`, `raining?`, `thunder_time?`, `thundering?` (int, bool, int, bool) | the `WorldInfo` setters `setRainTime`, `setRaining`, `setThunderTime`, `setThundering` (WorldInfo.java:195-221) for the fields given. A Tier B knob to reach `updateWeather`'s toggles (World.java:1792-1859) without waiting 12000+ ticks | — |
 | `preload` | `cx,cz,radius` | preload square (above) | `loaded` |
 | `player` | `x,y,z` (feet), `yaw?,pitch?` | `new HarnessPlayer(world)`, seeded, `setLocationAndAngles`, `entityJoinedWorld`. At most one | `id`, `joined` |
 | `spawn` | `kind`, `pos:[x,y,z]` (bounding-box bottom), `yaw?,pitch?`, `id?`; for `kind: "Item"`: `item:{id,count,damage?}`, `pickup_delay?` (10) | `new Entity<kind>(world)` with the class from EntityList's name table (EntityList.java:82-107: `Arrow`, `Snowball`, `Item`, `Painting`, `Mob`, `Monster`, `Creeper`, `Skeleton`, `Spider`, `Giant`, `Zombie`, `Slime`, `Ghast`, `PigZombie`, `Pig`, `Sheep`, `Cow`, `Chicken`, `Squid`, `Wolf`, `PrimedTnt`, `FallingSand`, `Minecart`, `Boat`); `rand.setSeed(mix(seed, id))` (Slime: size and jump delay redrawn); `setLocationAndAngles(x, y, z, yaw, pitch)` (Entity.java:669-676: `posY = y + yOffset`; yaw/pitch default to the constructor's, a `Math.random()` yaw for living entities); `entityJoinedWorld`. `Item` instead uses `new EntityItem(world, x, y, z, stack)` (EntityItem.java:11-21: `Math.random()` yaw and horizontal motion, `motionY` 0.2, position via `setPosition`) and `delayBeforeCanPickup = pickup_delay`, as block drops do (Block.java:355-364). `id`, if given, must equal the entity id it gets | `id`, `kind` (class simple name), `joined` |
@@ -585,6 +586,7 @@ were not loaded yet (population and moving entities may load more).
 | `rng_state` | — | `{"e":"rng_state","world_rand","lcg","math_random"}`: the 48-bit state of `World.rand`, `field_9437_g`, the 48-bit state of the `Math.random()` stream — the fastest first-divergence signal |
 | `ray_trace` | `from:[x,y,z]`, `to:[x,y,z]` (f64: integer or bit pattern), `stop_on_liquid?` (false) | `{"e":"ray_trace","from","to","stop_on_liquid","hit"}`: `World.rayTraceBlocks_do(Vec3D.createVector(from), Vec3D.createVector(to), stop_on_liquid)` (World.java:708-861). `from`/`to` echo the inputs as f64 bit strings. `hit` is `null` or the `MovingObjectPosition`: `{"type":"TILE","x","y","z","side","hit_vec":[3 f64 bit strings],"entity":null}` (`blockX/Y/Z`, `sideHit`, `hitVec`, `entityHit`; MovingObjectPosition.java:12-19). Every chunk of the block box spanned by `from` and `to` (x and z) must be loaded |
 | `power` | `x,y,z` | `{"e":"power","x","y","z","powered","indirectly_powered"}`: `World.isBlockGettingPowered`, then `World.isBlockIndirectlyGettingPowered` (World.java:2151-2190). They read blocks up to two away horizontally; those chunks must be loaded |
+| `weather` | — | `{"e":"weather","rain_time","raining","thunder_time","thundering","prev_rain_strength","rain_strength","prev_thunder_strength","thunder_strength"}`: the `WorldInfo` timers and flags (WorldInfo.java:191-221) and `World`'s `prevRainingStrength`, `rainingStrength`, `prevThunderingStrength`, `thunderingStrength` (World.java:27-30; f32 bits) |
 
 `entity` line: `idx` (list index), `id` (`entityId`), `kind` (Java class simple name, e.g.
 `EntityPig`, `HarnessPlayer`), `posX/Y/Z`, `prevPosX/Y/Z`, `motionX/Y/Z` (f64 bits),
@@ -704,8 +706,9 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   tick pins `World.rand` (6000 `randomDisplayUpdates` draws a tick, the lightning and
   snow rolls of 361 chunks) and the random-tick LCG; `scheduled_ticks` (full) and
   `world_time` every 10, `block_box` of the platform at the end.
-- `tick/spawning-draws` (`"mob_spawning": "default"`, difficulty 0): the same platform with
-  natural spawning on for 100 ticks. No grass and no water, and every spot with a normal
+- `tick/spawning-draws` (`"mob_spawning": "default"`, difficulty 0): the stone platform
+  with the sand column and glowstone of `random-ticks-stone-platform` (no gravel, glass,
+  obsidian or falling gravel), with natural spawning on for 100 ticks. No grass and no water, and every spot with a normal
   cube below is within 24 blocks of the player, so `performSpawning` never reaches a mob
   constructor but makes all its `World.rand` draws (per eligible chunk: the weighted pick,
   the spawn point, 72 pack draws where the point is air) and loads the chunks it probes;
@@ -719,6 +722,28 @@ entity code beyond the base `Block` behaviour, `BlockSand` (sand and gravel) and
   boundary), 0 at t = 40 and 11950 at t = 1000 (dusk, where `skylightSubtracted` changes);
   `world_time` and `rng_state` every 10 ticks. Pins the clock, the autosave cadence and
   `updateWeather`'s first-tick timer draws (both timers start at 0); nothing else draws.
+- `tick/weather-snow` (`"mob_spawning": "none"`): a player on a 32×16 stone platform at
+  y = 60 over chunks (61,-13) and (62,-13), where seed 123's biomes are Taiga
+  (`getEnableSnow`) on 431 columns and Forest/Swampland (rain) on 81; 400 ticks.
+  `set_weather` at t = 0 (rain in 20, thunder in 30 ticks) and t = 300 (rain off in 3,
+  thunder off in 5) drives all four `updateWeather` toggles and the four timer re-draws
+  (raining 12000 + nextInt(12000), thundering 3600 + nextInt(12000), dry
+  12000 + nextInt(168000) for both) and the strength ramps; once `isRaining`, the snow roll
+  places snow layers (78) on Taiga columns only. `weather` and `rng_state` every tick,
+  `block_box` of the platform and the layer above at t = 150 and the end.
+- `tick/weather-ice` (`"mob_spawning": "none"`): the same platform with still water at
+  every even x and even z (stone on four sides and below, so a freeze notifies no block
+  override), default weather (no rain within 600 ticks, so no snow can land on water:
+  `BlockSnow.canPlaceBlockAt` is not transcribed); the snow roll freezes water on Taiga
+  columns only. `weather` every 10, `rng_state` every tick, `block_box` at t = 299 and the
+  end.
+
+Not pinned by any fixture: the lightning strike path of `updateBlocksAndPlayCaveSounds`
+past its `nextInt(100000)` roll (World.java:1920-1930; on the weather-snow platform a strike
+would need the one-in-100000 roll on a platform column of a rainy biome, and
+`EntityLightningBolt` is WP-2.4), and so `canBlockBeRainedOn`'s biome test
+(World.java:2449-2460). A roll that does succeed on an empty column stops at
+`canBlockSeeTheSky` (y = -1), before the biome test.
 
 Vanilla behaviour these fixtures pin down:
 

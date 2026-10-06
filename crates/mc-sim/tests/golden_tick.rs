@@ -77,6 +77,8 @@ fixtures! {
     #[ignore = "population (ChunkProviderGenerate.populate, WP-1.7): first diff line 7 (t=4 scheduled_ticks, 2557 expected: populated liquids schedule ticks); then BlockFlowing (fluids task of WP-1.6)"]
     tick_water_flow => "tick" / "water-flow";
     tick_weather_time => "tick" / "weather-time";
+    tick_weather_snow => "tick" / "weather-snow";
+    tick_weather_ice => "tick" / "weather-ice";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test

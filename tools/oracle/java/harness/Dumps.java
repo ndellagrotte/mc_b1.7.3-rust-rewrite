@@ -20,6 +20,7 @@ import net.minecraft.src.MovingObjectPosition;
 import net.minecraft.src.NextTickListEntry;
 import net.minecraft.src.Vec3D;
 import net.minecraft.src.World;
+import net.minecraft.src.WorldInfo;
 
 /**
  * Tier B/C dump kinds (tests/golden/README.md "Dumps"). Dumps never load chunks: a dump that
@@ -58,6 +59,21 @@ final class Dumps {
         t.add(line(tick, "rng_state").put("world_rand", Rng.state(w.rand))
                 .put("lcg", Reflect.getInt(World.class, "field_9437_g", w))
                 .put("math_random", HarnessMath.state()));
+    }
+
+    /**
+     * WorldInfo's rain/thunder timers and flags (WorldInfo.java:191-221) and World's
+     * prev/current rain and thunder strengths (World.java:27-30, updated by updateWeather,
+     * World.java:1792-1859).
+     */
+    static void weather(Trace t, long tick, World w) {
+        WorldInfo i = w.getWorldInfo();
+        t.add(line(tick, "weather").put("rain_time", i.getRainTime()).put("raining", i.getRaining())
+                .put("thunder_time", i.getThunderTime()).put("thundering", i.getThundering())
+                .f32("prev_rain_strength", Reflect.getFloat(World.class, "prevRainingStrength", w))
+                .f32("rain_strength", Reflect.getFloat(World.class, "rainingStrength", w))
+                .f32("prev_thunder_strength", Reflect.getFloat(World.class, "prevThunderingStrength", w))
+                .f32("thunder_strength", Reflect.getFloat(World.class, "thunderingStrength", w)));
     }
 
     // ---- ray_trace, power -----------------------------------------------------

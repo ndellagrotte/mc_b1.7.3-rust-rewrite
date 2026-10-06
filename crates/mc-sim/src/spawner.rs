@@ -54,7 +54,7 @@ impl EnumCreatureType {
     /// `getCreatureClass()`: the class `countEntities` counts, as a Java
     /// class or interface name
     /// ([`crate::world::is_instance_of`]).
-    // src: EnumCreatureType.java:4-6, :19-21
+    // src: EnumCreatureType.java:4-6, :20-22
     pub fn get_creature_class(self) -> &'static str {
         match self {
             EnumCreatureType::Monster => "IMob",
@@ -64,7 +64,7 @@ impl EnumCreatureType {
     }
 
     /// `getMaxNumberOfCreature()`: the cap per 256 eligible chunks.
-    // src: EnumCreatureType.java:4-6, :23-25
+    // src: EnumCreatureType.java:4-6, :24-26
     pub fn get_max_number_of_creature(self) -> i32 {
         match self {
             EnumCreatureType::Monster => 70,
@@ -74,7 +74,7 @@ impl EnumCreatureType {
     }
 
     /// `getCreatureMaterial()`: the material a pack's centre must be.
-    // src: EnumCreatureType.java:4-6, :27-29
+    // src: EnumCreatureType.java:4-6, :28-30
     pub fn get_creature_material(self) -> Material {
         match self {
             EnumCreatureType::Monster | EnumCreatureType::Creature => Material::Air,
@@ -83,7 +83,7 @@ impl EnumCreatureType {
     }
 
     /// `getPeacefulCreature()`.
-    // src: EnumCreatureType.java:4-6, :31-33
+    // src: EnumCreatureType.java:4-6, :32-34
     pub fn get_peaceful_creature(self) -> bool {
         match self {
             EnumCreatureType::Monster => false,

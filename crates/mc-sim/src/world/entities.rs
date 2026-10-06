@@ -602,7 +602,9 @@ impl World {
     /// entities (other than `exclude`) whose box intersects `box`, scanning
     /// the chunks within 2 blocks, x outer, z inner, then each chunk's
     /// sections bottom-up, in list order. Entities taken out for an update are
-    /// skipped (see [`crate::entity`]).
+    /// skipped (see [`crate::entity`]); one that is not `exclude` is recorded,
+    /// because Java would have found it (BlockPressurePlate.java:75 passes a
+    /// null `exclude` from inside the colliding entity's `moveEntity`).
     // src: World.java:2013-2029, Chunk.java:488-510
     pub fn get_entities_within_aabb_excluding_entity(
         &self,
@@ -634,6 +636,10 @@ impl World {
                                 if self.entity_index(id).is_none() {
                                     self.note_unimplemented(
                                         "Chunk entity list holds an entity not in loadedEntityList",
+                                    );
+                                } else {
+                                    self.note_unimplemented(
+                                        "World.getEntitiesWithinAABBExcludingEntity over a taken-out entity",
                                     );
                                 }
                             }
@@ -682,10 +688,24 @@ impl World {
     /// `getEntitiesWithinAABB(class, box)`: ids of the loaded entities that
     /// are instances of `class` ([`is_instance_of`]) and intersect `box`, in
     /// the chunk and section order of
-    /// [`World::get_entities_within_aabb_excluding_entity`]. Entities taken
-    /// out for an update are not seen ([`crate::entity`] module docs).
+    /// [`World::get_entities_within_aabb_excluding_entity`].
+    ///
+    /// Java's list still holds an entity that is running its update, and the
+    /// query's vanilla callers run inside one (BlockPressurePlate and
+    /// BlockDetectorRail reach it from `onEntityCollidedWithBlock` during
+    /// `Entity.moveEntity`), so the entity standing on the plate must be found.
+    /// The caller passes the entity it holds out of its slot as `in_hand`;
+    /// when the scan reaches that id in a chunk section it tests `in_hand`
+    /// there, keeping Java's chunk/section/list order. Any other taken-out
+    /// entity the scan meets is recorded (it would be an entity further up the
+    /// stack that the caller cannot reach).
     // src: World.java:2031-2047, Chunk.java:512-534
-    pub fn get_entities_within_aabb(&self, class: &str, bb: &Aabb) -> Vec<i32> {
+    pub fn get_entities_within_aabb(
+        &self,
+        class: &str,
+        bb: &Aabb,
+        in_hand: Option<&Entity>,
+    ) -> Vec<i32> {
         let var3 = floor_double((bb.min_x - 2.0) / 16.0);
         let var4 = floor_double((bb.max_x + 2.0) / 16.0);
         let var5 = floor_double((bb.min_z - 2.0) / 16.0);
@@ -698,7 +718,8 @@ impl World {
                 };
                 for section in c.entity_sections(bb.min_y, bb.max_y) {
                     for &id in &c.entities[section] {
-                        match self.entity(id) {
+                        let held = in_hand.filter(|h| h.base.entity_id == id);
+                        match held.or_else(|| self.entity(id)) {
                             Some(o) => {
                                 if is_instance_of(&o.kind, class)
                                     && o.base.bounding_box.intersects_with(bb)
@@ -710,6 +731,10 @@ impl World {
                                 if self.entity_index(id).is_none() {
                                     self.note_unimplemented(
                                         "Chunk entity list holds an entity not in loadedEntityList",
+                                    );
+                                } else {
+                                    self.note_unimplemented(
+                                        "World.getEntitiesWithinAABB over a taken-out entity",
                                     );
                                 }
                             }

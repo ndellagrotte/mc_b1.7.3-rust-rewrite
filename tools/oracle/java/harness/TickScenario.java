@@ -24,6 +24,7 @@ import net.minecraft.src.MathHelper;
 import net.minecraft.src.PlayerControllerSP;
 import net.minecraft.src.Vec3D;
 import net.minecraft.src.World;
+import net.minecraft.src.WorldInfo;
 
 /**
  * Scenario kind {@code tick} (tiers B, C, S): a vanilla world ticked under a script of ops and
@@ -32,10 +33,10 @@ import net.minecraft.src.World;
 final class TickScenario {
     private TickScenario() {}
 
-    private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "preload",
+    private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
-            "entity_state", "world_time", "rng_state", "ray_trace", "power");
+            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather");
 
     @SuppressWarnings("unchecked")
     static Trace run(Map<String, Object> sc, Path dir) throws Exception {
@@ -210,6 +211,15 @@ final class TickScenario {
             case "set_time":
                 w.setWorldTime(num(op, "time")); // src: World.java:2274-2276
                 break;
+            case "set_weather": {
+                // src: WorldInfo.java:195-221 (plain setters), each only when given
+                WorldInfo info = w.getWorldInfo();
+                if (op.containsKey("rain_time")) info.setRainTime(i(op, "rain_time"));
+                if (op.containsKey("raining")) info.setRaining(bool(op, "raining"));
+                if (op.containsKey("thunder_time")) info.setThunderTime(i(op, "thunder_time"));
+                if (op.containsKey("thundering")) info.setThundering(bool(op, "thundering"));
+                break;
+            }
             case "preload":
                 l.put("loaded", preloadSquare(w, i(op, "cx"), i(op, "cz"), i(op, "radius")));
                 break;
@@ -273,6 +283,12 @@ final class TickScenario {
 
     private static int i(Map<String, Object> m, String k) {
         return Math.toIntExact(num(m, k));
+    }
+
+    private static boolean bool(Map<String, Object> m, String k) {
+        Object v = m.get(k);
+        if (!(v instanceof Boolean)) throw new IllegalArgumentException("\"" + k + "\" must be true or false");
+        return (Boolean) v;
     }
 
     private static int meta(Map<String, Object> op) {
@@ -433,6 +449,7 @@ final class TickScenario {
                 Dumps.rayTrace(trace, t, w, Num.vec3(d.get("from")), Num.vec3(d.get("to")), Main.Scenario.flag(d, "stop_on_liquid"));
                 break;
             case "power": Dumps.power(trace, t, w, i(d, "x"), i(d, "y"), i(d, "z")); break;
+            case "weather": Dumps.weather(trace, t, w); break;
             default: throw new IllegalArgumentException("unknown dump " + d.get("what"));
         }
     }

@@ -1,0 +1,9 @@
+{"name":"weather-snow","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":400,"mob_spawning":"none","comment":"updateWeather's toggles and re-draws and the snow roll's biome test (World.java:1792-1859, :1933-1950). A standing player on a stone platform over chunks (61,-13) and (62,-13), where seed 123's biomes are Taiga (getEnableSnow) on most columns and rainy (Forest, Swampland: 81 of 512 columns) on the west/north corner. set_weather at t=0 makes rain start at t=19 and thunder at t=29, each re-drawn the next tick from the raining/thundering branch (12000+nextInt(12000), 3600+nextInt(12000)); at t=300 both timers are cut so rain stops at t=302 and thunder at t=304, re-drawn from the dry branch (12000+nextInt(168000)). Once getRainStrength > 0.2, the snow roll places snow (78) on the snowy columns only. weather and rng_state every tick, the platform and the layer above it at t=150 and the end. No glowstone (snow and ice updateTick melt only above block light 11, not transcribed; recorded). No entity_state: the player's own update (WP-2.5) is not transcribed.",
+ "ops":[{"t":0,"op":"fill","x0":976,"y0":60,"z0":-208,"x1":1007,"y1":60,"z1":-193,"id":1},
+        {"t":0,"op":"player","x":"0x408f040000000000","y":61,"z":"0xc069100000000000"},
+        {"t":0,"op":"set_weather","rain_time":20,"raining":false,"thunder_time":30,"thundering":false},
+        {"t":300,"op":"set_weather","rain_time":3,"thunder_time":5}],
+ "dumps":[{"every":1,"what":"weather"},
+          {"every":1,"what":"rng_state"},
+          {"t":150,"what":"block_box","x0":976,"y0":60,"z0":-208,"x1":1007,"y1":61,"z1":-193},
+          {"t":399,"what":"block_box","x0":976,"y0":60,"z0":-208,"x1":1007,"y1":61,"z1":-193}]}

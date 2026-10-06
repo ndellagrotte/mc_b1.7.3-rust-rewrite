@@ -357,6 +357,22 @@ pub enum OpKind {
         /// New world time.
         time: i64,
     },
+    /// The `WorldInfo` weather setters (`setRainTime`, `setRaining`,
+    /// `setThunderTime`, `setThundering`), each only when given.
+    SetWeather {
+        /// `WorldInfo.setRainTime`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rain_time: Option<i32>,
+        /// `WorldInfo.setRaining`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        raining: Option<bool>,
+        /// `WorldInfo.setThunderTime`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thunder_time: Option<i32>,
+        /// `WorldInfo.setThundering`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        thundering: Option<bool>,
+    },
     /// Load the chunk square of radius `radius` around `(cx, cz)`.
     Preload {
         /// Centre chunk x.
@@ -602,6 +618,9 @@ pub enum DumpKind {
     WorldTime,
     /// `rng_state` line.
     RngState,
+    /// `weather` line: the `WorldInfo` timers and flags and the four
+    /// rain/thunder strengths.
+    Weather,
     /// `ray_trace` line: `World.rayTraceBlocks_do(from, to, stop_on_liquid)`.
     RayTrace {
         /// Start point.
