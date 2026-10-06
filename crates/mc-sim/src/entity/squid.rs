@@ -142,6 +142,8 @@ pub fn drop_few_items(e: &mut Entity, world: &mut World) {
 /// called twice per tick (`EntityLiving.onLivingUpdate`, then
 /// [`on_living_update`]).
 // src: EntitySquid.java:67-69
+// vanilla bug: a query with a side effect: each call pushes the squid by
+// the current again (twice a tick), transcribed.
 pub fn is_in_water(e: &mut Entity, world: &mut World) -> bool {
     let bb = e.base.bounding_box.expand(0.0, -0.6000000238418579, 0.0);
     world.handle_material_acceleration(&bb, Material::Water, e)
