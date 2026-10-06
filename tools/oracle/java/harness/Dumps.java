@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import net.minecraft.src.Chunk;
 import net.minecraft.src.ContainerPlayer;
+import net.minecraft.src.ChunkCoordinates;
 import net.minecraft.src.Entity;
 import net.minecraft.src.EntityArrow;
 import net.minecraft.src.EntityItem;
@@ -262,6 +263,31 @@ final class Dumps {
                     .put("arrowShake", a.arrowShake);
         }
         return l.raw("state", s.toString());
+    }
+
+    /**
+     * {@code player_state}: the player's {@code EntityPlayer} state the {@code entity} line does not
+     * carry (EntityPlayer.java:7-38, Entity.java fields it changes): sleep state and bed, spawn
+     * point, arm swing, size and offsets, camera bob, armour remainder, portal timer, the
+     * sneaking flag (HarnessPlayer.isSneaking).
+     */
+    static void playerState(Trace t, long tick, HarnessPlayer p) {
+        ChunkCoordinates bed = p.bedChunkCoordinates, spawn = p.getPlayerSpawnCoordinate();
+        t.add(line(tick, "player_state").put("id", p.entityId)
+                .put("sleeping", p.isPlayerSleeping()).put("sleepTimer", p.getSleepTimer())
+                .raw("bed", coords(bed)).raw("spawn", coords(spawn))
+                .put("isSwinging", p.isSwinging).put("swingProgressInt", p.swingProgressInt)
+                .f32("swingProgress", p.swingProgress)
+                .f32("width", p.width).f32("height", p.height).f32("yOffset", p.yOffset).f32("ySize", p.ySize)
+                .f32("cameraYaw", p.cameraYaw).put("score", p.score)
+                .put("damageRemainder", Reflect.getInt(EntityPlayer.class, "damageRemainder", p))
+                .put("timeUntilPortal", p.timeUntilPortal)
+                .put("inPortal", Reflect.getBoolean(EntityPlayer.class, "inPortal", p))
+                .put("sneaking", p.isSneaking()));
+    }
+
+    static String coords(ChunkCoordinates c) {
+        return c == null ? "null" : "[" + c.x + "," + c.y + "," + c.z + "]";
     }
 
     /** {@code {"id":..,"count":..,"damage":..}} or {@code null}. */

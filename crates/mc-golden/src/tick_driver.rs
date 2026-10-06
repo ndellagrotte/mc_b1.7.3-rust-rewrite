@@ -104,7 +104,9 @@ use mc_sim::block::dispatch as block_dispatch;
 use mc_sim::crafting::CraftingManager;
 use mc_sim::entity::dispatch;
 use mc_sim::entity::item::new_entity_item;
-use mc_sim::entity::player::{new_entity_player_sp, swing_item};
+use mc_sim::entity::player::{
+    MovementInput, inventory_set_inventory_slot_contents, new_entity_player_sp, swing_item,
+};
 use mc_sim::golden::{StateValue, entity_state_fields};
 use mc_sim::inventory::container::chest::new_container_chest;
 use mc_sim::inventory::container::dispenser::new_container_dispenser;
@@ -115,6 +117,7 @@ use mc_sim::inventory::container::{Container, ContainerKind};
 use mc_sim::inventory::crafting::InventoryCrafting;
 use mc_sim::inventory::large_chest::chest_inventory;
 use mc_sim::item::ItemStack;
+use mc_sim::player_controller::{self, PlayerControllerSp};
 use mc_sim::save::{ChunkLoader, NoSave, SaveError, SaveHandler, SaveOldDir, SharedSaveStore, Tag};
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::info::WorldInfo;
@@ -130,8 +133,28 @@ use crate::trace::{ChunkArrays, EntityLine, ScheduledTick};
 use crate::world_read_driver::{WORLD_DIR, emit_tier_s, harness_store};
 use crate::{GoldenError, Scenario, ScenarioKind, TraceLine, TraceWriter, blake3_hex};
 
-/// Drives a `kind: "tick"` scenario (module docs). Other kinds are an error.
+/// Drives a `kind: "tick"` scenario (module docs). Other kinds are an error,
+/// and so is `"world": "load"`, which needs the fixture directory
+/// ([`drive_in`]).
 pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError> {
+    drive_with(scenario, w, None)
+}
+
+/// The drive closure for a fixture directory (relative to the workspace
+/// root, as [`crate::fixture_dir`] gives it): [`drive`], plus
+/// `"world": "load"`, whose `dir` is relative to that directory.
+pub fn drive_in(
+    fixture: impl Into<std::path::PathBuf>,
+) -> impl FnOnce(&Scenario, &mut TraceWriter) -> Result<(), GoldenError> {
+    let fixture = fixture.into();
+    move |scenario, w| drive_with(scenario, w, Some(&fixture))
+}
+
+fn drive_with(
+    scenario: &Scenario,
+    w: &mut TraceWriter,
+    fixture: Option<&std::path::Path>,
+) -> Result<(), GoldenError> {
     let ScenarioKind::Tick(sc) = &scenario.kind else {
         return Err(GoldenError::other(format!(
             "tick_driver: scenario {:?} is not kind \"tick\"",
@@ -139,7 +162,10 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         )));
     };
     validate(sc)?;
-    let (mut world, save_store) = build_world(sc)?;
+    let (mut world, save_store) = match sc.world {
+        WorldSource::Load => load_world(sc, fixture)?,
+        _ => build_world(sc)?,
+    };
     let mut h = Harness {
         save_store,
         player: None,
@@ -149,6 +175,10 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
         player_pos: None,
         player_container: None,
         open_container: None,
+        controller: None,
+        last_dig: None,
+        mouse_ticks_ran: 0,
+        dig_this_tick: false,
     };
 
     implicit_preload(&mut world, &sc.ops, w);
@@ -161,10 +191,12 @@ pub fn drive(scenario: &Scenario, w: &mut TraceWriter) -> Result<(), GoldenError
     for t in 0..sc.ticks {
         // Frame start (Minecraft.java:519-520): AxisAlignedBB.clearBoundingBoxPool()
         // and Vec3D.initialize() reset object pools, which the port does not have.
+        h.dig_this_tick = false;
         while next < ops.len() && ops[next].t == t {
             apply(&mut world, &mut h, ops[next], w)?;
             next += 1;
         }
+        release_button(&mut h);
         run_tick(&mut world, &mut h);
         // Once per frame after the tick, Minecraft.java:553 (at most 500 updates).
         world.updating_lighting();
@@ -235,9 +267,12 @@ fn validate(sc: &TickScenario) -> Result<(), GoldenError> {
                 sc.ticks - 1
             )));
         }
-        if matches!(op.kind, OpKind::Save { .. }) && save_format != "mcregion" {
+        if matches!(op.kind, OpKind::Save { .. })
+            && save_format != "mcregion"
+            && sc.world != WorldSource::Load
+        {
             return Err(GoldenError::other(
-                "op save needs \"save_format\": \"mcregion\"",
+                "op save needs \"save_format\": \"mcregion\" or \"world\": \"load\"",
             ));
         }
     }
@@ -296,9 +331,9 @@ fn build_world(sc: &TickScenario) -> Result<(World, Option<SharedSaveStore>), Go
     let generator = match sc.world {
         WorldSource::Empty => ChunkGenerator::Empty(EmptyChunkProvider),
         // `World.getChunkProvider` (World.java:210-213): the provider's
-        // generator for the world seed. Population is still a recorded stub
-        // (WP-1.7), see `ChunkGenerator::populate`.
+        // generator for the world seed.
         WorldSource::Generated => provider.get_chunk_provider(sc.seed),
+        WorldSource::Load => unreachable!("load_world builds a loaded world"),
     };
     let (handler, store): (Box<dyn SaveHandler>, Option<SharedSaveStore>) =
         match sc.save_format.as_deref().unwrap_or("none") {
@@ -327,6 +362,97 @@ fn build_world(sc: &TickScenario) -> Result<(World, Option<SharedSaveStore>), Go
     );
     world.make_deterministic(sc.seed);
     Ok((world, store))
+}
+
+/// `TickScenario.load` (`"world": "load"`): the save directory `dir`
+/// (relative to the fixture directory, inside the fixture tree) copied into
+/// an in-memory storage as `world/…` (the oracle's temp copy), opened with the
+/// loading constructor `World(SaveOldDir, "harness", seed, null)`
+/// (`HarnessWorld.open`), then `makeDeterministic`/`resetStatics` with the
+/// scenario seed. The store is the world's save (autosaves, `save` ops).
+fn load_world(
+    sc: &TickScenario,
+    fixture: Option<&std::path::Path>,
+) -> Result<(World, Option<SharedSaveStore>), GoldenError> {
+    let Some(fixture) = fixture else {
+        return Err(GoldenError::other(
+            "\"world\": \"load\" needs the fixture directory (tick_driver::drive_in)",
+        ));
+    };
+    if sc.save_format.is_some() {
+        return Err(GoldenError::other(
+            "\"world\": \"load\" takes no \"save_format\" (the loaded save is the world's)",
+        ));
+    }
+    let sub = sc
+        .dir
+        .as_deref()
+        .ok_or_else(|| GoldenError::other("\"world\": \"load\" needs \"dir\""))?;
+    let src = load_dir_path(fixture, sub)?;
+    let mut storage = mc_sim::save::MemoryStorage::default();
+    for (rel, bytes) in crate::io::read_tree(&src)? {
+        use mc_sim::save::Storage;
+        storage
+            .write(&mc_sim::save::path_join(WORLD_DIR, &rel), &bytes)
+            .map_err(|e| GoldenError::other(e.to_string()))?;
+    }
+    let store = harness_store(storage);
+    let dir = SaveOldDir::new(store.clone(), "", WORLD_DIR)
+        .map_err(|e| GoldenError::other(e.to_string()))?;
+    let mut world = World::new_from_save(
+        Box::new(HarnessSaveHandler(dir)),
+        "harness",
+        sc.seed,
+        None,
+        // Overwritten by make_deterministic; vanilla draws these unseeded.
+        WorldEnvironment {
+            rand_seed: 0,
+            field_9437_g: 0,
+            lock_timestamp: 0,
+        },
+    );
+    if world.is_new_world {
+        return Err(GoldenError::other(format!("no level.dat in \"dir\" {sub}")));
+    }
+    world.make_deterministic(sc.seed);
+    Ok((world, Some(store)))
+}
+
+/// `fixture/sub`, lexically normalised (`..` climbs), which must stay inside
+/// the fixture tree (the fixture directory's grandparent, `tests/golden`)
+/// and hold a `level.dat`.
+fn load_dir_path(fixture: &std::path::Path, sub: &str) -> Result<std::path::PathBuf, GoldenError> {
+    use std::path::Component;
+    // Relative fixture paths are taken from the workspace root (crate::run).
+    let fixture = if fixture.is_absolute() {
+        fixture.to_path_buf()
+    } else {
+        crate::workspace_root().join(fixture)
+    };
+    let golden = fixture
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| GoldenError::other("the fixture directory has no fixture tree above it"))?
+        .to_path_buf();
+    let mut out = std::path::PathBuf::new();
+    for c in fixture.join(sub).components() {
+        match c {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    if !out.starts_with(&golden) {
+        return Err(GoldenError::other(
+            "\"dir\" must stay inside the fixture tree",
+        ));
+    }
+    if !out.join("level.dat").is_file() {
+        return Err(GoldenError::other(format!("no level.dat in \"dir\" {sub}")));
+    }
+    Ok(out)
 }
 
 /// `MathHelper.floor_double`.
@@ -405,6 +531,29 @@ struct Harness {
     /// `TickScenario.openContainer` / `openSpec`: the container the last
     /// `slot_click` with a spec other than `"player"` opened.
     open_container: Option<(String, Container)>,
+    /// `HarnessWorld.controller`: the left button's `PlayerControllerSP`,
+    /// created by the first `dig` op.
+    controller: Option<PlayerControllerSp>,
+    /// `HarnessWorld.lastDig`: the block the button was held on last tick.
+    last_dig: Option<[i32; 3]>,
+    /// `HarnessWorld.mouseTicksRan` (Minecraft.mouseTicksRan): the tick of
+    /// the last left click.
+    mouse_ticks_ran: u32,
+    /// `HarnessWorld.digThisTick`.
+    dig_this_tick: bool,
+}
+
+/// `TickScenario.releaseButton`: a tick without a `dig` op has the left
+/// button up: `updateController()` (Minecraft.java:962-964) and
+/// `func_6254_a(0, false)` → `resetBlockRemoving()` (Minecraft.java:779-797).
+fn release_button(h: &mut Harness) {
+    if let Some(c) = h.controller.as_mut()
+        && !h.dig_this_tick
+    {
+        c.update_controller();
+        c.reset_block_removing();
+        h.last_dig = None;
+    }
 }
 
 /// `HarnessWorld.runTick` (module docs).
@@ -535,6 +684,7 @@ fn apply(
             z,
             yaw,
             pitch,
+            ref inventory,
         } => {
             if h.player.is_some() {
                 return Err(GoldenError::other(format!("t={t}: only one player op")));
@@ -543,6 +693,23 @@ fn apply(
             // chain (mc_sim::entity::player); its `rand` is seeded with
             // mix(seed, id) at construction (`seedAfterConstruction`).
             let mut e = new_entity_player_sp(world);
+            // HarnessPlayer's username, as an EntityPlayerSP's session gives
+            // one (EntityPlayerSP.java:20).
+            player_data(&mut e).username = Some("Player".to_string());
+            for s in inventory.iter().flatten() {
+                if !(0..40).contains(&s.slot) {
+                    return Err(GoldenError::other(format!(
+                        "t={t}: inventory slot {} outside 0..39",
+                        s.slot
+                    )));
+                }
+                // src: InventoryPlayer.java:180-188 (setInventorySlotContents)
+                inventory_set_inventory_slot_contents(
+                    &mut player_data(&mut e).inventory,
+                    s.slot,
+                    Some(ItemStack::new(s.id, s.count, s.damage)),
+                );
+            }
             // `place`: setLocationAndAngles (Entity.java:669-676), yaw/pitch
             // defaulting to the constructor's.
             let yaw = yaw.unwrap_or(e.base.rotation_yaw);
@@ -692,6 +859,62 @@ fn apply(
                 .with("result", result)
                 .with("used", used)
                 .with("stack", stack_json(stack))
+        }
+        OpKind::Input {
+            forward,
+            strafe,
+            jump,
+            sneak,
+            hotbar,
+        } => {
+            let pid = require_player(h, t, "input")?;
+            let p = loaded_entity(world, t, "input", pid)?;
+            if let Some(slot) = hotbar {
+                if !(0..9).contains(&slot) {
+                    return Err(GoldenError::other(format!(
+                        "t={t}: hotbar {slot} outside 0..8"
+                    )));
+                }
+                // src: Minecraft.java:1073-1076 (the number keys)
+                player_data(p).inventory.current_item = slot;
+            }
+            // TickScenario.input: MovementInputFromOptions.updatePlayerMoveState's
+            // mapping (MovementInputFromOptions.java:50-76)
+            let mi = MovementInput::from_keys(
+                forward.unwrap_or(0.0),
+                strafe.unwrap_or(0.0),
+                jump,
+                sneak,
+            );
+            match &mut p.kind {
+                mc_sim::entity::EntityKindData::PlayerSp(_, _, d) => d.movement_input = mi,
+                _ => unreachable!("the player op's entity is an EntityPlayerSP"),
+            }
+            line("input")
+        }
+        OpKind::Dig { x, y, z, side } => dig(world, h, t, x, y, z, side)?,
+        OpKind::Sleep { x, y, z } => {
+            let pid = require_player(h, t, "sleep")?;
+            // TickScenario.sleep: Block.blockActivated as the player.
+            let r = world.with_entity_mut(pid, |w, p| {
+                if let mc_sim::entity::EntityKindData::PlayerSp(_, _, d) = &mut p.kind {
+                    d.last_sleep_status = None;
+                }
+                let id = w.get_block_id(x, y, z);
+                let result = id > 0 && block_dispatch::block_activated(w, id, x, y, z, p);
+                let status = match &p.kind {
+                    mc_sim::entity::EntityKindData::PlayerSp(_, _, d) => d.last_sleep_status,
+                    _ => None,
+                };
+                (result, status)
+            });
+            let Some((result, status)) = r else {
+                return Err(player_gone(t, "sleep"));
+            };
+            line("sleep").with("result", result).with(
+                "status",
+                status.map_or(Value::Null, |s| Value::from(s.name())),
+            )
         }
         OpKind::Explode {
             x,
@@ -890,6 +1113,74 @@ fn open_container<'h>(
     Ok(&mut h.open_container.as_mut().expect("just set").1)
 }
 
+/// The `player` op's player, or the oracle's "needs a player op first".
+fn require_player(h: &Harness, t: u32, op: &str) -> Result<i32, GoldenError> {
+    h.player
+        .ok_or_else(|| GoldenError::other(format!("t={t}: {op} needs a player op first")))
+}
+
+fn player_gone(t: u32, op: &str) -> GoldenError {
+    unsupported(
+        t,
+        op,
+        "the player is no longer in loadedEntityList (the oracle keeps using its \
+         HarnessPlayer object)",
+    )
+}
+
+/// `TickScenario.dig`: the left button held on block `(x, y, z)`, face
+/// `side`, this tick: a press (no `dig` last tick, or another block) or a
+/// held repeat 5 ticks after the last click is `clickMouse(0)`
+/// (`swingItem`, `clickBlock`); then `sendBlockRemoving`
+/// (Minecraft.java:779-830, :1003-1022, :1110-1113; README "Ops").
+fn dig(
+    world: &mut World,
+    h: &mut Harness,
+    t: u32,
+    x: i32,
+    y: i32,
+    z: i32,
+    side: i32,
+) -> Result<TraceLine, GoldenError> {
+    let pid = require_player(h, t, "dig")?;
+    if h.dig_this_tick {
+        return Err(GoldenError::other(format!("t={t}: one dig op per tick")));
+    }
+    h.dig_this_tick = true;
+    let mut c = h.controller.take().unwrap_or_default();
+    c.update_controller(); // src: Minecraft.java:962-964
+    let press = h.last_dig != Some([x, y, z]);
+    // `(float)(ticksRan - mouseTicksRan) >= timer.ticksPerSecond / 4.0F`
+    let repeat = (t as i64 - h.mouse_ticks_ran as i64) as f32 >= 20.0 / 4.0;
+    let r = world.with_entity_mut(pid, |w, p| {
+        let mut clicked = false;
+        let mut broken = false;
+        if press || repeat {
+            swing_item(p); // src: Minecraft.java:803-805
+            broken = c.click_block(w, p, x, y, z, side);
+            clicked = true;
+        }
+        broken |= c.send_block_removing(w, p, x, y, z, side);
+        (clicked, broken)
+    });
+    let progress = c.cur_block_damage;
+    h.controller = Some(c);
+    let Some((clicked, broken)) = r else {
+        return Err(player_gone(t, "dig"));
+    };
+    if clicked {
+        h.mouse_ticks_ran = t;
+    }
+    h.last_dig = Some([x, y, z]);
+    Ok(TraceLine::op(t as i64, "dig")
+        .with("x", x)
+        .with("y", y)
+        .with("z", z)
+        .with("clicked", clicked)
+        .with_f32("progress", progress)
+        .with("broken", broken))
+}
+
 /// `TickScenario.attack`: the target (and the attacker, if given) found in
 /// `loadedEntityList` by id. Attacker = the player: `swingItem`, then
 /// `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814) — not
@@ -912,13 +1203,30 @@ fn attack(
         None => None,
     };
     let line = TraceLine::op(t as i64, "attack").with("target_id", target_id);
-    if attacker.is_some() && attacker_id == h.player {
-        return Err(unsupported(
-            t,
-            "attack",
-            "attacker = the player: EntityPlayer.attackTargetEntityWithCurrentItem is not \
-             transcribed (WP-2.5)",
-        ));
+    if attacker.is_some()
+        && let Some(pid) = h.player
+        && attacker_id == Some(pid)
+    {
+        if target_id == pid {
+            return Err(unsupported(
+                t,
+                "attack",
+                "the target is the player itself (both would have to be in hand)",
+            ));
+        }
+        // Minecraft.clickMouse(0), ENTITY branch (Minecraft.java:802-814):
+        // swingItem, then PlayerController.attackEntity
+        // (PlayerController.java:92-94).
+        world
+            .with_entity_mut(pid, |w, p| {
+                swing_item(p);
+                w.with_entity_mut(target_id, |w, target| {
+                    player_controller::attack_entity(w, p, target)
+                })
+            })
+            .flatten()
+            .ok_or_else(|| player_gone(t, "attack"))?;
+        return Ok(line.with("via", "player"));
     }
     let Some(damage) = damage else {
         return Err(GoldenError::other(format!(
@@ -1567,8 +1875,60 @@ fn dump(
             let r = world.rng_state();
             w.push(TraceLine::rng_state(ti, r.world_rand, r.lcg, r.math_random));
         }
+        DumpKind::PlayerState => {
+            let pid = h
+                .player
+                .ok_or_else(|| GoldenError::other("player_state needs a player op first"))?;
+            let e = world.entity(pid).ok_or_else(|| {
+                GoldenError::other(format!(
+                    "t={t}: player_state: the player is not in loadedEntityList (the oracle \
+                     keeps its HarnessPlayer object)"
+                ))
+            })?;
+            w.push(player_state_line(ti, e));
+        }
     }
     Ok(())
+}
+
+/// `Dumps.playerState`: the `EntityPlayer` state an `entity` line does not
+/// carry.
+fn player_state_line(t: i64, e: &mc_sim::entity::Entity) -> TraceLine {
+    let mc_sim::entity::EntityKindData::PlayerSp(l, p, d) = &e.kind else {
+        unreachable!("the player op's entity is an EntityPlayerSP")
+    };
+    let coords = |c: Option<[i32; 3]>| match c {
+        None => Value::Null,
+        Some(c) => serde_json::json!(c),
+    };
+    TraceLine::new(t, "player_state")
+        .with("id", e.id())
+        .with("sleeping", p.is_player_sleeping())
+        .with("sleepTimer", p.get_sleep_timer())
+        .with(
+            "bed",
+            coords(p.bed_chunk_coordinates.map(|c| [c.pos_x, c.pos_y, c.pos_z])),
+        )
+        .with(
+            "spawn",
+            coords(
+                p.get_player_spawn_coordinate()
+                    .map(|c| [c.pos_x, c.pos_y, c.pos_z]),
+            ),
+        )
+        .with("isSwinging", p.is_swinging)
+        .with("swingProgressInt", p.swing_progress_int)
+        .with_f32("swingProgress", l.swing_progress)
+        .with_f32("width", e.base.width)
+        .with_f32("height", e.base.height)
+        .with_f32("yOffset", e.base.y_offset)
+        .with_f32("ySize", e.base.y_size)
+        .with_f32("cameraYaw", p.camera_yaw)
+        .with("score", p.score)
+        .with("damageRemainder", p.damage_remainder)
+        .with("timeUntilPortal", p.time_until_portal)
+        .with("inPortal", p.in_portal)
+        .with("sneaking", d.movement_input.sneak && !p.sleeping)
 }
 
 /// `Dumps.requireChunksLoaded`: every chunk of the block box spanned by the

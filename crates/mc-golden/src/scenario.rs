@@ -226,6 +226,11 @@ pub enum WorldSource {
     Generated,
     /// Every chunk all air (sky light 15 from y = 127 down to 1).
     Empty,
+    /// A saved world: [`TickScenario::dir`] (relative to the scenario
+    /// directory, inside the fixture tree), copied and opened with the
+    /// loading constructor; the dimension and world seed come from its
+    /// `level.dat`.
+    Load,
 }
 
 /// `mob_spawning` of a `tick` scenario.
@@ -259,6 +264,11 @@ pub struct TickScenario {
     /// Chunk source; default [`WorldSource::Generated`].
     #[serde(default)]
     pub world: WorldSource,
+    /// For [`WorldSource::Load`]: the save directory (holding `level.dat`
+    /// and `region/`), relative to the scenario directory; `..` may climb
+    /// as far as the fixture tree (`tests/golden`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dir: Option<String>,
     /// Number of ticks, at least 1.
     pub ticks: u32,
     /// 0..=3, default 0.
@@ -299,6 +309,21 @@ pub struct ItemSpec {
     /// Stack size.
     pub count: i32,
     /// Damage / metadata, default 0.
+    #[serde(default)]
+    pub damage: i32,
+}
+
+/// A preloaded player inventory slot (`player`'s `inventory`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InventorySlot {
+    /// `setInventorySlotContents` index: 0–35 main (0–8 the hotbar), 36–39
+    /// armour.
+    pub slot: i32,
+    /// Item id.
+    pub id: i32,
+    /// Stack size.
+    pub count: i32,
+    /// Damage, default 0.
     #[serde(default)]
     pub damage: i32,
 }
@@ -411,6 +436,56 @@ pub enum OpKind {
             skip_serializing_if = "Option::is_none"
         )]
         pitch: Option<f32>,
+        /// Stacks put into inventory slots before the player joins.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        inventory: Option<Vec<InventorySlot>>,
+    },
+    /// Set the player's `MovementInput` (until the next `input` op).
+    Input {
+        /// Forward key sum (`f32`), default 0.
+        #[serde(
+            default,
+            with = "flex::opt_f32",
+            skip_serializing_if = "Option::is_none"
+        )]
+        forward: Option<f32>,
+        /// Strafe key sum (`f32`, + left), default 0.
+        #[serde(
+            default,
+            with = "flex::opt_f32",
+            skip_serializing_if = "Option::is_none"
+        )]
+        strafe: Option<f32>,
+        /// Jump key, default false.
+        #[serde(default)]
+        jump: bool,
+        /// Sneak key, default false.
+        #[serde(default)]
+        sneak: bool,
+        /// Hotbar slot selected by its number key (`inventory.currentItem`),
+        /// if given.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hotbar: Option<i32>,
+    },
+    /// Hold the left button on a block face this tick.
+    Dig {
+        /// Block x.
+        x: i32,
+        /// Block y.
+        y: i32,
+        /// Block z.
+        z: i32,
+        /// Face.
+        side: i32,
+    },
+    /// Use the bed at a block as the player (`blockActivated`).
+    Sleep {
+        /// Block x.
+        x: i32,
+        /// Block y.
+        y: i32,
+        /// Block z.
+        z: i32,
     },
     /// Construct and join an entity by `EntityList` name.
     Spawn {
@@ -703,6 +778,8 @@ pub enum DumpKind {
     /// `inventory` line: the player's `InventoryPlayer` slots, selected
     /// slot and cursor stack, and its `ContainerPlayer` grid and result.
     Inventory,
+    /// `player_state` line: the player's `EntityPlayer` state.
+    PlayerState,
     /// `power` line: `isBlockGettingPowered` and
     /// `isBlockIndirectlyGettingPowered` at a block.
     Power {

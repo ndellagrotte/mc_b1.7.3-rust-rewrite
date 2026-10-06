@@ -19,6 +19,7 @@ import net.minecraft.src.EntityChicken;
 import net.minecraft.src.EntitySquid;
 import net.minecraft.src.ISaveHandler;
 import net.minecraft.src.Item;
+import net.minecraft.src.ItemStack;
 import net.minecraft.src.MathHelper;
 import net.minecraft.src.NextTickListEntry;
 import net.minecraft.src.RegionFileCache;
@@ -55,6 +56,17 @@ final class HarnessWorld {
      * (SpawnerAnimals.java:20-21).
      */
     boolean noMobSpawning;
+    /**
+     * The left button's controller ({@code dig} op, TickScenario.dig), created by the first
+     * {@code dig} op; null before.
+     */
+    Controller controller;
+    /** Block {x, y, z} the button was held on last tick (a {@code dig} op), or null. */
+    int[] lastDig;
+    /** Minecraft.mouseTicksRan (Minecraft.java:162): the tick of the last left click. */
+    int mouseTicksRan;
+    /** Whether the current tick had a {@code dig} op. */
+    boolean digThisTick;
 
     private HarnessWorld(World world, long seed, Path saveRoot, int difficulty) {
         this.world = world;
@@ -144,11 +156,16 @@ final class HarnessWorld {
      * {@code seed} only seeds the harness streams; the world seed is the file's.
      */
     static HarnessWorld open(Path saveCopyRoot, long seed) throws Exception {
+        return open(saveCopyRoot, seed, 0);
+    }
+
+    /** {@link #open(Path, long)} with the tick scenario's {@code difficulty} ({@code "world": "load"}). */
+    static HarnessWorld open(Path saveCopyRoot, long seed, int difficulty) throws Exception {
         resetStatics(seed);
         World world = new World(new SaveOldDir(saveCopyRoot.toFile(), "world", false), "harness", seed, null);
         if (world.isNewWorld) throw new IllegalStateException("no level.dat in " + saveCopyRoot.resolve("world"));
         makeDeterministic(world, seed);
-        return new HarnessWorld(world, seed, saveCopyRoot, 0);
+        return new HarnessWorld(world, seed, saveCopyRoot, difficulty);
     }
 
     static WorldProvider provider(String dimension) {
@@ -263,6 +280,117 @@ final class HarnessWorld {
                 if (Files.isDirectory(p)) Files.createDirectories(q);
                 else Files.copy(p, q);
             }
+        }
+    }
+
+    /**
+     * {@code PlayerControllerSP}'s block breaking (PlayerControllerSP.java:110-224,
+     * PlayerController.java:21-32) for the harness player. The vanilla class reaches the world
+     * and the player through {@code mc.theWorld} and {@code mc.thePlayer}, and
+     * {@code Minecraft.thePlayer} is an {@code EntityPlayerSP}, which the harness cannot build
+     * (HarnessPlayer); so this mirrors those methods line for line with the world and the player
+     * as fields. Only {@code mc.sndManager.playSound} (the dig step sound, :177-179, no draws) is
+     * left out.
+     */
+    static final class Controller {
+        final World w;
+        final HarnessPlayer p;
+        int field_1074_c = -1;
+        int field_1073_d = -1;
+        int field_1072_e = -1;
+        float curBlockDamage = 0.0F;
+        float prevBlockDamage = 0.0F;
+        float field_1069_h = 0.0F;
+        int blockHitWait = 0;
+
+        Controller(World w, HarnessPlayer p) {
+            this.w = w;
+            this.p = p;
+        }
+
+        /** PlayerController.sendBlockRemoved (PlayerController.java:21-32). */
+        private boolean superSendBlockRemoved(int x, int y, int z, int side) {
+            Block b = Block.blocksList[w.getBlockId(x, y, z)];
+            w.playAuxSFX(2001, x, y, z, b.blockID + w.getBlockMetadata(x, y, z) * 256);
+            int meta = w.getBlockMetadata(x, y, z);
+            boolean removed = w.setBlockWithNotify(x, y, z, 0);
+            if (b != null && removed) b.onBlockDestroyedByPlayer(w, x, y, z, meta);
+            return removed;
+        }
+
+        /** PlayerControllerSP.sendBlockRemoved (PlayerControllerSP.java:126-145). */
+        boolean sendBlockRemoved(int x, int y, int z, int side) {
+            int id = w.getBlockId(x, y, z);
+            int meta = w.getBlockMetadata(x, y, z);
+            boolean removed = superSendBlockRemoved(x, y, z, side);
+            ItemStack held = p.getCurrentEquippedItem();
+            boolean canHarvest = p.canHarvestBlock(Block.blocksList[id]);
+            if (held != null) {
+                held.onDestroyBlock(id, x, y, z, p);
+                if (held.stackSize == 0) {
+                    held.onItemDestroyedByUse(p);
+                    p.destroyCurrentEquippedItem();
+                }
+            }
+            if (removed && canHarvest) Block.blocksList[id].harvestBlock(w, p, x, y, z, meta);
+            return removed;
+        }
+
+        /**
+         * PlayerControllerSP.clickBlock (PlayerControllerSP.java:147-158); returns what the
+         * instant {@code sendBlockRemoved} returned, false when it did not run.
+         */
+        boolean clickBlock(int x, int y, int z, int side) {
+            w.onBlockHit(p, x, y, z, side);
+            int id = w.getBlockId(x, y, z);
+            if (id > 0 && curBlockDamage == 0.0F) Block.blocksList[id].onBlockClicked(w, x, y, z, p);
+            boolean broken = false;
+            if (id > 0 && Block.blocksList[id].blockStrength(p) >= 1.0F) broken = sendBlockRemoved(x, y, z, side);
+            return broken;
+        }
+
+        /** PlayerControllerSP.resetBlockRemoving (PlayerControllerSP.java:160-163). */
+        void resetBlockRemoving() {
+            curBlockDamage = 0.0F;
+            blockHitWait = 0;
+        }
+
+        /**
+         * PlayerControllerSP.sendBlockRemoving (PlayerControllerSP.java:165-199); returns what
+         * {@code sendBlockRemoved} returned, false when it did not run.
+         */
+        boolean sendBlockRemoving(int x, int y, int z, int side) {
+            boolean broken = false;
+            if (blockHitWait > 0) {
+                --blockHitWait;
+            } else if (x == field_1074_c && y == field_1073_d && z == field_1072_e) {
+                int id = w.getBlockId(x, y, z);
+                if (id == 0) return false;
+                Block b = Block.blocksList[id];
+                curBlockDamage += b.blockStrength(p);
+                // :177-179 mc.sndManager.playSound(step sound): client, no draws
+                ++field_1069_h;
+                if (curBlockDamage >= 1.0F) {
+                    broken = sendBlockRemoved(x, y, z, side);
+                    curBlockDamage = 0.0F;
+                    prevBlockDamage = 0.0F;
+                    field_1069_h = 0.0F;
+                    blockHitWait = 5;
+                }
+            } else {
+                curBlockDamage = 0.0F;
+                prevBlockDamage = 0.0F;
+                field_1069_h = 0.0F;
+                field_1074_c = x;
+                field_1073_d = y;
+                field_1072_e = z;
+            }
+            return broken;
+        }
+
+        /** PlayerControllerSP.updateController (PlayerControllerSP.java:221-224), without the music. */
+        void updateController() {
+            prevBlockDamage = curBlockDamage;
         }
     }
 }

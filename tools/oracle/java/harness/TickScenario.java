@@ -42,6 +42,7 @@ import net.minecraft.src.InventoryLargeChest;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
 import net.minecraft.src.MathHelper;
+import net.minecraft.src.MovementInput;
 import net.minecraft.src.PlayerControllerSP;
 import net.minecraft.src.TileEntity;
 import net.minecraft.src.TileEntityChest;
@@ -60,9 +61,9 @@ final class TickScenario {
 
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode",
-            "interact", "craft", "slot_click");
+            "interact", "craft", "slot_click", "input", "dig", "sleep");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
-            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory");
+            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory", "player_state");
 
     @SuppressWarnings("unchecked")
     static Trace run(Map<String, Object> sc, Path dir) throws Exception {
@@ -88,8 +89,8 @@ final class TickScenario {
             long t = num(op, "t");
             if (t < 0 || t >= ticks) throw new IllegalArgumentException("op t=" + t + " outside 0.." + (ticks - 1));
             if (!OPS.contains(str(op, "op"))) throw new IllegalArgumentException("unknown op " + op.get("op"));
-            if (str(op, "op").equals("save") && !saveFormat.equals("mcregion")) {
-                throw new IllegalArgumentException("op save needs \"save_format\": \"mcregion\"");
+            if (str(op, "op").equals("save") && !saveFormat.equals("mcregion") && !worldType.equals("load")) {
+                throw new IllegalArgumentException("op save needs \"save_format\": \"mcregion\" or \"world\": \"load\"");
             }
             ops.add(op);
         }
@@ -110,7 +111,9 @@ final class TickScenario {
 
         // Every vanilla Math.random() draws from HarnessMath: one stream per scenario.
         HarnessMath.seed(seed);
-        HarnessWorld hw = HarnessWorld.create(seed, dimension, worldType, saveFormat, difficulty);
+        HarnessWorld hw = worldType.equals("load")
+                ? load(sc, dir, seed, saveFormat, difficulty)
+                : HarnessWorld.create(seed, dimension, worldType, saveFormat, difficulty);
         openContainer = null;
         openSpec = null;
         hw.noMobSpawning = mobSpawning.equals("none");
@@ -125,10 +128,12 @@ final class TickScenario {
                 // Frame start, Minecraft.java:519-520 (one frame per tick).
                 AxisAlignedBB.clearBoundingBoxPool();
                 Vec3D.initialize();
+                hw.digThisTick = false;
                 while (next < sorted.size() && num(sorted.get(next), "t") == t) {
                     apply(hw, sorted.get(next), t, trace);
                     next++;
                 }
+                releaseButton(hw);
                 hw.runTick();
                 // Once per frame after the tick loop, Minecraft.java:553 (at most 500 updates).
                 hw.world.updatingLighting();
@@ -141,6 +146,47 @@ final class TickScenario {
             hw.close();
         }
         return trace;
+    }
+
+    /**
+     * {@code "world": "load"}: the save directory {@code dir} (relative to the scenario
+     * directory, inside the fixture tree {@code tests/golden}) is copied to a temp directory and
+     * opened with the loading constructor, as {@code world_read} does (HarnessWorld.open); the
+     * dimension and the world seed come from its level.dat, {@code seed} seeds the harness
+     * streams. The copy is the world's save: autosaves and {@code save} ops write there.
+     */
+    private static HarnessWorld load(Map<String, Object> sc, Path dir, long seed, String saveFormat, int difficulty)
+            throws Exception {
+        if (!saveFormat.equals("none") || sc.containsKey("save_format")) {
+            throw new IllegalArgumentException("\"world\": \"load\" takes no \"save_format\" (the loaded save is the world's)");
+        }
+        Path golden = dir.toAbsolutePath().normalize().getParent().getParent();
+        Path src = dir.toAbsolutePath().resolve(str(sc, "dir")).normalize();
+        if (!src.startsWith(golden)) throw new IllegalArgumentException("\"dir\" must stay inside the fixture tree");
+        if (!java.nio.file.Files.isRegularFile(src.resolve("level.dat"))) {
+            throw new IllegalArgumentException("no level.dat in \"dir\" " + sc.get("dir"));
+        }
+        Path root = java.nio.file.Files.createTempDirectory("harness-load");
+        try {
+            HarnessWorld.copyTree(src, root.resolve("world"));
+            return HarnessWorld.open(root, seed, difficulty);
+        } catch (Exception e) {
+            HarnessWorld.deleteTree(root);
+            throw e;
+        }
+    }
+
+    /**
+     * After a tick's ops: a tick without a {@code dig} op is a tick with the left button up,
+     * {@code Minecraft.func_6254_a(0, false)} → {@code resetBlockRemoving()} (Minecraft.java:779-797),
+     * with the controller's per-tick {@code updateController()} (Minecraft.java:962-964).
+     */
+    private static void releaseButton(HarnessWorld hw) {
+        if (hw.controller != null && !hw.digThisTick) {
+            hw.controller.updateController();
+            hw.controller.resetBlockRemoving();
+            hw.lastDig = null;
+        }
     }
 
     // ---- preload ----------------------------------------------------------------
@@ -204,6 +250,7 @@ final class TickScenario {
 
     // ---- ops --------------------------------------------------------------------
 
+    @SuppressWarnings("unchecked")
     private static void apply(HarnessWorld hw, Map<String, Object> op, int t, Trace trace) throws Exception {
         World w = hw.world;
         String name = str(op, "op");
@@ -255,6 +302,17 @@ final class TickScenario {
                 if (hw.player != null) throw new IllegalArgumentException("only one player op");
                 HarnessPlayer p = new HarnessPlayer(w);
                 seedAfterConstruction(p, hw.seed);
+                if (op.containsKey("inventory")) {
+                    // InventoryPlayer.setInventorySlotContents (InventoryPlayer.java:180-188):
+                    // slots 0-35 main (0-8 the hotbar), 36-39 armour.
+                    for (Object o : (List<Object>) op.get("inventory")) {
+                        Map<String, Object> it = Dumps.map(o, "player \"inventory\" entry");
+                        int slot = i(it, "slot");
+                        if (slot < 0 || slot >= 40) throw new IllegalArgumentException("inventory slot " + slot + " outside 0..39");
+                        p.inventory.setInventorySlotContents(slot, new ItemStack(i(it, "id"), i(it, "count"),
+                                it.containsKey("damage") ? i(it, "damage") : 0));
+                    }
+                }
                 place(p, op);
                 boolean joined = w.entityJoinedWorld(p); // src: World.java:896-918
                 hw.player = p;
@@ -304,6 +362,15 @@ final class TickScenario {
                 break;
             case "interact":
                 interact(hw, op, l);
+                break;
+            case "input":
+                input(hw, op, l);
+                break;
+            case "dig":
+                dig(hw, op, t, l);
+                break;
+            case "sleep":
+                sleep(hw, op, l);
                 break;
             case "explode":
                 explode(hw, op, l);
@@ -757,6 +824,88 @@ final class TickScenario {
                 .raw("held", Dumps.stack(p.inventory.getItemStack()));
     }
 
+    private static HarnessPlayer requirePlayer(HarnessWorld hw, String op) {
+        if (hw.player == null) throw new IllegalArgumentException(op + " needs a player op first");
+        return hw.player;
+    }
+
+    /**
+     * The player's {@code MovementInput} from now on (until the next {@code input} op), as
+     * {@code MovementInputFromOptions.updatePlayerMoveState} computes it from the keys
+     * (MovementInputFromOptions.java:50-76): {@code forward}/{@code strafe} are the key sums,
+     * multiplied by 0.3 (through double) while {@code sneak}. HarnessPlayer applies it where
+     * EntityPlayerSP does (EntityPlayerSP.java:27-32, :144-146). {@code hotbar}, if given, is
+     * the number key that selects a hotbar slot: {@code inventory.currentItem = hotbar}
+     * (Minecraft.java:1073-1076).
+     */
+    private static void input(HarnessWorld hw, Map<String, Object> op, Json.Line l) {
+        HarnessPlayer p = requirePlayer(hw, "input");
+        if (op.containsKey("hotbar")) {
+            int slot = i(op, "hotbar");
+            if (slot < 0 || slot >= 9) throw new IllegalArgumentException("hotbar " + slot + " outside 0..8");
+            p.inventory.currentItem = slot;
+        }
+        MovementInput m = p.movementInput;
+        m.moveForward = op.containsKey("forward") ? Num.f32(op.get("forward")) : 0.0F;
+        m.moveStrafe = op.containsKey("strafe") ? Num.f32(op.get("strafe")) : 0.0F;
+        m.jump = op.containsKey("jump") && bool(op, "jump");
+        m.sneak = op.containsKey("sneak") && bool(op, "sneak");
+        if (m.sneak) {
+            m.moveStrafe = (float) ((double) m.moveStrafe * 0.3D);
+            m.moveForward = (float) ((double) m.moveForward * 0.3D);
+        }
+    }
+
+    /**
+     * The left button held on block (x, y, z), face {@code side}, this tick (the ray trace replaced
+     * by the op): Minecraft.runTick's mouse handling (Minecraft.java:1003-1022, :1110-1113) with
+     * PlayerControllerSP (HarnessWorld.Controller). A press (no {@code dig} op last tick, or
+     * another block) is {@code clickMouse(0)}: {@code swingItem}, {@code clickBlock}
+     * (Minecraft.java:800-830); while held, {@code clickMouse(0)} repeats when 5 ticks
+     * ({@code ticksPerSecond / 4}) passed since the last click. Then every held tick
+     * {@code func_6254_a(0, true)} → {@code sendBlockRemoving} (Minecraft.java:779-797). A tick
+     * without a {@code dig} op releases the button ({@link #releaseButton}).
+     */
+    private static void dig(HarnessWorld hw, Map<String, Object> op, int t, Json.Line l) {
+        HarnessPlayer p = requirePlayer(hw, "dig");
+        if (hw.digThisTick) throw new IllegalArgumentException("one dig op per tick");
+        hw.digThisTick = true;
+        if (hw.controller == null) hw.controller = new HarnessWorld.Controller(hw.world, p);
+        HarnessWorld.Controller c = hw.controller;
+        c.updateController(); // src: Minecraft.java:962-964
+        int x = i(op, "x"), y = i(op, "y"), z = i(op, "z"), side = i(op, "side");
+        boolean press = hw.lastDig == null || hw.lastDig[0] != x || hw.lastDig[1] != y || hw.lastDig[2] != z;
+        boolean clicked = false, broken = false;
+        if (press || (float) (t - hw.mouseTicksRan) >= 20.0F / 4.0F) {
+            p.swingItem(); // src: Minecraft.java:803-805
+            broken = c.clickBlock(x, y, z, side);
+            hw.mouseTicksRan = t;
+            clicked = true;
+        }
+        broken |= c.sendBlockRemoving(x, y, z, side);
+        hw.lastDig = new int[] {x, y, z};
+        l.put("x", x).put("y", y).put("z", z).put("clicked", clicked).f32("progress", c.curBlockDamage)
+                .put("broken", broken);
+    }
+
+    /**
+     * Use the bed at (x, y, z) as the player: {@code Block.blockActivated} (BlockBed.java:14-83,
+     * which calls {@code EntityPlayer.sleepInBedAt}, EntityPlayer.java:537-596). {@code status}
+     * is the {@code EnumStatus} name sleepInBedAt returned, or null when it was not reached
+     * (another player sleeps there; the other half missing; not the overworld: the bed explodes).
+     */
+    private static void sleep(HarnessWorld hw, Map<String, Object> op, Json.Line l) {
+        HarnessPlayer p = requirePlayer(hw, "sleep");
+        World w = hw.world;
+        int x = i(op, "x"), y = i(op, "y"), z = i(op, "z");
+        p.lastSleepStatus = null;
+        int id = w.getBlockId(x, y, z);
+        boolean result = id > 0 && Block.blocksList[id].blockActivated(w, x, y, z, p);
+        l.put("result", result);
+        if (p.lastSleepStatus == null) l.raw("status", "null");
+        else l.put("status", p.lastSleepStatus.name());
+    }
+
     // ---- dumps ------------------------------------------------------------------
 
     private static void dump(HarnessWorld hw, Map<String, Object> d, int t, Trace trace) {
@@ -780,6 +929,7 @@ final class TickScenario {
                 if (hw.player == null) throw new IllegalArgumentException("dump inventory needs a player op first");
                 Dumps.inventory(trace, t, hw.player);
                 break;
+            case "player_state": Dumps.playerState(trace, t, requirePlayer(hw, "player_state")); break;
             default: throw new IllegalArgumentException("unknown dump " + d.get("what"));
         }
     }
