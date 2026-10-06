@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
   push:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -72,3 +73,47 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
       - name: Check format
         run: cargo fmt --all -- --check
+  wasm-check:
+    # PLAN_v4 D9: the simulation crates must build for the browser.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ubuntu-latest-cargo-wasm-check-${{ hashFiles('**/Cargo.toml') }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Check simulation crates for wasm32-unknown-unknown
+        run: cargo check -p mc-core -p mc-nbt -p mc-sim --target wasm32-unknown-unknown
+  golden-regen:
+    # Manual only. Regenerates golden fixtures from the Java oracle (PLAN_v4 §4.1).
+    # Needs the git-ignored reference tree, so it only does real work on a
+    # runner that has it (self-hosted); elsewhere it reports and exits 0.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for the reference tree
+        id: reference
+        run: |
+          if [ -d .reference/mc_b1.7.3_release ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "reference tree not available on this runner; run tools/oracle/regen.sh locally"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-java@v4
+        if: steps.reference.outputs.present == 'true'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Regenerate golden fixtures
+        if: steps.reference.outputs.present == 'true'
+        run: tools/oracle/regen.sh
