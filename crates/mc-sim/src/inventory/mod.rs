@@ -35,8 +35,6 @@
 //!
 //! # Gaps (recorded in [`World::unimplemented_hits`])
 //!
-//! - `EntityPlayer.dropPlayerItemWithRandomChoice` (WP-2.5a's player code):
-//!   [`drop_player_item_with_random_choice`] records it and drops nothing.
 //! - `EntityPlayer.addStat` (statistics and achievements, WP-2.7): crafting
 //!   and smelting pickups (`ItemStack.onCrafting`, `SlotCrafting`,
 //!   `SlotFurnace`) and armour breaking record it.
@@ -81,22 +79,17 @@ pub enum InventoryRef {
     LargeChest(Box<large_chest::InventoryLargeChest>),
 }
 
-/// `player.dropPlayerItemWithRandomChoice(stack, flag)` (EntityPlayer.java:
-/// 257-283): an `EntityItem` at the player's eyes with random motion.
-/// `EntityPlayer`'s own methods are WP-2.5a's (`entity/player.rs`); until
-/// that function exists this records `"EntityPlayer.dropPlayerItemWithRandomChoice"`
-/// and the stack is lost (the caller has already taken it out of its
-/// slot, as Java does). A null stack does nothing (EntityPlayer.java:258).
+/// `player.dropPlayerItemWithRandomChoice(stack, flag)`: an `EntityItem`
+/// at the player's eyes ([`crate::entity::player::drop_player_item_with_random_choice`],
+/// WP-2.5a). A null stack does nothing (EntityPlayer.java:258).
+// src: EntityPlayer.java:257-285
 pub fn drop_player_item_with_random_choice(
     world: &mut World,
     player: &mut Entity,
     stack: Option<ItemStack>,
     flag: bool,
 ) {
-    let _ = (player, flag);
-    if stack.is_some() {
-        world.note_unimplemented("EntityPlayer.dropPlayerItemWithRandomChoice");
-    }
+    crate::entity::player::drop_player_item_with_random_choice(player, world, stack, flag);
 }
 
 /// `player.dropPlayerItem(stack)`: `dropPlayerItemWithRandomChoice(stack,

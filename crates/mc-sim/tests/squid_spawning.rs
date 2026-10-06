@@ -301,8 +301,8 @@ fn creature_specific_init_sheep_fleece() {
 /// `World.tick` with every player fully asleep and hostile spawning on runs
 /// `performSleepSpawning`: the monsters are built (WP-2.3b) but none passes
 /// both `getCanSpawnHere` and the path test in the closed room, so none
-/// joins, the night is skipped and the player woken (`wakeUpPlayer`
-/// recorded).
+/// joins, the night is skipped and the player woken (`wakeUpPlayer`,
+/// WP-2.5a).
 /// Hostile spawning off: no sleep spawning, the night is skipped too.
 #[test]
 fn sleep_spawning_from_world_tick() {
@@ -325,6 +325,7 @@ fn sleep_spawning_from_world_tick() {
             d.sleeping = true;
             d.sleep_timer = 100;
         }
+        let pid = p.id();
         assert!(w.spawn_entity_in_world(p));
         w.update_all_players_sleeping_flag();
         w.world_info.world_time = 18000;
@@ -349,6 +350,15 @@ fn sleep_spawning_from_world_tick() {
             hostile,
             "monster constructors reached only with hostile spawning"
         );
-        assert!(hits.contains_key("EntityPlayer.wakeUpPlayer (World.wakeUpAllPlayers)"));
+        // `wakeUpAllPlayers` wakes the player (EntityPlayer.wakeUpPlayer,
+        // WP-2.5a): no gap recorded.
+        assert!(
+            !hits
+                .keys()
+                .any(|k| k.starts_with("EntityPlayer.wakeUpPlayer")),
+            "no wakeUpPlayer gap: {hits:?}"
+        );
+        let player = w.entity(pid).and_then(|e| e.kind.player()).unwrap();
+        assert!(!player.is_player_sleeping(), "the player is woken");
     }
 }

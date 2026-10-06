@@ -52,7 +52,7 @@
 //! | `set_time` | [`World::set_world_time`] |
 //! | `set_weather` | the given fields of [`World::world_info`] (`rain_time`, `raining`, `thunder_time`, `thundering`) |
 //! | `preload` | [`World::get_chunk_from_chunk_coords`] over the square, dz outer, dx inner, each followed by draining [`World::updating_lighting`] → `loaded` |
-//! | `player` | [`new_entity_player_sp`] (the `EntityPlayer` constructor chain), username `"Player"` (HarnessPlayer's), the `inventory` stacks ([`inventory_set_inventory_slot_contents`]), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
+//! | `player` | [`new_entity_player_sp`] (the `EntityPlayer` constructor chain), username `"Player"` (HarnessPlayer's), the `inventory` stacks ([`InventoryPlayer::set_inventory_slot_contents`](mc_sim::inventory::InventoryPlayer::set_inventory_slot_contents)), `setLocationAndAngles`, [`World::spawn_entity_in_world`] → `id`, `joined` |
 //! | `input` | the player's [`PlayerSpData::movement_input`](mc_sim::entity::PlayerSpData) = [`MovementInput::from_keys`]; `hotbar` → `inventory.currentItem` |
 //! | `dig` | `dig`: [`PlayerControllerSp::update_controller`], on a press or every 5 ticks held [`swing_item`] + [`PlayerControllerSp::click_block`], then [`PlayerControllerSp::send_block_removing`] → `x`, `y`, `z`, `clicked`, `progress`, `broken`; a tick without `dig` releases ([`PlayerControllerSp::reset_block_removing`]) |
 //! | `sleep` | [`block_dispatch::block_activated`] as the player → `result`, `status` ([`PlayerSpData::last_sleep_status`](mc_sim::entity::PlayerSpData)) |
@@ -113,8 +113,7 @@ use mc_sim::block::dispatch as block_dispatch;
 use mc_sim::crafting::CraftingManager;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::player::{
-    MovementInput, inventory_set_inventory_slot_contents, new_entity_player_sp, swing_item,
-    use_current_item_on_entity,
+    MovementInput, new_entity_player_sp, swing_item, use_current_item_on_entity,
 };
 use mc_sim::golden::{StateValue, entity_state_fields};
 use mc_sim::inventory::container::chest::new_container_chest;
@@ -534,8 +533,8 @@ struct Harness {
     player_pos: Option<(f64, f64, f64)>,
     /// The player's `inventorySlots` (`new ContainerPlayer(inventory,
     /// !multiplayerWorld)`, EntityPlayer.java:42), built by the `player` op.
-    /// Held here because the port's `PlayerData` has no container yet
-    /// (`EntityPlayer`'s fields are WP-2.5a's).
+    /// Held here because the port's `PlayerData` does not hold
+    /// `inventorySlots` (the [`mc_sim::entity::PlayerData`] docs).
     player_container: Option<Container>,
     /// `TickScenario.openContainer` / `openSpec`: the container the last
     /// `slot_click` with a spec other than `"player"` opened.
@@ -713,8 +712,7 @@ fn apply(
                     )));
                 }
                 // src: InventoryPlayer.java:180-188 (setInventorySlotContents)
-                inventory_set_inventory_slot_contents(
-                    &mut player_data(&mut e).inventory,
+                player_data(&mut e).inventory.set_inventory_slot_contents(
                     s.slot,
                     Some(ItemStack::new(s.id, s.count, s.damage)),
                 );

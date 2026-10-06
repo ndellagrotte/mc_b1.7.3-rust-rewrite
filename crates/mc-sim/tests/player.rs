@@ -8,10 +8,7 @@
 //! instant break and hit wait, and the respawn check.
 
 use mc_core::java_hash::ChunkCoordinates;
-use mc_sim::entity::player::{
-    self, EnumStatus, MovementInput, inventory_decr_stack_size, inventory_get_total_armor_value,
-    new_entity_player_sp,
-};
+use mc_sim::entity::player::{self, EnumStatus, MovementInput, new_entity_player_sp};
 use mc_sim::entity::{Entity, EntityKindData, PlayerData, PlayerSpData, dispatch, nbt};
 use mc_sim::inventory::InventoryPlayer;
 use mc_sim::item::ItemStack;
@@ -98,7 +95,7 @@ fn armour_absorbs_and_carries_the_remainder() {
     for (i, id) in [301, 300, 299, 298].into_iter().enumerate() {
         inv.armor_inventory[i] = Some(ItemStack::new(id, 1, 0));
     }
-    assert_eq!(inventory_get_total_armor_value(&pd(&p).inventory), 20);
+    assert_eq!(pd(&p).inventory.get_total_armor_value(), 20);
     dispatch::damage_entity(&mut p, &mut w, 7);
     // 7 * 5 = 35: 1 point, 10/25 kept.
     assert_eq!(p.kind.living().unwrap().health, 19);
@@ -113,7 +110,7 @@ fn armour_absorbs_and_carries_the_remainder() {
     );
     dispatch::damage_entity(&mut p, &mut w, 3);
     // Worn armour counts less: (20 - 1) * remaining / max + 1.
-    let a = inventory_get_total_armor_value(&pd(&p).inventory);
+    let a = pd(&p).inventory.get_total_armor_value();
     assert!(a < 20);
     // A nearly broken piece breaks and leaves its slot.
     pd_mut(&mut p).inventory.armor_inventory[0] = Some(ItemStack::new(301, 1, 38));
@@ -126,7 +123,7 @@ fn armour_absorbs_and_carries_the_remainder() {
 fn non_armour_in_armour_slots_counts_nothing() {
     let mut inv = InventoryPlayer::default();
     inv.armor_inventory[3] = Some(ItemStack::new(STONE, 1, 0));
-    assert_eq!(inventory_get_total_armor_value(&inv), 0);
+    assert_eq!(inv.get_total_armor_value(), 0);
 }
 
 /// `sleepInBedAt`: the nether (`NOT_POSSIBLE_HERE`), a dead player
@@ -322,17 +319,11 @@ fn drops_the_held_item_and_the_cursor_stack() {
 fn decr_stack_size_covers_both_arrays() {
     let mut inv = InventoryPlayer::default();
     inv.main_inventory[1] = Some(ItemStack::new(4, 2, 0));
-    assert_eq!(
-        inventory_decr_stack_size(&mut inv, 1, 5),
-        Some(ItemStack::new(4, 2, 0))
-    );
+    assert_eq!(inv.decr_stack_size(1, 5), Some(ItemStack::new(4, 2, 0)));
     assert_eq!(inv.main_inventory[1], None);
     inv.armor_inventory[2] = Some(ItemStack::new(300, 1, 0));
-    assert_eq!(
-        inventory_decr_stack_size(&mut inv, 38, 1),
-        Some(ItemStack::new(300, 1, 0))
-    );
-    assert_eq!(inventory_decr_stack_size(&mut inv, 38, 1), None);
+    assert_eq!(inv.decr_stack_size(38, 1), Some(ItemStack::new(300, 1, 0)));
+    assert_eq!(inv.decr_stack_size(38, 1), None);
 }
 
 /// `PlayerControllerSP`: a flower breaks on the click; stone held bare-handed

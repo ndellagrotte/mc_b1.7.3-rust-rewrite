@@ -7,7 +7,7 @@
 //! (scheduled block ticks) → `updateBlocksAndPlayCaveSounds` (random ticks).
 //!
 //! Fully transcribed: `tick`, `updateWeather`, `isAllPlayersFullyAsleep`,
-//! `wakeUpAllPlayers` (except `EntityPlayer.wakeUpPlayer`, below),
+//! `wakeUpAllPlayers` (with `EntityPlayer.wakeUpPlayer`, WP-2.5a),
 //! `SpawnerAnimals.performSleepSpawning` and `performSpawning`
 //! ([`crate::spawner`]), the chunk-cache `unload100OldestChunks`,
 //! `saveWorld`, `TickUpdates`, `updateBlocksAndPlayCaveSounds` (cave sounds,
@@ -16,9 +16,8 @@
 //! `randomDisplayUpdates`.
 //!
 //! Recorded gaps ([`World::skipped_systems`] / [`World::unimplemented_hits`]),
-//! each where its Java code runs: `EntityPlayer.wakeUpPlayer` (WP-2.5),
-//! the mob constructors the port does not have yet ([`crate::spawner`]
-//! module docs).
+//! each where its Java code runs: the mob constructors the port does not
+//! have yet ([`crate::spawner`] module docs).
 
 use mc_core::java_hash::ChunkCoordIntPair;
 use mc_core::math::floor_double;

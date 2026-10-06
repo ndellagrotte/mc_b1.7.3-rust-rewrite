@@ -142,7 +142,6 @@ fixtures! {
     tick_portal_ignite => "tick" / "portal-ignite";
     tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
     // WP-2.5a: Gate 2's long run, testWorld loaded and ticked 6000 times.
-    #[ignore = "the mobs saved in r.0.-1 (5 EntityCow, 5 EntitySkeleton, 4 EntityZombie, 4 EntityCreeper, 3 EntitySquid, 2 EntitySheep, 1 EntitySpider; WP-2.3) have no port constructor, so the chunk loader keeps them as compounds while the oracle runs them: first diff line 4 (t=499 chunk_digest of chunk (1,-4), field data); with dumps every tick the entity lists differ from t=0, world.rand and the random-tick LCG from t=34, chunk (1,-4) metadata from t=49. The same 6000 ticks on a copy of the save without those 24 entities (region rewritten, not committed) match the oracle line for line, generated chunks outside r.0.-1 included"]
     tick_testworld_6000 => "tick" / "testworld-6000";
     #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. BlockSapling.growTree (WP-1.6) and population (WP-1.7) are in"]
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
@@ -193,14 +192,11 @@ fixtures! {
     tick_soul_sand_web_item => "tick" / "soul-sand-web-item";
     tick_spawning_draws => "tick" / "spawning-draws";
     tick_natural_spawn_squid => "tick" / "natural-spawn-squid";
-    #[ignore = "needs EntityPlayer.onLivingUpdate's peaceful heal (WP-2.5): first diff line 43 (t=39 entity_state of the player, field state.health: actual 19, expected 20); every other line matches, the spawning included (the animals since WP-2.3a, the squid and SpawnerAnimals since WP-2.3c)"]
     tick_natural_spawn_pigs => "tick" / "natural-spawn-pigs";
-    #[ignore = "needs EntityPlayer.sleepInBedAt (WP-2.5a; BlockBed.blockActivated records it), then EntityPlayer.onUpdate's sleep timer and wakeUpPlayer (WP-2.5); the EntitySkeleton constructor and AI for the skeleton performSleepSpawning places at t=101 are in since WP-2.3b: first diff line 18 (t=2 entity_state of the player, field isCollidedVertically: the oracle's player lies in the bed); lines 1-17 match"]
     tick_sleep_spawning => "tick" / "sleep-spawning";
     tick_sponge_removal_notifies => "tick" / "sponge-removal-notifies";
     tick_tnt_by_fire => "tick" / "tnt-by-fire";
     tick_use_item_noop => "tick" / "use-item-noop";
-    #[ignore = "needs EntityPlayer.onLivingUpdate's peaceful heal (WP-2.5): first diff line 7 (t=99 entity_state of the player, field state.health: actual 19, expected 20); every other line matches (the tick-0 animal spawning since WP-2.3a/WP-2.3c, population WP-1.7, the BlockSapling/BlockGrass random ticks WP-1.6)"]
     tick_sapling_with_player => "tick" / "sapling-with-player";
     tick_snow_ice => "tick" / "snow-ice";
     tick_water_flow => "tick" / "water-flow";

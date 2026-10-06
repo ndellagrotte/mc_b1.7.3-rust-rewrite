@@ -30,7 +30,6 @@
 //!   and continues as if `getCanSpawnHere()` were false, so nothing joins.
 //!   **Known divergence** from that point when the oracle's mob would have
 //!   joined (its `creatureSpecificInit` and the pack count).
-//! - `EntityPlayer.wakeUpPlayer` (WP-2.5) after a sleep spawn.
 //!
 //! [`World::unimplemented_hits`]: crate::world::World::unimplemented_hits
 
@@ -548,8 +547,11 @@ fn sleep_spawn_next_to(
         .set_location_and_angles(x as f64, y as f64, z as f64, 0.0, 0.0);
     join_then(world, var17, |w, e| {
         creature_specific_init(e, w, x, y, z);
-        // `var5.wakeUpPlayer(true, false, false)`: EntityPlayer, WP-2.5.
-        w.note_unimplemented("EntityPlayer.wakeUpPlayer (SpawnerAnimals.performSleepSpawning)");
+        // src: SpawnerAnimals.java:241 (`var5.wakeUpPlayer(true, false, false)`,
+        // EntityPlayer.java:617-647)
+        w.with_entity_mut(pid, |w, p| {
+            crate::entity::player::wake_up_player(p, w, true, false, false)
+        });
         living::play_living_sound(e, w);
     });
     true

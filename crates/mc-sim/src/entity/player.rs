@@ -55,12 +55,6 @@
 //!
 //! # Code owned by other work packages, transcribed here for now
 //!
-//! - `InventoryPlayer` methods the player reaches (`decrementAnimations`,
-//!   `getDamageVsEntity`, `getTotalArmorValue`, `damageArmor`,
-//!   `dropAllItems`, `decrStackSize`, `setInventorySlotContents`): WP-2.5b
-//!   finishes `inventory/` in parallel; the `inventory_*` functions below
-//!   are its methods transcribed against [`InventoryPlayer`]'s fields, to be
-//!   replaced by the WP-2.5b ones at integration.
 //! - `ItemStack.hitEntity` / `onDestroyBlock` and the `Item` overrides they
 //!   reach (`ItemSword`, `ItemTool`, `ItemShears`): item behaviour (WP-2.6),
 //!   transcribed in [`item_stack_hit_entity`] /
@@ -86,7 +80,6 @@ use super::living::{self, LivingData, lv, lv_mut};
 use super::{Entity, EntityKindData, PlayerData, base, dispatch};
 use crate::block::bed;
 use crate::block::{BlockDef, Material};
-use crate::inventory::InventoryPlayer;
 use crate::item::{ItemKind, ItemStack};
 use crate::world::World;
 use crate::world::is_instance_of;
@@ -441,7 +434,7 @@ pub fn on_living_update(e: &mut Entity, world: &mut World) {
     {
         living::heal(e, 1);
     }
-    inventory_decrement_animations(e, world);
+    crate::inventory::player::decrement_animations(world, e);
     {
         let p = player_mut(e);
         p.prev_camera_yaw = p.camera_yaw;
@@ -509,7 +502,7 @@ pub fn on_death(e: &mut Entity, world: &mut World, var1: Option<&Entity>) {
             "EntityPlayer.onDeath with a null username (Java NullPointerException)",
         ),
     }
-    inventory_drop_all_items(e, world);
+    crate::inventory::player::drop_all_items(world, e);
     if var1.is_some() {
         let a = (lv(e).attacked_at_yaw + e.base.rotation_yaw) * 3.1415927 / 180.0;
         e.base.motion_x = (-math::cos(a) * 0.1) as f64;
@@ -539,7 +532,7 @@ pub fn add_to_player_score(e: &mut Entity, victim: &Entity, var2: i32) {
 // src: EntityPlayer.java:249-251
 pub fn drop_current_item(e: &mut Entity, world: &mut World) {
     let slot = player(e).inventory.current_item;
-    let s = inventory_decr_stack_size(&mut player_mut(e).inventory, slot, 1);
+    let s = player_mut(e).inventory.decr_stack_size(slot, 1);
     drop_player_item_with_random_choice(e, world, s, false);
 }
 
@@ -765,15 +758,13 @@ pub fn alert_wolves(e: &Entity, world: &mut World, var1: &EntityKindData, var2: 
 /// `EntityPlayer.damageEntity(amount)`: armour absorbs
 /// `getTotalArmorValue()` 25ths of the damage, the fraction carried over in
 /// `damageRemainder`; every armour piece takes the full damage as wear.
-/// `_world` keeps the `dispatch::damage_entity` entry-point signature;
-/// `damageEntity` itself never reads the world.
 // src: EntityPlayer.java:439-446
-pub fn damage_entity(e: &mut Entity, _world: &mut World, mut var1: i32) {
-    let var2 = 25 - inventory_get_total_armor_value(&player(e).inventory);
+pub fn damage_entity(e: &mut Entity, world: &mut World, mut var1: i32) {
+    let var2 = 25 - player(e).inventory.get_total_armor_value();
     let var3 = var1
         .wrapping_mul(var2)
         .wrapping_add(player(e).damage_remainder);
-    inventory_damage_armor(e, var1);
+    crate::inventory::player::damage_armor(world, e, var1);
     var1 = var3 / 25;
     player_mut(e).damage_remainder = var3 % 25;
     living::damage_entity(e, var1);
@@ -814,7 +805,7 @@ pub fn get_current_equipped_item(e: &Entity) -> Option<&ItemStack> {
 pub fn destroy_current_equipped_item(e: &mut Entity) {
     let inv = &mut player_mut(e).inventory;
     let slot = inv.current_item;
-    inventory_set_inventory_slot_contents(inv, slot, None);
+    inv.set_inventory_slot_contents(slot, None);
 }
 
 /// `EntityPlayer.getYOffset()`: `yOffset - 0.5`.
@@ -842,7 +833,7 @@ pub fn attack_target_entity_with_current_item(
     world: &mut World,
     var1: &mut Entity,
 ) {
-    let mut var2 = inventory_get_damage_vs_entity(&player(e).inventory);
+    let mut var2 = player(e).inventory.get_damage_vs_entity();
     if var2 > 0 {
         if e.base.motion_y < 0.0 {
             var2 = var2.wrapping_add(1);
@@ -1423,167 +1414,18 @@ pub fn sp_push_out_of_blocks(
     false
 }
 
-// ---- InventoryPlayer methods (WP-2.5b owns inventory/; module docs) -------------------
-
-/// `InventoryPlayer.decrementAnimations()`: each main stack's
-/// `updateAnimation` (ItemStack.java:212-218): the pick-up bob counts down,
-/// then `Item.onUpdate`, which only `ItemMap` overrides (map data, WP-2.6:
-/// recorded).
-// src: InventoryPlayer.java:110-117
-pub fn inventory_decrement_animations(e: &mut Entity, world: &mut World) {
-    let inv = &mut player_mut(e).inventory;
-    for s in inv.main_inventory.iter_mut().flatten() {
-        if s.animations_to_go > 0 {
-            s.animations_to_go -= 1;
-        }
-        if let Some(ItemKind::Map) = s.get_item().map(|i| &i.kind) {
-            world.note_unimplemented("ItemMap.onUpdate");
-        }
-    }
-}
-
-/// `InventoryPlayer.getDamageVsEntity(entity)`: the stack in slot
-/// `currentItem`'s damage (the item's `getDamageVsEntity`, which ignores the
-/// entity), 1 with an empty hand.
-// src: InventoryPlayer.java:266-269
-pub fn inventory_get_damage_vs_entity(inv: &InventoryPlayer) -> i32 {
-    match inv.get_stack_in_slot(inv.current_item) {
-        Some(s) => s.get_damage_vs_entity(),
-        None => 1,
-    }
-}
-
-/// `InventoryPlayer.getTotalArmorValue()`: the armour pieces' reduction
-/// points, scaled by their remaining durability.
-// src: InventoryPlayer.java:284-306
-pub fn inventory_get_total_armor_value(inv: &InventoryPlayer) -> i32 {
-    let mut var1 = 0i32;
-    let mut var2 = 0i32;
-    let mut var3 = 0i32;
-    for s in inv.armor_inventory.iter().flatten() {
-        if let Some(ItemKind::Armor {
-            damage_reduce_amount,
-            ..
-        }) = s.get_item().map(|i| &i.kind)
-        {
-            let var5 = s.get_max_damage();
-            let var6 = s.get_item_damage_for_display();
-            let var7 = var5.wrapping_sub(var6);
-            var2 = var2.wrapping_add(var7);
-            var3 = var3.wrapping_add(var5);
-            var1 = var1.wrapping_add(*damage_reduce_amount);
-        }
-    }
-    if var3 == 0 {
-        0
-    } else {
-        (var1 - 1).wrapping_mul(var2) / var3 + 1
-    }
-}
-
-/// `InventoryPlayer.damageArmor(amount)`: every armour piece wears by
-/// `amount` (`damageItem`); a broken one leaves its slot.
-// src: InventoryPlayer.java:308-319
-pub fn inventory_damage_armor(e: &mut Entity, var1: i32) {
-    for var2 in 0..4 {
-        let is_armor = player(e).inventory.armor_inventory[var2]
-            .is_some_and(|s| matches!(s.get_item().map(|i| &i.kind), Some(ItemKind::Armor { .. })));
-        if !is_armor {
-            continue;
-        }
-        item_stack_damage_item(e, ArmorOrMain::Armor(var2), var1);
-        if player(e).inventory.armor_inventory[var2].is_some_and(|s| s.stack_size == 0) {
-            // onItemDestroyedByUse(player): empty (ItemStack.java:167-168)
-            player_mut(e).inventory.armor_inventory[var2] = None;
-        }
-    }
-}
-
-/// `InventoryPlayer.dropAllItems()`: every main stack, then every armour
-/// piece, through `dropPlayerItemWithRandomChoice(stack, true)`, each slot
-/// emptied.
-// src: InventoryPlayer.java:321-337
-pub fn inventory_drop_all_items(e: &mut Entity, world: &mut World) {
-    for var1 in 0..36 {
-        if let Some(s) = player(e).inventory.main_inventory[var1] {
-            drop_player_item_with_random_choice(e, world, Some(s), true);
-            player_mut(e).inventory.main_inventory[var1] = None;
-        }
-    }
-    for var1 in 0..4 {
-        if let Some(s) = player(e).inventory.armor_inventory[var1] {
-            drop_player_item_with_random_choice(e, world, Some(s), true);
-            player_mut(e).inventory.armor_inventory[var1] = None;
-        }
-    }
-}
-
-/// `InventoryPlayer.decrStackSize(slot, n)`: up to `n` items off the slot
-/// (36-39 the armour), `None` for an empty slot.
-// src: InventoryPlayer.java:154-178
-pub fn inventory_decr_stack_size(
-    inv: &mut InventoryPlayer,
-    mut var1: i32,
-    var2: i32,
-) -> Option<ItemStack> {
-    let var3: &mut [Option<ItemStack>] = if var1 >= inv.main_inventory.len() as i32 {
-        var1 -= inv.main_inventory.len() as i32;
-        &mut inv.armor_inventory
-    } else {
-        &mut inv.main_inventory
-    };
-    let slot = &mut var3[var1 as usize];
-    let s = slot.as_mut()?;
-    if s.stack_size <= var2 {
-        slot.take()
-    } else {
-        let var4 = s.split_stack(var2);
-        if s.stack_size == 0 {
-            *slot = None;
-        }
-        Some(var4)
-    }
-}
-
-/// `InventoryPlayer.setInventorySlotContents(slot, stack)` (36-39 the
-/// armour).
-// src: InventoryPlayer.java:180-188
-pub fn inventory_set_inventory_slot_contents(
-    inv: &mut InventoryPlayer,
-    mut var1: i32,
-    var2: Option<ItemStack>,
-) {
-    if var1 >= inv.main_inventory.len() as i32 {
-        var1 -= inv.main_inventory.len() as i32;
-        inv.armor_inventory[var1 as usize] = var2;
-    } else {
-        inv.main_inventory[var1 as usize] = var2;
-    }
-}
-
 // ---- item behaviour the player reaches (WP-2.6 owns item/; module docs) --------------
 
-/// Which inventory array a stack the player wears out lives in.
-#[derive(Clone, Copy, Debug)]
-enum ArmorOrMain {
-    Main(usize),
-    Armor(usize),
-}
-
-fn stack_slot(e: &mut Entity, at: ArmorOrMain) -> &mut Option<ItemStack> {
-    let inv = &mut player_mut(e).inventory;
-    match at {
-        ArmorOrMain::Main(i) => &mut inv.main_inventory[i],
-        ArmorOrMain::Armor(i) => &mut inv.armor_inventory[i],
-    }
-}
-
-/// `ItemStack.damageItem(amount, entity)` with this player as the entity:
-/// the wear ([`ItemStack::damage_item`]), and when it breaks the
-/// `objectBreakStats` stat of the player ([`add_stat`]).
+/// `ItemStack.damageItem(amount, entity)` with this player as the entity,
+/// for the stack in main slot `slot` (the armour's is
+/// [`crate::inventory::player::damage_armor`]): the wear
+/// ([`ItemStack::damage_item`]), and when it breaks the `objectBreakStats`
+/// stat of the player ([`add_stat`]).
 // src: ItemStack.java:124-141
-fn item_stack_damage_item(e: &mut Entity, at: ArmorOrMain, n: i32) -> bool {
-    let broke = stack_slot(e, at).as_mut().is_some_and(|s| s.damage_item(n));
+fn item_stack_damage_item(e: &mut Entity, slot: usize, n: i32) -> bool {
+    let broke = player_mut(e).inventory.main_inventory[slot]
+        .as_mut()
+        .is_some_and(|s| s.damage_item(n));
     if broke {
         add_stat(e, "StatList.objectBreakStats[itemID]", 1);
     }
@@ -1602,11 +1444,11 @@ pub fn item_stack_hit_entity(e: &mut Entity, world: &mut World, slot: usize) {
         .map(|i| &i.kind);
     let var3 = match kind {
         Some(ItemKind::Sword { .. }) => {
-            item_stack_damage_item(e, ArmorOrMain::Main(slot), 1);
+            item_stack_damage_item(e, slot, 1);
             true
         }
         Some(ItemKind::Spade(..) | ItemKind::Pickaxe(..) | ItemKind::Axe(..)) => {
-            item_stack_damage_item(e, ArmorOrMain::Main(slot), 2);
+            item_stack_damage_item(e, slot, 2);
             true
         }
         _ => false,
@@ -1691,16 +1533,16 @@ pub fn item_stack_on_destroy_block(e: &mut Entity, world: &mut World, slot: usiz
         .map(|i| &i.kind);
     let var6 = match kind {
         Some(ItemKind::Spade(..) | ItemKind::Pickaxe(..) | ItemKind::Axe(..)) => {
-            item_stack_damage_item(e, ArmorOrMain::Main(slot), 1);
+            item_stack_damage_item(e, slot, 1);
             true
         }
         Some(ItemKind::Sword { .. }) => {
-            item_stack_damage_item(e, ArmorOrMain::Main(slot), 2);
+            item_stack_damage_item(e, slot, 2);
             true
         }
         Some(ItemKind::Shears) => {
             if var1 == LEAVES || var1 == WEB {
-                item_stack_damage_item(e, ArmorOrMain::Main(slot), 1);
+                item_stack_damage_item(e, slot, 1);
             }
             false
         }

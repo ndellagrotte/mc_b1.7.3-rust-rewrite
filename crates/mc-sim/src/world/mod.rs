@@ -19,9 +19,7 @@
 //! | Java | State |
 //! |---|---|
 //! | `saveLevel` (:293-297) | `MapStorage.saveAllData` WP-2.6 |
-//! | `spawnPlayerWithLoadedChunks` (:256-276) | the sleeping branch of `EntityPlayer.readEntityFromNBT` (`wakeUpPlayer`) WP-2.5 (recorded) |
 //! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
-//! | `wakeUpAllPlayers` (:2395-2407) | `EntityPlayer.wakeUpPlayer` WP-2.5 (recorded) |
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
 //! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |

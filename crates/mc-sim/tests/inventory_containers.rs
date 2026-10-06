@@ -72,6 +72,16 @@ fn inv_mut(p: &mut Entity) -> &mut InventoryPlayer {
     &mut p.kind.player_mut().unwrap().inventory
 }
 
+/// The `EntityItem`s in `loadedEntityList` (the drops of
+/// `dropPlayerItemWithRandomChoice`, WP-2.5a).
+fn dropped(w: &World) -> Vec<ItemStack> {
+    w.loaded_entity_list
+        .iter()
+        .filter_map(|s| s.entity.as_deref())
+        .filter_map(|e| e.kind.item().and_then(|d| d.item))
+        .collect()
+}
+
 fn hits(w: &World, what: &str) -> u64 {
     w.unimplemented_hits
         .borrow()
@@ -207,7 +217,7 @@ fn armor_wears_out_and_the_owner_drops_everything() {
     assert!(inv(&p).main_inventory.iter().all(Option::is_none));
     assert!(inv(&p).armor_inventory.iter().all(Option::is_none));
     assert_eq!(
-        hits(&w, "EntityPlayer.dropPlayerItemWithRandomChoice"),
+        dropped(&w).len(),
         2,
         "one per stack (the stick, the pumpkin)"
     );
@@ -238,7 +248,10 @@ fn clicking_outside_the_window_drops() {
     inv_mut(&mut p).item_stack = Some(ItemStack::new(COBBLESTONE, 3, 0));
     c.slot_click(&mut w, &mut p, -999, 0, false);
     assert_eq!(inv(&p).item_stack, None);
-    assert_eq!(hits(&w, "EntityPlayer.dropPlayerItemWithRandomChoice"), 4);
+    assert_eq!(
+        dropped(&w),
+        [1, 1, 1, 3].map(|n| ItemStack::new(COBBLESTONE, n, 0))
+    );
     // Other buttons do nothing.
     inv_mut(&mut p).item_stack = Some(ItemStack::new(COBBLESTONE, 3, 0));
     c.slot_click(&mut w, &mut p, -999, 2, false);
@@ -264,12 +277,12 @@ fn closing_drops_the_grid() {
     assert_eq!(inv(&p).item_stack, None);
     assert_eq!(c.craft_matrix().get_stack_in_slot(0), None);
     assert_eq!(c.craft_result().get_stack_in_slot(0), None);
-    assert_eq!(hits(&w, "EntityPlayer.dropPlayerItemWithRandomChoice"), 2);
+    assert_eq!(dropped(&w).len(), 2);
 
     let mut wb = new_container_workbench(0, 61, 0);
     wb.put_stack_in_slot(&mut w, &mut p, 5, Some(ItemStack::new(17, 1, 0)));
     wb.on_craft_gui_closed(&mut w, &mut p);
-    assert_eq!(hits(&w, "EntityPlayer.dropPlayerItemWithRandomChoice"), 3);
+    assert_eq!(dropped(&w).len(), 3);
     assert!(
         wb.craft_matrix().get_stack_in_slot(4).is_some(),
         "not cleared"

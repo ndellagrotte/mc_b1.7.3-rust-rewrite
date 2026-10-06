@@ -1259,13 +1259,14 @@ their drops only where a player is present: the player's own update is WP-2.5):
 - `tick/natural-spawn-pigs` (WP-2.3, generated terrain, player on the grass of
   `tick/sapling-with-player`, difficulty 0): natural animal and squid spawning end to end
   (every `SpawnListEntry` constructor: sheep, pig, chicken, cow, squid; wolves in forests).
-  Since the WP-2.3c merge every line matches but the player's health (the peaceful heal of
-  `EntityPlayer.onLivingUpdate`, WP-2.5), as in `tick/sapling-with-player`.
+  Passes since the WP-2.5a merge (the peaceful heal of `EntityPlayer.onLivingUpdate`), as
+  does `tick/sapling-with-player`.
 - `tick/sleep-spawning` (WP-2.3, player, difficulty 1): a player sleeps in a bed in a dark,
   water-roofed stone room (no monster spot outside it, so the unseeded `EntityMob.getCanSpawnHere`
   rolls of census §3 always pass); after 100 ticks `performSleepSpawning` places a skeleton by
   the bed and wakes the player. Stops before the skeleton's first arrow (unseeded heading
-  jitter). Needs `EntityPlayer.sleepInBedAt` (WP-2.5); the skeleton is in since WP-2.3b.
+  jitter). Passes since the WP-2.5a merge (`EntityPlayer.sleepInBedAt` and `wakeUpPlayer`);
+  the skeleton is in since WP-2.3b.
 
 Monsters, slime and ghast (WP-2.3, task 2), empty world, seed 123, `"mob_spawning": "none"`,
 `"difficulty": 1` (`EntityMob.onUpdate` and `EntityGhast.updatePlayerActionState` kill them
@@ -1370,10 +1371,9 @@ WP-2.5b):
 Gate 2's long run (PLAN_v4 §5): `tick/testworld-6000`, `"world": "load"` of
 `save/testworld/world`, the player at the spawn point (the `EntityPlayer` constructor's
 spot), natural spawning off, 6000 ticks; every 500 ticks the four chunks around the spawn,
-`rng_state`, `world_time` and the player. The port cannot run it yet: the region's 24
-saved mobs (cows, skeletons, zombies, creepers, squid, sheep, a spider) have no port
-constructor (WP-2.3), so they are missing from its world (the test is ignored with the
-first differing line). Only region `r.0.-1` is committed, and the player at the spawn
+`rng_state`, `world_time` and the player. It passes since the WP-2.5a merge, which brought
+the WP-2.3 constructors of the region's 24 saved mobs (cows, skeletons, zombies, creepers,
+squid, sheep, a spider) together with the loaded world. Only region `r.0.-1` is committed, and the player at the spawn
 chunk (1,-4) random-ticks a 19x19 chunk square around it (World.java:1868-1965), chunks x
 -8..10, z -13..5: the ones outside that region are generated and populated on both sides,
 so the fixture also covers generating chunks missing from a loaded save.
