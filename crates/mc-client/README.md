@@ -357,6 +357,20 @@ policy), `snapshot.rs` (what a mesh job reads).
   `terrain::blocks::*` on the snapshot, and the Tessellator is
   `RenderBlocks::tess`. A renderer must not read more than 3 blocks from the
   block it draws (the snapshot logs a read outside it once).
+- **Special render types (WP-3.3d, `terrain/special.rs`).** Types 5, 7-12
+  and 14-17 draw as vanilla's: the bounds `setBlockBoundsBasedOnState`
+  sets (doors, beds, rails, levers, pistons, stairs) come from the
+  snapshot; the stairs, fence, lever base, repeater slab and piston faces
+  go through `render_standard_block` with changed bounds (AO applies to
+  them as in vanilla); the wire's connections use
+  `special::is_power_provider_or_wire` on the snapshot (a world-free
+  `canProvidePower`). For WP-3.5b: `func_31078_d` (the extended base with
+  every face) and `func_31079_a(…, full_rod)` (the head, `false` = the
+  moving piston's half rod) are `TileEntityRendererPiston`'s entry points.
+  The repeater's torches go through 3.3c's `render_torch_at_angle`. Every
+  other block vanilla draws in the world (portal, snow layer, pressure
+  plates, buttons, farmland, cake, trapdoor, slabs, glass) is type 0;
+  signs and the moving piston are type -1 (tile-entity renderers).
 - **Crack overlay** (`drawBlockBreaking`): the mouse-over block drawn again
   with tile `240 + (int)(damagePartialTime * 10)`, colours off, `glColor(1,
   1, 1, 0.5)`, blended `(DST_COLOR, SRC_COLOR)` with a polygon offset,
@@ -759,7 +773,7 @@ Actions run in order, as many per frame as are due.
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
 | `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
-| `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0) | Dev (WP-3.3b): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (a placed flowing source, id 8 or 10, then flows). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks) |
+| `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0), `raw` (default false) | Dev (WP-3.3b, WP-3.3d): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (`onBlockAdded` and the neighbours' updates run, as for a placed block: a redstone torch powers its wire, a piston beside a torch extends, a placed flowing source, id 8 or 10, then flows); with `raw`, `setBlockAndMetadata` without neighbour updates, the metadata forced again (`onBlockAdded`, e.g. a rail's, may change it) and the block marked for re-render: shapes the game would not keep (a lone curved rail, a powered wire with no source). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks) |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

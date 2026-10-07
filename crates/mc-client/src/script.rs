@@ -262,20 +262,30 @@ pub enum Action {
         #[serde(default)]
         ahead: Option<f64>,
     },
-    /// Dev (WP-3.3b): `world.setBlockAndMetadataWithNotify(x, y, z, id,
-    /// meta)` (so a placed fluid source flows as the simulation runs it).
+    /// Dev (WP-3.3b, WP-3.3d): `world.setBlockAndMetadataWithNotify(x, y,
+    /// z, id, meta)` (the block's `onBlockAdded` and its neighbours'
+    /// `onNeighborBlockChange` run, as for a placed block; a placed fluid
+    /// source flows as the simulation runs it). With `raw`,
+    /// `setBlockAndMetadata` (no neighbour notification; `onBlockAdded`
+    /// still runs), then the metadata forced again with `setBlockMetadata`
+    /// (an `onBlockAdded` such as the rail's may have changed it) and
+    /// `markBlockNeedsUpdate`: a shape the game would not keep (a lone
+    /// curved rail, a powered wire with no source).
     SetBlock {
-        /// Block.
+        /// x.
         x: i32,
-        /// Block.
+        /// y.
         y: i32,
-        /// Block.
+        /// z.
         z: i32,
         /// The block id.
         id: i32,
         /// The metadata.
         #[serde(default)]
         meta: i32,
+        /// No neighbour notification, the metadata forced.
+        #[serde(default)]
+        raw: bool,
     },
 }
 
@@ -750,9 +760,22 @@ pub fn run_script(
                         });
                 }
             }
-            Action::SetBlock { x, y, z, id, meta } => {
+            Action::SetBlock {
+                x,
+                y,
+                z,
+                id,
+                meta,
+                raw,
+            } => {
                 if let Some(w) = game.the_world.as_mut() {
-                    w.set_block_and_metadata_with_notify(x, y, z, id, meta);
+                    if raw {
+                        w.set_block_and_metadata(x, y, z, id, meta);
+                        w.set_block_metadata(x, y, z, meta);
+                        w.mark_block_needs_update(x, y, z);
+                    } else {
+                        w.set_block_and_metadata_with_notify(x, y, z, id, meta);
+                    }
                 }
             }
         }
@@ -968,7 +991,8 @@ mod tests {
                 y: 70,
                 z: -2,
                 id: 9,
-                meta: 0
+                meta: 0,
+                raw: false
             }
         );
         assert_eq!(
@@ -978,7 +1002,39 @@ mod tests {
                 y: 70,
                 z: -2,
                 id: 8,
-                meta: 3
+                meta: 3,
+                raw: false
+            }
+        );
+    }
+
+    #[test]
+    fn parses_the_wp_3_3d_dev_action() {
+        let s = Script::parse(
+            r#"[{"action": "set_block", "x": 1, "y": 64, "z": -2, "id": 66, "meta": 7, "raw": true},
+                {"action": "set_block", "x": 0, "y": 65, "z": 0, "id": 85}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::SetBlock {
+                x: 1,
+                y: 64,
+                z: -2,
+                id: 66,
+                meta: 7,
+                raw: true
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::SetBlock {
+                x: 0,
+                y: 65,
+                z: 0,
+                id: 85,
+                meta: 0,
+                raw: false
             }
         );
     }

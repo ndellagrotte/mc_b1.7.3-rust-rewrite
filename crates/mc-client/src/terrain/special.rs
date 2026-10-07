@@ -72,7 +72,7 @@ pub const PISTON_ROD_TEXTURE: i32 = 108;
 /// (never while a frame is drawn). Every class's answer is constant, so
 /// this needs no world (mc-sim's `dispatch::can_provide_power` reads the
 /// wire's flag from it).
-// src: Block.java:466-468 and the overrides: BlockDetectorRail.java:16-18,
+// src: Block.java:537-539 and the overrides: BlockDetectorRail.java:16-18,
 // BlockRedstoneWire.java:9, :335-337, BlockLever.java:227-229,
 // BlockPressurePlate.java:145-147, BlockRedstoneTorch.java:147-149,
 // BlockButton.java:221-223, BlockRedstoneRepeater.java:127-129
@@ -864,7 +864,9 @@ impl RenderBlocks<'_> {
     /// `renderBlockBed(block, x, y, z)`: render type 14. The bottom 3/16
     /// above the floor in planks, the top turned per direction, and the
     /// four sides except the one that meets the other half
-    /// (`ModelBed.headInvisibleFace`), the side at the bed's end mirrored.
+    /// (`ModelBed.headInvisibleFace`; for the half with bit 8, the
+    /// opposite one), one long side drawn mirrored (`flipTexture`,
+    /// [`bed_flipped_side`]) so both long sides run the same way.
     // src: RenderBlocks.java:134-274
     pub fn render_block_bed(&mut self, id: i32, x: i32, y: i32, z: i32) -> bool {
         let (var2, var3, var4) = (x, y, z);
@@ -1439,8 +1441,8 @@ pub fn bed_top_uvs(tex: i32, var7: i32) -> [[f64; 2]; 4] {
     ]
 }
 
-/// The bed side whose texture is mirrored (`var65`): the foot end's for
-/// each direction (5, 3, 4, 2 for 0-3).
+/// The bed side whose texture is mirrored (`var65`): a long side, 5, 3, 4
+/// or 2 for directions 0-3.
 // src: RenderBlocks.java:213-225
 pub const fn bed_flipped_side(var7: i32) -> i32 {
     // vanilla's switch falls through from case 1 into case 2/default,
@@ -1911,18 +1913,22 @@ mod tests {
 
     #[test]
     fn bed_textures_per_direction() {
-        // (direction, foot) → textures of sides 1 (top), 2, 3, 4, 5
+        // metadata → textures of sides 1 (top), 2, 3, 4, 5. MCP's
+        // `isBlockFootOfBed` (bit 8) is the pillow half: `ItemBed` places the
+        // block with `dir` where clicked and `dir + 8` one step along the
+        // direction (ItemBed.java:14-35); the renderer only asks the bit.
         let st = snap().statics;
         let tex = |meta: i32| -> Vec<i32> {
             (1..6)
                 .map(|side| blocks::get_block_texture_from_side_and_metadata(&st, BED, side, meta))
                 .collect()
         };
-        // head, direction 0 (foot toward -z... head at +z): bedDirection[0]
-        // = {1, 0, 3, 2, 5, 4}: side 2 → 3 (the end: 150 - 1 + 16 = 149),
-        // side 3 → 2 (134), sides 4/5 → 5/4 (150)
+        // bit 8 clear, direction 0: bedDirection[0] = {1, 0, 3, 2, 5, 4}:
+        // side 2 → 3 (the end with the legs, 134 - 1 + 16 = 149), side 3 →
+        // 2 (134, hidden against the other half), sides 4/5 → 5/4 (150)
         assert_eq!(tex(0), vec![134, 149, 134, 150, 150]);
-        // foot (8), direction 0: side 3 → 2 (the end, 134 + 2 + 16 = 152)
+        // bit 8 set (the pillow), direction 0: side 3 → 2 (the end, 134 +
+        // 2 + 16 = 152)
         assert_eq!(tex(8), vec![135, 135, 152, 151, 151]);
         assert_eq!(tex(1), vec![134, 150, 150, 134, 149]);
         assert_eq!(tex(2), vec![134, 134, 149, 150, 150]);
@@ -1952,10 +1958,11 @@ mod tests {
             bed_top_uvs(134, 3),
             [[t.1, t.2], [t.1, t.3], [t.0, t.3], [t.0, t.2]]
         );
-        // drawn: bottom, top and three sides (the fourth meets the foot)
+        // drawn: bottom, top and three sides (+z, side 3, meets the other
+        // half: headInvisibleFace[0])
         let mut s = snap();
         s.set(0, 1, 0, BED, 0, 15, 0);
-        s.set(0, 1, -1, BED, 8, 15, 0);
+        s.set(0, 1, 1, BED, 8, 15, 0);
         let mut r = rb(&s);
         r.set_block_bounds(BED, 0.0, 0.0, 0.0, 1.0, 0.5625, 1.0);
         r.render_block_bed(BED, 0, 1, 0);
