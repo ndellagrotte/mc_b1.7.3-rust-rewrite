@@ -447,8 +447,8 @@ impl SlotList for StatsSlot {
             self.pressed_column = 2;
         }
         if self.pressed_column >= 0 {
-            let w = ctx.game.stats_mut().clone();
-            self.sort_by(self.pressed_column, &w);
+            let w: &StatFileWriter = ctx.game.stats_mut();
+            self.sort_by(self.pressed_column, w);
             ctx.play_sound_fx("random.click", 1.0, 1.0);
         }
     }
@@ -636,7 +636,7 @@ impl Screen for GuiStats {
     fn init_gui(&mut self, ctx: &mut ScreenCtx) {
         self.stats_title = ctx.lang.translate_key("gui.stats");
         let (w, h) = (self.base.width, self.base.height);
-        let writer = ctx.game.stats_mut().clone();
+        let writer: &StatFileWriter = ctx.game.stats_mut();
         let mut g = GeneralSlot::new_slot(w, h);
         g.register_scroll_buttons(1, 1);
         self.general = Some((
@@ -648,10 +648,10 @@ impl Screen for GuiStats {
         ));
         let mut i = StatsSlot::new_slot(w, h);
         i.register_scroll_buttons(1, 1);
-        self.item = Some((i, StatsSlot::new(StatsTable::Item, &writer, w, h)));
+        self.item = Some((i, StatsSlot::new(StatsTable::Item, writer, w, h)));
         let mut b = StatsSlot::new_slot(w, h);
         b.register_scroll_buttons(1, 1);
-        self.block = Some((b, StatsSlot::new(StatsTable::Block, &writer, w, h)));
+        self.block = Some((b, StatsSlot::new(StatsTable::Block, writer, w, h)));
         self.selected_slot = Tab::General;
         self.add_header_buttons(ctx);
     }

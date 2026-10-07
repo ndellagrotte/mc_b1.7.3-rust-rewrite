@@ -63,8 +63,8 @@ pub const WINDOW_H: i32 = 155;
 /// `Block.blockIndexInTexture` of the background's blocks (terrain.png
 /// indices): sand, diamond ore, redstone ore, iron ore, coal ore, stone,
 /// dirt, bedrock.
-// src: Block.java:604 (sand 18), :649 (oreDiamond 50), :665 (oreRedstone
-// 51), :608 (oreIron 33), :609 (oreCoal 34), :593 (stone 1), :595 (dirt
+// src: Block.java:604 (sand 18), :648 (oreDiamond 50), :665 (oreRedstone
+// 51), :607 (oreIron 33), :608 (oreCoal 34), :593 (stone 1), :595 (dirt
 // 2), :599 (bedrock 17)
 mod tile {
     pub const SAND: i32 = 18;
@@ -366,8 +366,14 @@ impl GuiAchievements {
 
         let now = clock::current_time_millis();
         let list: Vec<&'static StatBase> = StatList::get().achievement_list().collect();
-        let stats: StatFileWriter = ctx.game.stats_mut().clone();
-        for var28 in &list {
+        // statFileWriter.hasAchievementUnlocked / canUnlockAchievement for
+        // each achievement, read once through a shared borrow (the reads
+        // have no side effects).
+        let taken: Vec<Taken> = {
+            let stats: &StatFileWriter = ctx.game.stats_mut();
+            list.iter().map(|s| Taken::of(stats, s)).collect()
+        };
+        for (i, var28) in list.iter().enumerate() {
             let Some(a) = var28.achievement() else {
                 continue;
             };
@@ -381,8 +387,8 @@ impl GuiAchievements {
             let var15 = a.display_row * 24 - var5 + 11 + var11;
             let var16 = p.display_column * 24 - var4 + 11 + var10;
             let var17 = p.display_row * 24 - var5 + 11 + var11;
-            let var19 = stats.has_achievement_unlocked(var28);
-            let var20 = stats.can_unlock_achievement(var28);
+            let var19 = taken[i].unlocked;
+            let var20 = taken[i].can_unlock;
             let var38: i32 = if blink(now) > 0.6 { 255 } else { 130 };
             let var33 = if var19 {
                 -9408400
@@ -399,22 +405,23 @@ impl GuiAchievements {
             fill_clipped(g, clip, var16, a + 1, var16 + 1, b, var33);
         }
 
-        let mut var27: Option<&'static StatBase> = None;
+        let mut var27: Option<(&'static StatBase, Taken)> = None;
         // RenderHelper.enableStandardItemLighting() under a 180° X rotation:
         // the item renderer's (module docs).
         g.disable(gl::LIGHTING);
         g.enable(gl::RESCALE_NORMAL);
-        for var30 in &list {
+        for (i, var30) in list.iter().enumerate() {
+            let t = taken[i];
             let Some(a) = var30.achievement() else {
                 continue;
             };
             let var16 = a.display_column * 24 - var4;
             let var17 = a.display_row * 24 - var5;
             if var16 >= -24 && var17 >= -24 && var16 <= 224 && var17 <= 155 {
-                if stats.has_achievement_unlocked(var30) {
+                if t.unlocked {
                     let var35 = 1.0f32;
                     g.color4f(var35, var35, var35, 1.0);
-                } else if stats.can_unlock_achievement(var30) {
+                } else if t.can_unlock {
                     let var35 = if blink(now) < 0.6 { 0.6f32 } else { 0.8f32 };
                     g.color4f(var35, var35, var35, 1.0);
                 } else {
@@ -440,7 +447,7 @@ impl GuiAchievements {
                 // var29.field_27004_a: colorize the icon unless it cannot
                 // be taken yet (then it keeps the 0.1 grey).
                 let mut colorize = true;
-                if !stats.can_unlock_achievement(var30) {
+                if !t.can_unlock {
                     let var36 = 0.1f32;
                     g.color4f(var36, var36, var36, 1.0);
                     colorize = false;
@@ -472,7 +479,7 @@ impl GuiAchievements {
                     && var2 >= var34
                     && var2 <= var34 + 22
                 {
-                    var27 = Some(var30);
+                    var27 = Some((var30, t));
                 }
             }
         }
@@ -496,8 +503,8 @@ impl GuiAchievements {
         g.disable(gl::DEPTH_TEST);
         g.enable(gl::TEXTURE_2D);
         default_draw_screen(&mut self.base, ctx, g, var1, var2);
-        if let Some(var27) = var27 {
-            self.draw_tooltip(ctx, g, &stats, var27, var1, var2);
+        if let Some((var27, t)) = var27 {
+            self.draw_tooltip(ctx, g, t, var27, var1, var2);
         }
         g.enable(gl::DEPTH_TEST);
         g.enable(gl::LIGHTING);
@@ -509,7 +516,7 @@ impl GuiAchievements {
         &self,
         ctx: &mut ScreenCtx,
         g: &mut GuiGl,
-        stats: &StatFileWriter,
+        t: Taken,
         var27: &StatBase,
         var1: i32,
         var2: i32,
@@ -522,10 +529,10 @@ impl GuiAchievements {
         let var17 = var1 + 12;
         let var33 = var2 - 4;
         let special = var27.achievement().is_some_and(|a| a.get_special());
-        if stats.can_unlock_achievement(var27) {
+        if t.can_unlock {
             let var34 = f.get_string_width(&var31).max(120);
             let mut var37 = f.split_string_width(&var32, var34);
-            if stats.has_achievement_unlocked(var27) {
+            if t.unlocked {
                 var37 += 12;
             }
             draw::draw_gradient_rect(
@@ -538,7 +545,7 @@ impl GuiAchievements {
                 -1073741824,
             );
             f.draw_split_string(g, &var32, var17, var33 + 12, var34, -6250336);
-            if stats.has_achievement_unlocked(var27) {
+            if t.unlocked {
                 f.draw_string_with_shadow(
                     g,
                     &lang.translate_key("achievement.taken"),
@@ -568,7 +575,7 @@ impl GuiAchievements {
             );
             f.draw_split_string(g, &var39, var17, var33 + 12, var34, -9416624);
         }
-        let color = if stats.can_unlock_achievement(var27) {
+        let color = if t.can_unlock {
             if special { -128 } else { -1 }
         } else if special {
             -8355776
@@ -576,6 +583,24 @@ impl GuiAchievements {
             -8355712
         };
         f.draw_string_with_shadow(g, &var31, var17, var33, color);
+    }
+}
+
+/// One achievement's state in `mc.statFileWriter`.
+#[derive(Clone, Copy, Debug)]
+struct Taken {
+    /// `hasAchievementUnlocked`.
+    unlocked: bool,
+    /// `canUnlockAchievement`.
+    can_unlock: bool,
+}
+
+impl Taken {
+    fn of(stats: &StatFileWriter, s: &StatBase) -> Self {
+        Taken {
+            unlocked: stats.has_achievement_unlocked(s),
+            can_unlock: stats.can_unlock_achievement(s),
+        }
     }
 }
 

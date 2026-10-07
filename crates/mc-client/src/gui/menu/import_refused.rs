@@ -115,9 +115,13 @@ impl Screen for GuiImportRefused {
         }
     }
 
-    /// `GuiErrorScreen.drawScreen`'s layout: the title at `height / 4 - 40`,
-    /// the text from `height / 4` at `width / 2 - 150`.
-    // src: GuiErrorScreen.java:19-30 (the layout followed)
+    /// After `GuiErrorScreen.drawScreen` (a centred white title, grey text
+    /// below), with this dialog's own geometry: the title centred at
+    /// `height / 4 - 40`, the text from `height / 4 - 10` at
+    /// `width / 2 - 150`, each line wrapped to [`WRAP`] (300) and an empty
+    /// line skipping 9 pixels. (`GuiErrorScreen` itself draws its text at
+    /// `width / 2 - 140` from `height / 4`.)
+    // src: GuiErrorScreen.java:19-30 (the style followed)
     fn draw_screen(&mut self, ctx: &mut ScreenCtx, g: &mut GuiGl, mx: i32, my: i32, _p: f32) {
         draw_default_background(&self.base, ctx, g);
         let (w, h) = (self.base.width, self.base.height);

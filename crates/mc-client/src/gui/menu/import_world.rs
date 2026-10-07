@@ -16,8 +16,6 @@
 //! edge). Escape returns to the select-world screen (a vanilla screen's
 //! Escape closes every menu).
 
-#![allow(clippy::disallowed_methods)]
-
 use std::path::PathBuf;
 
 use super::display_parent;

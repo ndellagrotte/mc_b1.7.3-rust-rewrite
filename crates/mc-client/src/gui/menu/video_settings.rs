@@ -17,7 +17,7 @@ use crate::gui::widgets::button::GuiButton;
 use crate::settings::EnumOptions;
 
 /// `GuiVideoSettings.videoOptions`.
-// src: GuiVideoSettings.java:131-133
+// src: GuiVideoSettings.java:60-62
 pub const VIDEO_OPTIONS: [EnumOptions; 8] = [
     EnumOptions::Graphics,
     EnumOptions::RenderDistance,
@@ -61,7 +61,7 @@ impl Screen for GuiVideoSettings {
         ScreenKind::Other("GuiVideoSettings".into())
     }
 
-    // src: GuiVideoSettings.java:14-32
+    // src: GuiVideoSettings.java:14-33
     fn init_gui(&mut self, ctx: &mut ScreenCtx) {
         let var1 = ctx.lang;
         self.screen_title = var1.translate_key("options.videoTitle");
@@ -76,7 +76,7 @@ impl Screen for GuiVideoSettings {
         ));
     }
 
-    // src: GuiVideoSettings.java:34-51
+    // src: GuiVideoSettings.java:35-52
     fn action_performed(&mut self, ctx: &mut ScreenCtx, button: usize) {
         if !self.base.control_list[button].enabled {
             return;
@@ -95,7 +95,7 @@ impl Screen for GuiVideoSettings {
         set_world_and_resolution(self, ctx, var2.scaled_width, var2.scaled_height);
     }
 
-    // src: GuiVideoSettings.java:53-57
+    // src: GuiVideoSettings.java:54-58
     fn draw_screen(&mut self, ctx: &mut ScreenCtx, g: &mut GuiGl, mx: i32, my: i32, _p: f32) {
         draw_default_background(&self.base, ctx, g);
         draw::draw_centered_string(

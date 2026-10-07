@@ -73,7 +73,7 @@ pub fn option_buttons(
 /// The option buttons' `actionPerformed` half: a `GuiSmallButton` with an
 /// id below 100 steps its option (`setOptionValue(option, 1)`) and shows
 /// the new label (`getKeyBinding(EnumOptions.getEnumOptions(id))`).
-// src: GuiOptions.java:39-42, GuiVideoSettings.java:108-111
+// src: GuiOptions.java:39-42, GuiVideoSettings.java:37-40
 pub fn step_option_button(ctx: &mut ScreenCtx, b: &mut GuiButton) {
     if b.id < 100
         && let ButtonKind::Small { enum_options } = b.kind
