@@ -1,9 +1,9 @@
-//! The redstone-block paths the tick fixtures cannot reach yet (WP-1.6 task
-//! c): the placement hooks only items call (`onBlockPlaced`,
-//! `onBlockPlacedBy`; `tests/golden/tick/redstone-item-placement` pins them
-//! against the oracle once `Item.onItemUse` lands, WP-2.6), the left-click
-//! and walking hooks (no op for them), and the item-render bounds (client
-//! only). Expected values are read off the Java bodies cited per test.
+//! Redstone-block paths checked by hand (WP-1.6 task c): the placement
+//! hooks only items call (`onBlockPlaced`, `onBlockPlacedBy`; since WP-2.6
+//! they are also pinned against the oracle by `tests/golden/tick/`
+//! `redstone-item-placement`, `block-item-placement` and
+//! `place-stairs-slabs-doors-beds-signs`), the left-click and walking hooks
+//! (no op for them), and the item-render bounds (client only). Expected values are read off the Java bodies cited per test.
 
 use mc_core::java_random::JavaRandom;
 use mc_sim::block::dispatch as d;

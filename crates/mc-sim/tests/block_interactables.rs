@@ -1,7 +1,9 @@
 //! WP-1.6 task f: unit tests for the parts of the door, bed, ladder, cake,
-//! portal, fence, stairs, slab, workbench and locked-chest behaviour that no
-//! golden fixture reaches yet (placement tests that only items call, WP-2.6;
-//! the client-side face and texture queries; `getNearestEmptyChunkCoordinates`,
+//! portal, fence, stairs, slab, workbench and locked-chest behaviour checked
+//! by hand (the placement hooks only items call, since WP-2.6 also pinned by
+//! `tests/golden/tick/` `block-item-placement`, `redstone-item-placement`
+//! and `place-stairs-slabs-doors-beds-signs`; the client-side face and
+//! texture queries; `getNearestEmptyChunkCoordinates`,
 //! which only `EntityPlayer` calls, WP-2.5), against values derived by hand
 //! from the Java. The world-side behaviour is pinned by `tests/golden/tick/`
 //! `door-*`, `trapdoor-toggle`, `bed-*`, `ladder-placement`, `cake-eat`,

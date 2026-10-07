@@ -297,7 +297,7 @@ pub fn sign_on_item_use(
             Some(crate::world::tile_entity::TileEntityKindData::Sign(_))
         )
     }) {
-        // var2.displayGUIEditSign(var8): EntityPlayer.java:448-449 is empty;
+        // var2.displayGUIEditSign(var8): EntityPlayer.java:454-455 is empty;
         // EntityPlayerSP opens GuiEditSign (client GUI, Phase 3).
         var3.note_unimplemented("EntityPlayerSP.displayGUIEditSign");
     }

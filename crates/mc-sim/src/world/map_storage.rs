@@ -33,6 +33,12 @@
 //!   compound `data` (MapStorage.java:41-43, :88-93); `idcounts.dat` is
 //!   uncompressed NBT, one `TAG_Short` per key (:110-125, :146-158).
 //!
+//! # Not ported
+//!
+//! `MapData.updateMPMapData` (MapData.java:125-148), the multiplayer
+//! client's decode of a map packet (colour columns, or the marker list), is
+//! not ported (D3), like `ItemMap.getMPMapData`'s caller.
+//!
 //! # Errors
 //!
 //! Every file error is caught and printed in Java (`printStackTrace`), so

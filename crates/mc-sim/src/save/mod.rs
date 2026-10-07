@@ -289,22 +289,17 @@ pub trait SaveHandler {
     /// `getMapFile(name) != null`: whether the handler has a map data
     /// directory. False (`SaveHandlerMP`, SaveHandlerMP.java:24-26) means
     /// `MapStorage` reads and writes nothing.
-    fn has_map_files(&self) -> bool {
-        false
-    }
+    ///
+    /// The three map-file methods have no default body, so a wrapping
+    /// handler (the golden harness's) cannot silently lose them.
+    fn has_map_files(&self) -> bool;
     /// The bytes of `getMapFile(name)` (`data/<name>.dat`), `Ok(None)` when
     /// the file does not exist (`File.exists()` false) or there is no map
     /// directory.
-    fn read_map_file(&mut self, name: &str) -> Result<Option<Vec<u8>>, SaveError> {
-        let _ = name;
-        Ok(None)
-    }
+    fn read_map_file(&mut self, name: &str) -> Result<Option<Vec<u8>>, SaveError>;
     /// Writes `getMapFile(name)` (a `FileOutputStream` over it); nothing
     /// without a map directory.
-    fn write_map_file(&mut self, name: &str, bytes: &[u8]) -> Result<(), SaveError> {
-        let _ = (name, bytes);
-        Ok(())
-    }
+    fn write_map_file(&mut self, name: &str, bytes: &[u8]) -> Result<(), SaveError>;
 }
 
 /// `SaveHandlerMP` (SaveHandlerMP.java): saves nothing, loads nothing.
@@ -334,6 +329,18 @@ impl SaveHandler for NoSave {
     }
     // src: SaveHandlerMP.java:20-21
     fn save_world_info(&mut self, _info: &WorldInfo) -> Result<(), SaveError> {
+        Ok(())
+    }
+    // src: SaveHandlerMP.java:24-26 (getMapFile returns null)
+    fn has_map_files(&self) -> bool {
+        false
+    }
+    // src: SaveHandlerMP.java:24-26
+    fn read_map_file(&mut self, _name: &str) -> Result<Option<Vec<u8>>, SaveError> {
+        Ok(None)
+    }
+    // src: SaveHandlerMP.java:24-26
+    fn write_map_file(&mut self, _name: &str, _bytes: &[u8]) -> Result<(), SaveError> {
         Ok(())
     }
 }

@@ -323,6 +323,18 @@ impl SaveHandler for HarnessSaveHandler {
     fn save_world_info(&mut self, info: &WorldInfo) -> Result<(), SaveError> {
         self.0.save_world_info(info)
     }
+    // The oracle's SaveOldDir inherits SaveHandler.getMapFile, never null
+    // (SaveHandler.java:23-24, :167-169): idcounts.dat and data/map_N.dat
+    // are read and written in "mcregion" and "world": "load" scenarios.
+    fn has_map_files(&self) -> bool {
+        self.0.has_map_files()
+    }
+    fn read_map_file(&mut self, name: &str) -> Result<Option<Vec<u8>>, SaveError> {
+        self.0.read_map_file(name)
+    }
+    fn write_map_file(&mut self, name: &str, bytes: &[u8]) -> Result<(), SaveError> {
+        self.0.write_map_file(name, bytes)
+    }
 }
 
 /// `HarnessWorld.create`: `new World(handler, "harness", provider, seed)`,
