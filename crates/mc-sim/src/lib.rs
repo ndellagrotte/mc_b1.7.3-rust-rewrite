@@ -15,6 +15,7 @@
 //! | [`tick`] | `World.tick` and its block systems, `World.randomDisplayUpdates` | `impl World` |
 //! | [`tile_entity`] | `TileEntity*` subclasses, `FurnaceRecipes`, `IInventory` | data in `world::tile_entity::TileEntityKindData`, behaviour and NBT as free functions over a `TileEntityRef` (WP-1.8) |
 //! | [`spawner`] | `SpawnerAnimals`, `EnumCreatureType` | free functions over `&mut World` |
+//! | [`stats`] | `StatBase` + subclasses, `StatList`, `Achievement*`, `StatFileWriter` | the registries as a lazily built [`stats::StatList`]; the local player's stat file (WP-2.7) |
 //! | [`entity`] | `Entity` + subclasses | `Entity { base, kind }`, per-class modules, [`entity::dispatch`], take/put-back driver |
 //! | [`inventory`] | `InventoryPlayer`, `IInventory` implementations, `Container*`, `Slot*` | inventories and container click logic (WP-2.5); `IInventory` references are [`inventory::InventoryRef`] |
 //! | [`crafting`] | `CraftingManager`, `IRecipe`, `ShapedRecipes`, `ShapelessRecipes`, `RecipeSorter`, `Recipes*` | the sorted recipe list (151) and matching (WP-2.5) |
@@ -47,6 +48,7 @@ pub mod item;
 pub mod player_controller;
 pub mod save;
 pub mod spawner;
+pub mod stats;
 pub mod tick;
 pub mod tile_entity;
 pub mod world;

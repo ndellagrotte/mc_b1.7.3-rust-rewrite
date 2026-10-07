@@ -9,6 +9,8 @@ description = "Plain-Rust simulation of Minecraft Beta 1.7.3: blocks, items, wor
 [dependencies]
 mc-core = { path = "../mc-core" }
 mc-nbt = { path = "../mc-nbt" }
+# The stats file's JSON (StatFileWriter.func_27177_a; Argo replaced per PLAN_v4 §5).
+serde_json.workspace = true
 
 [lints]
 workspace = true

@@ -1,0 +1,649 @@
+{"t":0,"e":"stat_count","listed":467,"oneShot":486,"generalStats":23,"itemStats":106,"objectMineStats":68,"achievements":16}
+{"t":0,"e":"stat","i":0,"statId":1000,"name":"stat.startGame","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":1,"statId":1001,"name":"stat.createWorld","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":2,"statId":1002,"name":"stat.loadWorld","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":3,"statId":1003,"name":"stat.joinMultiplayer","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":4,"statId":1004,"name":"stat.leaveGame","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":5,"statId":1100,"name":"stat.playOneMinute","class":"StatBasic","type":"StatTypeTime","isIndependent":true}
+{"t":0,"e":"stat","i":6,"statId":2000,"name":"stat.walkOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":7,"statId":2001,"name":"stat.swimOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":8,"statId":2002,"name":"stat.fallOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":9,"statId":2003,"name":"stat.climbOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":10,"statId":2004,"name":"stat.flyOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":11,"statId":2005,"name":"stat.diveOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":12,"statId":2006,"name":"stat.minecartOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":13,"statId":2007,"name":"stat.boatOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":14,"statId":2008,"name":"stat.pigOneCm","class":"StatBasic","type":"StatTypeDistance","isIndependent":true}
+{"t":0,"e":"stat","i":15,"statId":2010,"name":"stat.jump","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":16,"statId":2011,"name":"stat.drop","class":"StatBasic","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":17,"statId":2020,"name":"stat.damageDealt","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":18,"statId":2021,"name":"stat.damageTaken","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":19,"statId":2022,"name":"stat.deaths","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":20,"statId":2023,"name":"stat.mobKills","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":21,"statId":2024,"name":"stat.playerKills","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":22,"statId":2025,"name":"stat.fishCaught","class":"StatBasic","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":23,"statId":16777217,"name":"stat.mineBlock(tile.stone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":1}
+{"t":0,"e":"stat","i":24,"statId":16777219,"name":"stat.mineBlock(tile.dirt.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":3}
+{"t":0,"e":"stat","i":25,"statId":16777220,"name":"stat.mineBlock(tile.stonebrick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":4}
+{"t":0,"e":"stat","i":26,"statId":16777221,"name":"stat.mineBlock(tile.wood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":5}
+{"t":0,"e":"stat","i":27,"statId":16777222,"name":"stat.mineBlock(tile.sapling.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":6}
+{"t":0,"e":"stat","i":28,"statId":16777228,"name":"stat.mineBlock(tile.sand.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":12}
+{"t":0,"e":"stat","i":29,"statId":16777229,"name":"stat.mineBlock(tile.gravel.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":13}
+{"t":0,"e":"stat","i":30,"statId":16777230,"name":"stat.mineBlock(tile.oreGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":14}
+{"t":0,"e":"stat","i":31,"statId":16777231,"name":"stat.mineBlock(tile.oreIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":15}
+{"t":0,"e":"stat","i":32,"statId":16777232,"name":"stat.mineBlock(tile.oreCoal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":16}
+{"t":0,"e":"stat","i":33,"statId":16777233,"name":"stat.mineBlock(tile.log.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":17}
+{"t":0,"e":"stat","i":34,"statId":16777235,"name":"stat.mineBlock(tile.sponge.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":19}
+{"t":0,"e":"stat","i":35,"statId":16777236,"name":"stat.mineBlock(tile.glass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":20}
+{"t":0,"e":"stat","i":36,"statId":16777237,"name":"stat.mineBlock(tile.oreLapis.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":21}
+{"t":0,"e":"stat","i":37,"statId":16777238,"name":"stat.mineBlock(tile.blockLapis.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":22}
+{"t":0,"e":"stat","i":38,"statId":16777239,"name":"stat.mineBlock(tile.dispenser.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":23}
+{"t":0,"e":"stat","i":39,"statId":16777240,"name":"stat.mineBlock(tile.sandStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":24}
+{"t":0,"e":"stat","i":40,"statId":16777241,"name":"stat.mineBlock(tile.musicBlock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":25}
+{"t":0,"e":"stat","i":41,"statId":16777243,"name":"stat.mineBlock(tile.goldenRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":27}
+{"t":0,"e":"stat","i":42,"statId":16777244,"name":"stat.mineBlock(tile.detectorRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":28}
+{"t":0,"e":"stat","i":43,"statId":16777245,"name":"stat.mineBlock(tile.pistonStickyBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":29}
+{"t":0,"e":"stat","i":44,"statId":16777246,"name":"stat.mineBlock(tile.web.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":30}
+{"t":0,"e":"stat","i":45,"statId":16777247,"name":"stat.mineBlock(tile.tallgrass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":31}
+{"t":0,"e":"stat","i":46,"statId":16777248,"name":"stat.mineBlock(tile.deadbush.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":32}
+{"t":0,"e":"stat","i":47,"statId":16777249,"name":"stat.mineBlock(tile.pistonBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":33}
+{"t":0,"e":"stat","i":48,"statId":16777250,"name":"stat.mineBlock(null.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":34}
+{"t":0,"e":"stat","i":49,"statId":16777251,"name":"stat.mineBlock(tile.cloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":35}
+{"t":0,"e":"stat","i":50,"statId":16777252,"name":"stat.mineBlock(null.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":36}
+{"t":0,"e":"stat","i":51,"statId":16777253,"name":"stat.mineBlock(tile.flower.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":37}
+{"t":0,"e":"stat","i":52,"statId":16777254,"name":"stat.mineBlock(tile.rose.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":38}
+{"t":0,"e":"stat","i":53,"statId":16777255,"name":"stat.mineBlock(tile.mushroom.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":39}
+{"t":0,"e":"stat","i":54,"statId":16777257,"name":"stat.mineBlock(tile.blockGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":41}
+{"t":0,"e":"stat","i":55,"statId":16777258,"name":"stat.mineBlock(tile.blockIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":42}
+{"t":0,"e":"stat","i":56,"statId":16777260,"name":"stat.mineBlock(tile.stoneSlab.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":44}
+{"t":0,"e":"stat","i":57,"statId":16777261,"name":"stat.mineBlock(tile.brick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":45}
+{"t":0,"e":"stat","i":58,"statId":16777262,"name":"stat.mineBlock(tile.tnt.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":46}
+{"t":0,"e":"stat","i":59,"statId":16777263,"name":"stat.mineBlock(tile.bookshelf.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":47}
+{"t":0,"e":"stat","i":60,"statId":16777264,"name":"stat.mineBlock(tile.stoneMoss.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":48}
+{"t":0,"e":"stat","i":61,"statId":16777265,"name":"stat.mineBlock(tile.obsidian.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":49}
+{"t":0,"e":"stat","i":62,"statId":16777266,"name":"stat.mineBlock(tile.torch.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":50}
+{"t":0,"e":"stat","i":63,"statId":16777269,"name":"stat.mineBlock(tile.stairsWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":53}
+{"t":0,"e":"stat","i":64,"statId":16777270,"name":"stat.mineBlock(tile.chest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":54}
+{"t":0,"e":"stat","i":65,"statId":16777272,"name":"stat.mineBlock(tile.oreDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":56}
+{"t":0,"e":"stat","i":66,"statId":16777273,"name":"stat.mineBlock(tile.blockDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":57}
+{"t":0,"e":"stat","i":67,"statId":16777274,"name":"stat.mineBlock(tile.workbench.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":58}
+{"t":0,"e":"stat","i":68,"statId":16777277,"name":"stat.mineBlock(tile.furnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":61}
+{"t":0,"e":"stat","i":69,"statId":16777281,"name":"stat.mineBlock(tile.ladder.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":65}
+{"t":0,"e":"stat","i":70,"statId":16777282,"name":"stat.mineBlock(tile.rail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":66}
+{"t":0,"e":"stat","i":71,"statId":16777283,"name":"stat.mineBlock(tile.stairsStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":67}
+{"t":0,"e":"stat","i":72,"statId":16777285,"name":"stat.mineBlock(tile.lever.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":69}
+{"t":0,"e":"stat","i":73,"statId":16777286,"name":"stat.mineBlock(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":70}
+{"t":0,"e":"stat","i":74,"statId":16777288,"name":"stat.mineBlock(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":72}
+{"t":0,"e":"stat","i":75,"statId":16777289,"name":"stat.mineBlock(tile.oreRedstone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":73}
+{"t":0,"e":"stat","i":76,"statId":16777291,"name":"stat.mineBlock(tile.notGate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":75}
+{"t":0,"e":"stat","i":77,"statId":16777293,"name":"stat.mineBlock(tile.button.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":77}
+{"t":0,"e":"stat","i":78,"statId":16777294,"name":"stat.mineBlock(tile.snow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":78}
+{"t":0,"e":"stat","i":79,"statId":16777295,"name":"stat.mineBlock(tile.ice.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":79}
+{"t":0,"e":"stat","i":80,"statId":16777296,"name":"stat.mineBlock(tile.snow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":80}
+{"t":0,"e":"stat","i":81,"statId":16777297,"name":"stat.mineBlock(tile.cactus.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":81}
+{"t":0,"e":"stat","i":82,"statId":16777298,"name":"stat.mineBlock(tile.clay.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":82}
+{"t":0,"e":"stat","i":83,"statId":16777300,"name":"stat.mineBlock(tile.jukebox.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":84}
+{"t":0,"e":"stat","i":84,"statId":16777301,"name":"stat.mineBlock(tile.fence.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":85}
+{"t":0,"e":"stat","i":85,"statId":16777302,"name":"stat.mineBlock(tile.pumpkin.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":86}
+{"t":0,"e":"stat","i":86,"statId":16777303,"name":"stat.mineBlock(tile.hellrock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":87}
+{"t":0,"e":"stat","i":87,"statId":16777304,"name":"stat.mineBlock(tile.hellsand.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":88}
+{"t":0,"e":"stat","i":88,"statId":16777305,"name":"stat.mineBlock(tile.lightgem.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":89}
+{"t":0,"e":"stat","i":89,"statId":16777306,"name":"stat.mineBlock(tile.portal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":90}
+{"t":0,"e":"stat","i":90,"statId":16777311,"name":"stat.mineBlock(tile.lockedchest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":95}
+{"t":0,"e":"stat","i":91,"statId":5242880,"name":"achievement.openInventory","class":"Achievement","type":"StatTypeSimple","isIndependent":true}
+{"t":0,"e":"stat","i":92,"statId":5242881,"name":"achievement.mineWood","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":93,"statId":5242882,"name":"achievement.buildWorkBench","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":94,"statId":5242883,"name":"achievement.buildPickaxe","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":95,"statId":5242884,"name":"achievement.buildFurnace","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":96,"statId":5242885,"name":"achievement.acquireIron","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":97,"statId":5242886,"name":"achievement.buildHoe","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":98,"statId":5242887,"name":"achievement.makeBread","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":99,"statId":5242888,"name":"achievement.bakeCake","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":100,"statId":5242889,"name":"achievement.buildBetterPickaxe","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":101,"statId":5242890,"name":"achievement.cookFish","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":102,"statId":5242891,"name":"achievement.onARail","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":103,"statId":5242892,"name":"achievement.buildSword","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":104,"statId":5242893,"name":"achievement.killEnemy","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":105,"statId":5242894,"name":"achievement.killCow","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":106,"statId":5242895,"name":"achievement.flyPig","class":"Achievement","type":"StatTypeSimple","isIndependent":false}
+{"t":0,"e":"stat","i":107,"statId":16908544,"name":"stat.useItem(item.shovelIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":256}
+{"t":0,"e":"stat","i":108,"statId":16908545,"name":"stat.useItem(item.pickaxeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":257}
+{"t":0,"e":"stat","i":109,"statId":16908546,"name":"stat.useItem(item.hatchetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":258}
+{"t":0,"e":"stat","i":110,"statId":16908547,"name":"stat.useItem(item.flintAndSteel.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":259}
+{"t":0,"e":"stat","i":111,"statId":16908548,"name":"stat.useItem(item.apple.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":260}
+{"t":0,"e":"stat","i":112,"statId":16908549,"name":"stat.useItem(item.bow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":261}
+{"t":0,"e":"stat","i":113,"statId":16908550,"name":"stat.useItem(item.arrow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":262}
+{"t":0,"e":"stat","i":114,"statId":16908551,"name":"stat.useItem(item.coal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":263}
+{"t":0,"e":"stat","i":115,"statId":16908552,"name":"stat.useItem(item.emerald.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":264}
+{"t":0,"e":"stat","i":116,"statId":16908553,"name":"stat.useItem(item.ingotIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":265}
+{"t":0,"e":"stat","i":117,"statId":16908554,"name":"stat.useItem(item.ingotGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":266}
+{"t":0,"e":"stat","i":118,"statId":16908555,"name":"stat.useItem(item.swordIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":267}
+{"t":0,"e":"stat","i":119,"statId":16908556,"name":"stat.useItem(item.swordWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":268}
+{"t":0,"e":"stat","i":120,"statId":16908557,"name":"stat.useItem(item.shovelWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":269}
+{"t":0,"e":"stat","i":121,"statId":16908558,"name":"stat.useItem(item.pickaxeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":270}
+{"t":0,"e":"stat","i":122,"statId":16908559,"name":"stat.useItem(item.hatchetWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":271}
+{"t":0,"e":"stat","i":123,"statId":16908560,"name":"stat.useItem(item.swordStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":272}
+{"t":0,"e":"stat","i":124,"statId":16908561,"name":"stat.useItem(item.shovelStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":273}
+{"t":0,"e":"stat","i":125,"statId":16908562,"name":"stat.useItem(item.pickaxeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":274}
+{"t":0,"e":"stat","i":126,"statId":16908563,"name":"stat.useItem(item.hatchetStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":275}
+{"t":0,"e":"stat","i":127,"statId":16908564,"name":"stat.useItem(item.swordDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":276}
+{"t":0,"e":"stat","i":128,"statId":16908565,"name":"stat.useItem(item.shovelDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":277}
+{"t":0,"e":"stat","i":129,"statId":16908566,"name":"stat.useItem(item.pickaxeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":278}
+{"t":0,"e":"stat","i":130,"statId":16908567,"name":"stat.useItem(item.hatchetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":279}
+{"t":0,"e":"stat","i":131,"statId":16908568,"name":"stat.useItem(item.stick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":280}
+{"t":0,"e":"stat","i":132,"statId":16908569,"name":"stat.useItem(item.bowl.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":281}
+{"t":0,"e":"stat","i":133,"statId":16908570,"name":"stat.useItem(item.mushroomStew.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":282}
+{"t":0,"e":"stat","i":134,"statId":16908571,"name":"stat.useItem(item.swordGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":283}
+{"t":0,"e":"stat","i":135,"statId":16908572,"name":"stat.useItem(item.shovelGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":284}
+{"t":0,"e":"stat","i":136,"statId":16908573,"name":"stat.useItem(item.pickaxeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":285}
+{"t":0,"e":"stat","i":137,"statId":16908574,"name":"stat.useItem(item.hatchetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":286}
+{"t":0,"e":"stat","i":138,"statId":16908575,"name":"stat.useItem(item.string.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":287}
+{"t":0,"e":"stat","i":139,"statId":16908576,"name":"stat.useItem(item.feather.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":288}
+{"t":0,"e":"stat","i":140,"statId":16908577,"name":"stat.useItem(item.sulphur.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":289}
+{"t":0,"e":"stat","i":141,"statId":16908578,"name":"stat.useItem(item.hoeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":290}
+{"t":0,"e":"stat","i":142,"statId":16908579,"name":"stat.useItem(item.hoeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":291}
+{"t":0,"e":"stat","i":143,"statId":16908580,"name":"stat.useItem(item.hoeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":292}
+{"t":0,"e":"stat","i":144,"statId":16908581,"name":"stat.useItem(item.hoeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":293}
+{"t":0,"e":"stat","i":145,"statId":16908582,"name":"stat.useItem(item.hoeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":294}
+{"t":0,"e":"stat","i":146,"statId":16908583,"name":"stat.useItem(item.seeds.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":295}
+{"t":0,"e":"stat","i":147,"statId":16908584,"name":"stat.useItem(item.wheat.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":296}
+{"t":0,"e":"stat","i":148,"statId":16908585,"name":"stat.useItem(item.bread.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":297}
+{"t":0,"e":"stat","i":149,"statId":16908586,"name":"stat.useItem(item.helmetCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":298}
+{"t":0,"e":"stat","i":150,"statId":16908587,"name":"stat.useItem(item.chestplateCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":299}
+{"t":0,"e":"stat","i":151,"statId":16908588,"name":"stat.useItem(item.leggingsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":300}
+{"t":0,"e":"stat","i":152,"statId":16908589,"name":"stat.useItem(item.bootsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":301}
+{"t":0,"e":"stat","i":153,"statId":16908590,"name":"stat.useItem(item.helmetChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":302}
+{"t":0,"e":"stat","i":154,"statId":16908591,"name":"stat.useItem(item.chestplateChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":303}
+{"t":0,"e":"stat","i":155,"statId":16908592,"name":"stat.useItem(item.leggingsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":304}
+{"t":0,"e":"stat","i":156,"statId":16908593,"name":"stat.useItem(item.bootsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":305}
+{"t":0,"e":"stat","i":157,"statId":16908594,"name":"stat.useItem(item.helmetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":306}
+{"t":0,"e":"stat","i":158,"statId":16908595,"name":"stat.useItem(item.chestplateIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":307}
+{"t":0,"e":"stat","i":159,"statId":16908596,"name":"stat.useItem(item.leggingsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":308}
+{"t":0,"e":"stat","i":160,"statId":16908597,"name":"stat.useItem(item.bootsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":309}
+{"t":0,"e":"stat","i":161,"statId":16908598,"name":"stat.useItem(item.helmetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":310}
+{"t":0,"e":"stat","i":162,"statId":16908599,"name":"stat.useItem(item.chestplateDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":311}
+{"t":0,"e":"stat","i":163,"statId":16908600,"name":"stat.useItem(item.leggingsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":312}
+{"t":0,"e":"stat","i":164,"statId":16908601,"name":"stat.useItem(item.bootsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":313}
+{"t":0,"e":"stat","i":165,"statId":16908602,"name":"stat.useItem(item.helmetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":314}
+{"t":0,"e":"stat","i":166,"statId":16908603,"name":"stat.useItem(item.chestplateGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":315}
+{"t":0,"e":"stat","i":167,"statId":16908604,"name":"stat.useItem(item.leggingsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":316}
+{"t":0,"e":"stat","i":168,"statId":16908605,"name":"stat.useItem(item.bootsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":317}
+{"t":0,"e":"stat","i":169,"statId":16908606,"name":"stat.useItem(item.flint.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":318}
+{"t":0,"e":"stat","i":170,"statId":16908607,"name":"stat.useItem(item.porkchopRaw.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":319}
+{"t":0,"e":"stat","i":171,"statId":16908608,"name":"stat.useItem(item.porkchopCooked.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":320}
+{"t":0,"e":"stat","i":172,"statId":16908609,"name":"stat.useItem(item.painting.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":321}
+{"t":0,"e":"stat","i":173,"statId":16908610,"name":"stat.useItem(item.appleGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":322}
+{"t":0,"e":"stat","i":174,"statId":16908611,"name":"stat.useItem(item.sign.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":323}
+{"t":0,"e":"stat","i":175,"statId":16908612,"name":"stat.useItem(item.doorWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":324}
+{"t":0,"e":"stat","i":176,"statId":16908613,"name":"stat.useItem(item.bucket.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":325}
+{"t":0,"e":"stat","i":177,"statId":16908614,"name":"stat.useItem(item.bucketWater.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":326}
+{"t":0,"e":"stat","i":178,"statId":16908615,"name":"stat.useItem(item.bucketLava.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":327}
+{"t":0,"e":"stat","i":179,"statId":16908616,"name":"stat.useItem(item.minecart.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":328}
+{"t":0,"e":"stat","i":180,"statId":16908617,"name":"stat.useItem(item.saddle.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":329}
+{"t":0,"e":"stat","i":181,"statId":16908618,"name":"stat.useItem(item.doorIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":330}
+{"t":0,"e":"stat","i":182,"statId":16908619,"name":"stat.useItem(item.redstone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":331}
+{"t":0,"e":"stat","i":183,"statId":16908620,"name":"stat.useItem(item.snowball.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":332}
+{"t":0,"e":"stat","i":184,"statId":16908621,"name":"stat.useItem(item.boat.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":333}
+{"t":0,"e":"stat","i":185,"statId":16908622,"name":"stat.useItem(item.leather.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":334}
+{"t":0,"e":"stat","i":186,"statId":16908623,"name":"stat.useItem(item.milk.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":335}
+{"t":0,"e":"stat","i":187,"statId":16908624,"name":"stat.useItem(item.brick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":336}
+{"t":0,"e":"stat","i":188,"statId":16908625,"name":"stat.useItem(item.clay.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":337}
+{"t":0,"e":"stat","i":189,"statId":16908626,"name":"stat.useItem(item.reeds.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":338}
+{"t":0,"e":"stat","i":190,"statId":16908627,"name":"stat.useItem(item.paper.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":339}
+{"t":0,"e":"stat","i":191,"statId":16908628,"name":"stat.useItem(item.book.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":340}
+{"t":0,"e":"stat","i":192,"statId":16908629,"name":"stat.useItem(item.slimeball.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":341}
+{"t":0,"e":"stat","i":193,"statId":16908630,"name":"stat.useItem(item.minecartChest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":342}
+{"t":0,"e":"stat","i":194,"statId":16908631,"name":"stat.useItem(item.minecartFurnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":343}
+{"t":0,"e":"stat","i":195,"statId":16908632,"name":"stat.useItem(item.egg.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":344}
+{"t":0,"e":"stat","i":196,"statId":16908633,"name":"stat.useItem(item.compass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":345}
+{"t":0,"e":"stat","i":197,"statId":16908634,"name":"stat.useItem(item.fishingRod.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":346}
+{"t":0,"e":"stat","i":198,"statId":16908635,"name":"stat.useItem(item.clock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":347}
+{"t":0,"e":"stat","i":199,"statId":16908636,"name":"stat.useItem(item.yellowDust.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":348}
+{"t":0,"e":"stat","i":200,"statId":16908637,"name":"stat.useItem(item.fishRaw.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":349}
+{"t":0,"e":"stat","i":201,"statId":16908638,"name":"stat.useItem(item.fishCooked.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":350}
+{"t":0,"e":"stat","i":202,"statId":16908639,"name":"stat.useItem(item.dyePowder.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":351}
+{"t":0,"e":"stat","i":203,"statId":16908640,"name":"stat.useItem(item.bone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":352}
+{"t":0,"e":"stat","i":204,"statId":16908641,"name":"stat.useItem(item.sugar.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":353}
+{"t":0,"e":"stat","i":205,"statId":16908642,"name":"stat.useItem(item.cake.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":354}
+{"t":0,"e":"stat","i":206,"statId":16908643,"name":"stat.useItem(item.bed.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":355}
+{"t":0,"e":"stat","i":207,"statId":16908644,"name":"stat.useItem(item.diode.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":356}
+{"t":0,"e":"stat","i":208,"statId":16908645,"name":"stat.useItem(item.cookie.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":357}
+{"t":0,"e":"stat","i":209,"statId":16908646,"name":"stat.useItem(item.map.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":358}
+{"t":0,"e":"stat","i":210,"statId":16908647,"name":"stat.useItem(item.shears.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":359}
+{"t":0,"e":"stat","i":211,"statId":16910544,"name":"stat.useItem(item.record.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":2256}
+{"t":0,"e":"stat","i":212,"statId":16910545,"name":"stat.useItem(item.record.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":2257}
+{"t":0,"e":"stat","i":213,"statId":16974080,"name":"stat.breakItem(item.shovelIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":256}
+{"t":0,"e":"stat","i":214,"statId":16974081,"name":"stat.breakItem(item.pickaxeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":257}
+{"t":0,"e":"stat","i":215,"statId":16974082,"name":"stat.breakItem(item.hatchetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":258}
+{"t":0,"e":"stat","i":216,"statId":16974083,"name":"stat.breakItem(item.flintAndSteel.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":259}
+{"t":0,"e":"stat","i":217,"statId":16974091,"name":"stat.breakItem(item.swordIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":267}
+{"t":0,"e":"stat","i":218,"statId":16974092,"name":"stat.breakItem(item.swordWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":268}
+{"t":0,"e":"stat","i":219,"statId":16974093,"name":"stat.breakItem(item.shovelWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":269}
+{"t":0,"e":"stat","i":220,"statId":16974094,"name":"stat.breakItem(item.pickaxeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":270}
+{"t":0,"e":"stat","i":221,"statId":16974095,"name":"stat.breakItem(item.hatchetWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":271}
+{"t":0,"e":"stat","i":222,"statId":16974096,"name":"stat.breakItem(item.swordStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":272}
+{"t":0,"e":"stat","i":223,"statId":16974097,"name":"stat.breakItem(item.shovelStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":273}
+{"t":0,"e":"stat","i":224,"statId":16974098,"name":"stat.breakItem(item.pickaxeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":274}
+{"t":0,"e":"stat","i":225,"statId":16974099,"name":"stat.breakItem(item.hatchetStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":275}
+{"t":0,"e":"stat","i":226,"statId":16974100,"name":"stat.breakItem(item.swordDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":276}
+{"t":0,"e":"stat","i":227,"statId":16974101,"name":"stat.breakItem(item.shovelDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":277}
+{"t":0,"e":"stat","i":228,"statId":16974102,"name":"stat.breakItem(item.pickaxeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":278}
+{"t":0,"e":"stat","i":229,"statId":16974103,"name":"stat.breakItem(item.hatchetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":279}
+{"t":0,"e":"stat","i":230,"statId":16974107,"name":"stat.breakItem(item.swordGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":283}
+{"t":0,"e":"stat","i":231,"statId":16974108,"name":"stat.breakItem(item.shovelGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":284}
+{"t":0,"e":"stat","i":232,"statId":16974109,"name":"stat.breakItem(item.pickaxeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":285}
+{"t":0,"e":"stat","i":233,"statId":16974110,"name":"stat.breakItem(item.hatchetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":286}
+{"t":0,"e":"stat","i":234,"statId":16974114,"name":"stat.breakItem(item.hoeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":290}
+{"t":0,"e":"stat","i":235,"statId":16974115,"name":"stat.breakItem(item.hoeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":291}
+{"t":0,"e":"stat","i":236,"statId":16974116,"name":"stat.breakItem(item.hoeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":292}
+{"t":0,"e":"stat","i":237,"statId":16974117,"name":"stat.breakItem(item.hoeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":293}
+{"t":0,"e":"stat","i":238,"statId":16974118,"name":"stat.breakItem(item.hoeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":294}
+{"t":0,"e":"stat","i":239,"statId":16974122,"name":"stat.breakItem(item.helmetCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":298}
+{"t":0,"e":"stat","i":240,"statId":16974123,"name":"stat.breakItem(item.chestplateCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":299}
+{"t":0,"e":"stat","i":241,"statId":16974124,"name":"stat.breakItem(item.leggingsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":300}
+{"t":0,"e":"stat","i":242,"statId":16974125,"name":"stat.breakItem(item.bootsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":301}
+{"t":0,"e":"stat","i":243,"statId":16974126,"name":"stat.breakItem(item.helmetChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":302}
+{"t":0,"e":"stat","i":244,"statId":16974127,"name":"stat.breakItem(item.chestplateChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":303}
+{"t":0,"e":"stat","i":245,"statId":16974128,"name":"stat.breakItem(item.leggingsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":304}
+{"t":0,"e":"stat","i":246,"statId":16974129,"name":"stat.breakItem(item.bootsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":305}
+{"t":0,"e":"stat","i":247,"statId":16974130,"name":"stat.breakItem(item.helmetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":306}
+{"t":0,"e":"stat","i":248,"statId":16974131,"name":"stat.breakItem(item.chestplateIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":307}
+{"t":0,"e":"stat","i":249,"statId":16974132,"name":"stat.breakItem(item.leggingsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":308}
+{"t":0,"e":"stat","i":250,"statId":16974133,"name":"stat.breakItem(item.bootsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":309}
+{"t":0,"e":"stat","i":251,"statId":16974134,"name":"stat.breakItem(item.helmetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":310}
+{"t":0,"e":"stat","i":252,"statId":16974135,"name":"stat.breakItem(item.chestplateDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":311}
+{"t":0,"e":"stat","i":253,"statId":16974136,"name":"stat.breakItem(item.leggingsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":312}
+{"t":0,"e":"stat","i":254,"statId":16974137,"name":"stat.breakItem(item.bootsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":313}
+{"t":0,"e":"stat","i":255,"statId":16974138,"name":"stat.breakItem(item.helmetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":314}
+{"t":0,"e":"stat","i":256,"statId":16974139,"name":"stat.breakItem(item.chestplateGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":315}
+{"t":0,"e":"stat","i":257,"statId":16974140,"name":"stat.breakItem(item.leggingsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":316}
+{"t":0,"e":"stat","i":258,"statId":16974141,"name":"stat.breakItem(item.bootsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":317}
+{"t":0,"e":"stat","i":259,"statId":16974170,"name":"stat.breakItem(item.fishingRod.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":346}
+{"t":0,"e":"stat","i":260,"statId":16974183,"name":"stat.breakItem(item.shears.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":359}
+{"t":0,"e":"stat","i":261,"statId":16908289,"name":"stat.useItem(tile.stone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":1}
+{"t":0,"e":"stat","i":262,"statId":16908291,"name":"stat.useItem(tile.dirt.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":3}
+{"t":0,"e":"stat","i":263,"statId":16908292,"name":"stat.useItem(tile.stonebrick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":4}
+{"t":0,"e":"stat","i":264,"statId":16908293,"name":"stat.useItem(tile.wood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":5}
+{"t":0,"e":"stat","i":265,"statId":16908294,"name":"stat.useItem(tile.sapling.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":6}
+{"t":0,"e":"stat","i":266,"statId":16908295,"name":"stat.useItem(tile.bedrock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":7}
+{"t":0,"e":"stat","i":267,"statId":16908296,"name":"stat.useItem(tile.water.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":8}
+{"t":0,"e":"stat","i":268,"statId":16908298,"name":"stat.useItem(tile.lava.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":10}
+{"t":0,"e":"stat","i":269,"statId":16908300,"name":"stat.useItem(tile.sand.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":12}
+{"t":0,"e":"stat","i":270,"statId":16908301,"name":"stat.useItem(tile.gravel.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":13}
+{"t":0,"e":"stat","i":271,"statId":16908302,"name":"stat.useItem(tile.oreGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":14}
+{"t":0,"e":"stat","i":272,"statId":16908303,"name":"stat.useItem(tile.oreIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":15}
+{"t":0,"e":"stat","i":273,"statId":16908304,"name":"stat.useItem(tile.oreCoal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":16}
+{"t":0,"e":"stat","i":274,"statId":16908305,"name":"stat.useItem(tile.log.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":17}
+{"t":0,"e":"stat","i":275,"statId":16908306,"name":"stat.useItem(tile.leaves.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":18}
+{"t":0,"e":"stat","i":276,"statId":16908307,"name":"stat.useItem(tile.sponge.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":19}
+{"t":0,"e":"stat","i":277,"statId":16908308,"name":"stat.useItem(tile.glass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":20}
+{"t":0,"e":"stat","i":278,"statId":16908309,"name":"stat.useItem(tile.oreLapis.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":21}
+{"t":0,"e":"stat","i":279,"statId":16908310,"name":"stat.useItem(tile.blockLapis.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":22}
+{"t":0,"e":"stat","i":280,"statId":16908311,"name":"stat.useItem(tile.dispenser.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":23}
+{"t":0,"e":"stat","i":281,"statId":16908312,"name":"stat.useItem(tile.sandStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":24}
+{"t":0,"e":"stat","i":282,"statId":16908313,"name":"stat.useItem(tile.musicBlock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":25}
+{"t":0,"e":"stat","i":283,"statId":16908314,"name":"stat.useItem(tile.bed.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":26}
+{"t":0,"e":"stat","i":284,"statId":16908315,"name":"stat.useItem(tile.goldenRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":27}
+{"t":0,"e":"stat","i":285,"statId":16908316,"name":"stat.useItem(tile.detectorRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":28}
+{"t":0,"e":"stat","i":286,"statId":16908317,"name":"stat.useItem(tile.pistonStickyBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":29}
+{"t":0,"e":"stat","i":287,"statId":16908318,"name":"stat.useItem(tile.web.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":30}
+{"t":0,"e":"stat","i":288,"statId":16908319,"name":"stat.useItem(tile.tallgrass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":31}
+{"t":0,"e":"stat","i":289,"statId":16908320,"name":"stat.useItem(tile.deadbush.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":32}
+{"t":0,"e":"stat","i":290,"statId":16908321,"name":"stat.useItem(tile.pistonBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":33}
+{"t":0,"e":"stat","i":291,"statId":16908322,"name":"stat.useItem(null.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":34}
+{"t":0,"e":"stat","i":292,"statId":16908323,"name":"stat.useItem(tile.cloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":35}
+{"t":0,"e":"stat","i":293,"statId":16908324,"name":"stat.useItem(null.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":36}
+{"t":0,"e":"stat","i":294,"statId":16908325,"name":"stat.useItem(tile.flower.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":37}
+{"t":0,"e":"stat","i":295,"statId":16908326,"name":"stat.useItem(tile.rose.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":38}
+{"t":0,"e":"stat","i":296,"statId":16908327,"name":"stat.useItem(tile.mushroom.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":39}
+{"t":0,"e":"stat","i":297,"statId":16908329,"name":"stat.useItem(tile.blockGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":41}
+{"t":0,"e":"stat","i":298,"statId":16908330,"name":"stat.useItem(tile.blockIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":42}
+{"t":0,"e":"stat","i":299,"statId":16908332,"name":"stat.useItem(tile.stoneSlab.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":44}
+{"t":0,"e":"stat","i":300,"statId":16908333,"name":"stat.useItem(tile.brick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":45}
+{"t":0,"e":"stat","i":301,"statId":16908334,"name":"stat.useItem(tile.tnt.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":46}
+{"t":0,"e":"stat","i":302,"statId":16908335,"name":"stat.useItem(tile.bookshelf.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":47}
+{"t":0,"e":"stat","i":303,"statId":16908336,"name":"stat.useItem(tile.stoneMoss.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":48}
+{"t":0,"e":"stat","i":304,"statId":16908337,"name":"stat.useItem(tile.obsidian.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":49}
+{"t":0,"e":"stat","i":305,"statId":16908338,"name":"stat.useItem(tile.torch.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":50}
+{"t":0,"e":"stat","i":306,"statId":16908339,"name":"stat.useItem(tile.fire.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":51}
+{"t":0,"e":"stat","i":307,"statId":16908340,"name":"stat.useItem(tile.mobSpawner.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":52}
+{"t":0,"e":"stat","i":308,"statId":16908341,"name":"stat.useItem(tile.stairsWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":53}
+{"t":0,"e":"stat","i":309,"statId":16908342,"name":"stat.useItem(tile.chest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":54}
+{"t":0,"e":"stat","i":310,"statId":16908343,"name":"stat.useItem(tile.redstoneDust.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":55}
+{"t":0,"e":"stat","i":311,"statId":16908344,"name":"stat.useItem(tile.oreDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":56}
+{"t":0,"e":"stat","i":312,"statId":16908345,"name":"stat.useItem(tile.blockDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":57}
+{"t":0,"e":"stat","i":313,"statId":16908346,"name":"stat.useItem(tile.workbench.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":58}
+{"t":0,"e":"stat","i":314,"statId":16908347,"name":"stat.useItem(tile.crops.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":59}
+{"t":0,"e":"stat","i":315,"statId":16908349,"name":"stat.useItem(tile.furnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":61}
+{"t":0,"e":"stat","i":316,"statId":16908351,"name":"stat.useItem(tile.sign.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":63}
+{"t":0,"e":"stat","i":317,"statId":16908352,"name":"stat.useItem(tile.doorWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":64}
+{"t":0,"e":"stat","i":318,"statId":16908353,"name":"stat.useItem(tile.ladder.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":65}
+{"t":0,"e":"stat","i":319,"statId":16908354,"name":"stat.useItem(tile.rail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":66}
+{"t":0,"e":"stat","i":320,"statId":16908355,"name":"stat.useItem(tile.stairsStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":67}
+{"t":0,"e":"stat","i":321,"statId":16908356,"name":"stat.useItem(tile.sign.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":68}
+{"t":0,"e":"stat","i":322,"statId":16908357,"name":"stat.useItem(tile.lever.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":69}
+{"t":0,"e":"stat","i":323,"statId":16908358,"name":"stat.useItem(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":70}
+{"t":0,"e":"stat","i":324,"statId":16908359,"name":"stat.useItem(tile.doorIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":71}
+{"t":0,"e":"stat","i":325,"statId":16908360,"name":"stat.useItem(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":72}
+{"t":0,"e":"stat","i":326,"statId":16908361,"name":"stat.useItem(tile.oreRedstone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":73}
+{"t":0,"e":"stat","i":327,"statId":16908363,"name":"stat.useItem(tile.notGate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":75}
+{"t":0,"e":"stat","i":328,"statId":16908365,"name":"stat.useItem(tile.button.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":77}
+{"t":0,"e":"stat","i":329,"statId":16908366,"name":"stat.useItem(tile.snow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":78}
+{"t":0,"e":"stat","i":330,"statId":16908367,"name":"stat.useItem(tile.ice.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":79}
+{"t":0,"e":"stat","i":331,"statId":16908368,"name":"stat.useItem(tile.snow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":80}
+{"t":0,"e":"stat","i":332,"statId":16908369,"name":"stat.useItem(tile.cactus.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":81}
+{"t":0,"e":"stat","i":333,"statId":16908370,"name":"stat.useItem(tile.clay.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":82}
+{"t":0,"e":"stat","i":334,"statId":16908371,"name":"stat.useItem(tile.reeds.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":83}
+{"t":0,"e":"stat","i":335,"statId":16908372,"name":"stat.useItem(tile.jukebox.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":84}
+{"t":0,"e":"stat","i":336,"statId":16908373,"name":"stat.useItem(tile.fence.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":85}
+{"t":0,"e":"stat","i":337,"statId":16908374,"name":"stat.useItem(tile.pumpkin.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":86}
+{"t":0,"e":"stat","i":338,"statId":16908375,"name":"stat.useItem(tile.hellrock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":87}
+{"t":0,"e":"stat","i":339,"statId":16908376,"name":"stat.useItem(tile.hellsand.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":88}
+{"t":0,"e":"stat","i":340,"statId":16908377,"name":"stat.useItem(tile.lightgem.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":89}
+{"t":0,"e":"stat","i":341,"statId":16908378,"name":"stat.useItem(tile.portal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":90}
+{"t":0,"e":"stat","i":342,"statId":16908380,"name":"stat.useItem(tile.cake.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":92}
+{"t":0,"e":"stat","i":343,"statId":16908381,"name":"stat.useItem(tile.diode.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":93}
+{"t":0,"e":"stat","i":344,"statId":16908383,"name":"stat.useItem(tile.lockedchest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":95}
+{"t":0,"e":"stat","i":345,"statId":16908384,"name":"stat.useItem(tile.trapdoor.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":96}
+{"t":0,"e":"stat","i":346,"statId":16843008,"name":"stat.craftItem(item.shovelIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":256}
+{"t":0,"e":"stat","i":347,"statId":16843009,"name":"stat.craftItem(item.pickaxeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":257}
+{"t":0,"e":"stat","i":348,"statId":16842753,"name":"stat.craftItem(tile.stone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":1}
+{"t":0,"e":"stat","i":349,"statId":16843010,"name":"stat.craftItem(item.hatchetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":258}
+{"t":0,"e":"stat","i":350,"statId":16843011,"name":"stat.craftItem(item.flintAndSteel.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":259}
+{"t":0,"e":"stat","i":351,"statId":16843013,"name":"stat.craftItem(item.bow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":261}
+{"t":0,"e":"stat","i":352,"statId":16842757,"name":"stat.craftItem(tile.wood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":5}
+{"t":0,"e":"stat","i":353,"statId":16843014,"name":"stat.craftItem(item.arrow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":262}
+{"t":0,"e":"stat","i":354,"statId":16843015,"name":"stat.craftItem(item.coal.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":263}
+{"t":0,"e":"stat","i":355,"statId":16843016,"name":"stat.craftItem(item.emerald.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":264}
+{"t":0,"e":"stat","i":356,"statId":16843017,"name":"stat.craftItem(item.ingotIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":265}
+{"t":0,"e":"stat","i":357,"statId":16843018,"name":"stat.craftItem(item.ingotGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":266}
+{"t":0,"e":"stat","i":358,"statId":16843019,"name":"stat.craftItem(item.swordIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":267}
+{"t":0,"e":"stat","i":359,"statId":16843020,"name":"stat.craftItem(item.swordWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":268}
+{"t":0,"e":"stat","i":360,"statId":16843021,"name":"stat.craftItem(item.shovelWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":269}
+{"t":0,"e":"stat","i":361,"statId":16843022,"name":"stat.craftItem(item.pickaxeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":270}
+{"t":0,"e":"stat","i":362,"statId":16843023,"name":"stat.craftItem(item.hatchetWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":271}
+{"t":0,"e":"stat","i":363,"statId":16843024,"name":"stat.craftItem(item.swordStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":272}
+{"t":0,"e":"stat","i":364,"statId":16843025,"name":"stat.craftItem(item.shovelStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":273}
+{"t":0,"e":"stat","i":365,"statId":16843026,"name":"stat.craftItem(item.pickaxeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":274}
+{"t":0,"e":"stat","i":366,"statId":16843027,"name":"stat.craftItem(item.hatchetStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":275}
+{"t":0,"e":"stat","i":367,"statId":16843028,"name":"stat.craftItem(item.swordDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":276}
+{"t":0,"e":"stat","i":368,"statId":16842772,"name":"stat.craftItem(tile.glass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":20}
+{"t":0,"e":"stat","i":369,"statId":16843029,"name":"stat.craftItem(item.shovelDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":277}
+{"t":0,"e":"stat","i":370,"statId":16843030,"name":"stat.craftItem(item.pickaxeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":278}
+{"t":0,"e":"stat","i":371,"statId":16842774,"name":"stat.craftItem(tile.blockLapis.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":22}
+{"t":0,"e":"stat","i":372,"statId":16842775,"name":"stat.craftItem(tile.dispenser.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":23}
+{"t":0,"e":"stat","i":373,"statId":16843031,"name":"stat.craftItem(item.hatchetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":279}
+{"t":0,"e":"stat","i":374,"statId":16842776,"name":"stat.craftItem(tile.sandStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":24}
+{"t":0,"e":"stat","i":375,"statId":16843032,"name":"stat.craftItem(item.stick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":280}
+{"t":0,"e":"stat","i":376,"statId":16842777,"name":"stat.craftItem(tile.musicBlock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":25}
+{"t":0,"e":"stat","i":377,"statId":16843033,"name":"stat.craftItem(item.bowl.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":281}
+{"t":0,"e":"stat","i":378,"statId":16843034,"name":"stat.craftItem(item.mushroomStew.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":282}
+{"t":0,"e":"stat","i":379,"statId":16842779,"name":"stat.craftItem(tile.goldenRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":27}
+{"t":0,"e":"stat","i":380,"statId":16843035,"name":"stat.craftItem(item.swordGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":283}
+{"t":0,"e":"stat","i":381,"statId":16842780,"name":"stat.craftItem(tile.detectorRail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":28}
+{"t":0,"e":"stat","i":382,"statId":16843036,"name":"stat.craftItem(item.shovelGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":284}
+{"t":0,"e":"stat","i":383,"statId":16843037,"name":"stat.craftItem(item.pickaxeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":285}
+{"t":0,"e":"stat","i":384,"statId":16842781,"name":"stat.craftItem(tile.pistonStickyBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":29}
+{"t":0,"e":"stat","i":385,"statId":16843038,"name":"stat.craftItem(item.hatchetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":286}
+{"t":0,"e":"stat","i":386,"statId":16842785,"name":"stat.craftItem(tile.pistonBase.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":33}
+{"t":0,"e":"stat","i":387,"statId":16843042,"name":"stat.craftItem(item.hoeWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":290}
+{"t":0,"e":"stat","i":388,"statId":16843043,"name":"stat.craftItem(item.hoeStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":291}
+{"t":0,"e":"stat","i":389,"statId":16842787,"name":"stat.craftItem(tile.cloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":35}
+{"t":0,"e":"stat","i":390,"statId":16843044,"name":"stat.craftItem(item.hoeIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":292}
+{"t":0,"e":"stat","i":391,"statId":16843045,"name":"stat.craftItem(item.hoeDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":293}
+{"t":0,"e":"stat","i":392,"statId":16843046,"name":"stat.craftItem(item.hoeGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":294}
+{"t":0,"e":"stat","i":393,"statId":16842793,"name":"stat.craftItem(tile.blockGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":41}
+{"t":0,"e":"stat","i":394,"statId":16843049,"name":"stat.craftItem(item.bread.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":297}
+{"t":0,"e":"stat","i":395,"statId":16842794,"name":"stat.craftItem(tile.blockIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":42}
+{"t":0,"e":"stat","i":396,"statId":16843050,"name":"stat.craftItem(item.helmetCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":298}
+{"t":0,"e":"stat","i":397,"statId":16843051,"name":"stat.craftItem(item.chestplateCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":299}
+{"t":0,"e":"stat","i":398,"statId":16843052,"name":"stat.craftItem(item.leggingsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":300}
+{"t":0,"e":"stat","i":399,"statId":16842796,"name":"stat.craftItem(tile.stoneSlab.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":44}
+{"t":0,"e":"stat","i":400,"statId":16843053,"name":"stat.craftItem(item.bootsCloth.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":301}
+{"t":0,"e":"stat","i":401,"statId":16842797,"name":"stat.craftItem(tile.brick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":45}
+{"t":0,"e":"stat","i":402,"statId":16842798,"name":"stat.craftItem(tile.tnt.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":46}
+{"t":0,"e":"stat","i":403,"statId":16843054,"name":"stat.craftItem(item.helmetChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":302}
+{"t":0,"e":"stat","i":404,"statId":16843055,"name":"stat.craftItem(item.chestplateChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":303}
+{"t":0,"e":"stat","i":405,"statId":16842799,"name":"stat.craftItem(tile.bookshelf.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":47}
+{"t":0,"e":"stat","i":406,"statId":16843056,"name":"stat.craftItem(item.leggingsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":304}
+{"t":0,"e":"stat","i":407,"statId":16843057,"name":"stat.craftItem(item.bootsChain.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":305}
+{"t":0,"e":"stat","i":408,"statId":16843058,"name":"stat.craftItem(item.helmetIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":306}
+{"t":0,"e":"stat","i":409,"statId":16842802,"name":"stat.craftItem(tile.torch.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":50}
+{"t":0,"e":"stat","i":410,"statId":16843059,"name":"stat.craftItem(item.chestplateIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":307}
+{"t":0,"e":"stat","i":411,"statId":16843060,"name":"stat.craftItem(item.leggingsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":308}
+{"t":0,"e":"stat","i":412,"statId":16842805,"name":"stat.craftItem(tile.stairsWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":53}
+{"t":0,"e":"stat","i":413,"statId":16843061,"name":"stat.craftItem(item.bootsIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":309}
+{"t":0,"e":"stat","i":414,"statId":16842806,"name":"stat.craftItem(tile.chest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":54}
+{"t":0,"e":"stat","i":415,"statId":16843062,"name":"stat.craftItem(item.helmetDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":310}
+{"t":0,"e":"stat","i":416,"statId":16843063,"name":"stat.craftItem(item.chestplateDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":311}
+{"t":0,"e":"stat","i":417,"statId":16843064,"name":"stat.craftItem(item.leggingsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":312}
+{"t":0,"e":"stat","i":418,"statId":16842809,"name":"stat.craftItem(tile.blockDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":57}
+{"t":0,"e":"stat","i":419,"statId":16843065,"name":"stat.craftItem(item.bootsDiamond.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":313}
+{"t":0,"e":"stat","i":420,"statId":16843066,"name":"stat.craftItem(item.helmetGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":314}
+{"t":0,"e":"stat","i":421,"statId":16842810,"name":"stat.craftItem(tile.workbench.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":58}
+{"t":0,"e":"stat","i":422,"statId":16843067,"name":"stat.craftItem(item.chestplateGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":315}
+{"t":0,"e":"stat","i":423,"statId":16843068,"name":"stat.craftItem(item.leggingsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":316}
+{"t":0,"e":"stat","i":424,"statId":16842813,"name":"stat.craftItem(tile.furnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":61}
+{"t":0,"e":"stat","i":425,"statId":16843069,"name":"stat.craftItem(item.bootsGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":317}
+{"t":0,"e":"stat","i":426,"statId":16843072,"name":"stat.craftItem(item.porkchopCooked.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":320}
+{"t":0,"e":"stat","i":427,"statId":16842817,"name":"stat.craftItem(tile.ladder.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":65}
+{"t":0,"e":"stat","i":428,"statId":16843073,"name":"stat.craftItem(item.painting.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":321}
+{"t":0,"e":"stat","i":429,"statId":16842818,"name":"stat.craftItem(tile.rail.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":66}
+{"t":0,"e":"stat","i":430,"statId":16843074,"name":"stat.craftItem(item.appleGold.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":322}
+{"t":0,"e":"stat","i":431,"statId":16843075,"name":"stat.craftItem(item.sign.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":323}
+{"t":0,"e":"stat","i":432,"statId":16842819,"name":"stat.craftItem(tile.stairsStone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":67}
+{"t":0,"e":"stat","i":433,"statId":16843076,"name":"stat.craftItem(item.doorWood.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":324}
+{"t":0,"e":"stat","i":434,"statId":16843077,"name":"stat.craftItem(item.bucket.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":325}
+{"t":0,"e":"stat","i":435,"statId":16842821,"name":"stat.craftItem(tile.lever.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":69}
+{"t":0,"e":"stat","i":436,"statId":16842822,"name":"stat.craftItem(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":70}
+{"t":0,"e":"stat","i":437,"statId":16843080,"name":"stat.craftItem(item.minecart.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":328}
+{"t":0,"e":"stat","i":438,"statId":16842824,"name":"stat.craftItem(tile.pressurePlate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":72}
+{"t":0,"e":"stat","i":439,"statId":16843082,"name":"stat.craftItem(item.doorIron.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":330}
+{"t":0,"e":"stat","i":440,"statId":16842828,"name":"stat.craftItem(tile.notGate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":76}
+{"t":0,"e":"stat","i":441,"statId":16843085,"name":"stat.craftItem(item.boat.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":333}
+{"t":0,"e":"stat","i":442,"statId":16842829,"name":"stat.craftItem(tile.button.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":77}
+{"t":0,"e":"stat","i":443,"statId":16842832,"name":"stat.craftItem(tile.snow.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":80}
+{"t":0,"e":"stat","i":444,"statId":16843088,"name":"stat.craftItem(item.brick.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":336}
+{"t":0,"e":"stat","i":445,"statId":16842834,"name":"stat.craftItem(tile.clay.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":82}
+{"t":0,"e":"stat","i":446,"statId":16843091,"name":"stat.craftItem(item.paper.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":339}
+{"t":0,"e":"stat","i":447,"statId":16842836,"name":"stat.craftItem(tile.jukebox.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":84}
+{"t":0,"e":"stat","i":448,"statId":16843092,"name":"stat.craftItem(item.book.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":340}
+{"t":0,"e":"stat","i":449,"statId":16842837,"name":"stat.craftItem(tile.fence.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":85}
+{"t":0,"e":"stat","i":450,"statId":16843094,"name":"stat.craftItem(item.minecartChest.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":342}
+{"t":0,"e":"stat","i":451,"statId":16843095,"name":"stat.craftItem(item.minecartFurnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":343}
+{"t":0,"e":"stat","i":452,"statId":16843097,"name":"stat.craftItem(item.compass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":345}
+{"t":0,"e":"stat","i":453,"statId":16842841,"name":"stat.craftItem(tile.lightgem.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":89}
+{"t":0,"e":"stat","i":454,"statId":16843098,"name":"stat.craftItem(item.fishingRod.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":346}
+{"t":0,"e":"stat","i":455,"statId":16843099,"name":"stat.craftItem(item.clock.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":347}
+{"t":0,"e":"stat","i":456,"statId":16842843,"name":"stat.craftItem(tile.litpumpkin.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":91}
+{"t":0,"e":"stat","i":457,"statId":16843102,"name":"stat.craftItem(item.fishCooked.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":350}
+{"t":0,"e":"stat","i":458,"statId":16843103,"name":"stat.craftItem(item.dyePowder.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":351}
+{"t":0,"e":"stat","i":459,"statId":16842848,"name":"stat.craftItem(tile.trapdoor.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":96}
+{"t":0,"e":"stat","i":460,"statId":16843105,"name":"stat.craftItem(item.sugar.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":353}
+{"t":0,"e":"stat","i":461,"statId":16843106,"name":"stat.craftItem(item.cake.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":354}
+{"t":0,"e":"stat","i":462,"statId":16843107,"name":"stat.craftItem(item.bed.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":355}
+{"t":0,"e":"stat","i":463,"statId":16843108,"name":"stat.craftItem(item.diode.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":356}
+{"t":0,"e":"stat","i":464,"statId":16843109,"name":"stat.craftItem(item.cookie.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":357}
+{"t":0,"e":"stat","i":465,"statId":16843110,"name":"stat.craftItem(item.map.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":358}
+{"t":0,"e":"stat","i":466,"statId":16843111,"name":"stat.craftItem(item.shears.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":359}
+{"t":0,"e":"unlisted_stat","statId":16777218,"name":"stat.mineBlock(tile.grass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":2}
+{"t":0,"e":"unlisted_stat","statId":16777256,"name":"stat.mineBlock(tile.mushroom.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":40}
+{"t":0,"e":"unlisted_stat","statId":16777259,"name":"stat.mineBlock(tile.stoneSlab.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":43}
+{"t":0,"e":"unlisted_stat","statId":16777276,"name":"stat.mineBlock(tile.farmland.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":60}
+{"t":0,"e":"unlisted_stat","statId":16777278,"name":"stat.mineBlock(tile.furnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":62}
+{"t":0,"e":"unlisted_stat","statId":16777290,"name":"stat.mineBlock(tile.oreRedstone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":74}
+{"t":0,"e":"unlisted_stat","statId":16777292,"name":"stat.mineBlock(tile.notGate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":76}
+{"t":0,"e":"unlisted_stat","statId":16777307,"name":"stat.mineBlock(tile.litpumpkin.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":91}
+{"t":0,"e":"unlisted_stat","statId":16908290,"name":"stat.useItem(tile.grass.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":2}
+{"t":0,"e":"unlisted_stat","statId":16908297,"name":"stat.useItem(tile.water.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":9}
+{"t":0,"e":"unlisted_stat","statId":16908299,"name":"stat.useItem(tile.lava.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":11}
+{"t":0,"e":"unlisted_stat","statId":16908328,"name":"stat.useItem(tile.mushroom.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":40}
+{"t":0,"e":"unlisted_stat","statId":16908331,"name":"stat.useItem(tile.stoneSlab.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":43}
+{"t":0,"e":"unlisted_stat","statId":16908348,"name":"stat.useItem(tile.farmland.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":60}
+{"t":0,"e":"unlisted_stat","statId":16908350,"name":"stat.useItem(tile.furnace.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":62}
+{"t":0,"e":"unlisted_stat","statId":16908362,"name":"stat.useItem(tile.oreRedstone.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":74}
+{"t":0,"e":"unlisted_stat","statId":16908364,"name":"stat.useItem(tile.notGate.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":76}
+{"t":0,"e":"unlisted_stat","statId":16908379,"name":"stat.useItem(tile.litpumpkin.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":91}
+{"t":0,"e":"unlisted_stat","statId":16908382,"name":"stat.useItem(tile.diode.name)","class":"StatCrafting","type":"StatTypeSimple","isIndependent":false,"itemId":94}
+{"t":0,"e":"stat_list","list":"generalStats","ids":[1000,1001,1002,1003,1004,1100,2000,2001,2002,2003,2004,2005,2006,2007,2008,2010,2011,2020,2021,2022,2023,2024,2025]}
+{"t":0,"e":"stat_list","list":"itemStats","ids":[16908544,16908545,16908546,16908547,16908548,16908549,16908550,16908551,16908552,16908553,16908554,16908555,16908556,16908557,16908558,16908559,16908560,16908561,16908562,16908563,16908564,16908565,16908566,16908567,16908568,16908569,16908570,16908571,16908572,16908573,16908574,16908575,16908576,16908577,16908578,16908579,16908580,16908581,16908582,16908583,16908584,16908585,16908586,16908587,16908588,16908589,16908590,16908591,16908592,16908593,16908594,16908595,16908596,16908597,16908598,16908599,16908600,16908601,16908602,16908603,16908604,16908605,16908606,16908607,16908608,16908609,16908610,16908611,16908612,16908613,16908614,16908615,16908616,16908617,16908618,16908619,16908620,16908621,16908622,16908623,16908624,16908625,16908626,16908627,16908628,16908629,16908630,16908631,16908632,16908633,16908634,16908635,16908636,16908637,16908638,16908639,16908640,16908641,16908642,16908643,16908644,16908645,16908646,16908647,16910544,16910545]}
+{"t":0,"e":"stat_list","list":"objectMineStats","ids":[16777217,16777219,16777220,16777221,16777222,16777228,16777229,16777230,16777231,16777232,16777233,16777235,16777236,16777237,16777238,16777239,16777240,16777241,16777243,16777244,16777245,16777246,16777247,16777248,16777249,16777250,16777251,16777252,16777253,16777254,16777255,16777257,16777258,16777260,16777261,16777262,16777263,16777264,16777265,16777266,16777269,16777270,16777272,16777273,16777274,16777277,16777281,16777282,16777283,16777285,16777286,16777288,16777289,16777291,16777293,16777294,16777295,16777296,16777297,16777298,16777300,16777301,16777302,16777303,16777304,16777305,16777306,16777311]}
+{"t":0,"e":"stat_array","array":"mineBlockStatArray","length":256,"entries":[[1,16777217],[2,16777219],[3,16777219],[4,16777220],[5,16777221],[6,16777222],[12,16777228],[13,16777229],[14,16777230],[15,16777231],[16,16777232],[17,16777233],[19,16777235],[20,16777236],[21,16777237],[22,16777238],[23,16777239],[24,16777240],[25,16777241],[27,16777243],[28,16777244],[29,16777245],[30,16777246],[31,16777247],[32,16777248],[33,16777249],[34,16777250],[35,16777251],[36,16777252],[37,16777253],[38,16777254],[39,16777255],[40,16777255],[41,16777257],[42,16777258],[43,16777260],[44,16777260],[45,16777261],[46,16777262],[47,16777263],[48,16777264],[49,16777265],[50,16777266],[53,16777269],[54,16777270],[56,16777272],[57,16777273],[58,16777274],[60,16777219],[61,16777277],[62,16777277],[65,16777281],[66,16777282],[67,16777283],[69,16777285],[70,16777286],[72,16777288],[73,16777289],[74,16777289],[75,16777291],[76,16777291],[77,16777293],[78,16777294],[79,16777295],[80,16777296],[81,16777297],[82,16777298],[84,16777300],[85,16777301],[86,16777302],[87,16777303],[88,16777304],[89,16777305],[90,16777306],[91,16777302],[95,16777311]]}
+{"t":0,"e":"stat_array","array":"objectUseStats","length":32000,"entries":[[1,16908289],[2,16908291],[3,16908291],[4,16908292],[5,16908293],[6,16908294],[7,16908295],[8,16908296],[9,16908296],[10,16908298],[11,16908299],[12,16908300],[13,16908301],[14,16908302],[15,16908303],[16,16908304],[17,16908305],[18,16908306],[19,16908307],[20,16908308],[21,16908309],[22,16908310],[23,16908311],[24,16908312],[25,16908313],[26,16908314],[27,16908315],[28,16908316],[29,16908317],[30,16908318],[31,16908319],[32,16908320],[33,16908321],[34,16908322],[35,16908323],[36,16908324],[37,16908325],[38,16908326],[39,16908327],[40,16908327],[41,16908329],[42,16908330],[43,16908332],[44,16908332],[45,16908333],[46,16908334],[47,16908335],[48,16908336],[49,16908337],[50,16908338],[51,16908339],[52,16908340],[53,16908341],[54,16908342],[55,16908343],[56,16908344],[57,16908345],[58,16908346],[59,16908347],[60,16908291],[61,16908349],[62,16908349],[63,16908351],[64,16908352],[65,16908353],[66,16908354],[67,16908355],[68,16908356],[69,16908357],[70,16908358],[71,16908359],[72,16908360],[73,16908361],[74,16908361],[75,16908363],[76,16908363],[77,16908365],[78,16908366],[79,16908367],[80,16908368],[81,16908369],[82,16908370],[83,16908371],[84,16908372],[85,16908373],[86,16908374],[87,16908375],[88,16908376],[89,16908377],[90,16908378],[91,16908374],[92,16908380],[93,16908381],[94,16908381],[95,16908383],[96,16908384],[256,16908544],[257,16908545],[258,16908546],[259,16908547],[260,16908548],[261,16908549],[262,16908550],[263,16908551],[264,16908552],[265,16908553],[266,16908554],[267,16908555],[268,16908556],[269,16908557],[270,16908558],[271,16908559],[272,16908560],[273,16908561],[274,16908562],[275,16908563],[276,16908564],[277,16908565],[278,16908566],[279,16908567],[280,16908568],[281,16908569],[282,16908570],[283,16908571],[284,16908572],[285,16908573],[286,16908574],[287,16908575],[288,16908576],[289,16908577],[290,16908578],[291,16908579],[292,16908580],[293,16908581],[294,16908582],[295,16908583],[296,16908584],[297,16908585],[298,16908586],[299,16908587],[300,16908588],[301,16908589],[302,16908590],[303,16908591],[304,16908592],[305,16908593],[306,16908594],[307,16908595],[308,16908596],[309,16908597],[310,16908598],[311,16908599],[312,16908600],[313,16908601],[314,16908602],[315,16908603],[316,16908604],[317,16908605],[318,16908606],[319,16908607],[320,16908608],[321,16908609],[322,16908610],[323,16908611],[324,16908612],[325,16908613],[326,16908614],[327,16908615],[328,16908616],[329,16908617],[330,16908618],[331,16908619],[332,16908620],[333,16908621],[334,16908622],[335,16908623],[336,16908624],[337,16908625],[338,16908626],[339,16908627],[340,16908628],[341,16908629],[342,16908630],[343,16908631],[344,16908632],[345,16908633],[346,16908634],[347,16908635],[348,16908636],[349,16908637],[350,16908638],[351,16908639],[352,16908640],[353,16908641],[354,16908642],[355,16908643],[356,16908644],[357,16908645],[358,16908646],[359,16908647],[2256,16910544],[2257,16910545]]}
+{"t":0,"e":"stat_array","array":"objectBreakStats","length":32000,"entries":[[256,16974080],[257,16974081],[258,16974082],[259,16974083],[267,16974091],[268,16974092],[269,16974093],[270,16974094],[271,16974095],[272,16974096],[273,16974097],[274,16974098],[275,16974099],[276,16974100],[277,16974101],[278,16974102],[279,16974103],[283,16974107],[284,16974108],[285,16974109],[286,16974110],[290,16974114],[291,16974115],[292,16974116],[293,16974117],[294,16974118],[298,16974122],[299,16974123],[300,16974124],[301,16974125],[302,16974126],[303,16974127],[304,16974128],[305,16974129],[306,16974130],[307,16974131],[308,16974132],[309,16974133],[310,16974134],[311,16974135],[312,16974136],[313,16974137],[314,16974138],[315,16974139],[316,16974140],[317,16974141],[346,16974170],[359,16974183]]}
+{"t":0,"e":"stat_array","array":"objectCraftStats","length":32000,"entries":[[1,16842753],[5,16842757],[20,16842772],[22,16842774],[23,16842775],[24,16842776],[25,16842777],[27,16842779],[28,16842780],[29,16842781],[33,16842785],[35,16842787],[41,16842793],[42,16842794],[43,16842796],[44,16842796],[45,16842797],[46,16842798],[47,16842799],[50,16842802],[53,16842805],[54,16842806],[57,16842809],[58,16842810],[61,16842813],[62,16842813],[65,16842817],[66,16842818],[67,16842819],[69,16842821],[70,16842822],[72,16842824],[75,16842828],[76,16842828],[77,16842829],[80,16842832],[82,16842834],[84,16842836],[85,16842837],[86,16842843],[89,16842841],[91,16842843],[96,16842848],[256,16843008],[257,16843009],[258,16843010],[259,16843011],[261,16843013],[262,16843014],[263,16843015],[264,16843016],[265,16843017],[266,16843018],[267,16843019],[268,16843020],[269,16843021],[270,16843022],[271,16843023],[272,16843024],[273,16843025],[274,16843026],[275,16843027],[276,16843028],[277,16843029],[278,16843030],[279,16843031],[280,16843032],[281,16843033],[282,16843034],[283,16843035],[284,16843036],[285,16843037],[286,16843038],[290,16843042],[291,16843043],[292,16843044],[293,16843045],[294,16843046],[297,16843049],[298,16843050],[299,16843051],[300,16843052],[301,16843053],[302,16843054],[303,16843055],[304,16843056],[305,16843057],[306,16843058],[307,16843059],[308,16843060],[309,16843061],[310,16843062],[311,16843063],[312,16843064],[313,16843065],[314,16843066],[315,16843067],[316,16843068],[317,16843069],[320,16843072],[321,16843073],[322,16843074],[323,16843075],[324,16843076],[325,16843077],[328,16843080],[330,16843082],[333,16843085],[336,16843088],[339,16843091],[340,16843092],[342,16843094],[343,16843095],[345,16843097],[346,16843098],[347,16843099],[350,16843102],[351,16843103],[353,16843105],[354,16843106],[355,16843107],[356,16843108],[357,16843109],[358,16843110],[359,16843111]]}
+{"t":0,"e":"achievement","i":0,"statId":5242880,"name":"achievement.openInventory","column":0,"row":0,"parent":null,"icon":{"id":340,"damage":0},"isSpecial":false,"isIndependent":true}
+{"t":0,"e":"achievement","i":1,"statId":5242881,"name":"achievement.mineWood","column":2,"row":1,"parent":5242880,"icon":{"id":17,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":2,"statId":5242882,"name":"achievement.buildWorkBench","column":4,"row":-1,"parent":5242881,"icon":{"id":58,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":3,"statId":5242883,"name":"achievement.buildPickaxe","column":4,"row":2,"parent":5242882,"icon":{"id":270,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":4,"statId":5242884,"name":"achievement.buildFurnace","column":3,"row":4,"parent":5242883,"icon":{"id":62,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":5,"statId":5242885,"name":"achievement.acquireIron","column":1,"row":4,"parent":5242884,"icon":{"id":265,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":6,"statId":5242886,"name":"achievement.buildHoe","column":2,"row":-3,"parent":5242882,"icon":{"id":290,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":7,"statId":5242887,"name":"achievement.makeBread","column":-1,"row":-3,"parent":5242886,"icon":{"id":297,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":8,"statId":5242888,"name":"achievement.bakeCake","column":0,"row":-5,"parent":5242886,"icon":{"id":354,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":9,"statId":5242889,"name":"achievement.buildBetterPickaxe","column":6,"row":2,"parent":5242883,"icon":{"id":274,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":10,"statId":5242890,"name":"achievement.cookFish","column":2,"row":6,"parent":5242884,"icon":{"id":350,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":11,"statId":5242891,"name":"achievement.onARail","column":2,"row":3,"parent":5242885,"icon":{"id":66,"damage":0},"isSpecial":true,"isIndependent":false}
+{"t":0,"e":"achievement","i":12,"statId":5242892,"name":"achievement.buildSword","column":6,"row":-1,"parent":5242882,"icon":{"id":268,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":13,"statId":5242893,"name":"achievement.killEnemy","column":8,"row":-1,"parent":5242892,"icon":{"id":352,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":14,"statId":5242894,"name":"achievement.killCow","column":7,"row":-3,"parent":5242892,"icon":{"id":334,"damage":0},"isSpecial":false,"isIndependent":false}
+{"t":0,"e":"achievement","i":15,"statId":5242895,"name":"achievement.flyPig","column":8,"row":-4,"parent":5242894,"icon":{"id":329,"damage":0},"isSpecial":true,"isIndependent":false}
+{"t":0,"e":"achievement_bounds","minDisplayColumn":-1,"minDisplayRow":-5,"maxDisplayColumn":8,"maxDisplayRow":6}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":0,"s":"0"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1,"s":"1"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":5,"s":"5"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":10,"s":"10"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":19,"s":"19"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":20,"s":"20"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":49,"s":"49"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":50,"s":"50"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":51,"s":"51"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":99,"s":"99"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":100,"s":"100"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":101,"s":"101"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":149,"s":"149"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":150,"s":"150"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":999,"s":"999"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1000,"s":"1,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1001,"s":"1,001"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1199,"s":"1,199"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1200,"s":"1,200"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1201,"s":"1,201"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":750,"s":"750"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1350,"s":"1,350"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":62500,"s":"62,500"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":87500,"s":"87,500"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":112500,"s":"112,500"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":9999,"s":"9,999"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":12345,"s":"12,345"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":49999,"s":"49,999"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":50000,"s":"50,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":50001,"s":"50,001"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":50005,"s":"50,005"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":50006,"s":"50,006"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":72000,"s":"72,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":123456,"s":"123,456"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1234567,"s":"1,234,567"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":1728000,"s":"1,728,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":2592000,"s":"2,592,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":31535999,"s":"31,535,999"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":31536000,"s":"31,536,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":630720000,"s":"630,720,000"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":2147483647,"s":"2,147,483,647"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":-1,"s":"-1"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":-50,"s":"-50"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":-100,"s":"-100"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":-12345,"s":"-12,345"}
+{"t":0,"e":"stat_format","type":"StatTypeSimple","v":-2147483648,"s":"-2,147,483,648"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":0,"s":"0.0 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1,"s":"0.05 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":5,"s":"0.25 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":10,"s":"0.5 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":19,"s":"0.95 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":20,"s":"1.0 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":49,"s":"2.45 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":50,"s":"2.5 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":51,"s":"2.55 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":99,"s":"4.95 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":100,"s":"5.0 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":101,"s":"5.05 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":149,"s":"7.45 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":150,"s":"7.5 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":999,"s":"0.83 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1000,"s":"0.83 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1001,"s":"0.83 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1199,"s":"1.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1200,"s":"1.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1201,"s":"1.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":750,"s":"0.62 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1350,"s":"1.12 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":62500,"s":"0.87 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":87500,"s":"1.22 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":112500,"s":"1.56 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":9999,"s":"8.33 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":12345,"s":"10.29 m"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":49999,"s":"0.69 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":50000,"s":"0.69 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":50001,"s":"0.69 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":50005,"s":"0.69 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":50006,"s":"0.69 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":72000,"s":"1.00 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":123456,"s":"1.71 h"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1234567,"s":"0.71 d"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":1728000,"s":"1.00 d"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":2592000,"s":"1.50 d"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":31535999,"s":"18.25 d"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":31536000,"s":"18.25 d"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":630720000,"s":"1.00 y"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":2147483647,"s":"3.40 y"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":-1,"s":"-0.05 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":-50,"s":"-2.5 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":-100,"s":"-5.0 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":-12345,"s":"-617.25 s"}
+{"t":0,"e":"stat_format","type":"StatTypeTime","v":-2147483648,"s":"-1.073741824E8 s"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":0,"s":"0 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1,"s":"1 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":5,"s":"5 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":10,"s":"10 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":19,"s":"19 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":20,"s":"20 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":49,"s":"49 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":50,"s":"50 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":51,"s":"0.51 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":99,"s":"0.99 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":100,"s":"1.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":101,"s":"1.01 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":149,"s":"1.49 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":150,"s":"1.50 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":999,"s":"9.99 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1000,"s":"10.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1001,"s":"10.01 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1199,"s":"11.99 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1200,"s":"12.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1201,"s":"12.01 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":750,"s":"7.50 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1350,"s":"13.50 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":62500,"s":"0.62 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":87500,"s":"0.88 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":112500,"s":"1.12 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":9999,"s":"99.99 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":12345,"s":"123.45 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":49999,"s":"499.99 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":50000,"s":"500.00 m"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":50001,"s":"0.50 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":50005,"s":"0.50 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":50006,"s":"0.50 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":72000,"s":"0.72 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":123456,"s":"1.23 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1234567,"s":"12.35 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":1728000,"s":"17.28 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":2592000,"s":"25.92 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":31535999,"s":"315.36 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":31536000,"s":"315.36 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":630720000,"s":"6307.20 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":2147483647,"s":"21474.84 km"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":-1,"s":"-1 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":-50,"s":"-50 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":-100,"s":"-100 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":-12345,"s":"-12345 cm"}
+{"t":0,"e":"stat_format","type":"StatTypeDistance","v":-2147483648,"s":"-2147483648 cm"}

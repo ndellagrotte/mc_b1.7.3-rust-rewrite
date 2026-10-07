@@ -37,6 +37,7 @@ final class TierA {
         switch (kind) {
             case "item_table": return ItemTable.run(sc); // WP-1.2
             case "recipe_table": return RecipeTable.run(sc); // WP-2.5
+            case "stat_table": return StatTable.run(sc); // WP-2.7
             case "java_random": return javaRandom(sc);
             case "sine_table": return sineTable();
             case "math_sweep": return mathSweep(sc);
