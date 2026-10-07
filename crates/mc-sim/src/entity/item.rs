@@ -203,7 +203,9 @@ const LEATHER: i32 = 334;
 /// `EntityItem.onCollideWithPlayer(player)`: a player touching the item
 /// picks it up once `delayBeforeCanPickup` is 0. The stack goes into
 /// `player.inventory` (`addItemStackToInventory`, which lowers
-/// `item.stackSize` in place); if anything was taken: the `mineWood` /
+/// `item.stackSize` in place); if the call returns true (only when the
+/// whole stack went in: InventoryPlayer.java:144-150 returns the last
+/// round's `stackSize < var2`): the `mineWood` /
 /// `killCow` achievements for a log / leather, `random.pop` with two `rand`
 /// draws, `onItemPickup` (empty for `EntityPlayer`, [`super::player::on_item_pickup`])
 /// with the size read *before* the call, and death once the stack is used up.

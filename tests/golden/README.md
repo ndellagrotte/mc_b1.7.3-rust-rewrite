@@ -1544,7 +1544,9 @@ so a loaded save's `data/idcounts.dat` and `data/map_<id>.dat` are read as in Ja
 Gate 2's long run (PLAN_v4 §5): `tick/testworld-6000`, `"world": "load"` of
 `save/testworld/world`, the player at the spawn point (the `EntityPlayer` constructor's
 spot), natural spawning off, 6000 ticks; every 500 ticks the four chunks around the spawn,
-`rng_state`, `world_time` and the player. It passes since the WP-2.5a merge, which brought
+`rng_state`, `world_time` and the `inventory`; every 100 ticks the player (entity 4: the
+preloaded chunks' saved entities take ids 0-3) and `player_state`; every 1000 ticks every
+entity (267 lines, WP-2.H). It passes since the WP-2.5a merge, which brought
 the WP-2.3 constructors of the region's 24 saved mobs (cows, skeletons, zombies, creepers,
 squid, sheep, a spider) together with the loaded world. Only region `r.0.-1` is committed, and the player at the spawn
 chunk (1,-4) random-ticks a 19x19 chunk square around it (World.java:1868-1965), chunks x
@@ -1579,10 +1581,9 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   hold every edit; the rest of the 3×3 around the player is unedited generated terrain,
   compared by the `chunk_digest` dumps every 20 ticks instead of ~165 kB `chunk_nbt` lines),
   `reload`, 100 more ticks, a final `save` (same chunks). The
-  scenario's `comment` lists the steps and ticks. In the port it needs `EntityItem`'s pickup
-  (`EntityItem.onCollideWithPlayer`, a recorded gap; first diff at line 745, t = 78) before
-  the item behaviour of WP-2.6 (`ItemBlock`, `ItemBed`, `ItemFood`, `ItemSword.hitEntity`,
-  merged) is reached.
+  scenario's `comment` lists the steps and ticks. It passes on all 3,237 lines since WP-2.H
+  transcribed `EntityItem.onCollideWithPlayer` (it was ignored at Gate 2, first diff at line
+  745, t = 78).
 
 Vanilla behaviour these fixtures pin down:
 
