@@ -500,6 +500,71 @@ impl World {
         crate::entity::base::mix_seed(self.entity_rand_seed, id as i64)
     }
 
+    // ---- reopening a save in the same session --------------------------------
+
+    /// Takes over from `old`, the world this one replaces (the game quitting
+    /// a world and opening its save again, `Minecraft.changeWorld`,
+    /// Minecraft.java:1268-1337), the state that is a Java static and so
+    /// outlives a `World` object in the JVM, which the port keeps per world
+    /// (module docs, "Conventions"): `Entity.nextEntityID` (Entity.java:7),
+    /// `NextTickListEntry.nextTickEntryID` (NextTickListEntry.java:4),
+    /// `World.lightingUpdatesScheduled` (World.java:52), the `Math.random()`
+    /// stream, the entity-RNG seed of the harness protocol, the block
+    /// singletons ([`BlockStatics`]), `SpawnerAnimals.eligibleChunksForSpawning`
+    /// (SpawnerAnimals.java:9) and the display `Random` (not Java state).
+    /// The diagnostics move too. `old` is left with fresh values.
+    ///
+    /// Java statics that land in `World` later must be added here.
+    pub fn adopt_statics(&mut self, old: &mut World) {
+        self.next_entity_id = old.next_entity_id;
+        self.next_tick_entry_id = old.next_tick_entry_id;
+        self.lighting_updates_scheduled = old.lighting_updates_scheduled;
+        self.math_random = std::mem::replace(&mut old.math_random, JavaRandom::new(0));
+        self.entity_rand_seed = old.entity_rand_seed;
+        self.block_statics = std::mem::take(&mut old.block_statics);
+        self.eligible_chunks_for_spawning =
+            std::mem::replace(&mut old.eligible_chunks_for_spawning, JavaHashSet::new());
+        self.display_random = std::mem::replace(&mut old.display_random, JavaRandom::new(0));
+        self.skipped_systems = std::mem::take(&mut old.skipped_systems);
+        self.unimplemented_hits = std::mem::take(&mut old.unimplemented_hits);
+    }
+
+    /// Sets the constructor's clock-seeded state (World.java:162, :170,
+    /// :177: `field_9437_g = new Random().nextInt()`, `rand = new Random()`,
+    /// `soundCounter = rand.nextInt(12000)`) to `old`'s: the golden harness's
+    /// definition of a reopened world, since those values have no
+    /// reproducible vanilla value (tests/golden/README.md "Reload").
+    pub fn adopt_clock_seeded_state(&mut self, old: &World) {
+        self.rand = old.rand.clone();
+        self.field_9437_g = old.field_9437_g;
+        self.sound_counter = old.sound_counter;
+    }
+
+    /// Replaces the terrain generator of the caching `ChunkProvider` (its
+    /// `chunkProvider` field, ChunkProvider.java:14). Only meaningful before
+    /// the first chunk is generated; the harness uses it to put
+    /// [`chunk_provider::EmptyChunkProvider`] into a world opened with the
+    /// loading constructor, as the oracle does by reflection.
+    pub fn set_chunk_generator(&mut self, generator: ChunkGenerator) {
+        self.chunk_provider.generator = Some(generator);
+    }
+
+    /// The loaded chunks' coordinates in `ChunkProvider.chunkList` (load)
+    /// order (ChunkProvider.java:17, :46).
+    pub fn loaded_chunk_coords(&self) -> Vec<(i32, i32)> {
+        self.chunk_provider
+            .chunk_list
+            .iter()
+            .filter_map(|k| self.chunk_provider.chunk_map.get(k))
+            .map(|c| (c.x_position, c.z_position))
+            .collect()
+    }
+
+    /// `chunkList.size()` (ChunkProvider.java:17).
+    pub fn loaded_chunk_count(&self) -> usize {
+        self.chunk_provider.chunk_list.len()
+    }
+
     // ---- diagnostics ----------------------------------------------------------
 
     /// Records that the untranscribed world system `what` was reached.

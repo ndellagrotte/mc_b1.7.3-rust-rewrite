@@ -3,7 +3,9 @@ package harness;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 import java.util.stream.Stream;
 import net.minecraft.src.Block;
@@ -13,6 +15,7 @@ import net.minecraft.src.BlockFurnace;
 import net.minecraft.src.BlockRedstoneTorch;
 import net.minecraft.src.BlockRedstoneWire;
 import net.minecraft.src.BlockSand;
+import net.minecraft.src.Chunk;
 import net.minecraft.src.ChunkProvider;
 import net.minecraft.src.Entity;
 import net.minecraft.src.EntityChicken;
@@ -40,11 +43,21 @@ final class HarnessWorld {
     /** Odd 64-bit constant of {@link #mix} (2^64 / golden ratio, as in SplitMix64). */
     static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
 
-    final World world;
+    /** The world; replaced by a {@code reload} op ({@link #reload}). */
+    World world;
     final long seed;
-    final HarnessWorldAccess access;
+    /** The world's seeding hook; a new one for the reloaded world ({@link #reload}). */
+    HarnessWorldAccess access;
     /** Temp directory holding the save directory {@code world/}, or null for SaveHandlerMP. */
     final Path saveRoot;
+    /**
+     * The {@code createPlayersDir} argument the save was opened with ({@code SaveHandler},
+     * SaveHandler.java:19-30): true for {@code "save_format": "mcregion"}, false for a loaded
+     * world; a {@code reload} reopens the save the same way.
+     */
+    boolean createPlayersDir;
+    /** {@code "world": "empty"}: a reload swaps the generator again ({@link #reload}). */
+    boolean emptyGenerator;
     final int difficulty;
     HarnessPlayer player;
     /** Minecraft.joinPlayerCounter (Minecraft.java:1135-1139). */
@@ -130,6 +143,7 @@ final class HarnessWorld {
                 break;
             default: throw new IllegalArgumentException("unknown save_format " + saveFormat);
         }
+        boolean empty = false;
         // src: World.java:62-100. Fresh WorldInfo(seed, "harness"), spawn (0, 0, 0); no chunk
         // is loaded and no spawn point is searched for.
         World world = new World(handler, "harness", provider, seed);
@@ -143,10 +157,14 @@ final class HarnessWorld {
                 // World.java:1732-1738, only reads the celestial angle) and the generator has
                 // not been asked for anything yet.
                 Reflect.set(ChunkProvider.class, "chunkProvider", world.getIChunkProvider(), new EmptyChunkProvider(world));
+                empty = true;
                 break;
             default: throw new IllegalArgumentException("unknown world " + worldType);
         }
-        return new HarnessWorld(world, seed, root, difficulty);
+        HarnessWorld hw = new HarnessWorld(world, seed, root, difficulty);
+        hw.createPlayersDir = true;
+        hw.emptyGenerator = empty;
+        return hw;
     }
 
     /**
@@ -258,6 +276,94 @@ final class HarnessWorld {
             world.randomDisplayUpdates(MathHelper.floor_double(player.posX),
                     MathHelper.floor_double(player.posY), MathHelper.floor_double(player.posZ));
         }
+    }
+
+    /**
+     * The {@code reload} op (tests/golden/README.md "Reload"): quit the world and open its save
+     * again in the same JVM, as a player leaving to the title screen and loading the world
+     * does, with the harness's seeding protocol carried across.
+     *
+     * <ol>
+     * <li>The loaded chunks of the old world, in {@code ChunkProvider.chunkList} (load) order.
+     * <li>{@code World.saveWorld(true, null)} (World.java:278-291), what
+     * {@code Minecraft.changeWorld} does to the world it leaves ({@code saveWorldIndirectly},
+     * Minecraft.java:1276, World.java:1653-1655). The old World object is then dropped.
+     * <li>The loading constructor {@code World(new SaveOldDir(root, "world", createPlayersDir),
+     * "harness", seed, null)} (World.java:149-208), as {@code open} / {@code "world": "load"}
+     * build one; for {@code "world": "empty"} the generator is swapped again as {@code create}
+     * does. The constructor's clock-seeded state has no vanilla-reproducible value, so the
+     * harness defines it: the old world's {@code rand} object itself (its 48-bit state and any
+     * pending {@code nextNextGaussian}; World.java:82, :170), {@code field_9437_g}
+     * (World.java:75, :162) and {@code soundCounter} (World.java:90, :177) are carried over.
+     * {@code makeDeterministic} and {@code resetStatics} do not run: the JVM statics
+     * ({@code Entity.nextEntityID}, {@code NextTickListEntry.nextTickEntryID}, the
+     * {@code HarnessMath} stream, {@code Item.itemRand} and the block singletons' Randoms and
+     * flags, {@code World.lightingUpdatesScheduled},
+     * {@code SpawnerAnimals.eligibleChunksForSpawning}, the open {@code RegionFileCache}) go on
+     * as they are, as they would in the game.
+     * <li>A new {@link HarnessWorldAccess} (the seeding hook) is registered; the dig
+     * controller and the last dug block are dropped (they belong to the old world and player).
+     * <li>The old world's chunks are loaded again in that order, each followed by draining the
+     * light queue (as a preload does): from the region files, or generated again when they
+     * were never saved (unmodified chunks are not, Chunk.java:536-550). Their entities and tile
+     * entities come back with the chunks, the entities with new ids from
+     * {@code Entity.nextEntityID} and seeded by the hook. Scheduled ticks do not come back:
+     * b1.7.3 does not save them (ChunkLoader.storeChunkInCompound, ChunkLoader.java:108-149, writes no tick list).
+     * <li>If the scenario had a player: a new {@code HarnessPlayer} (seeded after construction,
+     * as the {@code player} op does), then {@code world.spawnPlayerWithLoadedChunks(player)}
+     * (World.java:256-276: {@code readFromNBT} of level.dat's {@code Player} compound, which is
+     * then cleared, and {@code entityJoinedWorld}), as {@code Minecraft.changeWorld} ends
+     * (Minecraft.java:1325). The client's {@code preparePlayerToSpawn} and
+     * {@code PlayerControllerSP.flipPlayer} (Minecraft.java:1298-1300) are not called, as the
+     * {@code player} op does not call them; {@code readFromNBT} overwrites what they set. The
+     * new player's {@code MovementInput} is all zero until the next {@code input} op.
+     * </ol>
+     *
+     * Fields of the line: {@code chunks} ({@code chunkList.size()} afterwards), {@code entities}
+     * ({@code loadedEntityList.size()}), {@code tile_entities} ({@code loadedTileEntityList.size()}),
+     * {@code player} (the new player's entity id, or null).
+     */
+    void reload(Json.Line l) throws Exception {
+        if (saveRoot == null) {
+            throw new IllegalArgumentException("op reload needs \"save_format\": \"mcregion\" or \"world\": \"load\"");
+        }
+        World old = world;
+        List<int[]> coords = new ArrayList<>();
+        for (Object o : (List<?>) Reflect.get(ChunkProvider.class, "chunkList", old.getIChunkProvider())) {
+            Chunk c = (Chunk) o;
+            coords.add(new int[] {c.xPosition, c.zPosition});
+        }
+        old.saveWorld(true, null); // src: World.java:278-291
+        World w = new World(new SaveOldDir(saveRoot.toFile(), "world", createPlayersDir), "harness", seed, null);
+        if (w.isNewWorld) throw new IllegalStateException("reload: no level.dat in " + saveRoot.resolve("world"));
+        if (emptyGenerator) {
+            Reflect.set(ChunkProvider.class, "chunkProvider", w.getIChunkProvider(), new EmptyChunkProvider(w));
+        }
+        w.rand = old.rand;
+        Reflect.set(World.class, "field_9437_g", w, Reflect.getInt(World.class, "field_9437_g", old));
+        Reflect.set(World.class, "soundCounter", w, Reflect.getInt(World.class, "soundCounter", old));
+        world = w;
+        access = new HarnessWorldAccess(seed);
+        w.addWorldAccess(access);
+        controller = null;
+        lastDig = null;
+        for (int[] c : coords) {
+            w.getChunkFromChunkCoords(c[0], c[1]);
+            while (w.updatingLighting()) {
+                // drain, as a preload does (Minecraft.java:1370)
+            }
+        }
+        if (player != null) {
+            HarnessPlayer p = new HarnessPlayer(w);
+            TickScenario.seedAfterConstruction(p, seed);
+            w.spawnPlayerWithLoadedChunks(p); // src: World.java:256-276
+            player = p;
+        }
+        l.put("chunks", ((List<?>) Reflect.get(ChunkProvider.class, "chunkList", w.getIChunkProvider())).size())
+                .put("entities", w.loadedEntityList.size())
+                .put("tile_entities", w.loadedTileEntityList.size());
+        if (player == null) l.raw("player", "null");
+        else l.put("player", player.entityId);
     }
 
     /** Closes region files (RegionFileCache is static) and deletes the temp directory. */

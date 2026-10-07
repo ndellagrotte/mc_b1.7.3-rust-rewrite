@@ -61,7 +61,7 @@ final class TickScenario {
 
     private static final List<String> OPS = List.of("set_block", "set_block_silent", "fill", "set_time", "set_weather", "preload",
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode",
-            "interact", "craft", "slot_click", "input", "dig", "sleep");
+            "interact", "craft", "slot_click", "input", "dig", "sleep", "reload");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
             "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory", "player_state",
             "map_data");
@@ -90,8 +90,9 @@ final class TickScenario {
             long t = num(op, "t");
             if (t < 0 || t >= ticks) throw new IllegalArgumentException("op t=" + t + " outside 0.." + (ticks - 1));
             if (!OPS.contains(str(op, "op"))) throw new IllegalArgumentException("unknown op " + op.get("op"));
-            if (str(op, "op").equals("save") && !saveFormat.equals("mcregion") && !worldType.equals("load")) {
-                throw new IllegalArgumentException("op save needs \"save_format\": \"mcregion\" or \"world\": \"load\"");
+            boolean needsSave = str(op, "op").equals("save") || str(op, "op").equals("reload");
+            if (needsSave && !saveFormat.equals("mcregion") && !worldType.equals("load")) {
+                throw new IllegalArgumentException("op " + str(op, "op") + " needs \"save_format\": \"mcregion\" or \"world\": \"load\"");
             }
             ops.add(op);
         }
@@ -386,6 +387,12 @@ final class TickScenario {
                 trace.add(l);
                 TierS.save(hw, op, t, trace);
                 return;
+            case "reload":
+                // HarnessWorld.reload; the open container belongs to the old world.
+                hw.reload(l);
+                openContainer = null;
+                openSpec = null;
+                break;
             default: throw new IllegalArgumentException("unknown op " + name);
         }
         trace.add(l);

@@ -652,6 +652,9 @@ pub enum OpKind {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         chunks: Option<Vec<ChunkPos>>,
     },
+    /// Save, drop the world and open its save again (README "Reload"; needs
+    /// `save_format: "mcregion"` or `world: "load"`).
+    Reload {},
 }
 
 /// A dump, due when `(t + 1) % every == 0` or at tick `t`; exactly one of

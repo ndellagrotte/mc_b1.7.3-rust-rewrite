@@ -76,6 +76,7 @@
 //! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
 //! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
+//! | `reload` | `reload`: [`World::try_save_world`]`(true)`, [`World::new_from_save`] on a new [`SaveOldDir`] over the same store, [`World::set_chunk_generator`] (empty worlds), [`World::adopt_clock_seeded_state`], [`World::adopt_statics`], the old [`World::loaded_chunk_coords`] loaded again, a new player through [`World::spawn_player_with_loaded_chunks`] → `chunks`, `entities`, `tile_entities`, `player` |
 //!
 //! Not supported yet, each an error naming the op and the missing Java code:
 //! `spawn` of the mobs other than `Pig`, `Sheep`, `Cow`, `Chicken`, `Wolf`,
@@ -174,6 +175,8 @@ fn drive_with(
     };
     let mut h = Harness {
         save_store,
+        seed: sc.seed,
+        empty_generator: sc.world == WorldSource::Empty,
         player: None,
         join_player_counter: 0,
         difficulty: sc.difficulty,
@@ -273,13 +276,18 @@ fn validate(sc: &TickScenario) -> Result<(), GoldenError> {
                 sc.ticks - 1
             )));
         }
-        if matches!(op.kind, OpKind::Save { .. })
+        let name = match op.kind {
+            OpKind::Save { .. } => Some("save"),
+            OpKind::Reload {} => Some("reload"),
+            _ => None,
+        };
+        if let Some(name) = name
             && save_format != "mcregion"
             && sc.world != WorldSource::Load
         {
-            return Err(GoldenError::other(
-                "op save needs \"save_format\": \"mcregion\" or \"world\": \"load\"",
-            ));
+            return Err(GoldenError::other(format!(
+                "op {name} needs \"save_format\": \"mcregion\" or \"world\": \"load\""
+            )));
         }
     }
     for d in &sc.dumps {
@@ -529,6 +537,12 @@ struct Harness {
     /// The save's storage (`HarnessWorld.saveRoot`), for `"save_format":
     /// "mcregion"`.
     save_store: Option<SharedSaveStore>,
+    /// `HarnessWorld.seed`: the scenario seed (the `reload` op's loading
+    /// constructor takes it).
+    seed: i64,
+    /// `HarnessWorld.emptyGenerator`: `"world": "empty"`, whose generator a
+    /// `reload` swaps in again.
+    empty_generator: bool,
     /// `HarnessWorld.player`: the entity id of the `player` op's player.
     player: Option<i32>,
     /// `HarnessWorld.joinPlayerCounter` (Minecraft.joinPlayerCounter).
@@ -998,6 +1012,7 @@ fn apply(
                 .with("stack", stack_json(st))
                 .with("held", stack_json(held))
         }
+        OpKind::Reload {} => reload(world, h, t)?,
         OpKind::Save { ref chunks } => {
             let Some(store) = h.save_store.clone() else {
                 return Err(GoldenError::other(
@@ -1022,6 +1037,81 @@ fn apply(
     };
     w.push(out);
     Ok(())
+}
+
+/// `HarnessWorld.reload` (README "Reload"): save, drop the world, open the
+/// save again with the loading constructor, carry the Java statics
+/// ([`World::adopt_statics`]) and the harness-defined clock-seeded state
+/// ([`World::adopt_clock_seeded_state`]) over, reload the old world's chunks
+/// in `chunkList` order (each followed by draining the light queue), then,
+/// if there was a player, a new one through
+/// [`World::spawn_player_with_loaded_chunks`]. The dig controller, the last
+/// dug block and the open container are dropped; the player's
+/// `ContainerPlayer` is a new one (the constructor's).
+// src: HarnessWorld.java reload; Minecraft.java:1268-1337 (changeWorld)
+fn reload(world: &mut World, h: &mut Harness, t: u32) -> Result<TraceLine, GoldenError> {
+    let Some(store) = h.save_store.clone() else {
+        return Err(GoldenError::other(
+            "op reload needs \"save_format\": \"mcregion\" or \"world\": \"load\"",
+        ));
+    };
+    let coords = world.loaded_chunk_coords();
+    // src: World.java:278-291 (saveWorld(true, null), as
+    // Minecraft.changeWorld's saveWorldIndirectly does, Minecraft.java:1276)
+    world
+        .try_save_world(true)
+        .map_err(|e| GoldenError::other(format!("t={t}: reload: save: {e}")))?;
+    let dir = SaveOldDir::new(store, "", WORLD_DIR)
+        .map_err(|e| GoldenError::other(format!("t={t}: reload: {e}")))?;
+    // src: World.java:149-208, HarnessWorld.reload
+    let mut fresh = World::new_from_save(
+        Box::new(HarnessSaveHandler(dir)),
+        "harness",
+        h.seed,
+        None,
+        // Overwritten by adopt_clock_seeded_state below.
+        WorldEnvironment {
+            rand_seed: 0,
+            field_9437_g: 0,
+            lock_timestamp: 0,
+        },
+    );
+    if fresh.is_new_world {
+        return Err(GoldenError::other(format!(
+            "t={t}: reload: no level.dat in the save"
+        )));
+    }
+    if h.empty_generator {
+        fresh.set_chunk_generator(ChunkGenerator::Empty(EmptyChunkProvider));
+    }
+    fresh.adopt_clock_seeded_state(world);
+    fresh.adopt_statics(world);
+    // The old World object is dropped here.
+    *world = fresh;
+    h.controller = None;
+    h.last_dig = None;
+    h.open_container = None;
+    for (x, z) in coords {
+        world.get_chunk_from_chunk_coords(x, z);
+        while world.updating_lighting() {}
+    }
+    let mut player = Value::Null;
+    if h.player.is_some() {
+        // As the `player` op builds it: the EntityPlayer constructor chain,
+        // seeded at construction, username "Player", a new ContainerPlayer.
+        let mut e = new_entity_player_sp(world);
+        player_data(&mut e).username = Some("Player".to_string());
+        let eid = e.id();
+        h.player_container = Some(new_container_player(!world.multiplayer_world));
+        world.spawn_player_with_loaded_chunks(e); // src: World.java:256-276
+        h.player = Some(eid);
+        player = Value::from(eid);
+    }
+    Ok(TraceLine::op(t as i64, "reload")
+        .with("chunks", world.loaded_chunk_count() as u64)
+        .with("entities", world.loaded_entity_list.len() as u64)
+        .with("tile_entities", world.loaded_tile_entity_list.len() as u64)
+        .with("player", player))
 }
 
 /// `TickScenario.craft`: `CraftingManager.findMatchingRecipe` over a new
