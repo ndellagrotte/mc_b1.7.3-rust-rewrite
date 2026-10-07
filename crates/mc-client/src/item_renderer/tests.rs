@@ -422,11 +422,11 @@ fn a_synthetic_alpha_mask_shows_its_outline_on_the_slabs() {
     // row r) shows on both x slabs of column c and both y slabs of row r,
     // at the cell (15 - c, 15 - r)'s edges of the front face.
     let mut mask = [[false; 16]; 16];
-    for r in 2..14 {
-        mask[r][3] = true;
+    for row in &mut mask[2..14] {
+        row[3] = true;
     }
-    for c in 3..12 {
-        mask[13][c] = true;
+    for cell in &mut mask[13][3..12] {
+        *cell = true;
     }
     let t = extruded_icon(0);
     let mut shown = 0;
