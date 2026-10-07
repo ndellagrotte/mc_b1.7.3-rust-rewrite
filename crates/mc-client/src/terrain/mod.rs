@@ -179,7 +179,8 @@ pub struct Terrain {
     serial: u64,
     /// The snapshot template of the current world.
     template: Option<SnapshotTemplate>,
-    /// `EntityRenderer.renderEndNanoTime`.
+    /// `EntityRenderer.renderEndNanoTime`, taken at the start of the frame
+    /// ([`mark_render_end`]).
     render_end_nano_time: i64,
     /// The settings the grid was built with: fancy graphics, AO.
     built_with: Option<(bool, bool)>,
@@ -212,6 +213,7 @@ impl Plugin for TerrainPlugin {
             .init_resource::<TerrainTileEntities>()
             .init_resource::<TerrainStats>()
             .add_systems(Startup, spawn_terrain_handles)
+            .add_systems(First, mark_render_end)
             .add_systems(
                 Update,
                 (terrain_frame, draw_block_breaking, update_terrain_materials)
@@ -221,6 +223,19 @@ impl Plugin for TerrainPlugin {
                     .after(TexturesSet),
             );
     }
+}
+
+/// `renderEndNanoTime = System.nanoTime()` (EntityRenderer.java:390):
+/// vanilla takes it when `renderWorld` returns, before the GUI and
+/// `Display.update`, and gives the next frame's `updateRenderers` until
+/// `1/120` or `1/40` s after it (EntityRenderer.java:364-378). Bevy presents
+/// with vsync after this app's systems ran, so the matching point is the
+/// start of the next frame, once the previous present returned: taken from
+/// the end of [`terrain_frame`] instead, the vsync wait would use up the
+/// budget and `updateRenderers` would run once a frame whatever the limit.
+// src: EntityRenderer.java:364-391
+pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
+    terrain.render_end_nano_time = clock::nano_time();
 }
 
 /// Creates the materials and the crack overlay's entity.
@@ -646,8 +661,7 @@ pub fn terrain_frame(
     stats.pending_jobs = t.pending.len();
     stats.drawn = [d0, d1];
     stats.to_update = t.global.world_renderers_to_update.len();
-    t.render_end_nano_time = clock::nano_time();
-    stats.frame_nanos = (t.render_end_nano_time - frame_t0).max(0) as u64;
+    stats.frame_nanos = (clock::nano_time() - frame_t0).max(0) as u64;
 }
 
 /// `drawBlockBreaking` at the frame's call site ([`crack`]).

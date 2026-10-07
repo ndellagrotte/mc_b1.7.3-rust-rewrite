@@ -299,7 +299,8 @@ policy), `snapshot.rs` (what a mesh job reads).
   `updateRenderers` runs as vanilla runs it: every dirty section within 16
   blocks (nearest first) plus one more (the best by `RenderSorter`), once
   per frame without a frame-rate limit, repeated until the limit's time is
-  up with one. The near ones are meshed at once, the far one on Bevy's
+  up with one (1/120 or 1/40 s from `renderEndNanoTime`, taken at the start
+  of the frame: `terrain::mark_render_end` docs). The near ones are meshed at once, the far one on Bevy's
   `AsyncComputeTaskPool`. No separate chunk load/unload trigger: as
   `ChunkCache` does, a rebuild loads (or generates) the 3×3 chunks around
   its section first, and blocks a populator writes into a neighbour arrive
