@@ -56,6 +56,7 @@ pub mod map_storage;
 pub mod nibble;
 pub mod provider;
 pub mod ray_trace;
+pub mod teleporter;
 pub mod tick_entry;
 pub mod tile_entity;
 
