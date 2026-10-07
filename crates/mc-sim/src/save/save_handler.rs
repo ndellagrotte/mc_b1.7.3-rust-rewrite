@@ -20,6 +20,9 @@
 //!   `level.dat_new` renamed to `level.dat` (:109-136). Read from
 //!   `level.dat`, falling back to `level.dat_old` (:81-107).
 //! - `region/`, `DIM-1/region/`: the chunks ([`McRegionChunkLoader`]).
+//! - `data/<name>.dat`: map item data (`getMapFile`, :167-169), read and
+//!   written by `MapStorage` ([`crate::world::map_storage`]) through
+//!   [`SaveHandler::read_map_file`] / [`SaveHandler::write_map_file`].
 //!
 //! `mkdirs()` of the save directory, `players/` and `data/`
 //! (SaveHandler.java:21-27) and of `DIM-1` (SaveOldDir.java:15) have no
@@ -90,6 +93,29 @@ impl DirSaveHandler {
     /// The session-lock value this handler wrote.
     pub fn lock_timestamp(&self) -> i64 {
         self.now
+    }
+
+    /// `getMapFile(name)`: `new File(field_28114_d, name + ".dat")`, where
+    /// `field_28114_d` is the `data` directory of the save directory
+    /// (docs/mappings.md).
+    // src: SaveHandler.java:23, :167-169
+    pub fn get_map_file(&self, name: &str) -> String {
+        path_join(
+            &path_join(&self.save_directory, "data"),
+            &format!("{name}.dat"),
+        )
+    }
+
+    /// The bytes of [`Self::get_map_file`], `None` when it does not exist.
+    pub fn read_map_file(&self, name: &str) -> Result<Option<Vec<u8>>, SaveError> {
+        let path = self.get_map_file(name);
+        Ok(self.store.borrow_mut().storage.read(&path)?)
+    }
+
+    /// Writes [`Self::get_map_file`].
+    pub fn write_map_file(&self, name: &str, bytes: &[u8]) -> Result<(), SaveError> {
+        let path = self.get_map_file(name);
+        Ok(self.store.borrow_mut().storage.write(&path, bytes)?)
     }
 
     /// `checkSessionLock()`.
@@ -267,5 +293,20 @@ impl SaveHandler for SaveOldDir {
     // src: SaveHandler.java:138-165
     fn save_world_info(&mut self, info: &WorldInfo) -> Result<(), SaveError> {
         self.base.save_world_info(info)
+    }
+
+    // src: SaveHandler.java:167-169 (never null)
+    fn has_map_files(&self) -> bool {
+        true
+    }
+
+    // src: SaveHandler.java:167-169
+    fn read_map_file(&mut self, name: &str) -> Result<Option<Vec<u8>>, SaveError> {
+        self.base.read_map_file(name)
+    }
+
+    // src: SaveHandler.java:167-169
+    fn write_map_file(&mut self, name: &str, bytes: &[u8]) -> Result<(), SaveError> {
+        self.base.write_map_file(name, bytes)
     }
 }

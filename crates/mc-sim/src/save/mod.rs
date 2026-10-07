@@ -45,8 +45,6 @@
 //!   which `SaveHandler.getChunkLoader` and `SaveFormatOld.getSaveLoader`
 //!   hand out, and the conversion `SaveConverterMcRegion.convertMapFormat`
 //!   (SaveConverterMcRegion.java:62-171): deferred (PLAN_v4 D3).
-//! - `ISaveHandler.getMapFile` (SaveHandler.java:167-169): map item data,
-//!   with `MapStorage` (WP-2.6).
 
 pub mod chunk_loader;
 pub mod entity_list;
@@ -264,8 +262,10 @@ pub trait ChunkLoader {
     fn save_extra_data(&mut self);
 }
 
-/// `ISaveHandler` (ISaveHandler.java). `getMapFile` (map item data) is left
-/// out until `MapStorage` is ported (WP-2.6).
+/// `ISaveHandler` (ISaveHandler.java). `getMapFile(name)` (the map item
+/// data file, read and written only by `MapStorage`) is the three
+/// `*map_file*` methods: the file itself is never handed out, its bytes go
+/// through the handler's [`Storage`] (WP-2.6, [`crate::world::map_storage`]).
 pub trait SaveHandler {
     /// `loadWorldInfo()`: `None` for a new world.
     fn load_world_info(&mut self) -> Option<WorldInfo>;
@@ -286,6 +286,25 @@ pub trait SaveHandler {
     ) -> Result<(), SaveError>;
     /// `saveWorldInfo(info)`.
     fn save_world_info(&mut self, info: &WorldInfo) -> Result<(), SaveError>;
+    /// `getMapFile(name) != null`: whether the handler has a map data
+    /// directory. False (`SaveHandlerMP`, SaveHandlerMP.java:24-26) means
+    /// `MapStorage` reads and writes nothing.
+    fn has_map_files(&self) -> bool {
+        false
+    }
+    /// The bytes of `getMapFile(name)` (`data/<name>.dat`), `Ok(None)` when
+    /// the file does not exist (`File.exists()` false) or there is no map
+    /// directory.
+    fn read_map_file(&mut self, name: &str) -> Result<Option<Vec<u8>>, SaveError> {
+        let _ = name;
+        Ok(None)
+    }
+    /// Writes `getMapFile(name)` (a `FileOutputStream` over it); nothing
+    /// without a map directory.
+    fn write_map_file(&mut self, name: &str, bytes: &[u8]) -> Result<(), SaveError> {
+        let _ = (name, bytes);
+        Ok(())
+    }
 }
 
 /// `SaveHandlerMP` (SaveHandlerMP.java): saves nothing, loads nothing.

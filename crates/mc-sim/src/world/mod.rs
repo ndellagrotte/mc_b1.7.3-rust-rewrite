@@ -18,13 +18,11 @@
 //!
 //! | Java | State |
 //! |---|---|
-//! | `saveLevel` (:293-297) | `MapStorage.saveAllData` WP-2.6 |
 //! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
 //! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
 //! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
-//! | `setItemData`, `loadItemData`, `getUniqueDataId` (:2462-2472) | not ported: `MapStorage`, WP-2.6 |
 //! | `addWorldAccess`, `removeWorldAccess` (:951-957) | replaced by [`World::events`] |
 //! | `emptyMethod1`, `func_4085_a` (:253, :1587) | not ported: empty / returns null, no caller |
 //!
@@ -54,6 +52,7 @@ pub mod events;
 pub mod explosion;
 pub mod info;
 pub mod lighting;
+pub mod map_storage;
 pub mod nibble;
 pub mod provider;
 pub mod ray_trace;
@@ -77,6 +76,7 @@ use self::chunk_provider::{ChunkGenerator, ChunkProviderCache};
 use self::events::{EventQueue, WorldEvent};
 use self::info::WorldInfo;
 use self::lighting::{EnumSkyBlock, MetadataChunkBlock};
+use self::map_storage::{MapDataRef, MapStorage};
 use self::provider::WorldProvider;
 use self::tick_entry::{NextTickListEntry, TickKey};
 use self::tile_entity::{TileEntity, TileEntityRef};
@@ -93,6 +93,10 @@ pub fn in_world_xz(x: i32, z: i32) -> bool {
 /// Salt of [`World::display_random`]'s seed, so it is not the same stream
 /// as `World.rand` (any constant works; the stream is never traced).
 const DISPLAY_RANDOM_SALT: i64 = 0x5DEE_CE66_D1A5_7EED;
+
+/// The `k` of `mix(seed, k)` that seeds `Item.itemRand` ([`World::item_rand`];
+/// tests/golden/README.md "Seeding").
+pub const ITEM_RAND_KEY: i64 = -1;
 
 /// `World`.
 pub struct World {
@@ -211,7 +215,10 @@ pub struct World {
     /// `allPlayersSleeping`.
     // src: World.java:45
     pub(crate) all_players_sleeping: bool,
-    // `field_28108_z` (MapStorage, World.java:46): map item data, WP-2.6.
+    /// `field_28108_z`: the map item data (name kept, see
+    /// `docs/mappings.md`; [`map_storage`]).
+    // src: World.java:46
+    pub field_28108_z: MapStorage,
     // `collidingBoundingBoxes` (World.java:47) and `field_1012_M` (:55) are
     // scratch lists returned by reference; here each call returns a new Vec.
     /// `field_31055_L`: set while `updateEntities` iterates the tile entities.
@@ -248,6 +255,10 @@ pub struct World {
     /// The single stream every `Math.random()` call draws from (PLAN_v4 §3.4
     /// rule 3; the oracle's `HarnessMath`).
     pub math_random: JavaRandom,
+    /// `Item.itemRand` (Item.java:6, a clock-seeded static `Random`; the
+    /// oracle reseeds it with `mix(seed, -1)` per scenario): the item
+    /// sounds' pitch and bone meal on grass ([`crate::item::behaviour`]).
+    pub item_rand: JavaRandom,
     /// Seed of the entity-RNG protocol (PLAN_v4 §4.2): an entity's `rand` is
     /// seeded with `mix(entity_rand_seed, entityId)`
     /// ([`World::entity_rand_seed_for`]).
@@ -319,8 +330,8 @@ impl World {
             generator,
             env,
         );
-        // `field_28108_z = new MapStorage(saveHandler)` (World.java:96): WP-2.6.
-        // `worldProvider.registerWorld(this)` (World.java:97): done by
+        // `field_28108_z = new MapStorage(saveHandler)` (World.java:96) is in
+        // `construct`. `worldProvider.registerWorld(this)` (World.java:97): done by
         // `WorldProvider::new` (the surface biome manager is built on first
         // use, see `provider`).
         w.calculate_initial_skylight(); // src: World.java:99
@@ -348,7 +359,9 @@ impl World {
         provider: Option<WorldProvider>,
         env: WorldEnvironment,
     ) -> World {
-        // `field_28108_z = new MapStorage(var1)` (World.java:181): WP-2.6.
+        // `field_28108_z = new MapStorage(var1)` (World.java:181) is in
+        // `construct`: it only reads `idcounts.dat`, which nothing in between
+        // touches.
         let loaded = save_handler.load_world_info(); // src: World.java:182
         let is_new_world = loaded.is_none(); // src: World.java:183
         // src: World.java:184-190
@@ -394,6 +407,8 @@ impl World {
         let sound_counter = rand.next_int_bounded(12000);
         // src: World.java:210-213 (getChunkProvider)
         let loader = save_handler.get_chunk_loader(&provider);
+        // src: World.java:96, :181
+        let field_28108_z = MapStorage::new(save_handler.as_mut());
         World {
             scheduled_updates_are_immediate: false,
             lighting_to_update: Vec::new(),
@@ -429,6 +444,7 @@ impl World {
             world_info,
             finding_spawn_point: false,
             all_players_sleeping: false,
+            field_28108_z,
             field_31055_l: false,
             lighting_updates_counter: 0,
             spawn_hostile_mobs: true,
@@ -440,6 +456,8 @@ impl World {
             next_entity_id: 0,
             next_tick_entry_id: 0,
             math_random: JavaRandom::new(0),
+            // seeded as by `make_deterministic(0)`, like the block singletons'
+            item_rand: JavaRandom::new(crate::entity::base::mix_seed(0, ITEM_RAND_KEY)),
             entity_rand_seed: 0,
             block_statics: BlockStatics::default(),
             tile_entities: BTreeMap::new(),
@@ -464,6 +482,8 @@ impl World {
         self.field_9437_g = d.next_int();
         self.sound_counter = d.next_int_bounded(12000);
         self.math_random.set_seed(seed);
+        // `Item.itemRand` (`HarnessWorld.resetStatics`, census §2).
+        self.item_rand = JavaRandom::new(crate::entity::base::mix_seed(seed, ITEM_RAND_KEY));
         self.entity_rand_seed = seed;
         self.next_entity_id = 0;
         self.next_tick_entry_id = 0;
@@ -1029,6 +1049,27 @@ impl World {
     pub fn func_6466_a(&self, player: i32, x: i32, y: i32, z: i32) -> bool {
         let _ = (player, x, y, z);
         true
+    }
+
+    /// `setItemData(name, data)`: `field_28108_z.setData`.
+    // src: World.java:2462-2464
+    pub fn set_item_data(&mut self, var1: &str, var2: MapDataRef) {
+        self.field_28108_z.set_data(var1, var2);
+    }
+
+    /// `loadItemData(MapData.class, name)`: `field_28108_z.loadData` (the
+    /// only data class is `MapData`, [`map_storage`]).
+    // src: World.java:2466-2468
+    pub fn load_item_data(&mut self, var2: &str) -> Option<MapDataRef> {
+        self.field_28108_z
+            .load_data(self.save_handler.as_mut(), var2)
+    }
+
+    /// `getUniqueDataId(key)`: `field_28108_z.getUniqueDataId`.
+    // src: World.java:2470-2472
+    pub fn get_unique_data_id(&mut self, var1: &str) -> i32 {
+        self.field_28108_z
+            .get_unique_data_id(self.save_handler.as_mut(), var1)
     }
 
     /// `setEntityState(entity, state)`: empty in `World` (the multiplayer
@@ -1790,7 +1831,8 @@ impl World {
     /// `saveLevel()`: `checkSessionLock`, then
     /// `saveHandler.saveWorldInfoAndPlayer(worldInfo, playerEntities)` (the
     /// first player's `writeToNBT`, WorldInfo.java:72-87; failures are
-    /// printed in Java, ignored here). `MapStorage.saveAllData` is WP-2.6.
+    /// printed in Java, ignored here), then the dirty map data
+    /// (`MapStorage.saveAllData`).
     // src: World.java:293-297
     fn save_level(&mut self) -> Result<(), SaveError> {
         self.check_session_lock()?;
@@ -1810,7 +1852,8 @@ impl World {
         let _ = self
             .save_handler
             .save_world_info_and_player(&mut self.world_info, player);
-        // field_28108_z.saveAllData() (MapStorage): WP-2.6, nothing to save yet.
+        // src: World.java:296
+        self.field_28108_z.save_all_data(self.save_handler.as_mut());
         Ok(())
     }
 }
