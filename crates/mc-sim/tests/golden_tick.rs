@@ -230,6 +230,21 @@ fixtures! {
     tick_chest_container_clicks => "tick" / "chest-container-clicks";
     tick_furnace_dispenser_clicks => "tick" / "furnace-dispenser-clicks";
     tick_workbench_crafting => "tick" / "workbench-crafting";
+    // WP-2.6: item behaviour.
+    tick_place_stairs_slabs_doors_beds_signs => "tick" / "place-stairs-slabs-doors-beds-signs";
+    tick_bucket_fill_empty => "tick" / "bucket-fill-empty";
+    tick_bucket_nether_fizz => "tick" / "bucket-nether-fizz";
+    tick_bow_shoot => "tick" / "bow-shoot";
+    tick_flint_steel_tnt_portal => "tick" / "flint-steel-tnt-portal";
+    tick_hoe_seeds_crops => "tick" / "hoe-seeds-crops";
+    tick_food_eat_heal => "tick" / "food-eat-heal";
+    tick_dye_bonemeal_crops => "tick" / "dye-bonemeal-crops";
+    tick_sword_pickaxe_durability => "tick" / "sword-pickaxe-durability";
+    tick_minecart_boat_painting_place => "tick" / "minecart-boat-painting-place";
+    tick_saddle_pig_ride => "tick" / "saddle-pig-ride";
+    tick_record_jukebox => "tick" / "record-jukebox";
+    tick_fishing_rod_reel => "tick" / "fishing-rod-reel";
+    tick_map_create_update => "tick" / "map-create-update";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test
