@@ -12,11 +12,22 @@ commits, rebased and fast-forwarded from the per-WP branches `wp-2.1`, `wp-2.2`,
 `wp-2.3a/b/c`, `wp-2.4a/b`, `wp-2.5a/b`, `wp-2.6`, `wp-2.7` and `wp-2.G`. All of
 those branches still exist. Nothing is pushed.
 
+**Status (updated by the follow-up WP-2.H, 2026-10-06, branch `wp-2.H` from
+`e969e7b`).** Both Gate 2 criteria now pass. `tick/gate2-session` is no longer
+ignored and matches the oracle on all 3,237 lines (§3.1), and
+`tick/testworld-6000` now dumps the player and matches on all 267 lines (§3.2,
+question 2). WP-2.H transcribed the three pickups (`EntityItem`, `EntityArrow`,
+`EntitySnowball`/`EntityEgg.onCollideWithPlayer`, with the `mineWood`/`killCow`
+achievements and `EntityPlayer.onItemPickup`). The R2 wiring sites and the
+tamed-wolf branch of question 1 are still open. Every fixture passes: 219 of
+219, none ignored. The rest of this document is the review as written at
+`c415e67`; the sections that WP-2.H changed say so.
+
 Size of Phase 2: 317 files, +94,739 / −1,162 lines. `mc-sim` is now 62.9k lines
 of source and 13.6k lines of tests (Gate 1: 40.1k and 7.1k).
 
-**Verdict.** Gate 2 is not green. Its second criterion passes and its first
-fails on one recorded gap.
+**Verdict (at `c415e67`, before WP-2.H).** Gate 2 is not green. Its second
+criterion passes and its first fails on one recorded gap.
 
 - **`testWorld` 6,000 ticks: pass.** `tick/testworld-6000` matches the oracle on
   all 86 lines (§3.2).
@@ -56,6 +67,14 @@ no fix commits.
 | **Gate 2: scripted session** | **fail (ignored)** | §3.1 |
 | Ignored fixtures still fail as their reasons say | confirmed | `cargo test -p mc-sim --test golden_tick -- --ignored tick_gate2_session` fails at line 745, as the reason states |
 
+**WP-2.H re-run** (branch `wp-2.H`): `cargo test -p mc-sim -p mc-golden -p
+mc-core -p mc-nbt` gives 661 passed, 0 failed, 0 ignored. That is 8 new unit
+tests for the pickups plus `tick_gate2_session`; `golden_tick` gives 186
+passed, 0 ignored. clippy, fmt and the wasm check are clean. `regen.sh` changed
+only `tick/testworld-6000` (question 2). `check-reproducible.sh` reports "3
+runs byte-identical (221 files)" and `check-sensitivity.sh` 219/219 `ok`. The
+scripted-session row above is now **pass** (§3.1).
+
 The oracle still prints `harness: warning: chunk (1,0) already loaded before
 0,0; the "generated" stage is not pure generator output` for the `*-42-spread`
 worldgen fixtures. This is expected, as at Gate 1.
@@ -71,8 +90,8 @@ each fixture with its test.
 | A | 32 (rng 3, math 3, hash 6, nbt 5, block 1, item 1, recipe 1, stat 1, worldgen 11) | 32 | 0 | mc-core `golden_rng`, `golden_hash`, `golden_sine_table`, `math_sweep_report`; mc-nbt `golden_nbt`; mc-sim `golden_block_table`, `golden_item_table`, `golden_recipe_table` (new), `golden_stat_table` (new), `golden_worldgen` |
 | B | 90 (light 4, tick 86) | 90 | 0 | mc-sim `golden_tick` |
 | C | 89 (entity 62, tick 27) | 89 | 0 | mc-sim `golden_tick` |
-| S | 8 (save 3; tick 5: `dungeon-chest-save`, `chest-container-clicks`, `furnace-dispenser-clicks`, `reload-roundtrip`, `gate2-session`) | 7 | 1 | mc-sim `golden_save` (the 3 `save/*`), `golden_tick` (the 5 tick ones, listed in `golden_save::COVERED_IN_GOLDEN_TICK`) |
-| **Total** | **219** | **218** | **1** | |
+| S | 8 (save 3; tick 5: `dungeon-chest-save`, `chest-container-clicks`, `furnace-dispenser-clicks`, `reload-roundtrip`, `gate2-session`) | 8 (7 at `c415e67`; `gate2-session` since WP-2.H) | 0 (1 at `c415e67`) | mc-sim `golden_save` (the 3 `save/*`), `golden_tick` (the 5 tick ones, listed in `golden_save::COVERED_IN_GOLDEN_TICK`) |
+| **Total** | **219** | **219** (218 at `c415e67`) | **0** (1 at `c415e67`) | |
 
 Two Tier C fixtures, `entity/sheep-shear` and `entity/wolf-pack-retaliates`,
 also have a `save` op and emit Tier S lines. They are listed in
@@ -110,7 +129,10 @@ Phase 2 also ignored some fixtures for a while and then un-ignored them:
 
 All four pass.
 
-### 2.2 The one ignored fixture
+### 2.2 The one ignored fixture (un-ignored by WP-2.H)
+
+WP-2.H removed this `#[ignore]`, and `tick/gate2-session` passes (§3.1). The
+reason it had at `c415e67`:
 
 | Fixture | Tier | `#[ignore]` reason (golden_tick.rs:254, verbatim) |
 |---|---|---|
@@ -118,7 +140,7 @@ All four pass.
 
 ## 3. The two Gate 2 criteria
 
-### 3.1 The headless scripted session: `tick/gate2-session` (fail)
+### 3.1 The headless scripted session: `tick/gate2-session` (fail at `c415e67`; pass since WP-2.H)
 
 **What the scenario does** (`tests/golden/tick/gate2-session/scenario.json`;
 Tier S; 411 ticks).
@@ -208,6 +230,34 @@ The fix belongs in a WP with a reviewer: the snippet leaves out the
 `mineWood`/`killCow` achievements, and the arrow and snowball sites need the
 same change.
 
+**WP-2.H (the follow-up): pass.** WP-2.H transcribed the three pickups in
+full:
+- `entity::item::on_collide_with_player` (EntityItem.java:110-130) has the
+  experiment's body plus the `mineWood` (log, id 17) and `killCow` (leather,
+  334) achievements through `player::trigger_achievement`. It also calls
+  `player::on_item_pickup` with the stack size read before the call. A null
+  `item` is recorded as Java's `NullPointerException`.
+- `arrow::on_collide_with_player` (EntityArrow.java:257-266) and
+  `snowball::on_collide_with_player` (EntitySnowball.java:222-229,
+  EntityEgg.java:235-242): one arrow into the inventory, `random.pop`,
+  `onItemPickup(this, 1)` and `setEntityDead`. The snowball/egg arrow is the
+  transcribed vanilla bug.
+- `player::on_item_pickup` (EntityPlayer.java:346-347) is empty, as
+  `EntityPlayer`'s and `HarnessPlayer`'s are. `EntityPlayerSP`'s
+  `EntityPickupFX` is client-side (Phase 3).
+
+`#[ignore]` is gone, and the fixture matches on all 3,237 lines:
+
+```
+$ cargo test -p mc-sim --test golden_tick
+test result: ok. 186 passed; 0 failed; 0 ignored
+```
+
+The achievements never reach the trace. Through `EntityPlayerSP.addStat`,
+`mineWood` also needs its parent `openInventory`, which only the client's
+inventory screen awards. The arrow and snowball pickups have unit tests but
+no oracle fixture (see the WP-2.H report).
+
 ### 3.2 `testWorld` for 6,000 ticks: `tick/testworld-6000` (pass)
 
 **What the scenario does.** It loads `tests/golden/save/testworld/world` with
@@ -260,6 +310,18 @@ The player stays alive at health 20 for all 6,000 ticks. Gate 2's second
 criterion therefore holds for the player as well. Question 2 proposes fixing
 the committed scenario.
 
+**WP-2.H committed that fix** (question 2). The scenario's comment now gives
+the player as id 4. Its dumps are now:
+- entity 4 and `player_state` every 100 ticks;
+- `inventory` every 500;
+- every entity every 1000;
+- the chunk digests, `rng_state` and `world_time` every 500, as before.
+
+The oracle's regenerated `expected.jsonl` has 267 lines (86 before). Only
+`entity` and `entity_absent` lines were removed. Every chunk digest,
+`rng_state` and `world_time` line is unchanged. No other fixture changed, and
+`tick_testworld_6000` matches on every line.
+
 ## 4. Recorded gaps left in the code
 
 ### 4.1 Dispatch coverage tests
@@ -297,9 +359,9 @@ logged run (§3.1).
 
 | String | Site | From tick | Hit by | Note |
 |---|---|---|---|---|
-| `InventoryPlayer.addItemStackToInventory (EntityItem.onCollideWithPlayer)` | entity/item.rs:210 | yes | `tick/gate2-session` (115) | blocks Gate 2 (§3.1) |
-| `InventoryPlayer.addItemStackToInventory (EntityArrow.onCollideWithPlayer)` | entity/arrow.rs:523 | yes | — | the arrow is never picked up |
-| `InventoryPlayer.addItemStackToInventory (EntitySnowball/EntityEgg.onCollideWithPlayer)` | entity/snowball.rs:332 | yes | — | vanilla gives an arrow here (transcribed vanilla bug) |
+| `InventoryPlayer.addItemStackToInventory (EntityItem.onCollideWithPlayer)` | entity/item.rs:210 | yes | `tick/gate2-session` (115) | blocked Gate 2 (§3.1); **closed by WP-2.H** |
+| `InventoryPlayer.addItemStackToInventory (EntityArrow.onCollideWithPlayer)` | entity/arrow.rs:523 | yes | — | the arrow is never picked up; **closed by WP-2.H** |
+| `InventoryPlayer.addItemStackToInventory (EntitySnowball/EntityEgg.onCollideWithPlayer)` | entity/snowball.rs:332 | yes | — | vanilla gives an arrow here (transcribed vanilla bug); **closed by WP-2.H** |
 | `EntityPig.onStruckByLightning` | entity/pig.rs:102 | yes (thunder) | — | §4.1 |
 | `EntityWolf.isWolfTamed (EntityPlayer.alertWolves)` | entity/player.rs:725, :742 | yes (a mob hurts the player) | — | every wolf is treated as untamed, so a tamed wolf never defends its owner. The wolf exists since WP-2.3a |
 | `EntityPlayer.addToPlayerScore`, `EntityPlayer.onKillEntity` | entity/living.rs:772, :778 | yes | `entity/player-attack-pig`, `tick/gate2-session` | `scoreValue` is 0 for every b1.7.3 mob, so only the `mobKills`/`playerKills` stats and the `killEnemy` achievement are lost (stat file only). `dispatch::add_to_player_score` and `player::on_kill_entity` exist; `onDeath`'s shared-reference attacker is not wired to them |
@@ -573,7 +635,7 @@ up from 34 at Gate 1. The ones Phase 2 added cover:
 - **R1. `tick/testworld-6000` dumps an item, not the player** (§3.2). The
   scenario comment is wrong ("the player (id 0)"; the player is id 4), and no
   player state is compared in the long run. A variant that dumps the player
-  matches the oracle (267 lines).
+  matches the oracle (267 lines). **Fixed by WP-2.H** (question 2).
 - **R2. Wiring gaps left behind by Phase 1 call sites.** Four Phase 1 call
   sites still record a gap although the Phase 2 function they need exists:
   - `BlockPortal.onEntityCollidedWithBlock` records `EntityPlayer.setInPortal`;
@@ -590,8 +652,8 @@ up from 34 at Gate 1. The ones Phase 2 added cover:
   - spawner.rs module docs ("Recorded gaps", "Known divergence": no
     constructor is missing any more);
   - entity/item.rs module docs and `on_collide_with_player`'s doc ("needs the
-    inventory (WP-2.5)");
-  - arrow.rs:510-513 ("The inventory call is WP-2.5");
+    inventory (WP-2.5)"); fixed by WP-2.H;
+  - arrow.rs:510-513 ("The inventory call is WP-2.5"); fixed by WP-2.H;
   - living.rs:768-770 ("EntityPlayer's is WP-2.5");
   - pig.rs:12-13 (the `flyPig` achievement is done; `EntityPigZombie` "is
     WP-2.3");
@@ -640,10 +702,24 @@ up from 34 at Gate 1. The ones Phase 2 added cover:
    The pickup alone makes the whole session match (§3.1). The alternative is
    to accept Gate 2 with `gate2-session` ignored on a gap that is known and
    one call deep.
+
+   **WP-2.H update.** The first and last bullets are done. The three
+   `onCollideWithPlayer` pickups are transcribed with the achievements, and
+   `tick/gate2-session` is un-ignored and passes, so both Gate 2 criteria now
+   pass. The R2 wiring sites and the tamed-wolf branch of `alertWolves` were
+   not in WP-2.H's brief and are still open. The remaining question for the
+   owner is whether Gate 2 can be signed off now, with those left to a later
+   WP, or only after them. None of them changes a current fixture (§4.3).
 2. **Fix `tick/testworld-6000`'s dumps** (R1): dump `which: [4]` plus
    `player_state` and correct the comment. That means a regen of its
    `expected.jsonl`, which changes a committed fixture, so it needs the owner's
    approval. The variant already matches.
+
+   **WP-2.H update.** The orchestrator's brief approved this as a
+   scenario-only change, and WP-2.H made it (§3.2). The fixture is now 267
+   lines from the oracle, it passes, and every other `expected.jsonl` is
+   byte-identical. The owner may still overturn it: reverting is
+   `git revert` of the WP-2.H step 3 commit.
 3. **PLAN_v4 §8 item 3 (`Entity.rand` rewrite) is still undecided, and Phase 2
    finished without it.**
    - Not reproducible today: hostile natural spawning (K10) and every
@@ -818,7 +894,7 @@ also run with `--ignored` and fails as described in §3.1.
 | `tick/food-eat-heal` | C | pass | `golden_tick.rs::tick_food_eat_heal` |
 | `tick/furnace-dispenser-clicks` | S | pass | `golden_tick.rs::tick_furnace_dispenser_clicks` |
 | `tick/furnace-idle` | B | pass | `golden_tick.rs::tick_furnace_idle` |
-| `tick/gate2-session` | S | ignored | `golden_tick.rs::tick_gate2_session` |
+| `tick/gate2-session` | S | pass (ignored at `c415e67`; un-ignored by WP-2.H) | `golden_tick.rs::tick_gate2_session` |
 | `tick/grass-spread` | B | pass | `golden_tick.rs::tick_grass_spread` |
 | `tick/hoe-seeds-crops` | B | pass | `golden_tick.rs::tick_hoe_seeds_crops` |
 | `tick/inventory-slot-clicks` | C | pass | `golden_tick.rs::tick_inventory_slot_clicks` |
@@ -875,7 +951,7 @@ also run with `--ignored` and fails as described in §3.1.
 | `tick/spawning-draws` | B | pass | `golden_tick.rs::tick_spawning_draws` |
 | `tick/sponge-removal-notifies` | B | pass | `golden_tick.rs::tick_sponge_removal_notifies` |
 | `tick/sword-pickaxe-durability` | C | pass | `golden_tick.rs::tick_sword_pickaxe_durability` |
-| `tick/testworld-6000` | B | pass | `golden_tick.rs::tick_testworld_6000` |
+| `tick/testworld-6000` | B | pass (dumps the player since WP-2.H) | `golden_tick.rs::tick_testworld_6000` |
 | `tick/tnt-by-fire` | B | pass | `golden_tick.rs::tick_tnt_by_fire` |
 | `tick/torch-placement` | C | pass | `golden_tick.rs::tick_torch_placement` |
 | `tick/trapdoor-toggle` | B | pass | `golden_tick.rs::tick_trapdoor_toggle` |
