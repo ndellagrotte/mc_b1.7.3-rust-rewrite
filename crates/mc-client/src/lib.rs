@@ -31,6 +31,8 @@
 //! `RenderGlobal.spawnParticle`, `addRainParticles`).
 //! WP-3.7b: [`item_renderer`] (`ItemRenderer`: the first-person hand and
 //! item, the screen overlays, `renderItem`; `EntityRenderer.renderHand`).
+//! WP-3.5b: [`render`] (`RenderManager`, every `Render*`, the tile-entity
+//! special renderers, `RenderGlobal.renderEntities`).
 
 pub mod app;
 pub mod assets;
@@ -53,6 +55,7 @@ pub mod loading;
 pub mod model;
 pub mod particles;
 pub mod paths;
+pub mod render;
 pub mod screenshot;
 pub mod script;
 pub mod selection;
@@ -198,6 +201,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(particles::ParticlesPlugin);
         // WP-3.7b: ItemRenderer (the hand, held items, the overlays).
         app.add_plugins(item_renderer::ItemRendererPlugin);
+        // WP-3.5b: RenderManager, the entity and tile-entity renderers.
+        app.add_plugins(render::RenderPlugin);
     }
 }
 
