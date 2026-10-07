@@ -512,7 +512,9 @@ impl World {
     /// stream, the entity-RNG seed of the harness protocol, the block
     /// singletons ([`BlockStatics`]), `SpawnerAnimals.eligibleChunksForSpawning`
     /// (SpawnerAnimals.java:9) and the display `Random` (not Java state).
-    /// The diagnostics move too. `old` is left with fresh values.
+    /// The diagnostics move too. The fields that are moved (the `Random`
+    /// streams, the block singletons, the spawning set, the diagnostics) are
+    /// left fresh in `old`; the counters are copied.
     ///
     /// Java statics that land in `World` later must be added here.
     pub fn adopt_statics(&mut self, old: &mut World) {
@@ -529,7 +531,7 @@ impl World {
         self.unimplemented_hits = std::mem::take(&mut old.unimplemented_hits);
     }
 
-    /// Sets the constructor's clock-seeded state (World.java:162, :170,
+    /// Sets the constructor's clock-seeded state (World.java:162, :169,
     /// :177: `field_9437_g = new Random().nextInt()`, `rand = new Random()`,
     /// `soundCounter = rand.nextInt(12000)`) to `old`'s: the golden harness's
     /// definition of a reopened world, since those values have no

@@ -240,7 +240,10 @@ unloading stay vanilla. Its chunks are all air with `generateSkylightMap()` appl
 `world` and `access` are therefore not final: the op replaces them in place, so the tick loop
 and the dumps keep using the same `HarnessWorld`. Sequence: the old `ChunkProvider.chunkList`
 read by reflection (chunk coordinates in load order); `world.saveWorld(true, null)`; `new
-World(new SaveOldDir(saveRoot, "world", createPlayersDir), "harness", seed, null)` (the flag
+World(new SaveOldDir(saveRoot, "world", createPlayersDir), "harness", seed, provider)` with
+`provider = WorldProvider.getProviderForDimension(old.worldProvider.worldType)` (the old
+world's dimension kept, not read from `level.dat`'s `Player` compound: tests/golden/README.md
+"Reload" step 3) (the flag
 the save was first opened with: `true` after `"save_format": "mcregion"`, `false` for
 `"world": "load"`; `EmptyChunkProvider` swapped in again for `"world": "empty"`); `w.rand =
 old.rand` (the same `Random` object, so its state and any pending `nextNextGaussian` carry

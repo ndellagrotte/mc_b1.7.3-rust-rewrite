@@ -686,11 +686,17 @@ save: in this order
    world it leaves (`saveWorldIndirectly`, Minecraft.java:1276, World.java:1653-1655); the old
    `World` is then dropped;
 3. the save is opened with the loading constructor `World(SaveOldDir(<save root>, "world"),
-   "harness", seed, null)` (World.java:149-208), as `"world": "load"` opens one (dimension,
-   seed, time, weather and the `Player` compound from `level.dat`); `"world": "empty"` gets
-   its empty generator again;
+   "harness", seed, WorldProvider.getProviderForDimension(old.worldProvider.worldType))`
+   (World.java:149-208, WorldProvider.java:100-108): seed, time, weather and the `Player`
+   compound come from `level.dat` as for `"world": "load"`, but the dimension is the old
+   world's. This is a harness choice: with a null provider the dimension would come from the
+   `Player` compound's `Dimension` (World.java:186-190, WorldInfo.java:38-41), which is 0 for
+   a world without a player (no `Player` tag) and for the harness player (its
+   `Entity.dimension` is never set), so a nether world would come back as a surface world
+   reading `world/region` instead of `world/DIM-1/region` (SaveOldDir.java:11-20);
+   `tick/reload-nether` pins this down. `"world": "empty"` gets its empty generator again;
 4. **what is carried over and why.** The constructor draws `field_9437_g` and `rand` from
-   clock-seeded `new Random()`s and `soundCounter` from that `rand` (World.java:162, :170,
+   clock-seeded `new Random()`s and `soundCounter` from that `rand` (World.java:162, :169,
    :177): they have no vanilla-reproducible value, so the harness defines them as the old
    world's: the `World.rand` object itself (its 48-bit state and a pending
    `nextNextGaussian`), `field_9437_g` and `soundCounter`. Nothing is reseeded
@@ -1557,6 +1563,10 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   population's falling sand is still settling and the player walks: saved chunks come back
   from the region files with their entities, unsaved ones are generated (and populated)
   again in the new load order.
+- `tick/reload-nether` (empty nether world, 10 ticks): netherrack, glowstone and a chest
+  set, a pig spawned, `save`, `reload` at t = 5: the world comes back as the nether (the
+  provider kept, see "Reload" step 3), its chunks read from `world/DIM-1/region`, so the
+  blocks, the pig and the chest are there after the reload.
 - `tick/gate2-session` (Tier S, seed 123 terrain, difficulty 1, natural spawning off, 411
   ticks): PLAN_v4 Gate 2's headless session. Walk (60 ticks downhill from the grass at
   (−25.5, 67, −57.5)), dig the grass in front with a stone shovel and walk into the hole to
@@ -1565,7 +1575,10 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   crafting table, fight a zombie (spawned at t = 0 out of the player's sight, so its id does not depend on the terrain and the flipped-seed check can run the scenario, then moved 6 blocks from the player by `set_pos`; three sword hits), eat bread, set the
   time to night, place the bed (`use_item` with the bed item: ItemBed.onItemUse; no
   `set_block` fallback), `sleep` (`OK`; `World.tick` skips to the next morning after 100
-  ticks and wakes the player), `save`, `reload`, 100 more ticks, a final `save`. The
+  ticks and wakes the player), `save` (Tier S lines for chunks (−2, −4) and (−2, −3), which
+  hold every edit; the rest of the 3×3 around the player is unedited generated terrain,
+  compared by the `chunk_digest` dumps every 20 ticks instead of ~165 kB `chunk_nbt` lines),
+  `reload`, 100 more ticks, a final `save` (same chunks). The
   scenario's `comment` lists the steps and ticks. In the port it needs `EntityItem`'s pickup
   (`EntityItem.onCollideWithPlayer`, a recorded gap) and the item behaviour of WP-2.6
   (`ItemBlock`, `ItemBed`, `ItemFood`, `ItemSword.hitEntity`).

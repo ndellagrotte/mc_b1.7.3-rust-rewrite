@@ -293,7 +293,7 @@ final class HarnessWorld {
      * build one; for {@code "world": "empty"} the generator is swapped again as {@code create}
      * does. The constructor's clock-seeded state has no vanilla-reproducible value, so the
      * harness defines it: the old world's {@code rand} object itself (its 48-bit state and any
-     * pending {@code nextNextGaussian}; World.java:82, :170), {@code field_9437_g}
+     * pending {@code nextNextGaussian}; World.java:82, :169), {@code field_9437_g}
      * (World.java:75, :162) and {@code soundCounter} (World.java:90, :177) are carried over.
      * {@code makeDeterministic} and {@code resetStatics} do not run: the JVM statics
      * ({@code Entity.nextEntityID}, {@code NextTickListEntry.nextTickEntryID}, the
@@ -334,7 +334,14 @@ final class HarnessWorld {
             coords.add(new int[] {c.xPosition, c.zPosition});
         }
         old.saveWorld(true, null); // src: World.java:278-291
-        World w = new World(new SaveOldDir(saveRoot.toFile(), "world", createPlayersDir), "harness", seed, null);
+        // Harness choice: the old world's dimension is kept by passing a provider for it
+        // (World.java:184-185) instead of null, which would take the dimension from level.dat's
+        // Player compound (World.java:186-190, WorldInfo.java:38-41): the harness player's
+        // Entity.dimension is never set and a world without a player has no Player tag, so a
+        // nether world would come back as a surface one reading world/region instead of
+        // world/DIM-1/region (SaveOldDir.java:11-20).
+        WorldProvider provider = WorldProvider.getProviderForDimension(old.worldProvider.worldType); // src: WorldProvider.java:100-108
+        World w = new World(new SaveOldDir(saveRoot.toFile(), "world", createPlayersDir), "harness", seed, provider);
         if (w.isNewWorld) throw new IllegalStateException("reload: no level.dat in " + saveRoot.resolve("world"));
         if (emptyGenerator) {
             Reflect.set(ChunkProvider.class, "chunkProvider", w.getIChunkProvider(), new EmptyChunkProvider(w));

@@ -1063,12 +1063,18 @@ fn reload(world: &mut World, h: &mut Harness, t: u32) -> Result<TraceLine, Golde
         .map_err(|e| GoldenError::other(format!("t={t}: reload: save: {e}")))?;
     let dir = SaveOldDir::new(store, "", WORLD_DIR)
         .map_err(|e| GoldenError::other(format!("t={t}: reload: {e}")))?;
-    // src: World.java:149-208, HarnessWorld.reload
+    // src: World.java:149-208, HarnessWorld.reload. Harness choice: the old
+    // world's dimension is kept by passing its provider (World.java:184-185,
+    // WorldProvider.java:100-108) rather than taking it from level.dat's
+    // Player compound (World.java:186-190), which the harness player (whose
+    // Entity.dimension is never set) or a world without a player would get
+    // wrong, reading world/region instead of world/DIM-1/region
+    // (SaveOldDir.java:11-20).
     let mut fresh = World::new_from_save(
         Box::new(HarnessSaveHandler(dir)),
         "harness",
         h.seed,
-        None,
+        Some(WorldProvider::new(world.world_provider.dimension)),
         // Overwritten by adopt_clock_seeded_state below.
         WorldEnvironment {
             rand_seed: 0,
