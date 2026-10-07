@@ -129,6 +129,14 @@ pub enum Action {
     /// `Minecraft.shutdown()`: leaves the world (saving it and the player)
     /// and exits.
     Quit,
+    /// Dev (WP-3.2): writes a texture's current pixels, FX tiles included,
+    /// to a PNG ([`crate::textures::dump_texture`]).
+    DumpTexture {
+        /// `"terrain"`, `"items"` or a jar path such as `"/gui/gui.png"`.
+        name: String,
+        /// The PNG.
+        path: PathBuf,
+    },
 }
 
 /// One script line: an action and its optional time.
@@ -383,6 +391,14 @@ pub fn run_script(
             Action::Quit => {
                 game.shutdown();
                 return;
+            }
+            Action::DumpTexture { name, path } => {
+                commands.queue(move |w: &mut World| {
+                    match crate::textures::dump_texture(w, &name, &path) {
+                        Ok(()) => info!("script: texture {name} written to {}", path.display()),
+                        Err(e) => error!("script: dump_texture: {e}"),
+                    }
+                });
             }
         }
     }

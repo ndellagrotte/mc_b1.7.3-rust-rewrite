@@ -51,6 +51,7 @@ naming the path.
 | `debug` | `GuiIngame`'s F3 block | the F3 text (`DebugText`, `DebugSources`) |
 | `events` | `IWorldAccess`, `SoundManager` call sites, `EntityPlayerSP`'s calls into `Minecraft` | `WorldEventMsg`, `ClientSound`, `ClientEvent` |
 | `script` | — | the scripted-input dev mode |
+| `textures` | `RenderEngine`, `TextureFX` and its subclasses, `ColorizerGrass`/`ColorizerFoliage`/`ColorizerWater` | the texture cache (`Handle<Image>` by jar name, with a CPU copy), the terrain and items atlases, the animated tiles written every tick, the colour maps (WP-3.2) |
 | `jfmt`, `clock`, `paths` | JDK behaviour | `Float/Double.toString`, `parseFloat`/`parseInt`, `String.split`/`hashCode`; the clocks and `new Random()`'s seed; the default paths |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
@@ -124,6 +125,47 @@ nether travel.
   next input event is dispatched (drain right after each player-controller
   call in the click path).
 
+## Textures (WP-3.2)
+
+`textures::Textures` (a `Resource`) is `RenderEngine`:
+
+- `get_texture(name, &jar, &mut images) -> Handle<Image>` is
+  `getTexture(name)`: the jar's PNG (`"/terrain.png"`, `"/gui/gui.png"`,
+  …, with vanilla's `%clamp%`, `%blur%` and `##` prefixes), uploaded once
+  and cached by name; a missing one is the 64×64 "missingtex" image. In a
+  system take the `textures::TextureLoader` param and call `get(name)`.
+  Images are RGBA8 sRGB with one mip level and a nearest sampler (repeat;
+  `%clamp%` clamps, `%blur%` is linear); with the anaglyph option on, the
+  colours are converted on upload as vanilla does.
+- `entry(name)` / `entry_by_handle(h)` give a `TextureEntry`: the handle,
+  size and a CPU copy (`rgba`) of what was uploaded. The atlases are
+  `textures::TERRAIN_PNG` and `textures::ITEMS_PNG` (`terrain()`/`items()`
+  load them; both are loaded at start-up). Their CPU copies include the
+  animated tiles.
+- `textures::tile_uv(index) -> [u_min, v_min, u_max, v_max]` is
+  `RenderBlocks`' full-tile rectangle (`x = (i & 15) << 4`, `y = i & 240`,
+  `/ 256`, the far edge `- 0.01`); `tile_uv_f64` keeps the Java doubles.
+- `get_texture_contents(name)` is `func_28149_a` (ARGB ints).
+  `allocate_and_setup_texture`, `upload_argb` (`func_28150_a`) and
+  `delete_texture` are there for the font and the map.
+- The FX (`texture_list`, registered in `Minecraft.startGame`'s order: lava,
+  water, portal, compass, watch, flowing water, flowing lava, fire ×2) tick
+  in `RunTickHook::UpdateDynamicTextures` and write their 16×16 tiles into
+  the atlas (terrain: fire 31 and 47, water 205 and flowing 206/207/222/223,
+  lava 237 and flowing 238/239/254/255, portal 14; items: compass 54, clock
+  70). The Bevy image is rewritten after each update (`AssetEvent::Modified`).
+  Their `Math.random()` is the client's own clock-seeded stream
+  (`Textures::math_random`), never the simulation's.
+- `textures::Colorizers` (a `Resource`) holds the grass, foliage and water
+  colour maps: `get_grass_color(temperature, rainfall)`,
+  `get_foliage_color(..)`, and `colorizer::get_foliage_color_pine/birch/basic()`.
+- Switching the anaglyph option (`SettingsEffect::RefreshTextures`) runs
+  `refreshTextures` in `Update` after `GameFrameSet`, in
+  `textures::TexturesSet`; order systems that read the atlases after it.
+
+Texture packs (`TexturePackList`, `TexturePackCustom`) and the skin and cloak
+downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -155,6 +197,7 @@ Actions run in order, as many per frame as are due.
 | `use_portal` | — | Dev: `Minecraft.usePortal()` at once |
 | `respawn` | — | Dev: `Minecraft.respawn(false, 0)` |
 | `quit` | — | `Minecraft.shutdown()`: leaves the world (saving it and the player) and exits |
+| `dump_texture` | `name`, `path` | Dev (WP-3.2): writes the texture's current pixels (for `"terrain"` / `"items"` the atlas with its animated tiles; else a jar path as `getTexture` takes it) to a PNG |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
