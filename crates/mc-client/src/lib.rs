@@ -43,6 +43,7 @@ pub mod selection;
 pub mod session;
 pub mod settings;
 pub mod sky;
+pub mod sound;
 pub mod storage;
 pub mod textures;
 pub mod timer;
@@ -165,6 +166,8 @@ impl Plugin for ClientPlugin {
             );
         // WP-3.4: sky, clouds, weather, fog, selection box.
         app.add_plugins(sky::SkyPlugin);
+        // WP-3.8: SoundManager on bevy_kira_audio.
+        app.add_plugins(sound::SoundPlugin);
     }
 }
 
