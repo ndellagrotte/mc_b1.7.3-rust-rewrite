@@ -22,7 +22,7 @@
 //!
 //! `ItemArmor` and `ItemCoal` override no behaviour method. The data
 //! methods (`getIconFromDamage`, `getStrVsBlock`, `getDamageVsEntity`,
-//! `canHarvestBlock`, `isFull3D`, …) are on [`ItemDef`](super::ItemDef)
+//! `canHarvestBlock`, `isFull3D`, …) are on [`ItemDef`]
 //! (WP-1.2); `crates/mc-sim/tests/item_dispatch_coverage.rs` holds the
 //! split ([`DATA_METHODS`]) against the vanilla override set
 //! (`tests/data/item_overrides.txt`).
@@ -42,7 +42,7 @@
 //! pattern, [`crate::entity`]), so world queries do not see it; the one
 //! vanilla query on this path that would find it, the entity check of
 //! `World.canBlockBePlacedAt` in `ItemBlock` / `ItemReed`, is completed by
-//! [`can_block_be_placed_at`].
+//! `can_block_be_placed_at` (crate-private).
 //!
 //! # Randomness
 //!
@@ -150,7 +150,7 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
 ];
 
 /// `Item` methods whose overrides are data, transcribed on
-/// [`ItemDef`](super::ItemDef) (WP-1.2) and pinned per item by
+/// [`ItemDef`] (WP-1.2) and pinned per item by
 /// `tests/golden/item/item-table`; the coverage test takes them as done.
 pub const DATA_METHODS: &[&str] = &[
     "canHarvestBlock",
