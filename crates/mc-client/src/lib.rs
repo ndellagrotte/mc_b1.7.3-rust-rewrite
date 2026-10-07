@@ -29,6 +29,8 @@
 //! cameras).
 //! WP-3.7a: [`particles`] (`EffectRenderer`, the `EntityFX` family,
 //! `RenderGlobal.spawnParticle`, `addRainParticles`).
+//! WP-3.7b: [`item_renderer`] (`ItemRenderer`: the first-person hand and
+//! item, the screen overlays, `renderItem`; `EntityRenderer.renderHand`).
 
 pub mod app;
 pub mod assets;
@@ -43,6 +45,7 @@ pub mod gl_material;
 pub mod gui;
 pub mod import;
 pub mod input;
+pub mod item_renderer;
 pub mod jfmt;
 pub mod keys;
 pub mod lang;
@@ -193,6 +196,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(gui::GuiPlugin);
         // WP-3.7a: EffectRenderer and the particles.
         app.add_plugins(particles::ParticlesPlugin);
+        // WP-3.7b: ItemRenderer (the hand, held items, the overlays).
+        app.add_plugins(item_renderer::ItemRendererPlugin);
     }
 }
 
