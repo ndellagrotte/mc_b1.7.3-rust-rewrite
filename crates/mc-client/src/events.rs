@@ -60,6 +60,10 @@ pub enum ClientSound {
         /// `prevPosX + (posX - prevPosX) * partial`, … and the yaw likewise.
         pose: Option<([f64; 3], f32)>,
     },
+    /// `sndManager.playRandomMusicIfReady()`, which
+    /// `PlayerControllerSP.updateController()` calls every unpaused tick
+    /// (PlayerControllerSP.java:117-120): the music timer.
+    PlayRandomMusicIfReady,
     /// `forceReload()` (F3+S, Minecraft.java:1180-1185): a new sound
     /// manager with the settings, and the resources installed again.
     ForceReload,

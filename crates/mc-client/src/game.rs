@@ -70,7 +70,7 @@
 //!
 //! Applet, multiplayer, the snooper and stats sync (deferred, D2/D3: the
 //! `mcApplet`, `serverName`/`GuiConnecting`, `ThreadCheckHasPaid`,
-//! `ThreadDownloadResources`, `func_27175_b`/`func_27178_d`), texture packs
+//! `ThreadDownloadResources`, `func_27178_d`), texture packs
 //! (`TexturePackList`, D3), `OpenGlCapsChecker`, `checkGLError`, the
 //! out-of-memory handler `func_28002_e` (no reserve buffer `field_28006_b`
 //! to free), `Controllers`, the AWT canvas and `loadScreen`'s Mojang logo
@@ -107,10 +107,10 @@ use crate::storage::{FsStorage, WallClock};
 use crate::timer::Timer;
 
 /// `Block.grass.blockID` (Minecraft.java:923).
-// src: Block.java:595
+// src: Block.java:594
 const GRASS: i32 = 2;
 /// `Block.dirt.blockID`.
-// src: Block.java:596
+// src: Block.java:595
 const DIRT: i32 = 3;
 /// `Block.stairDouble.blockID` (Minecraft.java:927).
 // src: Block.java:635
@@ -119,7 +119,7 @@ const STAIR_DOUBLE: i32 = 43;
 // src: Block.java:636
 const STAIR_SINGLE: i32 = 44;
 /// `Block.bedrock.blockID` (Minecraft.java:931).
-// src: Block.java:600
+// src: Block.java:599
 const BEDROCK: i32 = 7;
 /// `Block.stone.blockID`.
 // src: Block.java:593
@@ -597,7 +597,7 @@ impl Game {
             self.outbox.events.push(ClientEvent::ScreenClosed(old));
         }
         // `if (var1 instanceof GuiMainMenu) statFileWriter.func_27175_b()`:
-        // stats sync, deferred (D2).
+        // an empty method (StatFileWriter.java:187-188).
         self.sync_stats();
         if var1.is_none() && self.the_world.is_none() {
             var1 = Some(GuiScreen::new(ScreenKind::MainMenu));
@@ -715,7 +715,7 @@ impl Game {
     /// (which saves it and the player), the sound system.
     // src: Minecraft.java:457-496
     pub fn shutdown_minecraft_applet(&mut self) {
-        // statFileWriter.func_27175_b(): stats sync (deferred, D2).
+        // statFileWriter.func_27175_b(): empty (StatFileWriter.java:187-188).
         self.sync_stats();
         info!("Stopping!");
         self.pending = None;
@@ -916,6 +916,9 @@ impl Game {
             && let Some(c) = self.player_controller.as_mut()
         {
             c.update_controller();
+            // PlayerControllerSP.updateController's second line
+            // (PlayerControllerSP.java:117-120).
+            self.outbox.sounds.push(ClientSound::PlayRandomMusicIfReady);
         }
     }
 
@@ -1321,7 +1324,7 @@ impl Game {
         portal: Option<(f64, f64)>,
         sync: bool,
     ) {
-        // statFileWriter.func_27175_b(): stats sync, deferred (D2).
+        // statFileWriter.func_27175_b(): empty (StatFileWriter.java:187-188).
         self.sync_stats();
         self.render_view_entity = None;
         self.loading_screen.print_text(var2);
@@ -1475,35 +1478,52 @@ impl Game {
         let (Some(pid), Some(world)) = (self.the_player, self.the_world.as_mut()) else {
             return;
         };
-        let Some(dim) = world.with_entity_mut(pid, |w, p| {
+        let in_world = world.entity(pid).is_some();
+        // thePlayer.dimension toggled; theWorld.setEntityDead(thePlayer);
+        // thePlayer.isDead = false. A dead player the world already dropped
+        // (respawning in the nether) is the detached copy.
+        let toggle = |p: &mut Entity| {
             let pd = p.kind.player_mut().expect("player");
             pd.dimension = if pd.dimension == -1 { 0 } else { -1 };
-            let dim = pd.dimension;
-            w.set_entity_dead(p);
-            p.base.is_dead = false;
-            dim
-        }) else {
+            pd.dimension
+        };
+        let dim = if in_world {
+            world.with_entity_mut(pid, |w, p| {
+                let d = toggle(p);
+                w.set_entity_dead(p);
+                p.base.is_dead = false;
+                d
+            })
+        } else {
+            self.detached_player.as_deref_mut().map(|p| {
+                let d = toggle(p);
+                p.base.is_dead = false;
+                d
+            })
+        };
+        let Some(dim) = dim else {
             return;
         };
         let var5 = 8.0f64;
-        let (mut var1, mut var3) = {
-            let p = world.entity(pid).expect("in its slot");
-            (p.base.pos_x, p.base.pos_z)
-        };
-        if dim == -1 {
-            var1 /= var5;
-            var3 /= var5;
-        } else {
-            var1 *= var5;
-            var3 *= var5;
-        }
-        let alive = {
-            let p = world.entity_mut(pid).expect("in its slot");
+        let scale = |p: &mut Entity| {
+            let (mut var1, mut var3) = (p.base.pos_x, p.base.pos_z);
+            if dim == -1 {
+                var1 /= var5;
+                var3 /= var5;
+            } else {
+                var1 *= var5;
+                var3 *= var5;
+            }
             let (y, yaw, pitch) = (p.base.pos_y, p.base.rotation_yaw, p.base.rotation_pitch);
             p.base.set_location_and_angles(var1, y, var3, yaw, pitch);
-            dispatch::is_entity_alive(p)
+            (var1, var3, dispatch::is_entity_alive(p))
         };
-        if alive {
+        let (var1, var3, alive) = if in_world {
+            scale(world.entity_mut(pid).expect("in its slot"))
+        } else {
+            scale(self.detached_player.as_deref_mut().expect("checked"))
+        };
+        if alive && in_world {
             world.update_entity_with_optional_force(pid, false);
         }
         let msg = if dim == -1 {
@@ -1518,36 +1538,37 @@ impl Game {
         });
         // `new World(theWorld, provider)` shares the old world's save handler
         // and copies its WorldInfo (World.java:103-143); changeWorld then saves
-        // the old world. Here the old world saves first (with the player
-        // still in its list, but no longer in playerEntities: level.dat gets
-        // no Player tag, as vanilla's), then a new handler on the same save
-        // directory opens the new one.
+        // the old world. Here the old world saves first (the player is no
+        // longer in playerEntities, so level.dat gets no Player tag, as
+        // vanilla's), then a new handler on the same save directory opens the
+        // new one.
+        let Some(dir) = self.world_dir.clone() else {
+            return;
+        };
         self.loading_screen.print_text(msg);
         world.save_world_indirectly();
         if let Some(e) = world.session_lock_error.take() {
             warn!("{e}");
         }
         self.collect_world_events();
-        let mut old = self.the_world.take().expect("checked");
-        let player = old
-            .entity_index(pid)
-            .and_then(|i| old.loaded_entity_list[i].entity.take());
-        let Some(player) = player else {
-            self.the_world = Some(old);
-            return;
-        };
-        let Some(dir) = self.world_dir.clone() else {
-            self.the_world = Some(old);
-            return;
-        };
         let handler = match self.save_loader.get_save_loader(&dir) {
             Ok(h) => h,
             Err(e) => {
                 self.last_error = Some(format!("usePortal: {e}"));
                 error!("usePortal: {e}");
-                self.the_world = Some(old);
                 return;
             }
+        };
+        let mut old = self.the_world.take().expect("checked");
+        let player = if in_world {
+            old.entity_index(pid)
+                .and_then(|i| old.loaded_entity_list[i].entity.take())
+        } else {
+            self.detached_player.take()
+        };
+        let Some(player) = player else {
+            self.the_world = Some(old);
+            return;
         };
         let mut var7 = new_world_for_dimension(&old, handler, provider);
         // The Java statics that outlive a World object in the JVM (module
@@ -1951,8 +1972,9 @@ impl Game {
             Some(info) => {
                 self.display_gui_screen(None);
                 self.player_controller = Some(PlayerControllerSp::new());
-                // getSaveName: the display name, the directory when empty
-                // (SaveConverterMcRegion.java:39-42).
+                // getSaveName: the list row's display name, which
+                // getSaveList made the directory name when the level name is
+                // empty (GuiSelectWorld.java:49-57, SaveConverterMcRegion.java:39-42).
                 let display = if info.level_name.is_empty() {
                     name.to_string()
                 } else {
@@ -2453,18 +2475,35 @@ mod tests {
         let mut g = game(&dir);
         g.open_world("M", Some("7")).unwrap();
         g.run_pending_to_completion();
-        // Let the player settle on the ground.
-        for _ in 0..40 {
-            tick(&mut g);
-        }
-        let z0 = g.player().unwrap().base.pos_z;
+        tick(&mut g);
         g.input.push_key(17, true, 'w'); // forward
-        for _ in 0..20 {
-            tick(&mut g);
-        }
-        let z1 = g.player().unwrap().base.pos_z;
-        // flipPlayer faces yaw -180: forward is -z (north).
-        assert!(z1 < z0 - 1.0, "{z0} -> {z1}");
+        g.input.push_key(30, true, 'a'); // left
+        tick(&mut g);
+        // EntityPlayerSP.updatePlayerActionState copied the input into the
+        // living entity's steering, which onLivingUpdate then damps by 0.98
+        // (EntityLiving.java). The spawn's surroundings vary with the
+        // clock-seeded spawn search, so the test does not rely on walking.
+        let p = g.player().unwrap();
+        let EntityKindData::PlayerSp(l, _, sp) = &p.kind else {
+            panic!("not a player");
+        };
+        assert_eq!(sp.movement_input.move_forward, 1.0);
+        assert_eq!((l.move_forward, l.move_strafing), (0.98, 0.98));
+        g.input.push_key(17, false, 'w');
+        g.input.push_key(42, true, '\0'); // sneak
+        tick(&mut g);
+        let p = g.player().unwrap();
+        let EntityKindData::PlayerSp(l, _, sp) = &p.kind else {
+            panic!("not a player");
+        };
+        assert!(sp.movement_input.sneak);
+        assert_eq!(
+            (l.move_forward, l.move_strafing),
+            (0.0, (1.0f64 * 0.3) as f32 * 0.98)
+        );
+        // Losing focus resets the keys (setIngameNotInFocus).
+        g.display_in_game_menu();
+        assert_eq!(g.movement_input, MovementInputFromOptions::default());
     }
 
     #[test]
@@ -2542,6 +2581,39 @@ mod tests {
         assert_eq!(g.the_world.as_ref().unwrap().world_provider.world_type, 0);
         assert_eq!(g.player().unwrap().kind.player().unwrap().dimension, 0);
         assert!(dir.0.join("saves/N/DIM-1/region").exists());
+    }
+
+    #[test]
+    fn dying_in_the_nether_respawns_in_the_overworld() {
+        let dir = TempDir::new("nether_death");
+        let mut g = game(&dir);
+        g.open_world("D", Some("17")).unwrap();
+        g.run_pending_to_completion();
+        g.use_portal(true);
+        assert_eq!(g.the_world.as_ref().unwrap().world_provider.world_type, -1);
+        let pid = g.the_player.unwrap();
+        // Kill the player and let the world drop the body (deathTime 20).
+        if let Some(l) = g.player_in_world_mut().and_then(|e| e.kind.living_mut()) {
+            l.health = 0;
+        }
+        for _ in 0..30 {
+            tick(&mut g);
+        }
+        assert!(g.the_world.as_ref().unwrap().entity(pid).is_none());
+        assert!(g.detached_player.is_some());
+        assert_eq!(
+            g.current_screen.as_ref().map(|s| s.kind.clone()),
+            Some(ScreenKind::GameOver)
+        );
+        g.respawn(false, 0);
+        g.run_pending_to_completion();
+        assert!(g.current_screen.is_none());
+        let w = g.the_world.as_ref().unwrap();
+        assert_eq!(w.world_provider.world_type, 0);
+        assert_eq!(g.the_player, Some(pid));
+        let p = g.player().unwrap();
+        assert_eq!(p.kind.living().unwrap().health, 20);
+        assert_eq!(p.kind.player().unwrap().dimension, 0);
     }
 
     #[test]
