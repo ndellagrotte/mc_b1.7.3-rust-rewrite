@@ -62,6 +62,7 @@ naming the path.
 | `gl_material` | — (GL state) | `GlMaterial`: glColor × vertex colour × texture, alpha test, GL fog, blend/depth/colour masks, draw-order biases; Tessellator helpers |
 | `terrain` (WP-3.3a) | `RenderBlocks`, `WorldRenderer`, `RenderGlobal` (terrain half: `loadRenderers`, `updateRenderers`, `sortAndRender`, `clipRenderersByFrustrum`, `markBlock*NeedsUpdate`, `drawBlockBreaking`), `RenderSorter`, `EntitySorter`, `ChunkCache`, `Tessellator`, `Frustrum`, `ClippingHelper(Impl)` | the terrain meshes, two passes, the crack overlay, `renderBlockOnInventory` (below) |
 | `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
+| `gui` (WP-3.6a) | `Gui`, `GuiScreen`, `GuiButton`, `GuiSmallButton`, `GuiSlider`, `GuiTextField`, `GuiSlot`, `GuiYesNo`, `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused`, `FontRenderer`, `ChatAllowedCharacters`, `ScaledResolution` (arithmetic) | the screen objects bound to `currentScreen`, their input and drawing; `GuiGl` (the GL state and Tessellator as data) and the two GUI cameras (below) |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -538,6 +539,93 @@ included, the ears) calls; the tests compare them bit for bit. The
 `render` draw lists (they need GL) are checked against the Java methods'
 call sequences written out by hand.
 
+## GUI (WP-3.6a)
+
+### Spike: a 2D batcher, not `bevy_ui`
+
+PLAN_v4 §3.5's default is confirmed. What was weighed (against the
+`bevy_ui` 0.19 sources; no `bevy_ui` prototype was built):
+
+- Vanilla's screens are immediate-mode: every frame `drawScreen` issues
+  `drawTexturedModalRect`/`drawRect`/`drawGradientRect`/`drawString` calls
+  in scaled pixels, interleaved with raw GL state changes (`glEnable`,
+  `glBlendFunc`, `glColor`, `glTranslatef`, `glDisable(GL_DEPTH_TEST)`) and
+  `Tessellator` quads with per-vertex colours. `bevy_ui` is a retained node
+  tree laid out by flexbox: a line-for-line transcription would need a
+  per-frame diff of draw calls into nodes, and the state-dependent parts
+  have no node equivalent.
+- `bevy_ui` blends every node with one fixed `ALPHA_BLENDING` state
+  (`bevy_ui_render` pipelines); `GuiIngame`'s crosshair needs
+  `glBlendFunc(775, 769)` (colour inversion), the overlays need
+  `GL_ALPHA_TEST`, flat versus smooth shading, the depth test against
+  `zLevel` (items at z 100+ in containers).
+- Text: `bevy_text` lays out TTF/OTF fonts; the Beta font is an 8×8 bitmap
+  whose advances come from pixel columns, with `§` colour codes and a
+  shadow pass. It would be per-glyph image nodes either way.
+- Gradients (`BackgroundGradient`) interpolate in a chosen colour space,
+  not GL's Gouraud on the Java values; 3D items in inventory slots
+  (WP-3.6b/3.7) need a 3D pass anyway.
+
+So the GUI is `GuiGl` (`gui::batch`): the fixed-function state and the
+`Tessellator` as data. `draw()` records the quads under the current state
+(vertex colour = the Tessellator's or `glColor`, flat shading = the quad's
+last vertex, the matrix applied); consecutive draws under one state merge,
+so a screen is a handful of batches (one per texture or state switch) in
+call order. `Gui*` code transcribes nearly line for line (`gui::draw` is
+`Gui`). The batches become one mesh each with `gui::render::GuiMaterial`
+(WP-3.4's `gl_material.wgsl`, any `glBlendFunc` pair, GL's depth test and
+mask, the alpha test), drawn by two orthographic `Camera3d`s after the
+world camera (order 1: the in-game overlay, order 2: the screen; each
+clears the depth buffer as vanilla does before each). The projection is
+`setupOverlayRendering`'s `glOrtho(0, scaledWidthD, scaledHeightD, 0,
+1000, 3000)`: one scaled pixel is `scaleFactor` window pixels.
+
+Measured differences (all from the sRGB target, see `gl_material`):
+opaque pixels are vanilla's bytes; blends with `0 < alpha < 1` happen in
+linear space, so `drawDefaultBackground`'s dark gradient dims the world
+less than vanilla (sky `(42, 61, 183)` becomes `(25, 33, 97)` where GL
+writes `(22, 27, 57)`) and `drawRect` translucency and the list shadows
+are lighter. Bevy composites cameras by the framebuffer alpha, which GL
+never showed: the GUI never changes it (a translucent draw that did let
+the window behind show through). Switching the client to
+`CompositingSpace::Srgb` (WP-3.1's camera) would make every GUI blend
+GL's.
+
+### For WP-3.6b/c
+
+- A screen implements `gui::screen::Screen` with a `ScreenBase`
+  (`width`, `height`, `control_list`, `allow_user_input`, `z_level`). Java's
+  `super.drawScreen/keyTyped/mouseClicked/mouseMovedOrUp` are
+  `default_draw_screen`, `default_key_typed`, `default_mouse_clicked`,
+  `default_mouse_moved_or_up`; `drawDefaultBackground` and friends are
+  in `gui::screen`.
+- `this.mc` is `ScreenCtx`: `ctx.game` (`Minecraft`), `ctx.font`,
+  `ctx.lang`, `ctx.display_gui_screen(Some(Box::new(..)))` (at once, as
+  Java), `ctx.display_this()` (`displayGuiScreen(this)`),
+  `ctx.display_wrapping_this(|this| Box::new(GuiYesNo::new(this, ..)))`
+  (`new GuiYesNo(this, ..)`), `ctx.play_sound_fx`, `ctx.create_screen(kind)`
+  (`new GuiMainMenu()` and other registered classes),
+  `ctx.get_clipboard_string()`.
+- The shell opens some screens by kind (`GuiMainMenu`, `GuiIngameMenu`,
+  `GuiGameOver`, `GuiInventory`, `GuiConflictWarning`); register a factory
+  for the class name with `ScreenRegistry::register` (a resource) and the
+  binder makes the object. Unregistered kinds get a `ShellScreen` (the
+  background and the keys the shell gave them before).
+- Screen objects are bound to the slot by `Game::screen_serial`; the
+  binder catches up after each `display_gui_screen` and at the start of
+  the screen hook and of the drawing. A screen that replaces itself gets
+  `onGuiClosed` when its method returns; the rest of a `handleInput`'s
+  events still go to it (Java's `this`).
+- The in-game overlay draws in a system in `GuiSet::Overlay` (layer
+  `GuiLayer::Overlay`, the default at frame start). Textures: bind a jar
+  name (`g.bind_texture("/gui/icons.png")`) or a `Handle<Image>` from
+  `Textures`; the GUI samples an `Rgba8Unorm` copy that follows the engine
+  image (so the animated atlases work for item icons).
+- Keys: Ctrl+letter reaches `keyTyped` as the control character (LWJGL's
+  22 for Ctrl+V). The system clipboard needs Bevy's `system_clipboard`
+  feature (off in the workspace): without it `getClipboardString` reads
+  Bevy's in-process buffer.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -577,6 +665,10 @@ Actions run in order, as many per frame as are due.
 | `set_option` | `option`, `step` (default 1) | Dev (WP-3.3a): `gameSettings.setOptionValue(option, step)` with its side effects and `saveOptions`, as the options screen's button (`option` is the translation key: `"options.ao"`, `"options.graphics"`, `"options.renderDistance"`, …) |
 | `dump_debug` | `path` | Dev (WP-3.3a): writes the F3 text (`DebugText`, `DebugSources`, the fps line) and `terrain::TerrainStats` as JSON |
 | `debug_model` | `model`, `path`; optional `texture`, `distance` (3), `turn`, `limb_swing`, `limb_yaw`, `ticks`, `head_yaw`, `head_pitch`, `swing`, `scale`, `brightness` (1), `blend_alpha`, `additive` (the powered creeper's pass), `keep`, `sitting` | Dev (WP-3.5a): spawns a model (`"pig"`, `"sheep_fur"`, `"biped_armor"`, … = `model::ModelKind`) standing `distance` blocks in front of the player at feet level, facing the camera turned by `turn` degrees, posed with those `render` arguments, its skin from the jar (default: the renderer's texture); with `path`, waits 20 frames and saves a screenshot. Earlier debug models are removed unless `keep` (to draw a pass model over its main model). Hidden while no world is drawn |
+| `debug_gui` | `screen`, `path` (optional) | Dev (WP-3.6a): opens a GUI test screen — `"widgets"` (buttons normal/disabled, small buttons, a slider, a focused text field; the button under the pointer shows hovered), `"list"` (a `GuiSlot`), `"font"` (every `§` colour code and glyph), `"yesno"` (a `GuiYesNo` over the widget screen) or any registered screen name — and with `path` screenshots it three frames later |
+| `open_screen` | `name` | Dev (WP-3.6a): `displayGuiScreen(new X())` for a screen class name (`"GuiConflictWarning"`, `"GuiErrorScreen"`, `"GuiIngameMenu"`, …; an unregistered one is a placeholder) |
+| `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
+| `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

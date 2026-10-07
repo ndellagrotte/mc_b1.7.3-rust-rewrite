@@ -121,6 +121,15 @@ mixed-case originals).
 | `RenderBlocks.field_31084_j` | `RenderBlocks::uv_rotate_north` (WP-3.3a) | Read only by `renderNorthFace` (−x) (RenderBlocks.java:3029-3060); set by the piston renderer (:397, :405, :410) |
 | `RenderBlocks.field_31083_k` | `RenderBlocks::uv_rotate_top` (WP-3.3a) | Read only by `renderTopFace` (RenderBlocks.java:2762-2793); set by the piston renderer (:411, :418, :425) |
 | `RenderBlocks.field_31082_l` | `RenderBlocks::uv_rotate_bottom` (WP-3.3a) | Read only by `renderBottomFace` (RenderBlocks.java:2680-2711); set by the piston renderer (:412, :419, :426) |
+| `GuiSlot.field_25123_p` | `mc-client` `gui::widgets::slot::GuiSlot::show_selection_box` | Set only by `setShowSelectionBox` (GuiSlot.java:39-41); true by default (:24); gates drawing the selected row's box (:209) |
+| `GuiSlot.field_27262_q` | `GuiSlot::has_list_header` | Set by `func_27259_a` (GuiSlot.java:43-45); gates the `func_27260_a` header call (:200-202); the statistics lists turn it on (GuiSlotStats.java:24) |
+| `GuiSlot.field_27261_r` | `GuiSlot::header_padding` | The header's height: added to the content height (GuiSlot.java:59) and to every row's y (:78, :135, :206); forced to 0 without a header (:46-48); 20 for the statistics lists (GuiSlotStats.java:24) |
+| `GuiSlot.func_27259_a(boolean, int)` | `GuiSlot::set_has_list_header` | Sets the two fields above (GuiSlot.java:43-50) |
+| `GuiSlot.func_27256_c(int, int)` | `GuiSlot::get_slot_index_from_screen_coords` | Returns the row index under `(x, y)` or -1, with the same arithmetic as the click test of `drawScreen` (GuiSlot.java:75-81, :133-137); the statistics tooltip uses it on the pointer (GuiSlotStats.java:119) |
+| `GuiSlot.func_27260_a(int, int, Tessellator)` | `SlotList::draw_list_header` | Called with the list's left x and first-row y when the list has a header (GuiSlot.java:200-202); the statistics lists draw their column icons there (GuiSlotStats.java:38) |
+| `GuiSlot.func_27255_a(int, int)` | `SlotList::header_clicked` | Called for a click inside the list's columns above the first row, with coordinates relative to the header (GuiSlot.java:142-145); the statistics lists pick the sort column from x (GuiSlotStats.java:79-90) |
+| `GuiSlot.func_27257_b(int, int)` | `SlotList::post_draw` | Called with the pointer at the end of `drawScreen`, after the bands and the scroll bar (GuiSlot.java:297); the statistics lists draw their tooltips there (GuiSlotStats.java:117-130) |
+| `GuiErrorScreen.field_28098_a` | `mc-client` `gui::error_screen::GuiErrorScreen::update_counter` | `++` in `updateScreen` (GuiErrorScreen.java:6-8), never read: the same tick counter `GuiConflictWarning` names `updateCounter` (GuiConflictWarning.java:4-8) |
 
 ## Kept (meaning documented)
 
@@ -262,6 +271,7 @@ mixed-case originals).
 | `RenderLiving.func_167_c(EntityLiving, float)` (protected) | — (WP-3.5b); its value is `mc-client` `model::Model::on_ground` | Returns `entity.getSwingProgress(partial)` (RenderLiving.java:134-136); `doRenderLiving` stores it in `mainModel.onGround` and the pass model's (:22-25), which `ModelBiped`/`ModelZombie` read as the attack swing (WP-3.5a) |
 | `RenderLiving.func_170_d(EntityLiving, float)` (protected) | — (WP-3.5b); its value is the `ticks` (`var3`) argument of `model::Model::render` / `set_rotation_angles` | `ticksExisted + partial` (RenderLiving.java:138-140), passed as `render`'s third argument (:53); overridden to return the chicken's wing angle (`RenderChicken.getWingRotation`), the wolf's tail angle (`RenderWolf.func_25004_a` → `EntityWolf.setTailRotation()`) and the squid's tentacle angle (`RenderSquid.func_21006_b`) (WP-3.5a) |
 | `RenderWolf.func_25004_a(EntityWolf, float)` | — (WP-3.5b) | `entity.setTailRotation()` (RenderWolf.java:12-14): the wolf's `func_170_d`, which `ModelWolf.setRotationAngles` puts in `wolfTail.rotateAngleX` (ModelWolf.java:136) (WP-3.5a) |
+| `GuiParticle.func_25088_a()` | not ported (cited at `mc-client` `gui::screen_input`) | Ticks the screen's GUI particles (GuiParticle.java:16); `Minecraft.runTick` calls it every tick a screen is open (Minecraft.java:990), but nothing in Beta adds a `Particle` to a `GuiParticle`, so it never does anything |
 
 ## Real names changed for Rust
 

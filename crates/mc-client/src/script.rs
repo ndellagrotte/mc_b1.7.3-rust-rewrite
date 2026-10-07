@@ -202,6 +202,36 @@ pub enum Action {
     /// pose in front of the player with its skin from the jar, and with
     /// `path` set, takes a screenshot of it a few frames later.
     DebugModel(crate::model::debug::DebugModelSpec),
+    /// Dev (WP-3.6a): opens a GUI test screen (`"widgets"`, `"list"`,
+    /// `"font"`, `"yesno"`, or a registered screen name) and, with `path`,
+    /// screenshots it a few frames later.
+    DebugGui {
+        /// The test screen.
+        screen: String,
+        /// The PNG.
+        #[serde(default)]
+        path: Option<PathBuf>,
+    },
+    /// Dev (WP-3.6a): `mc.displayGuiScreen(new X())` for the screen class
+    /// `name` (`"GuiConflictWarning"`, `"GuiIngameMenu"`, …).
+    OpenScreen {
+        /// The class name.
+        name: String,
+    },
+    /// Dev (WP-3.6a): puts the (unbuffered) pointer on scaled GUI pixel
+    /// `(x, y)` (`Mouse.getX()`/`getY()`; later button events carry it).
+    MouseTo {
+        /// Scaled x.
+        x: i32,
+        /// Scaled y (down).
+        y: i32,
+    },
+    /// Dev (WP-3.6a): types `text`: a key press and release per character
+    /// carrying the character (key code 0, LWJGL's `KEY_NONE`).
+    TypeText {
+        /// The characters.
+        text: String,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -583,6 +613,58 @@ pub fn run_script(
                     );
                 }
             }
+            Action::DebugGui { screen, path } => {
+                let name = crate::gui::debug_screens::debug_screen_name(&screen);
+                commands.queue(move |w: &mut World| crate::gui::open_screen_by_name(w, &name));
+                if let Some(path) = path {
+                    // Drawn on the next frames, then captured.
+                    let at = r.next;
+                    r.script.steps.splice(
+                        at..at,
+                        [
+                            Step {
+                                tick: None,
+                                frame: None,
+                                action: Action::Wait {
+                                    ticks: None,
+                                    frames: Some(3),
+                                    in_game: false,
+                                },
+                            },
+                            Step {
+                                tick: None,
+                                frame: None,
+                                action: Action::Screenshot { path },
+                            },
+                        ],
+                    );
+                }
+                return;
+            }
+            Action::OpenScreen { name } => {
+                commands.queue(move |w: &mut World| crate::gui::open_screen_by_name(w, &name));
+                return;
+            }
+            Action::MouseTo { x, y } => {
+                let (dw, dh) = (game.display_width, game.display_height);
+                let sr = crate::app::ScaledResolution::new(game.game_settings.gui_scale, dw, dh);
+                let (mx, my) = crate::gui::scaled::gui_to_mouse(
+                    x,
+                    y,
+                    sr.scaled_width,
+                    sr.scaled_height,
+                    dw,
+                    dh,
+                );
+                game.input.mouse_x = mx;
+                game.input.mouse_y = my;
+            }
+            Action::TypeText { text } => {
+                for ch in text.chars() {
+                    game.input.push_key(0, true, ch);
+                    game.input.push_key(0, false, ch);
+                }
+            }
         }
     }
 }
@@ -698,6 +780,34 @@ mod tests {
                 path: "build/screens/d.json".into()
             }
         );
+    }
+
+    #[test]
+    fn parses_the_wp_3_6a_dev_actions() {
+        let s = Script::parse(
+            r#"[{"action": "debug_gui", "screen": "widgets", "path": "a.png"},
+                {"action": "debug_gui", "screen": "font"},
+                {"action": "open_screen", "name": "GuiConflictWarning"},
+                {"action": "mouse_to", "x": 10, "y": 20},
+                {"action": "type_text", "text": "ab"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::DebugGui {
+                screen: "widgets".into(),
+                path: Some("a.png".into())
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::DebugGui {
+                screen: "font".into(),
+                path: None
+            }
+        );
+        assert_eq!(s.steps[3].action, Action::MouseTo { x: 10, y: 20 });
+        assert_eq!(s.steps[4].action, Action::TypeText { text: "ab".into() });
     }
 
     #[test]
