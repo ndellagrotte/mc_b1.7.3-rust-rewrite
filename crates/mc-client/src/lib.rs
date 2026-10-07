@@ -19,6 +19,9 @@
 //! rest), [`clouds`], [`weather`] (`renderRainSnow`), [`fog`]
 //! (`updateFogColor`, `setupFog`, [`fog::FogState`]), [`selection`] (the
 //! block outline), [`gl_material`] (the GL-state material they draw with).
+//!
+//! WP-3.3a: [`terrain`] (`RenderBlocks`, `WorldRenderer`, the terrain half
+//! of `RenderGlobal`, the crack overlay).
 
 pub mod app;
 pub mod assets;
@@ -45,6 +48,7 @@ pub mod settings;
 pub mod sky;
 pub mod sound;
 pub mod storage;
+pub mod terrain;
 pub mod textures;
 pub mod timer;
 pub mod weather;
@@ -168,6 +172,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(sky::SkyPlugin);
         // WP-3.8: SoundManager on bevy_kira_audio.
         app.add_plugins(sound::SoundPlugin);
+        // WP-3.3a: the terrain (RenderBlocks, WorldRenderer, RenderGlobal).
+        app.add_plugins(terrain::TerrainPlugin);
     }
 }
 
