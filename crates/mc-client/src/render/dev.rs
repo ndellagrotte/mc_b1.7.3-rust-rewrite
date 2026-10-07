@@ -84,6 +84,10 @@ pub struct SpawnEntitySpec {
     /// An arrow: `arrowShake`.
     #[serde(default)]
     pub shake: i32,
+    /// A living entity: its health (0: it dies on its next update and
+    /// tips over).
+    #[serde(default)]
+    pub health: Option<i32>,
     /// Primed TNT: the fuse (`EntityList`'s constructor leaves 0; the
     /// block's is 80).
     #[serde(default)]
@@ -141,6 +145,9 @@ pub fn spawn_entity(game: &mut Game, s: &SpawnEntitySpec) -> bool {
         l.prev_render_yaw_offset = s.yaw;
         l.hurt_time = s.hurt_time;
         l.max_hurt_time = s.hurt_time.max(l.max_hurt_time);
+        if let Some(h) = s.health {
+            l.health = h;
+        }
     }
     match &mut e.kind {
         K::Creeper(..) if s.powered => {
