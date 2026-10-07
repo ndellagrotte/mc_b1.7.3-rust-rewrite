@@ -21,7 +21,7 @@
 //! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
 //! | `World(World, WorldProvider)` (:103-143) | [`World::new_for_dimension`] (WP-3.1b): the save handler is passed in rather than shared |
-//! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
+//! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | client rendering only: in `world/sky.rs` (WP-3.4) |
 //! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
 //! | `addWorldAccess`, `removeWorldAccess` (:951-957) | replaced by [`World::events`] |
 //! | `emptyMethod1`, `func_4085_a` (:253, :1587) | not ported: empty / returns null, no caller |
@@ -57,6 +57,7 @@ pub mod map_storage;
 pub mod nibble;
 pub mod provider;
 pub mod ray_trace;
+mod sky;
 pub mod teleporter;
 pub mod tick_entry;
 pub mod tile_entity;
