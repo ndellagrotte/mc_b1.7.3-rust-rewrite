@@ -64,6 +64,7 @@ naming the path.
 | `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
 | `gui` (WP-3.6a) | `Gui`, `GuiScreen`, `GuiButton`, `GuiSmallButton`, `GuiSlider`, `GuiTextField`, `GuiSlot`, `GuiYesNo`, `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused`, `FontRenderer`, `ChatAllowedCharacters`, `ScaledResolution` (arithmetic) | the screen objects bound to `currentScreen`, their input and drawing; `GuiGl` (the GL state and Tessellator as data) and the two GUI cameras (below) |
 | `gui` (WP-3.6b) | `GuiIngame`, `ChatLine`, `GuiChat`, `GuiAchievement`, `RenderItem` (GUI half), `RenderHelper` (item lighting), `GuiContainer`, `GuiInventory`, `GuiChest`, `GuiFurnace`, `GuiCrafting`, `GuiDispenser`, `GuiEditSign`, `GuiSleepMP`, `GuiGameOver`, `Minecraft.displayDebugInfo` (graph) | the HUD, the chat, the achievement popup, the container and in-world screens (below) |
+| `gui::menu`, `gui::loading`, `gui::screens_menu` (WP-3.6c) | `GuiMainMenu`, `GuiIngameMenu`, `GuiOptions`, `GuiVideoSettings`, `GuiControls`, `GuiSelectWorld`, `GuiWorldSlot`, `GuiCreateWorld`, `GuiRenameWorld`, `GuiAchievements`, `GuiStats` and its `GuiSlotStats*` / `SorterStats*`, `GuiTexturePacks`, `GuiTexturePackSlot`, `LoadingScreenRenderer` (drawing) | the title, pause, options, world and statistics screens, the D5 import screen and refusal dialog, the loading screen (below) |
 | `particles` (WP-3.7a) | `EffectRenderer`, `EntityFX` and every `Entity*FX`, `RenderGlobal.spawnParticle`, `playAuxSFX` (particle half), `EntityRenderer.addRainParticles` | the `EffectRenderer` resource, the particle updates in `RunTickHook::UpdateEffects`, the rain splashes in `UpdateRenderer`, the particle meshes (below) |
 | `item_renderer` (WP-3.7b) | `ItemRenderer`, `MapItemRenderer`, `EntityRenderer.renderHand`, `RenderPlayer.drawFirstPersonHand` (the call) | the first-person hand and held item, the fire / inside-a-block / water overlays, `updateEquippedItem`, `renderItem` for the entity renderers (`HeldItemHook`), the hand camera (below) |
 | `render` (WP-3.5b) | `RenderManager`, `Render` and every `Render*` subclass, `RenderGlobal.renderEntities`, `TileEntityRenderer`, `TileEntitySpecialRenderer`, `TileEntitySignRenderer`, `TileEntityMobSpawnerRenderer`, `TileEntityRendererPiston`, `SignModel`, `RenderHelper` (the lit Tessellator draws), `EffectRenderer.renderLitParticles` (the pickups' entities) | the entity and tile-entity draws (below), `HeldItemHook` for 3.7b, the `spawn_entity` / `set_block` dev actions |
@@ -771,6 +772,76 @@ destination alpha anyway.
     `glDepthFunc(GL_EQUAL)` in `GuiGl`), no shadow or fire
     (`Render.doRenderShadowAndFire`, WP-3.5b).
 
+## Menus (WP-3.6c)
+
+`gui::screens_menu::MenuPlugin` (added by `ClientPlugin` after `GuiPlugin`)
+registers the menus by class name (`GuiMainMenu` and `GuiIngameMenu` are
+the ones the shell opens by kind; the others, e.g. `GuiOptions`,
+`GuiSelectWorld`, `GuiAchievements`, `GuiStats`, `GuiImportWorld`, can be
+opened with `open_screen`, without a parent), reads the title splashes
+from the jar's `/title/splashes.txt`, and draws the loading screen.
+
+- **Title** (`GuiMainMenu`): logo, splash (rotated −20°, pulsing, the
+  date overrides), Singleplayer, Multiplayer (always disabled: deferred,
+  D3), Mods and Texture Packs, Options..., Quit Game (shown: no applet,
+  `Minecraft.hideQuitButton` false), the version and copyright lines.
+- **Parents**: a screen opened from another keeps it
+  (`ctx.display_wrapping_this`) and shows it again on Done/Cancel, which
+  re-runs its `initGui` as Java's `displayGuiScreen(parent)` does.
+- **Worlds**: `GuiSelectWorld` lists `getSaveList()` sorted latest first;
+  the second line is `folder (M/d/yy h:mm a, N.NN MB)` (Java 6 `en_US`
+  `SimpleDateFormat()`, local time). Play, double click, Create
+  (`GuiCreateWorld`: the folder is the trimmed name with `/ \ : * ? " < > |`,
+  the backquote and the control characters replaced by `_`, and `-`
+  appended while a world has it; the seed is a `long`, else its
+  `String.hashCode()`, random when empty or 0), Rename (the level name
+  only), Delete (with `GuiYesNo`). A world needing conversion is
+  listed with "Must be converted!"; opening it fails (deferred, D3).
+- **Import** (D5, project-owned): the select-world screen's "Import..."
+  button (top right, 70 × 20, in the title band) opens a path box (typed
+  or pasted; `~/` is the home directory; Bevy has no native file dialog),
+  Import and Cancel. Import runs `import::import_world` (the whole folder
+  is read and checked first; a refusal copies nothing) and opens the world
+  as Play does; a refusal opens a `GuiErrorScreen`-style dialog: "Block id
+  N is not a Beta 1.7.3 block. First found in chunk (x, z) (…)" (or the
+  item id, or the file it cannot read), Back returns to the path. The copy
+  runs inside the click.
+- **Pause menu**: Back to game, Achievements, Statistics, Options..., Save
+  and quit to title (`changeWorld1(null)` then a new title screen), the
+  blinking "Saving level.." while `quickSaveWorld` has chunks left (it is
+  called every drawn frame, as in vanilla).
+- **Achievements**: vanilla clips the map's lines and icons to the tiled
+  window with `glDepthFunc(GL_GEQUAL)` and z −200; the GUI GL has no depth
+  function, and the GUI batches are ordered by Bevy's transparent sort,
+  which also weighs a batch's distance (a batch at z −200 sorts before the
+  background drawn at z 0). The map is therefore drawn at z 0 and the
+  lines, frames and icons are cut to the tiled rectangle on the CPU
+  (`gui::menu::Clip`). **For WP-3.6a/3.6b**: `gui::render::flush_gui`'s
+  `sort_bias: n` is outweighed by z differences between batches; a
+  screen drawing at another z (containers' items at z 100+) can draw out
+  of call order. A bias that dominates (e.g. `n × 1e5`) or a sort by index
+  only would fix it.
+- **Item icons**: `gui::menu::draw_item_into_gui(g, colorize, clip, id,
+  damage, icon, x, y)` is the hook the achievement map and the statistics
+  rows call for `RenderItem.drawItemIntoGui`. It draws the flat icon
+  (terrain.png or items.png) as vanilla's 2D branch; blocks vanilla draws
+  as a lit cube (`renderItemIn3d`) are drawn flat for now. WP-3.6b's GUI
+  item renderer should take over its body.
+- **Statistics**: General, Blocks and Items (disabled while empty); column
+  sorting by the header icons (descending, ascending, off), the tooltips;
+  values in each stat's format (`1,234`, `1.50 km`, `2.00 h`).
+- **Texture packs**: the default pack only (deferred, D3); "Open texture
+  pack folder" disabled.
+- **Loading screen** (`gui::loading`): drawn every frame while a world
+  change is pending (`Game::pending`): the dirt, the title and message
+  lines, and the 100 × 2 progress bar.
+- **Scripts**: key and mouse events reach the screen that is current when
+  the next tick's `handleInput` begins (vanilla's `this`): wait at least a
+  tick (`{"action": "wait", "ticks": 2}`) after a click that opens a screen
+  before typing into it, or the keys go to the old screen. A world-list row
+  is clicked with `mouse_to` + `mouse_down`, a few frames, `mouse_up`
+  (`GuiSlot` polls the held button while drawing).
+
 ## Particles (WP-3.7a)
 
 `particles::ParticlesPlugin` (added by `ClientPlugin`) owns
@@ -1054,6 +1125,7 @@ Actions run in order, as many per frame as are due.
 | `open_screen` | `name` | Dev (WP-3.6a): `displayGuiScreen(new X())` for a screen class name (`"GuiConflictWarning"`, `"GuiErrorScreen"`, `"GuiIngameMenu"`, …; an unregistered one is a placeholder) |
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
+| `click_button` | `label` | Dev (WP-3.6c): presses the enabled button labelled `label` (its text as drawn, e.g. `"Singleplayer"`, `"Options..."`, `"Done"`, `"Save and quit to title"`, `"Import..."`) on the current screen: the pointer moves to its centre, then a left press and release. Waits up to 120 frames for such a button |
 | `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
 | `give_item` | `id`, `count` (1), `damage` (0), `slot` (optional) | Dev (WP-3.7b): puts the stack into main-inventory slot `slot` (0-8: the hotbar; replacing what is there), or without `slot` as a pickup does (`addItemStackToInventory`). Select it with the number keys (`key_down` `"1"`…`"9"`) or `wheel` |
 | `set_fire` | `ticks` | Dev (WP-3.7b): sets the player's `fire` (`isBurning()`, the fire overlay; the simulation counts it down, burns the player every 20 ticks, and water puts it out) |

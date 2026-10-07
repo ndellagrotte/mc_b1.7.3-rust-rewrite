@@ -334,6 +334,14 @@ pub enum Action {
         #[serde(default)]
         armor: Option<usize>,
     },
+    /// Dev (WP-3.6c): presses the button labelled `label` on the current
+    /// screen: the pointer moves to its centre and a left press and
+    /// release follow (vanilla's `mouseClicked` path). Waits up to 120
+    /// frames for a screen with such an enabled button.
+    ClickButton {
+        /// The button's text (`displayString`), as drawn.
+        label: String,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -407,6 +415,8 @@ pub struct ScriptRunner {
     pub start_ticks: Option<i32>,
     /// A relative wait in progress: (until ticks, until frame, in game).
     waiting: Option<(Option<u64>, Option<u64>, bool)>,
+    /// Frames a `click_button` has waited for its button (WP-3.6c).
+    click_waited: u32,
 }
 
 impl ScriptRunner {
@@ -418,6 +428,7 @@ impl ScriptRunner {
             frames: 0,
             start_ticks: None,
             waiting: None,
+            click_waited: 0,
         }
     }
 
@@ -503,6 +514,7 @@ pub fn run_script(
     mut game: NonSendMut<Game>,
     pending: Res<PendingScreenshots>,
     state: Res<State<crate::app::AppState>>,
+    binder: Option<Res<crate::gui::screen::Binder>>,
 ) {
     let Some(mut r) = runner else {
         return;
@@ -760,6 +772,50 @@ pub fn run_script(
                 );
                 game.input.mouse_x = mx;
                 game.input.mouse_y = my;
+            }
+            Action::ClickButton { label } => {
+                let found = binder
+                    .as_deref()
+                    .filter(|b| b.bound_serial() == Some(game.screen_serial))
+                    .and_then(|b| b.screen())
+                    .and_then(|s| {
+                        s.base()
+                            .control_list
+                            .iter()
+                            .find(|b| b.enabled && b.enabled2 && b.display_string == label)
+                            .map(|b| (b.x_position + b.width / 2, b.y_position + b.height / 2))
+                    });
+                match found {
+                    Some((x, y)) => {
+                        r.click_waited = 0;
+                        let (dw, dh) = (game.display_width, game.display_height);
+                        let sr =
+                            crate::app::ScaledResolution::new(game.game_settings.gui_scale, dw, dh);
+                        let (mx, my) = crate::gui::scaled::gui_to_mouse(
+                            x,
+                            y,
+                            sr.scaled_width,
+                            sr.scaled_height,
+                            dw,
+                            dh,
+                        );
+                        game.input.mouse_x = mx;
+                        game.input.mouse_y = my;
+                        game.input.push_button(0, true);
+                        game.input.push_button(0, false);
+                        info!("script: clicked {label:?}");
+                    }
+                    None if r.click_waited < 120 => {
+                        // Not there yet: try again next frame.
+                        r.click_waited += 1;
+                        r.next -= 1;
+                        return;
+                    }
+                    None => {
+                        r.click_waited = 0;
+                        error!("script: click_button: no enabled button {label:?}");
+                    }
+                }
             }
             Action::TypeText { text } => {
                 for ch in text.chars() {
