@@ -14,7 +14,12 @@
 //! Vanilla quirks, transcribed: a snowball or egg never sets its in-ground
 //! flag in flight (any hit kills it), so the in-ground branch and the pickup
 //! are only reachable from NBT; and the pickup would give an *arrow*
-//! (EntitySnowball.java:223, EntityEgg.java:236).
+//! (EntitySnowball.java:223, EntityEgg.java:236). The pickup can never fire
+//! in vanilla: `thrower` is only set by the `(World, EntityLiving)`
+//! constructor (EntitySnowball.java:32, EntityEgg.java:32) and is not in the
+//! NBT (EntitySnowball.java:204-220, EntityEgg.java:217-233), so the
+//! NBT-loaded projectile whose in-ground flag is set has a null thrower,
+//! which no player equals. It is transcribed anyway; no fixture can reach it.
 
 use mc_core::Vec3D;
 use mc_core::math;

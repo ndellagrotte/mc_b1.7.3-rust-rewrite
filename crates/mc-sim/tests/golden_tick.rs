@@ -250,6 +250,8 @@ fixtures! {
     tick_reload_roundtrip => "tick" / "reload-roundtrip";
     tick_reload_generated => "tick" / "reload-generated";
     tick_reload_nether => "tick" / "reload-nether";
+    // WP-2.H: a player's own arrow picked up (EntityArrow.onCollideWithPlayer).
+    tick_bow_arrow_pickup => "tick" / "bow-arrow-pickup";
     // Gate 2's scripted session (passes since WP-2.H's EntityItem pickup); the
     // reload part alone is also in tick/reload-generated.
     tick_gate2_session => "tick" / "gate2-session";

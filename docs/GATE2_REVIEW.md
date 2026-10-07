@@ -19,8 +19,8 @@ ignored and matches the oracle on all 3,237 lines (§3.1), and
 question 2). WP-2.H transcribed the three pickups (`EntityItem`, `EntityArrow`,
 `EntitySnowball`/`EntityEgg.onCollideWithPlayer`, with the `mineWood`/`killCow`
 achievements and `EntityPlayer.onItemPickup`). The R2 wiring sites and the
-tamed-wolf branch of question 1 are still open. Every fixture passes: 219 of
-219, none ignored. The rest of this document is the review as written at
+tamed-wolf branch of question 1 are still open. Every fixture passes: 220 of
+220 (WP-2.H added `tick/bow-arrow-pickup`), none ignored. The rest of this document is the review as written at
 `c415e67`; the sections that WP-2.H changed say so.
 
 Size of Phase 2: 317 files, +94,739 / −1,162 lines. `mc-sim` is now 62.9k lines
@@ -68,11 +68,14 @@ no fix commits.
 | Ignored fixtures still fail as their reasons say | confirmed | `cargo test -p mc-sim --test golden_tick -- --ignored tick_gate2_session` fails at line 745, as the reason states |
 
 **WP-2.H re-run** (branch `wp-2.H`): `cargo test -p mc-sim -p mc-golden -p
-mc-core -p mc-nbt` gives 661 passed, 0 failed, 0 ignored. That is 8 new unit
-tests for the pickups plus `tick_gate2_session`; `golden_tick` gives 186
-passed, 0 ignored. clippy, fmt and the wasm check are clean. `regen.sh` changed
-only `tick/testworld-6000` (question 2). `check-reproducible.sh` reports "3
-runs byte-identical (221 files)" and `check-sensitivity.sh` 219/219 `ok`. The
+mc-core -p mc-nbt` gives 662 passed, 0 failed, 0 ignored. That is 8 new unit
+tests for the pickups plus `tick_gate2_session` and the new fixture
+`tick_bow_arrow_pickup`; `golden_tick` gives 187 passed, 0 ignored. clippy,
+fmt and the wasm check are clean. `regen.sh` changed only
+`tick/testworld-6000` (question 2) and added `tick/bow-arrow-pickup`.
+`check-reproducible.sh` reports "3 runs byte-identical (222 files)" and
+`check-sensitivity.sh` 220/220 `ok` (203 seeded fixtures change, 17 unseeded
+stay identical). The
 scripted-session row above is now **pass** (§3.1).
 
 The oracle still prints `harness: warning: chunk (1,0) already loaded before
@@ -81,7 +84,8 @@ worldgen fixtures. This is expected, as at Gate 1.
 
 ## 2. Fixtures
 
-There are 219 fixture directories under `tests/golden` (Gate 1 had 131). A Rust
+There are 220 fixture directories under `tests/golden` (Gate 1 had 131; 219
+at `c415e67`, WP-2.H added `tick/bow-arrow-pickup`). A Rust
 test runs every one of them, so no fixture lacks a test. The appendix lists
 each fixture with its test.
 
@@ -89,9 +93,9 @@ each fixture with its test.
 |---|---|---|---|---|
 | A | 32 (rng 3, math 3, hash 6, nbt 5, block 1, item 1, recipe 1, stat 1, worldgen 11) | 32 | 0 | mc-core `golden_rng`, `golden_hash`, `golden_sine_table`, `math_sweep_report`; mc-nbt `golden_nbt`; mc-sim `golden_block_table`, `golden_item_table`, `golden_recipe_table` (new), `golden_stat_table` (new), `golden_worldgen` |
 | B | 90 (light 4, tick 86) | 90 | 0 | mc-sim `golden_tick` |
-| C | 89 (entity 62, tick 27) | 89 | 0 | mc-sim `golden_tick` |
+| C | 90 (entity 62, tick 28; 89 at `c415e67`) | 90 | 0 | mc-sim `golden_tick` |
 | S | 8 (save 3; tick 5: `dungeon-chest-save`, `chest-container-clicks`, `furnace-dispenser-clicks`, `reload-roundtrip`, `gate2-session`) | 8 (7 at `c415e67`; `gate2-session` since WP-2.H) | 0 (1 at `c415e67`) | mc-sim `golden_save` (the 3 `save/*`), `golden_tick` (the 5 tick ones, listed in `golden_save::COVERED_IN_GOLDEN_TICK`) |
-| **Total** | **219** | **219** (218 at `c415e67`) | **0** (1 at `c415e67`) | |
+| **Total** | **220** (219 at `c415e67`) | **220** (218 at `c415e67`) | **0** (1 at `c415e67`) | |
 
 Two Tier C fixtures, `entity/sheep-shear` and `entity/wolf-pack-retaliates`,
 also have a `save` op and emit Tier S lines. They are listed in
@@ -250,13 +254,19 @@ full:
 
 ```
 $ cargo test -p mc-sim --test golden_tick
-test result: ok. 186 passed; 0 failed; 0 ignored
+test result: ok. 187 passed; 0 failed; 0 ignored
 ```
 
 The achievements never reach the trace. Through `EntityPlayerSP.addStat`,
 `mineWood` also needs its parent `openInventory`, which only the client's
-inventory screen awards. The arrow and snowball pickups have unit tests but
-no oracle fixture (see the WP-2.H report).
+inventory screen awards. The arrow pickup is compared with the oracle by
+`tick/bow-arrow-pickup` (added by WP-2.H's review fixes): two bow-shot arrows of
+the player are picked up, one in reach as soon as `arrowShake` reaches 0, one
+after a `set_pos` next to the wall it is stuck in; only the player, the
+inventory and the arrows' `entity_absent` lines are traced, as their heading
+jitter is a K11 constructor draw. The snowball/egg pickup cannot be reached in
+vanilla (only an NBT-loaded projectile is in the ground, and its unsaved
+`thrower` is null), so it has unit tests only.
 
 ### 3.2 `testWorld` for 6,000 ticks: `tick/testworld-6000` (pass)
 
@@ -848,6 +858,7 @@ also run with `--ignored` and fails as described in §3.1.
 | `tick/bed-place-and-break` | B | pass | `golden_tick.rs::tick_bed_place_and_break` |
 | `tick/block-item-placement` | B | pass | `golden_tick.rs::tick_block_item_placement` |
 | `tick/bonemeal-sapling` | B | pass | `golden_tick.rs::tick_bonemeal_sapling` |
+| `tick/bow-arrow-pickup` | C | pass | `golden_tick.rs::tick_bow_arrow_pickup` (WP-2.H) |
 | `tick/bow-shoot` | C | pass | `golden_tick.rs::tick_bow_shoot` |
 | `tick/bucket-fill-empty` | B | pass | `golden_tick.rs::tick_bucket_fill_empty` |
 | `tick/bucket-nether-fizz` | B | pass | `golden_tick.rs::tick_bucket_nether_fizz` |

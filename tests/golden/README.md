@@ -1497,6 +1497,17 @@ and, where the stacks matter, `inventory` every tick:
   jitter from their own `rand` before the join hook seeds it (tools/oracle/census.md §3), so
   their flight is not reproducible in the oracle; it draws nothing from `World.rand` or
   `Math.random()`.
+- `tick/bow-arrow-pickup` (tier C, WP-2.H): `EntityArrow.onCollideWithPlayer` on the player's
+  own arrows (`doesArrowBelongToPlayer` from the `(World, EntityLiving)` constructor). Shot at
+  pitch 60 at t = 2, the arrow sticks in the floor in front of the player at t = 3
+  (`arrowShake` 7) and goes back into slot 5 at t = 11, the first player update that sees
+  `arrowShake` 0; shot at pitch 0 at t = 15 into a wall out of reach, it is picked up at
+  t = 30 after a `set_pos` next to the wall. As in `tick/bow-shoot` the arrows' positions are
+  not reproducible, so only the player, the inventory, `rng_state` and the arrows'
+  `entity_absent` lines at t = 49 are dumped; the geometry keeps the hit tick and the reach
+  test far from their boundaries. The snowball and egg pickups (`EntitySnowball` /
+  `EntityEgg.onCollideWithPlayer`) cannot be reached in vanilla: only an NBT-loaded
+  projectile is in the ground, and its `thrower` (not saved) is null.
 - `tick/flint-steel-tnt-portal`: fire on a block, beside a block, refused into stone (still
   worn), removed under a floating block (`BlockFire.onBlockAdded`), a portal lit in an
   obsidian frame, fire beside TNT; the `dig` op with flint and steel held on TNT

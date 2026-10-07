@@ -1,0 +1,13 @@
+{"name":"bow-arrow-pickup","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":50,"mob_spawning":"none",
+ "comment":"WP-2.H (review coverage gap): EntityArrow.onCollideWithPlayer on a player's own arrow (EntityArrow.java:257-266). Stone floor y 60 and a stone wall at z 8; the player (id 0) at (0.5, 61, 0.5), yaw 0, pitch 60, holds a bow (slot 0) with 2 arrows in slot 5. t 2: use_item shoots arrow id 1 (EntityArrow(world, player): doesArrowBelongToPlayer true) down and forward; it flies two ticks and sticks in the floor about a block in front of the player (arrowShake 7), inside the player's collision box expanded by (1, 0, 1) (EntityPlayer.onLivingUpdate), so it is picked up once inGround and arrowShake <= 0: the arrow goes back into the inventory (slot 5 count 1 -> 2) at a tick the inventory dump shows. t 10: pitch 0, t 11: arrow id 2 sticks in the wall at z 8, out of reach; t 30: set_pos puts the player at z 7 (posY 61 + yOffset 1.62F), in reach, and it is picked up on the next player update. Only the player, the inventory and rng_state are dumped every tick, and the arrows only as entity_absent at t 49: the arrows' heading jitter is drawn from their own rand in the constructor, before the join hook seeds it (tools/oracle/census.md section 3), so their positions are not reproducible; the geometry keeps the hit tick and the reach test far from any boundary (the floor hit is 0.2 blocks into the second tick, the reach margins are 0.1 blocks or more).",
+ "ops":[{"t":0,"op":"fill","x0":-6,"y0":60,"z0":-6,"x1":6,"y1":60,"z1":10,"id":1},
+        {"t":0,"op":"fill","x0":-4,"y0":61,"z0":8,"x1":4,"y1":65,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x3fe0000000000000","yaw":0,"pitch":60,"inventory":[{"slot":0,"id":261,"count":1},{"slot":5,"id":262,"count":2}]},
+        {"t":2,"op":"use_item","x":0,"y":60,"z":-3,"side":1},
+        {"t":14,"op":"set_rotation","id":0,"yaw":0,"pitch":0},
+        {"t":15,"op":"use_item","x":0,"y":60,"z":-3,"side":1},
+        {"t":30,"op":"set_pos","id":0,"pos":["0x3fe0000000000000","0x404f4f5c29000000","0x401c000000000000"]}],
+ "dumps":[{"every":1,"what":"inventory"},
+          {"every":1,"what":"entity_state","which":[0]},
+          {"every":1,"what":"rng_state"},
+          {"t":49,"what":"entity_state","which":[1,2]}]}
