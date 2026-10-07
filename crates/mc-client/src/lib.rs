@@ -14,14 +14,22 @@
 //!
 //! WP-3.2: [`textures`] (`RenderEngine`, the `TextureFX` family, the
 //! colorizers).
+//!
+//! WP-3.4: [`sky`] (`RenderGlobal.renderSky`; [`sky::SkyPlugin`] wires the
+//! rest), [`clouds`], [`weather`] (`renderRainSnow`), [`fog`]
+//! (`updateFogColor`, `setupFog`, [`fog::FogState`]), [`selection`] (the
+//! block outline), [`gl_material`] (the GL-state material they draw with).
 
 pub mod app;
 pub mod assets;
 pub mod camera;
 pub mod clock;
+pub mod clouds;
 pub mod debug;
 pub mod events;
+pub mod fog;
 pub mod game;
+pub mod gl_material;
 pub mod import;
 pub mod input;
 pub mod jfmt;
@@ -31,11 +39,14 @@ pub mod loading;
 pub mod paths;
 pub mod screenshot;
 pub mod script;
+pub mod selection;
 pub mod session;
 pub mod settings;
+pub mod sky;
 pub mod storage;
 pub mod textures;
 pub mod timer;
+pub mod weather;
 
 use bevy::prelude::*;
 use mc_sim::stats::AchievementMap;
@@ -152,6 +163,8 @@ impl Plugin for ClientPlugin {
                     .chain()
                     .in_set(GameFrameSet),
             );
+        // WP-3.4: sky, clouds, weather, fog, selection box.
+        app.add_plugins(sky::SkyPlugin);
     }
 }
 
