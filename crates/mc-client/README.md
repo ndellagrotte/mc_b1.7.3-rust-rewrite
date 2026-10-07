@@ -872,13 +872,26 @@ GL emulation), `render/apply.rs` (the Bevy side).
   (`render::material::EntityGlMaterial`, pooled meshes at
   `order::TESS + n` in call order) in the entity band before the particles.
   Textures are the shared cache's sRGB images (no mirrors).
-- **Colours.** As everything drawn on the sRGB target (`gl_material`
-  "Colours"): opaque pixels are vanilla's; the shadows (alpha ≈ 0.25-0.5)
-  and the hurt overlay blend in linear space, so shadows are lighter than
-  GL's; the lightning's additive strips (`GL_SRC_ALPHA, GL_ONE`) are exact
-  over black and much dimmer over the sky.
+- **Colours.** As everything else drawn on the main target (`gl_material`
+  "Colours", "Compositing in sRGB"): with the cameras compositing in sRGB
+  since WP-3.7b, `EntityGlMaterial` and `ModelMaterial` take the
+  `GL_TARGET_UNORM` path and return the Java values unconverted, so opaque
+  pixels are vanilla's and the shadows (alpha ≈ 0.25-0.5), the hurt overlay
+  and the lightning's additive strips (`GL_SRC_ALPHA, GL_ONE`) blend as GL
+  blends its framebuffer bytes. (Before WP-3.7b they blended in linear
+  space: lighter shadows, the lightning much dimmer over the sky.)
 
 ### For WP-3.7b
+
+**Integration status (WP-3.5b merge):** WP-3.7b, merged first, defined its
+own hook for this call, `item_renderer::render_item::HeldItemHook` (a
+function returning an `ItemDraw { mesh, atlas, matrix, gl_color }`), and
+fills it; nothing yet inserts the `render::held_item::HeldItemHook` below,
+so third-person held items are not drawn. Bridging the two (an
+`EntityGl` draw of a prebuilt mesh, or `renderItem` transcribed on
+`EntityGl`) is a follow-up. Likewise the third-person player draw does not
+yet call `ItemRenderer::player_model_drawn` (WP-3.7b's note on the arm's
+`isRiding`); `render_hand` covers third person and sleeping.
 
 `ItemRenderer.renderItem(entity, stack)` (the held items of `RenderPlayer`
 and `RenderBiped`, the helmet slot's block) calls
