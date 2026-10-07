@@ -61,6 +61,7 @@ naming the path.
 | `selection` | `RenderGlobal.drawSelectionBox` | the block outline |
 | `gl_material` | — (GL state) | `GlMaterial`: glColor × vertex colour × texture, alpha test, GL fog, blend/depth/colour masks, draw-order biases; Tessellator helpers |
 | `terrain` (WP-3.3a) | `RenderBlocks`, `WorldRenderer`, `RenderGlobal` (terrain half: `loadRenderers`, `updateRenderers`, `sortAndRender`, `clipRenderersByFrustrum`, `markBlock*NeedsUpdate`, `drawBlockBreaking`), `RenderSorter`, `EntitySorter`, `ChunkCache`, `Tessellator`, `Frustrum`, `ClippingHelper(Impl)` | the terrain meshes, two passes, the crack overlay, `renderBlockOnInventory` (below) |
+| `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -396,6 +397,136 @@ policy), `snapshot.rs` (what a mesh job reads).
   `isLit`), so after a sky-light change `updateAllRenderers` can rebuild
   fewer sections than vanilla; nothing drawn differs.
 
+## Models (WP-3.5a)
+
+`model` is the `Model*` family as data (PLAN_v4 D1 rule 6, D7): every model
+the renderers construct is a `model::ModelKind` (one variant per
+constructor call: `Biped` = `new ModelBiped()`, `BipedArmor` =
+`ModelBiped(0.5F)`, `BipedArmorChestplate` = `ModelBiped(1.0F)`, `Zombie`,
+`Skeleton`, `Pig`, `PigSaddle` = `ModelPig(0.5F)`, `Cow`, `Sheep` =
+`ModelSheep2`, `SheepFur` = `ModelSheep1`, `Chicken`, `Wolf`, `Creeper`,
+`CreeperArmor` = `ModelCreeper(2.0F)`, `Spider`, `Slime` = `ModelSlime(16)`,
+`SlimeOuter` = `ModelSlime(0)`, `Ghast`, `Squid`, `Minecart`, `Boat`), and a
+`model::Model` holds its parts (`ModelPart` = `ModelRenderer`, in the Java's
+field order; index constants per model module, e.g. `model::biped::RIGHT_ARM`)
+plus `ModelBase`'s/`ModelBiped`'s state (`on_ground` = the swing progress,
+`is_riding`, `held_item_left/right`, `is_sneak`). `ModelBed` is three tables
+(`model::bed`) for the bed block (WP-3.3).
+
+All b1.7.3 models texture over 64×32 (`TexturedQuad` hard-codes it; there is
+no `textureWidth`/`textureHeight` yet); UVs are already divided, with
+vanilla's half-texel inset.
+
+### Drawing a model (for WP-3.5b)
+
+Recommended: **an entity with one child entity per part** (the Java's
+display list per `ModelRenderer` is a Bevy mesh built once and shared by
+every entity of that kind; only transforms change per frame):
+
+1. Keep one `Model` per renderer, as `RenderManager` keeps one model per
+   entity class (state the Java does not reset leaks between entities the
+   same way: the wolf's rotation points, the minecart's inner floor, the
+   armour models' `showModel`).
+2. Spawn: `model::spawn_model(&mut commands, &mut ModelMeshes, &mut
+   Assets<Mesh>, kind, material, root_transform)` → the root entity
+   (`ModelEntity { kind, parts }`), with one hidden child per part
+   (`ModelPartEntity`, `Mesh3d` from the `ModelMeshes` cache, keyed by kind).
+3. Each frame, as `RenderLiving.doRenderLiving` does: set
+   `model.on_ground = getSwingProgress(partial)` (`func_167_c`),
+   `is_riding`, and for bipeds `held_item_right`/`is_sneak`
+   (`RenderPlayer`, `RenderBiped`); call `model.set_living_animations(&
+   LivingInputs::Wolf(WolfAnimInputs::from_entity(e, partial,
+   brightness)), limbSwing, limbSwingAmount, partial)` for wolves (it
+   returns the shaking wolf's `glColor3f`); then
+   `let draws = model.render(limbSwing, limbSwingAmount, ticks, headYaw,
+   headPitch, MODEL_SCALE)` (`ticks` = `func_170_d`: age + partial, the
+   chicken's wing angle, the wolf's tail angle, the squid's tentacle angle)
+   and `model::apply_pose(&model_entity, &draws, &mut part_query)`, which
+   places and shows the drawn parts and hides the others.
+4. The root `Transform` is the renderer's matrix (RenderLiving.java:36-43):
+   `translate(entity) · rotY(180 - renderYawOffset) · [death: rotZ] ·
+   scale(-1, -1, 1) · preRenderCallback scale · translate(0, -24 × 0.0625 -
+   0.0078125, 0)` (`Transform::from_matrix` handles it; `scale(-1, -1, 1)` is
+   a rotation). Minecarts and boats: their own `translate · rotY · rotZ ·
+   … · scale(-1, -1, 1)` with no −1.5 offset. `model::debug::root_transform`
+   is a reduced example. Part transforms are `ModelPart::transform(mode,
+   scale)` (translate to the rotation point × 0.0625, then rotate Z, Y, X for
+   `render`/`postRender`, Y, X, Z for `renderWithRotation`, which the wolf's
+   head, ears, snout and tail use); `model::part_transform(part)` is the
+   common case.
+5. Held items and the helmet block hang off `model.post_render(part,
+   MODEL_SCALE)` (`bipedRightArm.postRender`, `bipedHead.postRender`) as a
+   child of the root. `render_ears` / `render_cloak` give the extra parts'
+   draws for `RenderPlayer` (skins and cloaks are downloads: deferred, D2).
+6. Hide (or despawn) model entities while no world is drawn (`FogState::
+   active`): Bevy re-specialises visible meshes' pipelines when the world
+   camera's `DistanceFog` goes away, and a pipeline compile still running at
+   exit crashes the NVIDIA driver at teardown (seen with `debug_model`).
+
+Drawing through `TessBatch` instead (re-tessellating every part of every
+entity per frame) is not recommended for models; it suits the one-off quads
+of `RenderArrow`, `RenderPainting`, `RenderSnowball`, `RenderFish` &c.
+
+### The material
+
+`model::ModelMaterial` is `GlMaterial`'s arithmetic (same colour
+conversion and sRGB caveats) plus GL lighting:
+`RenderHelper.enableStandardItemLighting` is on for every entity draw
+(EntityRenderer.java:500-503), so a face shows `clamp(c × 0.4 + c × 0.6 ×
+Σ max(n·Lᵢ, 0))` of `glColor` `c`, the two lights fixed in the world
+(`model::material::standard_light_directions`). Normals come from
+`Tessellator.setNormal`'s byte packing, **vanilla bug kept**: `x × 128` wraps
+`+1` to `-128` and the sign extension spills into y and z, so both x faces
+of every box are lit as `-x` (`model::part::tess_normal`).
+
+- Main pass: `ModelMaterial::living(texture, brightness)` (`glColor3f(
+  getEntityBrightness)`, RenderManager.java:107-108; alpha test 0.1; cull
+  off; opaque phase), `.with_fog(&FogState)`, and `set_fog` when the fog
+  changes. Textures: `TextureLoader::get(path)` (the shared cache's sRGB
+  images; `texture_srgb` makes the shader read the PNG's values).
+- Passes (`ModelKey`, `ModelParams`): hurt/death red and the creeper flash
+  (`textured: 0`, alpha test off, `GlBlend::Alpha`, `depth_equal: true`,
+  `color` (b, 0, 0, 0.4) or the multiplier's ARGB); the powered creeper
+  (`CreeperArmor`, `/armor/power.png`, `lighting: 0`, `GlBlend::Additive`
+  (`glBlendFunc(1, 1)` with alpha 1), `color` 0.5, `uv_offset` = `(t ×
+  0.01, t × 0.01)`); spider eyes (`GlBlend::Alpha`, alpha test off, `color`
+  (1, 1, 1, (1 − brightness) × 0.5)); the slime's outer cube
+  (`GlBlend::Alpha`); sheep wool (`color` = brightness × fleece colour).
+  Blended passes go to `Transparent3d`: give them a `sort_bias` in the
+  entity band (−0.95e6 … −0.91e6, `gl_material::order`). Minecarts and
+  boats keep `GL_CULL_FACE`: `key.cull = true`.
+
+### Textures per model (the renderers' `loadTexture` / `getEntityTexture`)
+
+| Entity | Renderer | Models | Texture |
+|---|---|---|---|
+| Player | `RenderPlayer` | `Biped`; armour `BipedArmorChestplate` (helmet, chestplate, boots), `BipedArmor` (leggings) | `/mob/char.png` (EntityPlayer.java:51; skin downloads deferred); `/armor/{cloth,chain,iron,diamond,gold}_{1,2}.png`, `_2` for leggings (RenderPlayer.java:25) |
+| Zombie | `RenderBiped` | `Zombie` | `/mob/zombie.png` |
+| Zombie pigman | `RenderBiped` (the zombie's) | `Zombie` | `/mob/pigzombie.png` (EntityPigZombie.java:12) |
+| Giant | `RenderGiantZombie` (scale 6) | `Zombie` | `/mob/zombie.png` |
+| Skeleton | `RenderBiped` | `Skeleton` | `/mob/skeleton.png` |
+| Creeper | `RenderCreeper` | `Creeper`; powered pass `CreeperArmor` | `/mob/creeper.png`; `/armor/power.png` |
+| Spider | `RenderSpider` | `Spider` twice | `/mob/spider.png`; eyes pass `/mob/spider_eyes.png` |
+| Pig | `RenderPig` | `Pig`; saddle pass `PigSaddle` | `/mob/pig.png`; `/mob/saddle.png` |
+| Sheep | `RenderSheep` | `Sheep`; wool pass `SheepFur` | `/mob/sheep.png`; `/mob/sheep_fur.png` |
+| Cow | `RenderCow` | `Cow` | `/mob/cow.png` |
+| Chicken | `RenderChicken` | `Chicken` | `/mob/chicken.png` |
+| Wolf | `RenderWolf` | `Wolf` | `/mob/wolf.png`, `/mob/wolf_tame.png` (tamed), `/mob/wolf_angry.png` (angry) (EntityWolf.java:34-39) |
+| Slime | `RenderSlime` | `Slime`; outer pass `SlimeOuter` | `/mob/slime.png` |
+| Ghast | `RenderGhast` | `Ghast` | `/mob/ghast.png`, `/mob/ghast_fire.png` while attacking (EntityGhast.java:28) |
+| Squid | `RenderSquid` | `Squid` | `/mob/squid.png` |
+| Other `EntityLiving` | `RenderLiving` | `Biped` | `/mob/char.png` |
+| Minecart | `RenderMinecart` | `Minecart` | `/item/cart.png` (the chest/furnace block from `/terrain.png`) |
+| Boat | `RenderBoat` | `Boat` | `/item/boat.png` |
+
+### Checked
+
+`model/testdata/java_models.txt` is the vanilla classes run on the oracle
+JVM (`model/testdata/ModelDump.java`, regenerated as its header says):
+every part's rotation point, angles, mirror flag, corners and faces, and
+the parts after a sequence of `setRotationAngles` (and the wolf's
+`setLivingAnimations`, the ears) calls; the tests compare them bit for bit.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -434,6 +565,7 @@ Actions run in order, as many per frame as are due.
 | `aux_sfx` | `kind`, `x`, `y`, `z`, `data` | Dev (WP-3.8): queues `world.playAuxSFX(kind, x, y, z, data)` as the simulation would (`1005` with `data` 2256 plays record `13` at the block, `data` 0 stops it; `2001` with a block id plays its break sound) |
 | `set_option` | `option`, `step` (default 1) | Dev (WP-3.3a): `gameSettings.setOptionValue(option, step)` with its side effects and `saveOptions`, as the options screen's button (`option` is the translation key: `"options.ao"`, `"options.graphics"`, `"options.renderDistance"`, …) |
 | `dump_debug` | `path` | Dev (WP-3.3a): writes the F3 text (`DebugText`, `DebugSources`, the fps line) and `terrain::TerrainStats` as JSON |
+| `debug_model` | `model`, `path`; optional `texture`, `distance` (3), `turn`, `limb_swing`, `limb_yaw`, `ticks`, `head_yaw`, `head_pitch`, `swing`, `scale`, `brightness` (1), `blend_alpha`, `keep`, `sitting` | Dev (WP-3.5a): spawns a model (`"pig"`, `"sheep_fur"`, `"biped_armor"`, … = `model::ModelKind`) standing `distance` blocks in front of the player at feet level, facing the camera turned by `turn` degrees, posed with those `render` arguments, its skin from the jar (default: the renderer's texture); with `path`, waits 20 frames and saves a screenshot. Earlier debug models are removed unless `keep` (to draw a pass model over its main model). Hidden while no world is drawn |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
