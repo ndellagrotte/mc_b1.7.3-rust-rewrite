@@ -66,7 +66,9 @@ use crate::textures::TextureLoader;
 /// the next one. Nothing else uses these layers.
 pub const GUI_RENDER_LAYER: usize = 30;
 
-/// The GUI cameras' order after the world camera (order 0).
+/// The GUI cameras' order after the world (order −1,
+/// `camera::WORLD_CAMERA_ORDER`) and first-person hand (order 0,
+/// `item_renderer`) cameras.
 const GUI_CAMERA_ORDER: isize = 1;
 
 /// A GUI batch's GL state as a material (module docs).

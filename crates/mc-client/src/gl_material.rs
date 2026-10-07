@@ -8,20 +8,23 @@
 //! # Colours
 //!
 //! Vanilla writes its colour values straight into an 8-bit framebuffer, so a
-//! value `v` shows as the byte `v * 255`. Bevy's window target is sRGB, so the
-//! shader does all of GL's arithmetic (colour products, alpha test, fog) on
-//! the Java values and converts to linear only at the end: an opaque pixel
-//! comes out as the same byte vanilla shows. Textures are uploaded as
-//! `Rgba8Unorm` (not sRGB) so sampling returns the PNG's bytes / 255, as GL
-//! does.
+//! value `v` shows as the byte `v * 255`. The shader does all of GL's
+//! arithmetic (colour products, alpha test, fog) on the Java values.
+//! Textures are uploaded as `Rgba8Unorm` (not sRGB) so sampling returns the
+//! PNG's bytes / 255, as GL does.
 //!
-//! Blending: GL blends the bytes it stores. When the main pass target is
-//! not sRGB (`Rgba8Unorm`: the camera carries Bevy's
-//! `CompositingSpace::Srgb`), the shader returns the Java values unconverted
-//! (`GL_TARGET_UNORM`, chosen from the pipeline's target format) and the
-//! hardware blends exactly as GL does. On the default sRGB target the
-//! hardware blends linear values instead, which no output can make exact for
-//! every destination:
+//! Blending: GL blends the bytes it stores. Every camera composites in sRGB
+//! (`CompositingSpace::Srgb`, WP-3.7b: `camera::spawn_camera` and
+//! `crate::ClientPlugin`), so the main pass target is `Rgba8Unorm`; the
+//! shader returns the Java values unconverted (`GL_TARGET_UNORM`, chosen
+//! from the pipeline's target format) and the hardware blends exactly as GL
+//! does. Bevy's upscale pass decodes the result for the window, so opaque
+//! pixels are the bytes vanilla shows.
+//!
+//! History (before WP-3.7b): on Bevy's default sRGB target the shader
+//! converted to linear at the end and the hardware blended linear values,
+//! which no output can make exact for every destination (that path is still
+//! in the shader, for a camera without `CompositingSpace::Srgb`):
 //! - [`GlBlend::Additive`] (sun, moon, stars) returns `linear(c·a) / a`, so
 //!   the hardware adds `linear(c·a)`: byte-exact over a black destination
 //!   (midnight stars show as byte 64, `getStarBrightness`² = 0.25 as in GL,
@@ -34,8 +37,8 @@
 //!   glow is off too.
 //!
 //! Measured with the camera switched to `CompositingSpace::Srgb` (an
-//! uncommitted experiment, since the camera is WP-3.1's): the outline is
-//! 111, the stars 64, the sun shows its halo, and opaque pixels stay exact.
+//! experiment then, the live path since WP-3.7b): the outline is 111, the
+//! stars 64, the sun shows its halo, and opaque pixels stay exact.
 //!
 //! # Draw order
 //!

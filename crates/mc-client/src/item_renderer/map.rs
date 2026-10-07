@@ -25,20 +25,29 @@ pub const MAPBG_PNG: &str = "/misc/mapbg.png";
 // src: MapItemRenderer.java:73
 pub const MAPICONS_PNG: &str = "/misc/mapicons.png";
 
-/// `renderMap`'s pixel loop: `MapData.colors` → `intArray` (ARGB), as
-/// RGBA bytes for an `Rgba8Unorm` image (what `func_28150_a` uploads).
-/// A colour index without a `MapColor` (14, 15) or a negative byte would
-/// throw in Java (`NullPointerException`, `ArrayIndexOutOfBoundsException`);
-/// here such a pixel is transparent.
+/// `renderMap`'s pixel loop: `MapData.colors` → `intArray` (ARGB), then
+/// `func_28150_a`'s upload ([`upload_pixels`]) as RGBA bytes for an
+/// `Rgba8Unorm` image. With the anaglyph option on, an explored pixel's
+/// colour goes through the anaglyph transform twice, once here and once
+/// in the upload.
 // src: MapItemRenderer.java:25-57
 pub fn map_pixels(colors: &[u8], anaglyph: bool) -> Vec<u8> {
-    let mut out = vec![0u8; MAP_COLORS_LEN * 4];
+    upload_pixels(&map_int_array(colors, anaglyph), anaglyph)
+}
+
+/// `renderMap`'s loop over `MapData.colors`, filling `intArray` (ARGB).
+/// A colour index without a `MapColor` (14, 15) or a negative byte would
+/// throw in Java (`NullPointerException`, `ArrayIndexOutOfBoundsException`);
+/// here such a pixel is 0 (transparent).
+// src: MapItemRenderer.java:25-55
+pub fn map_int_array(colors: &[u8], anaglyph: bool) -> Vec<i32> {
+    let mut out = vec![0i32; MAP_COLORS_LEN];
     for var4 in 0..MAP_COLORS_LEN.min(colors.len()) {
         let var5 = colors[var4] as i8 as i32;
-        let argb: u32 = if var5 / 4 == 0 {
+        out[var4] = if var5 / 4 == 0 {
             // (var4 + var4 / 128 & 1) * 8 + 16 << 24
             let v = var4 as i32;
-            ((((v + v / 128) & 1) * 8 + 16) << 24) as u32
+            (((v + v / 128) & 1) * 8 + 16) << 24
         } else {
             let Some(c) = usize::try_from(var5 / 4)
                 .ok()
@@ -59,23 +68,26 @@ pub fn map_pixels(colors: &[u8], anaglyph: bool) -> Vec<u8> {
             let mut var10 = (var6 >> 8 & 255) * var8 / 255;
             let mut var11 = (var6 & 255) * var8 / 255;
             if anaglyph {
-                let var12 = (var9 * 30 + var10 * 59 + var11 * 11) / 100;
-                let var13 = (var9 * 30 + var10 * 70) / 100;
-                let var14 = (var9 * 30 + var11 * 70) / 100;
-                var9 = var12;
-                var10 = var13;
-                var11 = var14;
+                // src: MapItemRenderer.java:44-51
+                (var9, var10, var11) = crate::textures::texture_fx::anaglyph(var9, var10, var11);
             }
-            (-16777216i32 | var9 << 16 | var10 << 8 | var11) as u32
+            -16777216i32 | var9 << 16 | var10 << 8 | var11
         };
-        out[var4 * 4..var4 * 4 + 4].copy_from_slice(&[
-            (argb >> 16) as u8,
-            (argb >> 8) as u8,
-            argb as u8,
-            (argb >> 24) as u8,
-        ]);
     }
     out
+}
+
+/// `RenderEngine.func_28150_a(intArray, 128, 128, bufferedImage)`: ARGB →
+/// RGBA bytes, applying the anaglyph transform again when the option is on
+/// (`options` is the game's settings, RenderEngine.java:36). The arithmetic
+/// is `setupTexture`'s, so this is [`crate::textures::argb_to_rgba`]; the
+/// hand pass uploads through [`crate::textures::Textures::upload_argb`],
+/// which converts the same way with the texture cache's anaglyph flag.
+// vanilla bug: with anaglyph on, renderMap has already transformed the
+// colours (MapItemRenderer.java:44-51), so the map is transformed twice.
+// src: RenderEngine.java:246-293, MapItemRenderer.java:57
+pub fn upload_pixels(int_array: &[i32], anaglyph: bool) -> Vec<u8> {
+    crate::textures::argb_to_rgba(int_array, anaglyph)
 }
 
 /// The background quad (ItemRenderer.java:208-215).

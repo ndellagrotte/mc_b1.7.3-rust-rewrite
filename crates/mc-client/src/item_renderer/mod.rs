@@ -71,7 +71,7 @@ use bevy::ecs::message::MessageCursor;
 use bevy::math::{Mat4, Vec3, Vec4};
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
-use bevy::render::render_resource::{BlendState, TextureFormat};
+use bevy::render::render_resource::BlendState;
 use mc_core::math::floor_double;
 use mc_sim::block::{BlockStatics, Material};
 use mc_sim::entity::{Entity as SimEntity, base, dispatch, living};
@@ -141,8 +141,24 @@ pub struct ItemRenderer {
     // src: ItemRenderer.java:13
     pub equipped_item_slot: i32,
     /// `RenderPlayer.modelBipedMain.isRiding`: the player's `isRiding()`
-    /// the last frame `RenderPlayer` drew it (third person or asleep).
+    /// the last time `RenderPlayer` drew it (third person, asleep, or
+    /// `GuiInventory`'s preview); set through
+    /// [`ItemRenderer::player_model_drawn`].
     pub hand_model_is_riding: bool,
+}
+
+impl ItemRenderer {
+    /// `RenderLiving.doRenderLiving` drew the player with `RenderPlayer`,
+    /// whose `modelBipedMain` the first-person arm shares: the model's
+    /// `isRiding` becomes the player's and stays so for the arm. Called by
+    /// [`render_hand`] for the third-person and sleeping draws; WP-3.6b's
+    /// `GuiInventory` preview (GuiInventory.java:58 →
+    /// `RenderManager.renderEntityWithPosYaw`) and WP-3.5b's player
+    /// renderer call it too whenever they draw the local player.
+    // src: RenderLiving.java:26-29
+    pub fn player_model_drawn(&mut self, is_riding: bool) {
+        self.hand_model_is_riding = is_riding;
+    }
 }
 
 impl Default for ItemRenderer {
@@ -403,8 +419,8 @@ pub fn render_hand(
     let sleeping = p.kind.player().is_some_and(|d| d.is_player_sleeping());
     if third_person || sleeping {
         // RenderPlayer.renderPlayer → doRenderLiving sets the shared model's
-        // isRiding (RenderLiving.java:29).
-        ir.hand_model_is_riding = p.base.is_riding();
+        // isRiding (RenderLiving.java:26).
+        ir.player_model_drawn(p.base.is_riding());
     }
     frame.arm_is_riding = ir.hand_model_is_riding;
     let mut m = GlMatrix::default();
@@ -592,8 +608,8 @@ pub struct HandPool {
     overlays: Vec<(Entity, Handle<GlMaterial>, Handle<Mesh>)>,
     terrain_mirror: Option<Handle<Image>>,
     water: Option<Handle<Image>>,
+    /// `MapItemRenderer.bufferedImage` (an allocated texture).
     map_image: Option<Handle<Image>>,
-    map_pixels: Vec<u8>,
     map_bg_mesh: Option<Handle<Mesh>>,
     map_image_mesh: Option<Handle<Mesh>>,
     map_icons_mesh: Option<Handle<Mesh>>,
@@ -842,28 +858,35 @@ pub fn apply_hand(
                 let Some(mf) = frame.map.as_ref() else {
                     continue;
                 };
-                let px = map::map_pixels(&mf.colors, game.game_settings.anaglyph);
-                let img = match pool.map_image.clone() {
-                    Some(h) => {
-                        if pool.map_pixels != px
-                            && let Some(mut i) = loader.images.get_mut(&h)
-                        {
-                            i.data = Some(px.clone());
-                        }
-                        h
-                    }
-                    None => {
-                        // allocateAndSetupTexture(new BufferedImage(128, 128, 2)):
-                        // nearest, repeat (RenderEngine.java:162-186).
-                        let i = crate::textures::setup_texture(128, 128, px.clone(), false, false);
-                        let mut i = i;
-                        i.texture_descriptor.format = TextureFormat::Rgba8Unorm;
-                        let h = loader.images.add(i);
-                        pool.map_image = Some(h.clone());
-                        h
-                    }
-                };
-                pool.map_pixels = px;
+                // MapItemRenderer's texture: allocateAndSetupTexture(new
+                // BufferedImage(128, 128, 2)) in its constructor, made with
+                // the ItemRenderer (MapItemRenderer.java:16,
+                // ItemRenderer.java:17).
+                let img = pool
+                    .map_image
+                    .get_or_insert_with(|| {
+                        loader.textures.allocate_and_setup_texture(
+                            crate::textures::ArgbImage::new(128, 128),
+                            &mut loader.images,
+                        )
+                    })
+                    .clone();
+                // renderMap's intArray (with gameSettings.anaglyph), then
+                // func_28150_a (with the RenderEngine's options.anaglyph,
+                // transforming an explored pixel a second time: vanilla bug,
+                // map::upload_pixels). The upload is skipped when the image
+                // already holds those bytes (nothing to put on the GPU).
+                // src: MapItemRenderer.java:25-57
+                let ints = map::map_int_array(&mf.colors, game.game_settings.anaglyph);
+                let unchanged = loader.images.get(&img).is_some_and(|i| {
+                    i.data.as_deref()
+                        == Some(&map::upload_pixels(&ints, loader.textures.anaglyph)[..])
+                });
+                if !unchanged {
+                    loader
+                        .textures
+                        .upload_argb(&ints, 128, 128, &img, &mut loader.images);
+                }
                 let mesh = pool
                     .map_image_mesh
                     .get_or_insert_with(|| {
@@ -988,21 +1011,20 @@ pub fn apply_hand(
                 }
             }
             OverlayKind::Water => {
-                let h = match pool.water.clone() {
-                    Some(h) => h,
-                    None => {
-                        let Ok(img) = crate::gl_material::jar_texture(
-                            &loader.jar,
-                            overlays::WATER_PNG,
-                            false,
-                        ) else {
-                            continue;
-                        };
-                        let h = loader.images.add(img);
-                        pool.water = Some(h.clone());
-                        h
-                    }
+                // getTexture("/misc/water.png") through the texture cache
+                // (its setupTexture applies the anaglyph transform), drawn
+                // from the cache entry's Rgba8Unorm mirror.
+                // src: ItemRenderer.java:315, RenderEngine.java:204-213
+                let _ = loader.get(overlays::WATER_PNG);
+                let Some(h) = crate::particles::render::sync_mirror(
+                    &loader.textures,
+                    &mut loader.images,
+                    overlays::WATER_PNG,
+                    pool.water.clone(),
+                ) else {
+                    continue;
                 };
+                pool.water = Some(h.clone());
                 (h, GlBlend::Alpha, order::WATER)
             }
         };
@@ -1061,7 +1083,12 @@ impl Plugin for ItemRendererPlugin {
             .init_resource::<ItemMeshCache>()
             .init_resource::<render_item::HeldItemHook>()
             .add_systems(Startup, spawn_hand_camera)
-            .add_systems(RunTickHook::UpdateRenderer, tick_update_equipped_item)
+            // updateEquippedItem() before addRainParticles()
+            // (EntityRenderer.java:75-76).
+            .add_systems(
+                RunTickHook::UpdateRenderer,
+                tick_update_equipped_item.before(crate::particles::add_rain_particles),
+            )
             .add_systems(
                 Update,
                 (compute_hand, apply_hand)

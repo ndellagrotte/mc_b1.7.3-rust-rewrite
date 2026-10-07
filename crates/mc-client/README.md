@@ -207,21 +207,20 @@ downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
   draw anything that writes depth with
   `TransparentSortingInfo3d::AlwaysOnTop` (Bevy gizmos do): it is drawn
   before the sky and punches the clear colour through it.
-- **Colours:** `GlMaterial` does GL's arithmetic on the Java values and
-  converts to linear at the end, so opaque pixels are the bytes vanilla
-  writes (checked: the sky plane's pixels equal `getSkyColor` fogged by
-  `setupFog(-1)` exactly). Textures it samples are uploaded as `Rgba8Unorm`.
-  Blending: on the default sRGB target the hardware blends linear values,
-  not GL's bytes; additive draws (sun, moon, stars) return `linear(c·a)/a`,
-  exact over black (midnight stars: byte 64 as in GL, 92 before), and
-  alpha-blended draws are off where `0 < a < 1` (clouds 1-3 bytes; the
+- **Colours:** `GlMaterial` does GL's arithmetic on the Java values, so
+  opaque pixels are the bytes vanilla writes (checked: the sky plane's
+  pixels equal `getSkyColor` fogged by `setupFog(-1)` exactly). Textures it
+  samples are uploaded as `Rgba8Unorm`. Blending: every camera composites
+  in sRGB since WP-3.7b (see "Compositing in sRGB"): the main target is
+  `Rgba8Unorm`, `GlMaterial` returns the Java values unconverted
+  (`GL_TARGET_UNORM`) and every blend is GL's (outline 111, stars 64, the
+  sun's halo visible). History: on Bevy's default sRGB target (before
+  WP-3.7b) the shader converted to linear and the hardware blended linear
+  values; additive draws returned `linear(c·a)/a` (exact over black) and
+  alpha-blended draws were off where `0 < a < 1` (clouds 1-3 bytes; the
   selection outline 147 where GL writes 111; the sun's halo nearly
-  invisible by day). With `bevy::camera::CompositingSpace::Srgb` on the
-  world camera (main target `Rgba8Unorm`) `GlMaterial` returns the Java
-  values unconverted and every blend is GL's (checked in an experiment:
-  outline 111, stars 64, halo visible). Switching the camera is a
-  client-wide decision (WP-3.1's `spawn_camera`): every other material must
-  then return the Java values unconverted too (`gl_material` module docs).
+  invisible by day). That path is still in the shader for a camera without
+  `CompositingSpace::Srgb` (`gl_material` module docs).
 - **Wide lines:** `GlKey::wide_lines` + `gl_material::wide_line_mesh` draw
   `glLineWidth` lines (`GlParams::line_width` pixels, widened along the
   minor screen axis as GL's aliased lines); wgpu itself draws 1-pixel lines.
@@ -626,26 +625,27 @@ call order. `Gui*` code transcribes nearly line for line (`gui::draw` is
 `Gui`). The batches become one mesh each with `gui::render::GuiMaterial`
 (WP-3.4's `gl_material.wgsl`, any `glBlendFunc` pair, GL's depth test and
 mask, the alpha test), drawn by two orthographic `Camera3d`s after the
-world camera (order 1: the in-game overlay, order 2: the screen; each
+world camera (order −1) and the first-person hand camera (order 0,
+WP-3.7b): order 1 is the in-game overlay, order 2 the screen (each
 clears the depth buffer as vanilla does before each). The projection is
 `setupOverlayRendering`'s `glOrtho(0, scaledWidthD, scaledHeightD, 0,
 1000, 3000)`: one scaled pixel is `scaleFactor` window pixels.
 
-Measured differences (all from the sRGB target, see `gl_material`):
-opaque pixels are vanilla's bytes; blends with `0 < alpha < 1` happen in
-linear space, so `drawDefaultBackground`'s dark gradient dims the world
-less than vanilla (sky `(42, 61, 183)` becomes `(25, 33, 97)` where GL
-writes `(22, 27, 57)`) and `drawRect` translucency and the list shadows
-are lighter. The three cameras share one main texture, but Bevy's
+Blending: opaque pixels are vanilla's bytes, and since WP-3.7b (every
+camera composites in sRGB, see "Compositing in sRGB") blends with
+`0 < alpha < 1` are GL's byte-space blends: `drawDefaultBackground` over
+the noon sky `(145, 163, 255)` gives `(48, 52, 75)`, GL's arithmetic.
+History: on the earlier sRGB target these blends happened in linear space,
+so the dark gradient dimmed the world less than vanilla (sky
+`(42, 61, 183)` became `(25, 33, 97)` where GL writes `(22, 27, 57)`) and
+`drawRect` translucency and the list shadows were lighter. The three cameras share one main texture, but Bevy's
 upscale pass by default alpha-blends each later camera's copy of it over
 the window by that texture's alpha, which the world's clouds and sunrise
 band leave below 1: camera 0's world-only frame then showed through every
 GUI pixel there (the text field's black came out `(67, 73, 90)` under a
 cloud). The GUI cameras therefore write with `CameraOutputMode::Write {
 blend_state: Some(BlendState::REPLACE), .. }`, and GUI draws keep the
-destination alpha anyway. Switching the client to
-`CompositingSpace::Srgb` (WP-3.1's camera) would make every GUI blend
-GL's.
+destination alpha anyway.
 
 ### For WP-3.6b/c
 
@@ -788,6 +788,14 @@ GL's.
   `should_rotate_around_when_rendering`, `is_block_3d` give the branches of
   those methods. The hook is defined here because WP-3.5b's
   `render::HeldItemHook` was not in this tree; the integrator may move it.
+- **For WP-3.5b and WP-3.6b (the arm's `isRiding`):** the arm is
+  `RenderPlayer.modelBipedMain`'s, whose `isRiding` every draw of the
+  player sets (RenderLiving.java:26) and nothing resets. Whenever the local
+  player is drawn with the player model (`GuiInventory`'s preview,
+  GuiInventory.java:58; any third-person draw), call
+  `ItemRenderer::player_model_drawn(player.base.is_riding())` on the
+  `item_renderer::ItemRenderer` resource. `render_hand` already does it for
+  third person and sleeping.
 - **Not done:** the skin download (`getTextureForDownloadableImage`,
   deferred, D2: always `/mob/char.png`); anaglyph's second pass (the shell
   draws one eye); `cameraZoom` (only the unused high-resolution screenshot

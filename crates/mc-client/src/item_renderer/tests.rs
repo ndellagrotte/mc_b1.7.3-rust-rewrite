@@ -659,6 +659,32 @@ fn map_pixels_follow_map_item_renderer() {
 }
 
 #[test]
+fn map_pixels_under_anaglyph_are_transformed_twice() {
+    // renderMap's transform (MapItemRenderer.java:44-51), then
+    // func_28150_a's (RenderEngine.java:276-283): grass, shade 2.
+    let mut colors = vec![0u8; 16384];
+    colors[0] = 4 + 2;
+    let px = map_pixels(&colors, true);
+    let grass = 8368696i32;
+    let (r, g, b) = (grass >> 16 & 255, grass >> 8 & 255, grass & 255);
+    let t = |r: i32, g: i32, b: i32| {
+        (
+            (r * 30 + g * 59 + b * 11) / 100,
+            (r * 30 + g * 70) / 100,
+            (r * 30 + b * 70) / 100,
+        )
+    };
+    let (r1, g1, b1) = t(r, g, b);
+    let (r2, g2, b2) = t(r1, g1, b1);
+    assert_eq!(&px[0..4], &[r2 as u8, g2 as u8, b2 as u8, 255]);
+    // Not the single transform: (127,178,56) → (149,162,77) → (148,158,98).
+    assert_eq!((r1, g1, b1), (149, 162, 77));
+    assert_eq!(&px[0..4], &[148, 158, 98, 255]);
+    // Unexplored pixels are black, so both transforms leave them alone.
+    assert_eq!(&px[4..8], &[0, 0, 0, 24]);
+}
+
+#[test]
 fn map_icons_are_placed_as_the_java() {
     use mc_sim::world::map_storage::MapCoord;
     let b = icon_quads(&[MapCoord {
@@ -713,4 +739,18 @@ fn render_item_hook_draws_blocks_in_3d_and_items_flat() {
     assert!(approx(t.matrix, flat_item_matrix()));
     // No such item.
     assert!((hook.render_item)(&mut cache, &mut meshes, &args(4000, 0)).is_none());
+}
+
+// ---- the shared arm model ------------------------------------------------------
+
+#[test]
+fn the_arm_keeps_the_last_drawn_riding_pose() {
+    // RenderLiving.java:26: every draw of the player sets the shared
+    // modelBipedMain.isRiding; nothing resets it for the first-person arm.
+    let mut ir = ItemRenderer::default();
+    assert!(!ir.hand_model_is_riding);
+    ir.player_model_drawn(true);
+    assert!(ir.hand_model_is_riding);
+    ir.player_model_drawn(false);
+    assert!(!ir.hand_model_is_riding);
 }
