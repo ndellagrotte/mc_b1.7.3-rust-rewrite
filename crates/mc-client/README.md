@@ -334,7 +334,7 @@ policy), `snapshot.rs` (what a mesh job reads).
   | 1 | `renderBlockReed` (`renderCrossedSquares`) | saplings, flowers, mushrooms, reeds, tall grass, dead bush, web | 3.3c, `plants.rs` |
   | 2 | `renderBlockTorch` (`renderTorchAtAngle`) | torches | 3.3c, `plants.rs` |
   | 3 | `renderBlockFire` | fire | 3.3c, `plants.rs` |
-  | 4 | `renderBlockFluids` (`func_1224_a`) | water, lava | 3.3b, `fluids.rs` |
+  | 4 | `renderBlockFluids` (`func_1224_a`; `BlockFluid.getFlowDirection` on the snapshot) | water (pass 1, not culled: seen from below too), lava (pass 0) | 3.3b, `fluids.rs` (done; no `renderBlockOnInventory` case in vanilla) |
   | 5 | `renderBlockRedstoneWire` | redstone dust | 3.3d, `special.rs` |
   | 6 | `renderBlockCrops` (`func_1245_b`) | wheat | 3.3c, `plants.rs` |
   | 7 | `renderBlockDoor` | doors | 3.3d, `special.rs` |
@@ -724,6 +724,7 @@ Actions run in order, as many per frame as are due.
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
 | `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
+| `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0) | Dev (WP-3.3b): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (a placed flowing source, id 8 or 10, then flows). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks) |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

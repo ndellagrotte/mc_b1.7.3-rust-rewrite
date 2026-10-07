@@ -262,6 +262,21 @@ pub enum Action {
         #[serde(default)]
         ahead: Option<f64>,
     },
+    /// Dev (WP-3.3b): `world.setBlockAndMetadataWithNotify(x, y, z, id,
+    /// meta)` (so a placed fluid source flows as the simulation runs it).
+    SetBlock {
+        /// Block.
+        x: i32,
+        /// Block.
+        y: i32,
+        /// Block.
+        z: i32,
+        /// The block id.
+        id: i32,
+        /// The metadata.
+        #[serde(default)]
+        meta: i32,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -735,6 +750,11 @@ pub fn run_script(
                         });
                 }
             }
+            Action::SetBlock { x, y, z, id, meta } => {
+                if let Some(w) = game.the_world.as_mut() {
+                    w.set_block_and_metadata_with_notify(x, y, z, id, meta);
+                }
+            }
         }
     }
 }
@@ -930,6 +950,35 @@ mod tests {
                 dy: 0.0,
                 dz: 0.0,
                 ahead: Some(2.0)
+            }
+        );
+    }
+
+    #[test]
+    fn parses_the_wp_3_3b_dev_action() {
+        let s = Script::parse(
+            r#"[{"action": "set_block", "x": 1, "y": 70, "z": -2, "id": 9},
+                {"action": "set_block", "x": 1, "y": 70, "z": -2, "id": 8, "meta": 3}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::SetBlock {
+                x: 1,
+                y: 70,
+                z: -2,
+                id: 9,
+                meta: 0
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::SetBlock {
+                x: 1,
+                y: 70,
+                z: -2,
+                id: 8,
+                meta: 3
             }
         );
     }
