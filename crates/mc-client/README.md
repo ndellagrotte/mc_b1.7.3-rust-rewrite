@@ -371,8 +371,11 @@ policy), `snapshot.rs` (what a mesh job reads).
   in `DebugSources::renders`.
 - Not done: occlusion queries (`advancedOpengl`; wgpu has none, so
   `occlusionEnabled` is false as on a GL without `ARB_occlusion_query`, F3
-  `O: 0`); `RenderList`'s 1024-block anchoring (Bevy's transforms are
-  already camera-relative in f32 at the section). b1.7.3 has no
+  `O: 0`); `RenderList`'s 1024-block anchoring: the section
+  transforms are world-space `f32` and Bevy's `clip_from_world` is too, so
+  far from the origin vertices lose precision where vanilla's do not (at
+  about 1,000,000 blocks the `f32` step is 1/16 block: jitter); a floating
+  origin would be a camera-wide change (WP-3.1). b1.7.3 has no
   `bytesDrawn` statistic. Pass 1's sections are sorted by Bevy (back to
   front by entity); vanilla calls them nearest first (`sortedWorldRenderers`),
   which shows only with fast graphics, where pass 1 writes depth while

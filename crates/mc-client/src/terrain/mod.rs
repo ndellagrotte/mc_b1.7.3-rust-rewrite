@@ -21,7 +21,10 @@
 //! queued (`IWorldAccess`: `markBlockAndNeighborsNeedsUpdate`,
 //! `markBlockRangeNeedsUpdate`, `updateAllRenderers`), `loadRenderers` when
 //! the render distance, graphics or AO changed, `clipRenderersByFrustrum`,
-//! `updateRenderers` (with the frame-rate limit's time budget), finished
+//! `updateRenderers` (with the frame-rate limit's time budget; the loop also
+//! stops once [`max_pending_jobs`] jobs are in flight, since a far rebuild
+//! here costs only a snapshot and a task where vanilla meshed it inside the
+//! budget), finished
 //! mesh jobs, `sortAndRender` for both passes (the visibility of the
 //! section entities, the F3 line `RenderGlobal.getDebugInfoRenders` into
 //! [`crate::debug::DebugSources::renders`]). [`draw_block_breaking`] then
@@ -223,6 +226,20 @@ impl Plugin for TerrainPlugin {
                     .after(TexturesSet),
             );
     }
+}
+
+/// Whether two `Colorizers` share their three colour maps.
+fn same_maps(a: &Colorizers, b: &Colorizers) -> bool {
+    std::sync::Arc::ptr_eq(&a.grass, &b.grass)
+        && std::sync::Arc::ptr_eq(&a.foliage, &b.foliage)
+        && std::sync::Arc::ptr_eq(&a.water, &b.water)
+}
+
+/// The most mesh jobs in flight before `updateRenderers`' time-budget loop
+/// stops early: 16 per task-pool thread (finished jobs are collected once a
+/// frame, and a thread meshes about that many sections in a 60 Hz frame).
+fn max_pending_jobs() -> usize {
+    AsyncComputeTaskPool::get().thread_num().max(1) * 16
 }
 
 /// `renderEndNanoTime = System.nanoTime()` (EntityRenderer.java:390):
@@ -449,6 +466,29 @@ pub fn terrain_frame(
         world_events.clear();
         return;
     }
+    // The IWorldAccess calls of this frame's ticks, also while nothing is
+    // drawn below (a preload's marks reach vanilla's RenderGlobal at once;
+    // Bevy drops unread messages after two frames).
+    for WorldEventMsg(e) in world_events.read() {
+        match *e {
+            WorldEvent::MarkBlockAndNeighborsNeedsUpdate { x, y, z } => {
+                t.global.mark_block_and_neighbors_needs_update(x, y, z)
+            }
+            WorldEvent::MarkBlockRangeNeedsUpdate {
+                x0,
+                y0,
+                z0,
+                x1,
+                y1,
+                z1,
+            } => t
+                .global
+                .mark_block_range_needs_update(x0, y0, z0, x1, y1, z1),
+            WorldEvent::UpdateAllRenderers => t.global.update_all_renderers(),
+            _ => {}
+        }
+    }
+
     // No renderWorld while the loading screen preloads the chunks (vanilla
     // does not render inside func_6255_d).
     if g.pending.is_some() {
@@ -483,29 +523,15 @@ pub fn terrain_frame(
         t.built_with = Some((fancy, ao));
     }
     match &mut t.template {
-        Some(tpl) => tpl.refresh_statics(world),
-        None => t.template = Some(SnapshotTemplate::of(world, &colorizers)),
-    }
-
-    // The IWorldAccess calls of this frame's ticks.
-    for WorldEventMsg(e) in world_events.read() {
-        match *e {
-            WorldEvent::MarkBlockAndNeighborsNeedsUpdate { x, y, z } => {
-                t.global.mark_block_and_neighbors_needs_update(x, y, z)
+        Some(tpl) => {
+            tpl.refresh_statics(world);
+            // refreshTextures re-reads the colour maps (WP-3.2 replaces the
+            // resource): later rebuilds use the new ones.
+            if !same_maps(&tpl.colorizers, &colorizers) {
+                tpl.colorizers = colorizers.clone();
             }
-            WorldEvent::MarkBlockRangeNeedsUpdate {
-                x0,
-                y0,
-                z0,
-                x1,
-                y1,
-                z1,
-            } => t
-                .global
-                .mark_block_range_needs_update(x0, y0, z0, x1, y1, z1),
-            WorldEvent::UpdateAllRenderers => t.global.update_all_renderers(),
-            _ => {}
         }
+        None => t.template = Some(SnapshotTemplate::of(world, &colorizers)),
     }
 
     // clipRenderersByFrustrum(new Frustrum() at the interpolated position)
@@ -533,7 +559,8 @@ pub fn terrain_frame(
     } else {
         t.render_end_nano_time + 1_000_000_000 / var7
     };
-    let template = t.template.clone().expect("set above");
+    let template = t.template.take().expect("set above");
+    let max_jobs = max_pending_jobs();
     let mut rebuilt = 0i32;
     loop {
         let (done, list) = t.global.update_renderers(view_pos, false);
@@ -592,12 +619,19 @@ pub fn terrain_frame(
         if done || var2 == 0 {
             break;
         }
+        // Project choice: vanilla's far rebuild costs its meshing time within
+        // the budget; here it is a snapshot and a task, so the loop also stops
+        // once enough jobs are in flight (module docs, "Each frame").
+        if t.pending.len() >= max_jobs {
+            break;
+        }
         let var20 = var2 - clock::nano_time();
         if !(0..=1_000_000_000).contains(&var20) {
             break;
         }
     }
 
+    t.template = Some(template);
     g.chunks_updated = g.chunks_updated.wrapping_add(rebuilt);
 
     // Finished jobs.
@@ -668,6 +702,7 @@ pub fn terrain_frame(
 // src: EntityRenderer.java:507-513, :549-555
 #[allow(clippy::too_many_arguments)]
 pub fn draw_block_breaking(
+    mut cache: Local<Option<crack::CrackKey>>,
     mut game: NonSendMut<Game>,
     terrain: Res<Terrain>,
     frame: Res<FrameView>,
@@ -681,37 +716,44 @@ pub fn draw_block_breaking(
         return;
     };
     let g = &mut *game;
-    let hidden = |vis: &mut Visibility| {
+    let hidden = |vis: &mut Visibility, cache: &mut Option<crack::CrackKey>| {
+        *cache = None;
         if *vis != Visibility::Hidden {
             *vis = Visibility::Hidden;
         }
     };
     let (Some(m), Some(template)) = (frame.object_mouse_over, terrain.template.as_ref()) else {
-        hidden(&mut vis);
+        hidden(&mut vis, &mut cache);
         return;
     };
     if g.the_world.is_none() || g.pending.is_some() {
-        hidden(&mut vis);
+        hidden(&mut vis, &mut cache);
         return;
     }
     let Some(view) = sky::gather_view(g) else {
-        hidden(&mut vis);
+        hidden(&mut vis, &mut cache);
         return;
     };
     if !view.is_player {
-        hidden(&mut vis);
+        hidden(&mut vis, &mut cache);
         return;
     }
     let (ao, anaglyph) = (g.game_settings.ambient_occlusion, g.game_settings.anaglyph);
     let world = g.the_world.as_mut().expect("checked");
-    let Some(quads) =
-        crack::crack_quads(world, template, &m, frame.damage_partial_time, ao, anaglyph)
-    else {
-        hidden(&mut vis);
-        return;
-    };
-    mesh3d.0 = meshes.add(quads.to_mesh());
-    *tr = Transform::from_xyz(m.block_x as f32, m.block_y as f32, m.block_z as f32);
+    // The quads change only with the stage, the settings or the blocks
+    // around: rebuild them then.
+    let key = crack::CrackKey::of(world, template, &m, frame.damage_partial_time, ao, anaglyph);
+    if *cache != Some(key) {
+        let Some(quads) =
+            crack::crack_quads(world, template, &m, frame.damage_partial_time, ao, anaglyph)
+        else {
+            hidden(&mut vis, &mut cache);
+            return;
+        };
+        mesh3d.0 = meshes.add(quads.to_mesh());
+        *tr = Transform::from_xyz(m.block_x as f32, m.block_y as f32, m.block_z as f32);
+        *cache = Some(key);
+    }
     if *vis != Visibility::Inherited {
         *vis = Visibility::Inherited;
     }

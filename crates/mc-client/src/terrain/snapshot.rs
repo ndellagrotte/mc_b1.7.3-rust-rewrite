@@ -581,6 +581,11 @@ impl ChunkSnapshot {
         z: i32,
         side: i32,
     ) -> Option<Option<i32>> {
+        if self.textures.is_empty()
+            || !block::block(id).is_some_and(|b| is_texture_override_kind(b.kind))
+        {
+            return None;
+        }
         let i = self.index(x, y, z)?;
         let (tid, t) = self.textures.get(&i)?;
         (*tid == id && (0..6).contains(&side)).then(|| t[side as usize])
@@ -589,6 +594,11 @@ impl ChunkSnapshot {
     /// The precomputed bounds of block `id` at `(x, y, z)`, if its kind
     /// overrides `setBlockBoundsBasedOnState`.
     pub fn bounds_override(&self, id: i32, x: i32, y: i32, z: i32) -> Option<BlockBounds> {
+        if self.bounds.is_empty()
+            || !block::block(id).is_some_and(|b| is_bounds_override_kind(b.kind))
+        {
+            return None;
+        }
         let i = self.index(x, y, z)?;
         let (bid, b) = self.bounds.get(&i)?;
         (*bid == id).then_some(*b)

@@ -77,6 +77,55 @@ pub fn crack_quads(
     (!rb.tess.is_empty()).then_some(rb.tess)
 }
 
+/// What the overlay's quads depend on: the block, the stage, the settings,
+/// the leaves' graphics level and the 3×3×3 blocks around (face culling,
+/// neighbour-dependent bounds and textures).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CrackKey {
+    pos: [i32; 3],
+    stage: i32,
+    settings: [bool; 3],
+    blocks: [(i32, i32); 27],
+}
+
+impl CrackKey {
+    /// The key of the overlay `crack_quads` would draw now (`stage` is -1
+    /// when nothing is being broken).
+    pub fn of(
+        world: &mut World,
+        template: &SnapshotTemplate,
+        m: &MovingObjectPosition,
+        damage_partial_time: f32,
+        ambient_occlusion: bool,
+        anaglyph: bool,
+    ) -> Self {
+        let (x, y, z) = (m.block_x, m.block_y, m.block_z);
+        let mut blocks = [(0, 0); 27];
+        let mut i = 0;
+        for dy in -1..=1 {
+            for dz in -1..=1 {
+                for dx in -1..=1 {
+                    blocks[i] = (
+                        world.get_block_id(x + dx, y + dy, z + dz),
+                        world.get_block_metadata(x + dx, y + dy, z + dz),
+                    );
+                    i += 1;
+                }
+            }
+        }
+        CrackKey {
+            pos: [x, y, z],
+            stage: if damage_partial_time > 0.0 {
+                crack_texture(damage_partial_time)
+            } else {
+                -1
+            },
+            settings: [ambient_occlusion, anaglyph, template.statics.graphics_level],
+            blocks,
+        }
+    }
+}
+
 /// Marks the crack overlay's entity.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct CrackOverlay;
