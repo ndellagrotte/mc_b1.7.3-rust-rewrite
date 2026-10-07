@@ -399,6 +399,41 @@ policy), `snapshot.rs` (what a mesh job reads).
   `isLit`), so after a sky-light change `updateAllRenderers` can rebuild
   fewer sections than vanilla; nothing drawn differs.
 
+### Plants, torches, fire, crops, cactus (WP-3.3c)
+
+`terrain/plants.rs` fills render types 1, 2, 3, 6 and 13 (module docs list
+the blocks and textures):
+
+- **1** `renderBlockReed` → `renderCrossedSquares`: two diagonal planes
+  0.45 around the centre, each emitted with both windings (vanilla culls
+  back faces), colour = brightness × `colorMultiplier`. Tall grass (31) is
+  drawn at an offset hashed from the position (`plants::tall_grass_offset`,
+  ±0.25 in x and z, −0.2..0 in y; RenderBlocks.java:1327-1333), and tinted
+  by the biome at a second hashed offset (`blocks::color_multiplier`).
+- **2** `renderBlockTorch` → `renderTorchAtAngle`: metadata 1-4 lean the
+  torch off its wall (0.1 toward it, 0.2 up, 0.4 per block of tilt), other
+  values stand. A block with a light value (torch, lit redstone torch) is
+  drawn at brightness 1, so it stays bright at night.
+- **3** `renderBlockFire`: over a normal cube or a flammable block (the
+  `chanceToEncourageFire` table, `plants::can_block_catch_fire`), four
+  slanted planes 1.4 high; otherwise one leaning flame per flammable side
+  neighbour and two hanging planes under a flammable block. The first and
+  second animation tiles (31, 47) and the mirrored u alternate with the
+  position's parity.
+- **6** `renderBlockCrops` → `func_1245_b`: four planes in a `#` 1/16
+  below the cell, texture `88 + meta`.
+- **13** `renderBlockCactus` → `func_1230_b`: the plain-shaded faces with
+  the four sides drawn 1/16 inside the cell.
+
+`renderBlockOnInventory` already calls the type 1, 2 and 6 helpers at
+(−0.5, −0.5, −0.5) (WP-3.7b's `render_block_as_item`); the helpers set no
+colour, as the Java leaves it to `glColor`.
+
+Smoke-test tip: `set_pos` with `y` exactly `ground + 1.62` leaves the
+player one block down: `yOffset` is the float `1.62F` (1.6200000047683716),
+so the box's bottom lands just below the ground's top, inside the ground
+block, which the collision then ignores. Add 0.01.
+
 ## Models (WP-3.5a)
 
 `model` is the `Model*` family as data (PLAN_v4 D1 rule 6, D7): every model
