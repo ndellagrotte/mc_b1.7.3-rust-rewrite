@@ -581,11 +581,14 @@ pub fn inv_name(world: &World, inv: &InventoryRef) -> String {
 /// Registers the screens the shell opens by kind and the dev ones by name:
 /// `GuiInventory`, `GuiGameOver`, `GuiChat`, `GuiSleepMP`.
 pub fn register(registry: &mut ScreenRegistry) {
+    // src: GuiInventory.java:9-13 (allowUserInput = true)
     registry.register("GuiInventory", || {
-        Box::new(GuiContainer::new(
+        let mut g = GuiContainer::new(
             None,
             ContainerVariant::Inventory(inventory::InventoryState::default()),
-        ))
+        );
+        g.base.allow_user_input = true;
+        Box::new(g)
     });
     registry.register(
         "GuiGameOver",

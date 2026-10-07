@@ -318,6 +318,22 @@ pub enum Action {
         /// The file.
         path: PathBuf,
     },
+    /// Dev (WP-3.6b): puts `new ItemStack(id, count, damage)` into the
+    /// player's inventory (`InventoryPlayer.addItemStackToInventory`), or
+    /// into armour slot `armor` (0 boots … 3 helmet) when given.
+    Give {
+        /// Item or block id.
+        id: i32,
+        /// Count.
+        #[serde(default = "one")]
+        count: i32,
+        /// Damage.
+        #[serde(default)]
+        damage: i32,
+        /// Armour slot instead.
+        #[serde(default)]
+        armor: Option<usize>,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -829,6 +845,22 @@ pub fn run_script(
                         }
                     });
                 });
+            }
+            Action::Give {
+                id,
+                count,
+                damage,
+                armor,
+            } => {
+                if let Some(d) = game.player_in_world_mut().and_then(|e| e.kind.player_mut()) {
+                    let mut s = mc_sim::item::ItemStack::new(id, count, damage);
+                    match armor {
+                        Some(i) if i < 4 => d.inventory.armor_inventory[i] = Some(s),
+                        _ => {
+                            d.inventory.add_item_stack_to_inventory(&mut s);
+                        }
+                    }
+                }
             }
             Action::DumpInventory { path } => {
                 let v = inventory_json(&game);
