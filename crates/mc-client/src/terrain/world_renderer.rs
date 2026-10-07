@@ -250,6 +250,69 @@ pub fn entity_sorter_key(r: &WorldRenderer, pos: [f64; 3]) -> f64 {
     var3 * var3 + var5 * var5 + var7 * var7
 }
 
+/// `EntitySorter.sortByDistanceToEntity(a, b)`: `(int)((d1 - d2) * 1024)`,
+/// so two squared distances less than 1/1024 apart compare equal (and the
+/// comparator is not transitive).
+// src: EntitySorter.java:16-24
+pub fn entity_sorter_compare(a: &WorldRenderer, b: &WorldRenderer, pos: [f64; 3]) -> i32 {
+    ((entity_sorter_key(a, pos) - entity_sorter_key(b, pos)) * 1024.0) as i32
+}
+
+/// `Arrays.sort(Object[], Comparator)` as the JDK of the time (Java 6)
+/// implements it: a stable top-down merge sort with an insertion sort
+/// below 7 elements and the "halves already in order" shortcut. Written
+/// out rather than `slice::sort_by` because [`entity_sorter_compare`] is
+/// not a total order: the result depends on the algorithm, and the
+/// standard library's sort may panic on such a comparator.
+pub fn java_legacy_sort<T: Copy>(a: &mut [T], mut c: impl FnMut(&T, &T) -> i32) {
+    let mut aux = a.to_vec();
+    let len = a.len();
+    legacy_merge_sort(&mut aux, a, 0, len, 0, &mut c);
+}
+
+/// `Arrays.mergeSort(src, dest, low, high, off, c)` (JDK 6).
+fn legacy_merge_sort<T: Copy>(
+    src: &mut [T],
+    dest: &mut [T],
+    mut low: usize,
+    mut high: usize,
+    off: isize,
+    c: &mut impl FnMut(&T, &T) -> i32,
+) {
+    let length = high - low;
+    if length < 7 {
+        for i in low..high {
+            let mut j = i;
+            while j > low && c(&dest[j - 1], &dest[j]) > 0 {
+                dest.swap(j, j - 1);
+                j -= 1;
+            }
+        }
+        return;
+    }
+    let dest_low = low;
+    let dest_high = high;
+    low = (low as isize + off) as usize;
+    high = (high as isize + off) as usize;
+    let mid = (low + high) >> 1;
+    legacy_merge_sort(dest, src, low, mid, -off, c);
+    legacy_merge_sort(dest, src, mid, high, -off, c);
+    if c(&src[mid - 1], &src[mid]) <= 0 {
+        dest[dest_low..dest_low + length].copy_from_slice(&src[low..high]);
+        return;
+    }
+    let (mut p, mut q) = (low, mid);
+    for d in dest.iter_mut().take(dest_high).skip(dest_low) {
+        if q >= high || (p < mid && c(&src[p], &src[q]) <= 0) {
+            *d = src[p];
+            p += 1;
+        } else {
+            *d = src[q];
+            q += 1;
+        }
+    }
+}
+
 /// The terrain half of `RenderGlobal` (module docs).
 #[derive(Clone, Debug, Default)]
 pub struct RenderGlobalTerrain {
@@ -378,12 +441,13 @@ impl RenderGlobalTerrain {
         self.render_entities_startup_counter = 2;
     }
 
-    /// `Arrays.sort(sortedWorldRenderers, new EntitySorter(view))` (stable).
+    /// `Arrays.sort(sortedWorldRenderers, new EntitySorter(view))`
+    /// ([`java_legacy_sort`] with [`entity_sorter_compare`]).
     // src: RenderGlobal.java:247, :418
     pub fn sort_by_entity(&mut self, pos: [f64; 3]) {
         let wr = &self.world_renderers;
-        self.sorted_world_renderers.sort_by(|&a, &b| {
-            entity_sorter_key(&wr[a], pos).total_cmp(&entity_sorter_key(&wr[b], pos))
+        java_legacy_sort(&mut self.sorted_world_renderers, |&a, &b| {
+            entity_sorter_compare(&wr[a], &wr[b], pos)
         });
     }
 
@@ -891,6 +955,29 @@ mod tests {
             .map(|&i| entity_sorter_key(&g.world_renderers[i], [1000.5, 70.0, -500.25]))
             .collect();
         assert!(d.windows(2).all(|w| w[0] <= w[1]));
+    }
+
+    #[test]
+    fn legacy_sort_is_stable_and_entity_sorter_quantises() {
+        // a stable sort of pairs by key, both below and above the insertion
+        // sort threshold
+        let mut r = mc_core::java_random::JavaRandom::new(7);
+        for n in [0usize, 1, 5, 6, 7, 40, 333] {
+            let mut v: Vec<(i32, usize)> = (0..n).map(|i| (r.next_int_bounded(10), i)).collect();
+            let mut want = v.clone();
+            want.sort_by_key(|p| p.0);
+            java_legacy_sort(&mut v, |a, b| a.0 - b.0);
+            assert_eq!(v, want, "n {n}");
+        }
+        // squared distances under 1/1024 apart compare equal
+        let a = WorldRenderer::new(0, 0, 0, 16);
+        let b = WorldRenderer::new(16, 0, 0, 16);
+        // centres 8 and 24 on x: the difference is 32 * (1/65536) = 1/2048
+        let p = [16.0 + 1.0 / 65536.0, 8.0, 8.0];
+        assert!(entity_sorter_key(&a, p) > entity_sorter_key(&b, p));
+        assert_eq!(entity_sorter_compare(&a, &b, p), 0);
+        assert!(entity_sorter_compare(&a, &b, [15.0, 8.0, 8.0]) < 0);
+        assert!(entity_sorter_compare(&b, &a, [15.0, 8.0, 8.0]) > 0);
     }
 
     #[test]

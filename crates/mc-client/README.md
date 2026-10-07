@@ -311,7 +311,9 @@ policy), `snapshot.rs` (what a mesh job reads).
   singletons' bounds and leaves state (`BlockStatics`, a copy the job
   mutates), the `getBlockTexture` and `setBlockBoundsBasedOnState` results
   of the kinds that read the world (computed by `mc-sim`), the special-render
-  tile entities, a copy of the `WorldChunkManager` (biome colours) and the
+  tile entities (found through `Chunk.getChunkBlockTileEntity`, which
+  creates a container's missing tile entity and drops an invalid one, as
+  vanilla's renderer does), a copy of the `WorldChunkManager` (biome colours) and the
   `Colorizers`.
 - **Colours.** Vertex colours are the Tessellator's bytes; brightness is
   `lightBrightnessTable[max(sky - skylightSubtracted, block, lightValue)]`
@@ -364,7 +366,12 @@ policy), `snapshot.rs` (what a mesh job reads).
   colorizers, id, meta, brightness)` is `new RenderBlocks().renderBlockOnInventory`
   for render types 0 and 16 (and 10, 11, 13 built from faces; 1, 2, 6 call
   the 3.3c stubs): the quads around the origin with per-face normals, and
-  `glColor` from `getRenderColor(meta) × brightness`.
+  `glColor` from `getRenderColor(meta) × brightness`. The normals are the
+  Tessellator's bytes with its overflow (the +x face has the −x normal;
+  `terrain::tessellator` module docs), and the two vertices
+  `convertQuadsToTriangles` copies carry a stale normal in vanilla, which
+  the shared-vertex mesh does not reproduce (it matters only with smooth
+  shading under item lighting).
 - **Stats:** `terrain::TerrainStats` (rebuilds this frame and in total,
   jobs in flight, sections drawn per pass, the update list's length, the
   snapshot and meshing time) and the F3 line `RenderGlobal.getDebugInfoRenders`
@@ -379,7 +386,15 @@ policy), `snapshot.rs` (what a mesh job reads).
   `bytesDrawn` statistic. Pass 1's sections are sorted by Bevy (back to
   front by entity); vanilla calls them nearest first (`sortedWorldRenderers`),
   which shows only with fast graphics, where pass 1 writes depth while
-  blending (overlapping water of two sections; WP-3.3b).
+  blending (overlapping water of two sections; WP-3.3b). `Chunk.isLit`
+  is a static that vanilla clears before `new ChunkCache(…)`, so chunks
+  that cache loads or populates can set it (population reads
+  `Chunk.getBlockLightValue`, e.g. `BlockFlower.canBlockStay`,
+  Chunk.java:341-345, WorldRenderer.java:93-101): such a section is marked
+  `isChunkLit` even if its own blocks read no sky light. Here the flag is
+  the snapshot's own and covers only the drawing reads (mc-sim keeps no
+  `isLit`), so after a sky-light change `updateAllRenderers` can rebuild
+  fewer sections than vanilla; nothing drawn differs.
 
 ## Scripted-input dev mode
 

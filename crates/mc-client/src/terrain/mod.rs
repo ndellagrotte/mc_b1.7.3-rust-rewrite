@@ -734,7 +734,11 @@ pub fn draw_block_breaking(
         hidden(&mut vis, &mut cache);
         return;
     };
-    if !view.is_player {
+    // The call after the translucent pass also wants `cameraZoom == 1`
+    // (always, outside the high-resolution screenshot code); the one in
+    // water does not test it.
+    // src: EntityRenderer.java:507, :549
+    if !view.is_player || (!view.in_water && g.entity_renderer.camera_zoom != 1.0) {
         hidden(&mut vis, &mut cache);
         return;
     }

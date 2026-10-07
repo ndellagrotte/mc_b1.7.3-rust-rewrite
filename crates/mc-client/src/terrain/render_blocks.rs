@@ -2436,10 +2436,12 @@ mod tests {
         for p in &d.tess.positions {
             assert!(p.iter().all(|c| *c == -0.5 || *c == 0.5), "{p:?}");
         }
-        // normals per face, bottom first
-        assert_eq!(d.tess.normals[0], [0.0, -1.0, 0.0]);
-        assert_eq!(d.tess.normals[4], [0.0, 1.0, 0.0]);
-        assert_eq!(d.tess.normals[20], [1.0, 0.0, 0.0]);
+        // normals per face, bottom first, as the Tessellator's bytes (the
+        // -y and +x overflow: tessellator module docs)
+        assert_eq!(d.tess.normals[0], [0, -127, -1]);
+        assert_eq!(d.tess.normals[4], [0, 127, 0]);
+        assert_eq!(d.tess.normals[16], [-128, -1, -1]);
+        assert_eq!(d.tess.normals[20], [-128, -1, -1]);
         // leaves tinted by getRenderColor(meta) × brightness
         let d = render_block_as_item(
             &statics,

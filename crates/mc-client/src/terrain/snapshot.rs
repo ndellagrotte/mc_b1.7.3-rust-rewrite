@@ -31,7 +31,19 @@
 //!   afterwards);
 //! - the positions of the tile entities with a special renderer (sign, mob
 //!   spawner, moving piston), for WP-3.5b (`WorldRenderer.tileEntityRenderers`,
-//!   WorldRenderer.java:126-131);
+//!   WorldRenderer.java:126-131). They are looked up as pass 0 looks them
+//!   up, through `ChunkCache.getBlockTileEntity` →
+//!   `Chunk.getChunkBlockTileEntity` (mc-sim
+//!   `chunk::get_chunk_block_tile_entity`), with its side effects on the
+//!   world: a container block without a tile entity gets one from its
+//!   `onBlockAdded`, and an invalid one is removed from the chunk's map
+//!   (ChunkCache.java:42-46, Chunk.java:401-421). The cell is re-read from
+//!   the world afterwards, as the live `ChunkCache` would see it (a furnace's
+//!   or dispenser's `onBlockAdded` sets its metadata). The block events
+//!   that change raises mark the section dirty once more; vanilla loses
+//!   that mark (`updateRenderers` clears `needsUpdate` after the rebuild,
+//!   RenderGlobal.java:1010-1011, :1027-1028), so here the section is rebuilt one extra
+//!   time;
 //! - a copy of the world's `WorldChunkManager` (biome temperature and
 //!   humidity for `colorMultiplier`: grass, leaves, tall grass) and the
 //!   colour maps ([`Colorizers`]).
@@ -50,10 +62,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use mc_core::java_hash::ChunkPosition;
 use mc_sim::block::{self, BlockBounds, BlockKind, BlockStatics, Material, dispatch};
 use mc_sim::world::World;
-use mc_sim::world::chunk::block_index;
+use mc_sim::world::chunk::{self, block_index};
 use mc_sim::world::tile_entity::TileEntityKindData;
 use mc_sim::worldgen::chunk_manager::WorldChunkManager;
 
@@ -339,6 +350,38 @@ impl ChunkSnapshot {
                     let Some(i) = self.index(x, y, z) else {
                         continue;
                     };
+                    // Pass 0 asks the ChunkCache for the tile entity of every
+                    // container before drawing it, and Chunk.getChunkBlockTileEntity
+                    // changes the world: a container without one gets it from
+                    // onBlockAdded (which may also set the block's metadata: the
+                    // furnace's and dispenser's setDefaultDirection), and an invalid
+                    // one is dropped from the chunk's map.
+                    // src: WorldRenderer.java:126-131, ChunkCache.java:42-46, Chunk.java:401-421
+                    if def.is_block_container && world.loaded_chunk(x >> 4, z >> 4).is_some() {
+                        let r = chunk::get_chunk_block_tile_entity(
+                            world,
+                            x >> 4,
+                            z >> 4,
+                            x & 15,
+                            y,
+                            z & 15,
+                        );
+                        if let Some(c) = world.loaded_chunk(x >> 4, z >> 4) {
+                            // the block is drawn from the world as it is now
+                            self.ids[i] = c.blocks[block_index(x & 15, y, z & 15)];
+                            self.meta[i] = c.data.get_nibble(x & 15, y, z & 15) as u8;
+                        }
+                        if let Some(r) = r
+                            && let Some(te) = world.tile_entities.get(&r)
+                            && has_special_renderer(&te.kind)
+                        {
+                            self.special_tile_entities.push([x, y, z]);
+                        }
+                    }
+                    let id = self.get_block_id(x, y, z);
+                    let Some(def) = block::block(id) else {
+                        continue;
+                    };
                     if is_texture_override_kind(def.kind) {
                         let t = [0, 1, 2, 3, 4, 5]
                             .map(|side| dispatch::get_block_texture(world, id, x, y, z, side));
@@ -348,16 +391,6 @@ impl ChunkSnapshot {
                         dispatch::set_block_bounds_based_on_state(world, id, x, y, z);
                         self.bounds
                             .insert(i, (id, world.block_statics.bounds[(id & 255) as usize]));
-                    }
-                    if def.is_block_container
-                        && let Some(c) = world.loaded_chunk(x >> 4, z >> 4)
-                        && let Some(r) =
-                            c.chunk_tile_entity_map
-                                .get(&ChunkPosition::new(x & 15, y, z & 15))
-                        && let Some(te) = world.tile_entities.get(r)
-                        && has_special_renderer(&te.kind)
-                    {
-                        self.special_tile_entities.push([x, y, z]);
                     }
                 }
             }
@@ -688,6 +721,72 @@ mod tests {
         assert!(!s.is_block_opaque_cube(0, 1, 0));
         assert!(s.is_block_normal_cube(0, 0, 0));
         assert!(!s.is_block_normal_cube(0, 1, 0));
+    }
+
+    fn empty_world() -> World {
+        use mc_sim::save::NoSave;
+        use mc_sim::world::WorldEnvironment;
+        use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+        use mc_sim::world::provider::{Dimension, WorldProvider};
+        let mut w = World::new(
+            Box::new(NoSave),
+            "snapshot",
+            WorldProvider::new(Dimension::Surface),
+            5,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.get_chunk_from_chunk_coords(0, 0);
+        w
+    }
+
+    /// Pass 0's `ChunkCache.getBlockTileEntity` (Chunk.java:401-421): a
+    /// container block without a tile entity gets one from `onBlockAdded`
+    /// (listed when it has a special renderer), and an invalid one is
+    /// dropped from the chunk's map.
+    #[test]
+    fn rebuild_creates_missing_tile_entities_and_drops_invalid_ones() {
+        use mc_core::java_hash::ChunkPosition;
+        let mut w = empty_world();
+        {
+            // raw block writes: no onBlockAdded, so no tile entity
+            let c = w.get_chunk_from_chunk_coords(0, 0);
+            c.blocks[block_index(1, 1, 1)] = 54; // chest
+            c.blocks[block_index(3, 1, 1)] = 63; // standing sign
+        }
+        let chest = ChunkPosition::new(1, 1, 1);
+        let sign = ChunkPosition::new(3, 1, 1);
+        assert!(
+            w.loaded_chunk(0, 0)
+                .unwrap()
+                .chunk_tile_entity_map
+                .is_empty()
+        );
+        let t = SnapshotTemplate::of(&mut w, &Colorizers::default());
+        let s = ChunkSnapshot::build(&mut w, &t, [0, 0, 0], [16, 16, 16], ChunkLoad::LoadedOnly);
+        let map = &w.loaded_chunk(0, 0).unwrap().chunk_tile_entity_map;
+        let (rc, rs) = (*map.get(&chest).unwrap(), *map.get(&sign).unwrap());
+        assert!(matches!(
+            w.tile_entities[&rc].kind,
+            TileEntityKindData::Chest(_)
+        ));
+        assert!(matches!(
+            w.tile_entities[&rs].kind,
+            TileEntityKindData::Sign(_)
+        ));
+        // only the sign has a special renderer
+        assert_eq!(s.special_tile_entities, vec![[3, 1, 1]]);
+        // an invalid tile entity is removed from the chunk's map
+        w.tile_entities.get_mut(&rs).unwrap().invalidate();
+        let s = ChunkSnapshot::build(&mut w, &t, [0, 0, 0], [16, 16, 16], ChunkLoad::LoadedOnly);
+        assert!(s.special_tile_entities.is_empty());
+        let map = &w.loaded_chunk(0, 0).unwrap().chunk_tile_entity_map;
+        assert!(map.get(&sign).is_none());
+        assert_eq!(map.get(&chest).copied(), Some(rc));
     }
 
     /// The biome lookup the snapshot makes per block (`1×1` at the block)
