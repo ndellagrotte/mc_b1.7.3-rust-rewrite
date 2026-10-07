@@ -1,8 +1,9 @@
 //! The model tables and poses against the vanilla classes run on the
 //! oracle JVM (`testdata/java_models.txt`, made by `testdata/ModelDump.java`:
-//! every part's rotation point, angles, mirror flag, corners and faces, then
-//! the parts after a fixed sequence of pose calls on one shared instance),
-//! compared bit for bit.
+//! every part's rotation point, angles, mirror flag, corners and faces, each
+//! face's normal and `Tessellator.setNormal` packing, then the parts after a
+//! fixed sequence of pose calls on one shared instance), compared bit for
+//! bit.
 
 use super::part::{TEXTURE_HEIGHT, TEXTURE_WIDTH};
 use super::*;
@@ -17,6 +18,8 @@ struct JavaPart {
     mirror: bool,
     corners: Vec<f32>,
     faces: Vec<[i32; 8]>,
+    /// Per face: `TexturedQuad.draw`'s normal and the packed `normal` int.
+    normals: Vec<([f32; 3], i32)>,
 }
 
 #[derive(Debug, Default)]
@@ -24,6 +27,7 @@ struct JavaDump {
     models: Vec<(String, Vec<JavaPart>)>,
     poses: Vec<(String, String, Vec<[f32; 6]>)>,
     ghast_lengths: Vec<i32>,
+    wolf_shading: f32,
 }
 
 fn parse() -> JavaDump {
@@ -56,6 +60,12 @@ fn parse() -> JavaDump {
                 let v: Vec<i32> = w[1..].iter().map(|s| s.parse().unwrap()).collect();
                 p.faces.push(v.try_into().unwrap());
             }
+            "normal" => {
+                let p = d.models.last_mut().unwrap().1.last_mut().unwrap();
+                p.normals
+                    .push(([f(w[1]), f(w[2]), f(w[3])], w[4].parse().unwrap()));
+            }
+            "wolf_shading" => d.wolf_shading = f(w[1]),
             "pose" => {
                 d.poses
                     .push((w[1].to_string(), w[2].to_string(), Vec::new()));
@@ -141,7 +151,21 @@ fn constructors_match_the_java_tables() {
                     );
                     assert_eq!(v.pos, g.corners[f.corner[k]].pos);
                 }
+                // The face normal (signed zeros included) and what GL reads
+                // of the packed bytes.
+                let (jn, packed) = j.normals[fi];
+                let n = f.face_normal();
+                assert_eq!(bits(&n), bits(&jn), "{ctx} face {fi} normal");
+                let b = |shift: u32| ((packed >> shift) & 0xFF) as u8 as i8;
+                let conv = |c: i8| (2.0 * c as f32 + 1.0) / 255.0;
+                let want = [conv(b(0)), conv(b(8)), conv(b(16))];
+                assert_eq!(
+                    bits(&part::tess_normal(n[0], n[1], n[2])),
+                    bits(&want),
+                    "{ctx} face {fi} packed normal {packed}"
+                );
             }
+            assert_eq!(j.normals.len(), 6, "{ctx}");
         }
     }
 }
@@ -270,6 +294,25 @@ fn replay() -> Vec<(String, String, Vec<[f32; 6]>)> {
     m.set_living_animations(&living(&e, 0.9), 2.5, 0.4, 0.9);
     m.set_rotation_angles(2.5, 0.4, 1.5707964, 10.0, 5.0, 0.0625);
     out.push(("Wolf".into(), "angry".into(), snap(&m)));
+    // Shaking: the angles as the Java's, and the glColor3f the Java would
+    // set, brightness × getShadingWhileShaking (ModelWolf.java:119-122).
+    mc_sim::entity::wolf::set_wolf_angry(&mut e, false);
+    {
+        let w = wolf_data(&mut e);
+        w.is_wolf_shaking = true;
+        w.time_wolf_is_shaking = 0.4;
+        w.prev_time_wolf_is_shaking = 0.2;
+    }
+    let inputs = wolf::WolfAnimInputs::from_entity(&e, 0.3, 0.6);
+    let shading = parse().wolf_shading;
+    assert_eq!(inputs.shading_while_shaking.to_bits(), shading.to_bits());
+    let c = 0.6 * shading;
+    assert_eq!(
+        m.set_living_animations(&LivingInputs::Wolf(inputs), 3.0, 0.5, 0.3),
+        Some([c, c, c])
+    );
+    m.set_rotation_angles(3.0, 0.5, 0.9, -10.0, 15.0, 0.0625);
+    out.push(("Wolf".into(), "shaking".into(), snap(&m)));
     out
 }
 
@@ -437,4 +480,133 @@ fn part_transform_places_the_box() {
     let far = t.transform_point(Vec3::new(0.0, 0.0, -8.0 * MODEL_SCALE));
     assert_eq!(near, Vec3::new(0.0, 12.0, -6.0) * MODEL_SCALE);
     assert!((far - Vec3::new(0.0, 12.0, -14.0) * MODEL_SCALE).length() < 1e-6);
+}
+
+/// Every model's `render` draw list (which parts, in which order, with
+/// `render` or `renderWithRotation`), against the Java `render` methods'
+/// call sequences written out by hand (the oracle cannot run them: they
+/// need GL).
+#[test]
+fn draw_lists_match_the_java_render_methods() {
+    const R: RenderMode = RenderMode::Render;
+    const W: RenderMode = RenderMode::WithRotation;
+    // src: ModelBiped.java:60-66
+    let biped: &[(&str, RenderMode)] = &[
+        ("bipedHead", R),
+        ("bipedBody", R),
+        ("bipedRightArm", R),
+        ("bipedLeftArm", R),
+        ("bipedRightLeg", R),
+        ("bipedLeftLeg", R),
+        ("bipedHeadwear", R),
+    ];
+    // src: ModelQuadruped.java:33-38
+    let quad: &[(&str, RenderMode)] = &[
+        ("head", R),
+        ("body", R),
+        ("leg1", R),
+        ("leg2", R),
+        ("leg3", R),
+        ("leg4", R),
+    ];
+    // src: ModelCow.java:39-42 (super.render first)
+    let cow: Vec<(&str, RenderMode)> = quad
+        .iter()
+        .copied()
+        .chain([("horn1", R), ("horn2", R), ("udders", R)])
+        .collect();
+    // src: ModelChicken.java:43-50
+    let chicken: &[(&str, RenderMode)] = &[
+        ("head", R),
+        ("bill", R),
+        ("chin", R),
+        ("body", R),
+        ("rightLeg", R),
+        ("leftLeg", R),
+        ("rightWing", R),
+        ("leftWing", R),
+    ];
+    // src: ModelCreeper.java:43-48 (no unusedCreeperHeadwear)
+    let creeper: &[(&str, RenderMode)] = quad;
+    // src: ModelSpider.java:56-66
+    let spider: Vec<(&str, RenderMode)> = [
+        "spiderHead",
+        "spiderNeck",
+        "spiderBody",
+        "spiderLeg1",
+        "spiderLeg2",
+        "spiderLeg3",
+        "spiderLeg4",
+        "spiderLeg5",
+        "spiderLeg6",
+        "spiderLeg7",
+        "spiderLeg8",
+    ]
+    .map(|n| (n, R))
+    .to_vec();
+    // src: ModelWolf.java:59-69
+    let wolf: &[(&str, RenderMode)] = &[
+        ("wolfHeadMain", W),
+        ("wolfBody", R),
+        ("wolfLeg1", R),
+        ("wolfLeg2", R),
+        ("wolfLeg3", R),
+        ("wolfLeg4", R),
+        ("wolfRightEar", W),
+        ("wolfLeftEar", W),
+        ("wolfSnout", W),
+        ("wolfTail", W),
+        ("wolfMane", R),
+    ];
+    // src: ModelSlime.java:30-35
+    let slime: &[(&str, RenderMode)] = &[
+        ("slimeBodies", R),
+        ("slimeRightEye", R),
+        ("slimeLeftEye", R),
+        ("slimeMouth", R),
+    ];
+    let indexed = |first: &'static str, array: &str, n: usize| {
+        let mut v = vec![(first.to_string(), R)];
+        v.extend((0..n).map(|i| (format!("{array}[{i}]"), R)));
+        v
+    };
+    let owned = |l: &[(&str, RenderMode)]| -> Vec<(String, RenderMode)> {
+        l.iter().map(|&(n, m)| (n.to_string(), m)).collect()
+    };
+    let want = |k: ModelKind| -> Vec<(String, RenderMode)> {
+        match k {
+            ModelKind::Biped
+            | ModelKind::BipedArmor
+            | ModelKind::BipedArmorChestplate
+            | ModelKind::Zombie
+            | ModelKind::Skeleton => owned(biped),
+            ModelKind::Pig | ModelKind::PigSaddle | ModelKind::Sheep | ModelKind::SheepFur => {
+                owned(quad)
+            }
+            ModelKind::Cow => owned(&cow),
+            ModelKind::Chicken => owned(chicken),
+            ModelKind::Creeper | ModelKind::CreeperArmor => owned(creeper),
+            ModelKind::Spider => owned(&spider),
+            ModelKind::Wolf => owned(wolf),
+            ModelKind::Slime => owned(slime),
+            ModelKind::SlimeOuter => owned(&slime[..1]),
+            // src: ModelGhast.java:39-43
+            ModelKind::Ghast => indexed("body", "tentacles", 9),
+            // src: ModelSquid.java:38-42
+            ModelKind::Squid => indexed("squidBody", "squidTentacles", 8),
+            // src: ModelMinecart.java:39-41 (sideModels[0..6))
+            ModelKind::Minecart => (0..6).map(|i| (format!("sideModels[{i}]"), R)).collect(),
+            // src: ModelBoat.java:33-35
+            ModelKind::Boat => (0..5).map(|i| (format!("boatSides[{i}]"), R)).collect(),
+        }
+    };
+    for k in ModelKind::ALL {
+        let mut m = Model::new(k);
+        let got: Vec<(String, RenderMode)> = m
+            .render(1.3, 0.7, 25.5, 30.0, -20.0, MODEL_SCALE)
+            .iter()
+            .map(|d| (m.parts[d.part].name.to_string(), d.mode))
+            .collect();
+        assert_eq!(got, want(k), "{}", k.name());
+    }
 }

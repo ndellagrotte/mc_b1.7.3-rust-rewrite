@@ -15,7 +15,7 @@ pub const TENTACLE0: usize = 1;
 pub const TENTACLES: usize = 9;
 
 /// `render`'s draw list: the body, then the tentacles in order.
-// src: ModelGhast.java:34-42
+// src: ModelGhast.java:37-45
 pub const RENDER: &[(usize, RenderMode)] = &[
     (BODY, RenderMode::Render),
     (1, RenderMode::Render),
@@ -42,7 +42,7 @@ const TENTACLE_NAMES: [&str; TENTACLES] = [
 ];
 
 /// The tentacle lengths: `new Random(1660L).nextInt(7) + 8`, nine draws.
-// src: ModelGhast.java:12, :18
+// src: ModelGhast.java:15, :21
 pub fn tentacle_lengths() -> [i32; TENTACLES] {
     let mut var2 = JavaRandom::new(1660);
     std::array::from_fn(|_| var2.next_int_bounded(7) + 8)
@@ -50,7 +50,7 @@ pub fn tentacle_lengths() -> [i32; TENTACLES] {
 
 /// `new ModelGhast()`: the tentacles on a 3×3 grid under the body, the
 /// middle row shifted half a step.
-// src: ModelGhast.java:7-25
+// src: ModelGhast.java:9-28
 pub fn build() -> Vec<ModelPart> {
     let var1: i32 = -16;
     let mut body = ModelPart::new("body", 0, 0);
@@ -74,7 +74,7 @@ pub fn build() -> Vec<ModelPart> {
 }
 
 /// `ModelGhast.setRotationAngles`: each tentacle swings by `ticks`.
-// src: ModelGhast.java:27-32
+// src: ModelGhast.java:30-35
 pub fn set_rotation_angles(
     m: &mut Model,
     _var1: f32,

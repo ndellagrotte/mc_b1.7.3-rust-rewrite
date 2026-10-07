@@ -16,7 +16,7 @@ pub const BODY: usize = 2;
 pub const LEG1: usize = 3;
 
 /// `render`'s draw list: head, neck, body, legs 1-8.
-// src: ModelSpider.java:39-51
+// src: ModelSpider.java:54-67
 pub const RENDER: &[(usize, RenderMode)] = &[
     (HEAD, RenderMode::Render),
     (NECK, RenderMode::Render),
@@ -32,7 +32,7 @@ pub const RENDER: &[(usize, RenderMode)] = &[
 ];
 
 /// `new ModelSpider()`.
-// src: ModelSpider.java:15-37
+// src: ModelSpider.java:16-52
 pub fn build() -> Vec<ModelPart> {
     let var1 = 0.0f32;
     let var2: i32 = 15;
@@ -71,7 +71,7 @@ pub fn build() -> Vec<ModelPart> {
 /// (Z by `π/4`, the middle pairs ×0.74; Y fanned by `π/8` steps), then the
 /// walk: four phases of a Y swing (`cos` at twice the rate) and a Z lift
 /// (`|sin|`).
-// src: ModelSpider.java:53-114
+// src: ModelSpider.java:69-131
 pub fn set_rotation_angles(
     m: &mut Model,
     var1: f32,

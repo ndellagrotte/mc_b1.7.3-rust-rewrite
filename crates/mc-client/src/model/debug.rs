@@ -7,7 +7,7 @@
 //! renderer's `preRenderCallback` scale, translate `(0, -24 × 0.0625 -
 //! 0.0078125, 0)`; RenderLiving.java:36-43), or `RenderMinecart`'s /
 //! `RenderBoat`'s (translate, rotate, `glScalef(-1, -1, 1)`;
-//! RenderMinecart.java:42, :72-74, RenderBoat.java:14-15, :31-32). It is a
+//! RenderMinecart.java:43-45, :73-74, RenderBoat.java:15-16, :31-32). It is a
 //! dev aid; WP-3.5b transcribes the renderers.
 
 use std::path::PathBuf;
@@ -64,6 +64,12 @@ pub struct DebugModelSpec {
     /// Alpha-blended (the slime's outer cube) with this `glColor4f` alpha.
     #[serde(default)]
     pub blend_alpha: Option<f32>,
+    /// The powered creeper's pass state (RenderCreeper.java:56-67): `GL_ONE,
+    /// GL_ONE` blending, `glColor4f(0.5, 0.5, 0.5, 1)`, lighting off, the
+    /// alpha test kept, the `GL_TEXTURE` matrix translated by `ticks ×
+    /// 0.01` in u and v.
+    #[serde(default)]
+    pub additive: bool,
     /// Keep the previous debug models (to draw a pass model over its main
     /// model).
     #[serde(default)]
@@ -111,7 +117,7 @@ pub fn root_transform(kind: ModelKind, feet: Vec3, yaw: f32, pre_scale: f32) -> 
         ModelKind::Squid => {
             // RenderSquid.func_21007_a at pitch and yaw 0: up 0.5, down
             // 1.2 (before the flip), then RenderLiving's offset.
-            // src: RenderSquid.java:14-23
+            // src: RenderSquid.java:14-22
             m = Mat4::from_translation(feet + Vec3::new(0.0, 0.5 - 1.2, 0.0))
                 * Mat4::from_rotation_y((180.0 - yaw).to_radians())
                 * Mat4::from_scale(Vec3::new(-1.0, -1.0, 1.0))
@@ -166,7 +172,7 @@ pub fn spawn_debug_model(
         );
         let pre = spec.scale.unwrap_or(match kind {
             // RenderGhast.func_4014_a with attackCounter 0: (8 + 1) / 2.
-            // src: RenderGhast.java:11-18
+            // src: RenderGhast.java:11-19
             ModelKind::Ghast => 4.5,
             _ => 1.0,
         });
@@ -180,6 +186,16 @@ pub fn spawn_debug_model(
         if let Some(a) = spec.blend_alpha {
             mat.key.blend = GlBlend::Alpha;
             mat.params.color.w = a;
+            mat.sort_bias = -0.93e6;
+        }
+        if spec.additive {
+            // src: RenderCreeper.java:58-60, :63-67
+            mat.key.blend = GlBlend::Additive;
+            mat.key.src_one = true;
+            mat.params.color = Vec4::new(0.5, 0.5, 0.5, 1.0);
+            mat.params.lighting = 0;
+            let t = spec.ticks * 0.01;
+            mat.params.uv_offset = Vec4::new(t, t, 0.0, 0.0);
             mat.sort_bias = -0.93e6;
         }
         let mh = materials.add(mat);

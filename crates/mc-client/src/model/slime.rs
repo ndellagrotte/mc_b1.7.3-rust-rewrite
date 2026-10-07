@@ -14,7 +14,7 @@ pub const LEFT_EYE: usize = 2;
 pub const MOUTH: usize = 3;
 
 /// `render`'s draw list (the eyes and mouth only when built).
-// src: ModelSlime.java:27-36
+// src: ModelSlime.java:28-37
 pub const RENDER: &[(usize, RenderMode)] = &[
     (BODY, RenderMode::Render),
     (RIGHT_EYE, RenderMode::Render),

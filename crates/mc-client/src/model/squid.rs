@@ -14,7 +14,7 @@ pub const TENTACLE0: usize = 1;
 pub const TENTACLES: usize = 8;
 
 /// `render`'s draw list: the body, then the tentacles.
-// src: ModelSquid.java:33-41
+// src: ModelSquid.java:36-44
 pub const RENDER: &[(usize, RenderMode)] = &[
     (BODY, RenderMode::Render),
     (1, RenderMode::Render),
@@ -40,7 +40,7 @@ const TENTACLE_NAMES: [&str; TENTACLES] = [
 
 /// `new ModelSquid()`: the tentacles on a circle of radius 5 under the
 /// body (`Math.cos`/`Math.sin` in doubles), each turned to face outwards.
-// src: ModelSquid.java:7-24
+// src: ModelSquid.java:7-27
 pub fn build() -> Vec<ModelPart> {
     let var1: i32 = -16;
     let mut body = ModelPart::new("squidBody", 0, 0);
@@ -65,7 +65,7 @@ pub fn build() -> Vec<ModelPart> {
 
 /// `ModelSquid.setRotationAngles`: every tentacle's X angle is `ticks`
 /// (`RenderSquid` passes the interpolated tentacle angle there).
-// src: ModelSquid.java:26-31
+// src: ModelSquid.java:29-34
 pub fn set_rotation_angles(
     m: &mut Model,
     _var1: f32,

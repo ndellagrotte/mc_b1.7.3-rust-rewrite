@@ -6,7 +6,7 @@
 use super::part::{ModelPart, RenderMode};
 
 /// `render`'s draw list: `boatSides[0..5]`.
-// src: ModelBoat.java:28-33
+// src: ModelBoat.java:32-37
 pub const RENDER: &[(usize, RenderMode)] = &[
     (0, RenderMode::Render),
     (1, RenderMode::Render),
@@ -16,7 +16,7 @@ pub const RENDER: &[(usize, RenderMode)] = &[
 ];
 
 /// `new ModelBoat()`.
-// src: ModelBoat.java:6-26
+// src: ModelBoat.java:6-30
 pub fn build() -> Vec<ModelPart> {
     let mut s = [
         ModelPart::new("boatSides[0]", 0, 8),

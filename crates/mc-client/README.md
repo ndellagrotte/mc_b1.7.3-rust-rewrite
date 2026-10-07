@@ -415,7 +415,8 @@ plus `ModelBase`'s/`ModelBiped`'s state (`on_ground` = the swing progress,
 
 All b1.7.3 models texture over 64×32 (`TexturedQuad` hard-codes it; there is
 no `textureWidth`/`textureHeight` yet); UVs are already divided, with
-vanilla's half-texel inset.
+vanilla's inset of a tenth of a texel (`0.0015625` = 0.1/64, `0.003125` =
+0.1/32).
 
 ### Drawing a model (for WP-3.5b)
 
@@ -456,7 +457,9 @@ every entity of that kind; only transforms change per frame):
    common case.
 5. Held items and the helmet block hang off `model.post_render(part,
    MODEL_SCALE)` (`bipedRightArm.postRender`, `bipedHead.postRender`) as a
-   child of the root. `render_ears` / `render_cloak` give the extra parts'
+   child of the root. `None` (the part hidden) means the identity: Java's
+   `postRender` then leaves the matrix alone and the item is still drawn
+   at the root's origin, so do not skip it. `render_ears` / `render_cloak` give the extra parts'
    draws for `RenderPlayer` (skins and cloaks are downloads: deferred, D2).
 6. Hide (or despawn) model entities while no world is drawn (`FogState::
    active`): Bevy re-specialises visible meshes' pipelines when the world
@@ -488,8 +491,12 @@ of every box are lit as `-x` (`model::part::tess_normal`).
   (`textured: 0`, alpha test off, `GlBlend::Alpha`, `depth_equal: true`,
   `color` (b, 0, 0, 0.4) or the multiplier's ARGB); the powered creeper
   (`CreeperArmor`, `/armor/power.png`, `lighting: 0`, `GlBlend::Additive`
-  (`glBlendFunc(1, 1)` with alpha 1), `color` 0.5, `uv_offset` = `(t ×
-  0.01, t × 0.01)`); spider eyes (`GlBlend::Alpha`, alpha test off, `color`
+  with `key.src_one = true` (`glBlendFunc(GL_ONE, GL_ONE)`,
+  RenderCreeper.java:67; plain `GlBlend::Additive` is `GL_SRC_ALPHA,
+  GL_ONE` and would weight power.png's texels by their alpha), the alpha
+  test kept at 0.1 (the pass leaves `GL_ALPHA_TEST` on), `color` 0.5,
+  `uv_offset` = `(t × 0.01, t × 0.01)`; `debug_model`'s `additive` is this
+  state); spider eyes (`GlBlend::Alpha`, alpha test off, `color`
   (1, 1, 1, (1 − brightness) × 0.5)); the slime's outer cube
   (`GlBlend::Alpha`); sheep wool (`color` = brightness × fleece colour).
   Blended passes go to `Transparent3d`: give them a `sort_bias` in the
@@ -523,9 +530,13 @@ of every box are lit as `-x` (`model::part::tess_normal`).
 
 `model/testdata/java_models.txt` is the vanilla classes run on the oracle
 JVM (`model/testdata/ModelDump.java`, regenerated as its header says):
-every part's rotation point, angles, mirror flag, corners and faces, and
-the parts after a sequence of `setRotationAngles` (and the wolf's
-`setLivingAnimations`, the ears) calls; the tests compare them bit for bit.
+every part's rotation point, angles, mirror flag, corners and faces, each
+face's `TexturedQuad.draw` normal and the int the real
+`Tessellator.setNormal` packs from it, and the parts after a sequence of
+`setRotationAngles` (and the wolf's `setLivingAnimations`, shaking
+included, the ears) calls; the tests compare them bit for bit. The
+`render` draw lists (they need GL) are checked against the Java methods'
+call sequences written out by hand.
 
 ## Scripted-input dev mode
 
@@ -565,7 +576,7 @@ Actions run in order, as many per frame as are due.
 | `aux_sfx` | `kind`, `x`, `y`, `z`, `data` | Dev (WP-3.8): queues `world.playAuxSFX(kind, x, y, z, data)` as the simulation would (`1005` with `data` 2256 plays record `13` at the block, `data` 0 stops it; `2001` with a block id plays its break sound) |
 | `set_option` | `option`, `step` (default 1) | Dev (WP-3.3a): `gameSettings.setOptionValue(option, step)` with its side effects and `saveOptions`, as the options screen's button (`option` is the translation key: `"options.ao"`, `"options.graphics"`, `"options.renderDistance"`, …) |
 | `dump_debug` | `path` | Dev (WP-3.3a): writes the F3 text (`DebugText`, `DebugSources`, the fps line) and `terrain::TerrainStats` as JSON |
-| `debug_model` | `model`, `path`; optional `texture`, `distance` (3), `turn`, `limb_swing`, `limb_yaw`, `ticks`, `head_yaw`, `head_pitch`, `swing`, `scale`, `brightness` (1), `blend_alpha`, `keep`, `sitting` | Dev (WP-3.5a): spawns a model (`"pig"`, `"sheep_fur"`, `"biped_armor"`, … = `model::ModelKind`) standing `distance` blocks in front of the player at feet level, facing the camera turned by `turn` degrees, posed with those `render` arguments, its skin from the jar (default: the renderer's texture); with `path`, waits 20 frames and saves a screenshot. Earlier debug models are removed unless `keep` (to draw a pass model over its main model). Hidden while no world is drawn |
+| `debug_model` | `model`, `path`; optional `texture`, `distance` (3), `turn`, `limb_swing`, `limb_yaw`, `ticks`, `head_yaw`, `head_pitch`, `swing`, `scale`, `brightness` (1), `blend_alpha`, `additive` (the powered creeper's pass), `keep`, `sitting` | Dev (WP-3.5a): spawns a model (`"pig"`, `"sheep_fur"`, `"biped_armor"`, … = `model::ModelKind`) standing `distance` blocks in front of the player at feet level, facing the camera turned by `turn` degrees, posed with those `render` arguments, its skin from the jar (default: the renderer's texture); with `path`, waits 20 frames and saves a screenshot. Earlier debug models are removed unless `keep` (to draw a pass model over its main model). Hidden while no world is drawn |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

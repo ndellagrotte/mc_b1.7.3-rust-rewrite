@@ -411,7 +411,7 @@ impl Model {
     /// `4 - ticks` instead), then the drawn parts with their transforms, in
     /// draw order. Parts that are hidden, `showModel = false` or without a
     /// box are skipped as `ModelRenderer.render` skips them.
-    // src: ModelBiped.java:58-67, ModelMinecart.java:34-40, ModelBoat.java:28-33, ModelWolf.java:56-70
+    // src: ModelBiped.java:58-67, ModelMinecart.java:36-43, ModelBoat.java:32-37, ModelWolf.java:56-70
     pub fn render(
         &mut self,
         var1: f32,
@@ -467,8 +467,10 @@ impl Model {
 
     /// `part.postRender(scale)`'s transform (the held item's and the
     /// helmet block's anchor: `bipedRightArm`, `bipedHead`), or `None`
-    /// when the part is hidden (`postRender` then changes nothing).
-    // src: ModelRenderer.java:150-178, RenderBiped.java:15, RenderPlayer.java:89
+    /// when the part is hidden (`postRender` then changes nothing: the
+    /// caller uses the identity and still draws the item, it does not skip
+    /// it).
+    // src: ModelRenderer.java:150-178, RenderBiped.java:17, RenderPlayer.java:110, :182
     pub fn post_render(&self, part: usize, scale: f32) -> Option<Transform> {
         let p = self.parts.get(part)?;
         (!p.is_hidden && p.show_model).then(|| p.transform(RenderMode::Render, scale))

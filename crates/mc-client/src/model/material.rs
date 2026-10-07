@@ -73,6 +73,11 @@ pub struct ModelKey {
     pub depth_equal: bool,
     /// `GL_CULL_FACE` (back faces, counter-clockwise front).
     pub cull: bool,
+    /// With [`GlBlend::Additive`]: the source factor is `GL_ONE`
+    /// (`glBlendFunc(1, 1)`, the powered creeper's pass,
+    /// RenderCreeper.java:67) instead of `GL_SRC_ALPHA`, so texels are added
+    /// unweighted by their alpha. Ignored for the other blends.
+    pub src_one: bool,
 }
 
 impl Default for ModelKey {
@@ -84,6 +89,7 @@ impl Default for ModelKey {
             depth_write: true,
             depth_equal: false,
             cull: false,
+            src_one: false,
         }
     }
 }
@@ -249,11 +255,19 @@ impl Material for ModelMaterial {
                     TextureFormat::Rgba8Unorm | TextureFormat::Bgra8Unorm
                 )
             });
+            // glBlendFunc(GL_ONE, GL_ONE) adds the colour as it is: the
+            // plain conversion, no alpha weighting to undo.
+            let src_one = k.blend == GlBlend::Additive && k.src_one;
             if unorm {
                 frag.shader_defs.push("GL_TARGET_UNORM".into());
-            } else if k.blend == GlBlend::Additive {
+            } else if k.blend == GlBlend::Additive && !src_one {
                 frag.shader_defs.push("GL_BLEND_ADDITIVE".into());
             }
+            let add_src = if src_one {
+                BlendFactor::One
+            } else {
+                BlendFactor::SrcAlpha
+            };
             for t in frag.targets.iter_mut().flatten() {
                 t.blend = match k.blend {
                     GlBlend::Off => None,
@@ -271,12 +285,12 @@ impl Material for ModelMaterial {
                     }),
                     GlBlend::Additive => Some(BlendState {
                         color: BlendComponent {
-                            src_factor: BlendFactor::SrcAlpha,
+                            src_factor: add_src,
                             dst_factor: BlendFactor::One,
                             operation: BlendOperation::Add,
                         },
                         alpha: BlendComponent {
-                            src_factor: BlendFactor::SrcAlpha,
+                            src_factor: add_src,
                             dst_factor: BlendFactor::One,
                             operation: BlendOperation::Add,
                         },

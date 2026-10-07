@@ -13,7 +13,7 @@ pub const HORN1: usize = 7;
 pub const HORN2: usize = 8;
 
 /// `render`'s draw list: the quadruped's, then the horns and udders.
-// src: ModelCow.java:36-41
+// src: ModelCow.java:38-43
 pub const RENDER: &[(usize, RenderMode)] = &[
     (HEAD, RenderMode::Render),
     (BODY, RenderMode::Render),
@@ -27,7 +27,7 @@ pub const RENDER: &[(usize, RenderMode)] = &[
 ];
 
 /// `new ModelCow()`.
-// src: ModelCow.java:8-34
+// src: ModelCow.java:8-36
 pub fn build() -> Vec<ModelPart> {
     let mut p = quadruped::build(12, 0.0);
     let mut head = ModelPart::new("head", 0, 0);
@@ -62,7 +62,7 @@ pub fn build() -> Vec<ModelPart> {
 
 /// `ModelCow.setRotationAngles`: the quadruped's, the horns following the
 /// head.
-// src: ModelCow.java:43-50
+// src: ModelCow.java:45-51
 pub fn set_rotation_angles(
     m: &mut Model,
     var1: f32,

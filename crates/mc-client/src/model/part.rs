@@ -21,15 +21,15 @@ use mc_core::math::sqrt_double;
 
 /// The texture size every b1.7.3 model's UVs are divided by: `TexturedQuad`
 /// hard-codes 64×32 (there is no `textureWidth`/`textureHeight` yet).
-// src: TexturedQuad.java:15-18
+// src: TexturedQuad.java:15-22
 pub const TEXTURE_WIDTH: f32 = 64.0;
 /// See [`TEXTURE_WIDTH`].
-// src: TexturedQuad.java:15-18
+// src: TexturedQuad.java:15-22
 pub const TEXTURE_HEIGHT: f32 = 32.0;
 
 /// The scale every client caller renders models at (`0.0625F`, one texel
 /// of a 16-pixel block): the display lists are compiled at it.
-// src: RenderLiving.java:39, RenderMinecart.java:74, RenderBoat.java:32
+// src: RenderLiving.java:39, RenderMinecart.java:75, RenderBoat.java:33
 pub const MODEL_SCALE: f32 = 0.0625;
 
 /// `PositionTextureVertex`: a corner and a texture coordinate. The Java
@@ -81,10 +81,10 @@ pub struct TexturedQuad {
 
 impl TexturedQuad {
     /// `new TexturedQuad(vertices, u1, v1, u2, v2)`: the vertices get the
-    /// texel rectangle's corners divided by 64×32, inset by half a texel's
-    /// fraction (`0.0015625F`, `0.003125F`): `[u2, v1]`, `[u1, v1]`,
-    /// `[u1, v2]`, `[u2, v2]`.
-    // src: TexturedQuad.java:13-21
+    /// texel rectangle's corners divided by 64×32, inset by a tenth of a
+    /// texel (`0.0015625F` = 0.1/64, `0.003125F` = 0.1/32): `[u2, v1]`,
+    /// `[u1, v1]`, `[u1, v2]`, `[u2, v2]`.
+    // src: TexturedQuad.java:15-23
     pub fn new(
         v: [PositionTextureVertex; 4],
         corner: [usize; 4],
@@ -121,7 +121,7 @@ impl TexturedQuad {
     }
 
     /// `flipFace()`: the vertex order reversed.
-    // src: TexturedQuad.java:23-31
+    // src: TexturedQuad.java:25-33
     pub fn flip_face(&mut self) {
         self.vertex_positions.reverse();
         self.corner.reverse();
@@ -130,7 +130,7 @@ impl TexturedQuad {
     /// The normal `draw` passes to `Tessellator.setNormal`: `(v1 - v2) ×
     /// (v0 - v1)` normalised (`Vec3D.subtract(o)` is `o - this`), in doubles,
     /// cast to float.
-    // src: TexturedQuad.java:34-42, Vec3D.java:59-70
+    // src: TexturedQuad.java:36-44, Vec3D.java:59-70
     pub fn face_normal(&self) -> [f32; 3] {
         let p = |i: usize| {
             let q = self.vertex_positions[i].pos;
@@ -390,7 +390,7 @@ impl ModelPart {
     /// The display list's vertices: per face (in order) its four vertices
     /// at `corner * scale` (`(float)x * scale`), its texture coordinates and
     /// the normal GL reads ([`tess_normal`]).
-    // src: ModelRenderer.java:180-191, TexturedQuad.java:33-50
+    // src: ModelRenderer.java:180-191, TexturedQuad.java:35-52
     pub fn display_list(&self, scale: f32) -> PartVertices {
         let mut out = PartVertices::default();
         let Some(g) = &self.geometry else {

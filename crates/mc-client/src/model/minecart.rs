@@ -10,7 +10,7 @@ use super::part::{ModelPart, RenderMode};
 pub const INNER: usize = 5;
 
 /// `render`'s draw list: `sideModels[0..6]`.
-// src: ModelMinecart.java:34-40
+// src: ModelMinecart.java:36-43
 pub const RENDER: &[(usize, RenderMode)] = &[
     (0, RenderMode::Render),
     (1, RenderMode::Render),
@@ -21,7 +21,7 @@ pub const RENDER: &[(usize, RenderMode)] = &[
 ];
 
 /// `new ModelMinecart()` (the six created parts).
-// src: ModelMinecart.java:6-32
+// src: ModelMinecart.java:6-34
 pub fn build() -> Vec<ModelPart> {
     let mut s = [
         ModelPart::new("sideModels[0]", 0, 10),

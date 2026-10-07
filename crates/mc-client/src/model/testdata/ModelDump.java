@@ -4,8 +4,10 @@
 // each ModelRenderer's rotation point, angles, mirror flag, the 8 box corners
 // and the 6 faces (corner indices in stored order and the texel rectangle the
 // face's UVs were made from, checked bit for bit against TexturedQuad's
-// formula), then the parts' angles and rotation points after a fixed list of
-// pose calls on one shared instance per model (as the renderers share them).
+// formula), each face's normal as TexturedQuad.draw computes it and the int
+// Tessellator.setNormal packs from it, then the parts' angles and rotation
+// points after a fixed list of pose calls on one shared instance per model (as
+// the renderers share them), including a shaking wolf.
 //
 // Regenerate (from the repository root, after tools/oracle/build.sh):
 //   . tools/oracle/env.sh   # with ROOT set to the repository root
@@ -109,6 +111,22 @@ public class ModelDump {
                 }
                 out.append("face ").append(idx[0]).append(' ').append(idx[1]).append(' ').append(idx[2]).append(' ').append(idx[3])
                    .append(' ').append(u1).append(' ').append(v1).append(' ').append(u2).append(' ').append(v2).append('\n');
+                // TexturedQuad.draw's normal (TexturedQuad.java:36-38, 43) and
+                // the int the real Tessellator.setNormal packs from it.
+                PositionTextureVertex[] vp = t.vertexPositions;
+                Vec3D a = vp[1].vector3D.subtract(vp[0].vector3D);
+                Vec3D b = vp[1].vector3D.subtract(vp[2].vector3D);
+                Vec3D n = b.crossProduct(a).normalize();
+                float nx = (float) n.xCoord;
+                float ny = (float) n.yCoord;
+                float nz = (float) n.zCoord;
+                Tessellator tess = Tessellator.instance;
+                tess.startDrawingQuads();
+                tess.setNormal(nx, ny, nz);
+                int packed = field(Tessellator.class, "normal").getInt(tess);
+                field(Tessellator.class, "isDrawing").setBoolean(tess, false);
+                out.append("normal ").append(f(nx)).append(' ').append(f(ny)).append(' ').append(f(nz))
+                   .append(' ').append(packed).append('\n');
             }
         }
     }
@@ -242,6 +260,25 @@ public class ModelDump {
         w.setLivingAnimations(e, 2.5F, 0.4F, 0.9F);
         w.setRotationAngles(2.5F, 0.4F, 1.5707964F, 10.0F, 5.0F, 0.0625F);
         dumpPose("Wolf", "angry", w, WOLF);
+        // case: shaking (getWolfShaking true). setLivingAnimations sets every
+        // angle, then reads getEntityBrightness (needs a world) and calls
+        // glColor3f (needs a GL context): the throw comes after the angles
+        // (ModelWolf.java:111-121). The shading it would multiply in is
+        // printed instead.
+        e.setWolfAngry(false);
+        field(EntityWolf.class, "isWolfShaking").setBoolean(e, true);
+        shaking.setFloat(e, 0.4F);
+        prevShaking.setFloat(e, 0.2F);
+        boolean threw = false;
+        try {
+            w.setLivingAnimations(e, 3.0F, 0.5F, 0.3F);
+        } catch (RuntimeException ex) {
+            threw = true;
+        }
+        if (!threw) throw new IllegalStateException("expected no world / no GL");
+        out.append("wolf_shading ").append(f(e.getShadingWhileShaking(0.3F))).append('\n');
+        w.setRotationAngles(3.0F, 0.5F, 0.9F, -10.0F, 15.0F, 0.0625F);
+        dumpPose("Wolf", "shaking", w, WOLF);
 
         Random r = new Random(1660L);
         out.append("ghast_lengths");

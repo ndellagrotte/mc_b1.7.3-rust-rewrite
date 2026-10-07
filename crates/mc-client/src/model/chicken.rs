@@ -23,7 +23,7 @@ pub const BILL: usize = 6;
 pub const CHIN: usize = 7;
 
 /// `render`'s draw list.
-// src: ModelChicken.java:39-49
+// src: ModelChicken.java:41-51
 pub const RENDER: &[(usize, RenderMode)] = &[
     (HEAD, RenderMode::Render),
     (BILL, RenderMode::Render),
@@ -36,7 +36,7 @@ pub const RENDER: &[(usize, RenderMode)] = &[
 ];
 
 /// `new ModelChicken()`.
-// src: ModelChicken.java:12-37
+// src: ModelChicken.java:13-39
 pub fn build() -> Vec<ModelPart> {
     let var1: i32 = 16;
     let mut head = ModelPart::new("head", 0, 0);
@@ -71,7 +71,7 @@ pub fn build() -> Vec<ModelPart> {
 /// `ModelChicken.setRotationAngles`: head look (pitch negated), the body
 /// level, legs' walk swing, the wings flapping by `ticks`
 /// (`RenderChicken.getWingRotation`).
-// src: ModelChicken.java:51-63
+// src: ModelChicken.java:53-65
 pub fn set_rotation_angles(
     m: &mut Model,
     var1: f32,
