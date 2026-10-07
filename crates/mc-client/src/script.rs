@@ -181,6 +181,28 @@ pub enum Action {
         #[serde(default)]
         data: i32,
     },
+    /// Dev (WP-3.3a): `gameSettings.setOptionValue(option, step)` with its
+    /// side effects and `saveOptions`, as the options screen's button does
+    /// (`option` is the translation key, e.g. `"options.ao"`,
+    /// `"options.graphics"`, `"options.renderDistance"`).
+    SetOption {
+        /// `EnumOptions.getEnumString()`.
+        option: String,
+        /// The step (1 for an on/off option).
+        #[serde(default = "one")]
+        step: i32,
+    },
+    /// Dev (WP-3.3a): writes the F3 text (`DebugText`, `DebugSources`) and
+    /// the terrain's counters (`terrain::TerrainStats`) as JSON.
+    DumpDebug {
+        /// The file.
+        path: PathBuf,
+    },
+}
+
+/// The default `step` of [`Action::SetOption`].
+fn one() -> i32 {
+    1
 }
 
 /// One script line: an action and its optional time.
@@ -482,6 +504,47 @@ pub fn run_script(
                     w.play_aux_sfx(kind, x, y, z, data);
                 }
             }
+            Action::SetOption { option, step } => {
+                match crate::settings::EnumOptions::VALUES
+                    .into_iter()
+                    .find(|o| o.get_enum_string() == option)
+                {
+                    Some(o) => game.set_option_value(o, step),
+                    None => error!("script: set_option: no option {option:?}"),
+                }
+            }
+            Action::DumpDebug { path } => {
+                commands.queue(move |w: &mut World| {
+                    use serde_json::json;
+                    let text = w.get_resource::<crate::debug::DebugText>().cloned();
+                    let src = w.get_resource::<crate::debug::DebugSources>().cloned();
+                    let stats = w.get_resource::<crate::terrain::TerrainStats>().copied();
+                    let fps_line = w.get_non_send::<Game>().map(|g| g.debug.clone());
+                    let v = json!({
+                        "debug": fps_line,
+                        "left": text.as_ref().map(|t| t.left.clone()),
+                        "renders": src.as_ref().map(|s| s.renders.clone()),
+                        "terrain": stats.map(|s| json!({
+                            "rebuilds_this_frame": s.rebuilds_this_frame,
+                            "rebuilds_total": s.rebuilds_total,
+                            "pending_jobs": s.pending_jobs,
+                            "drawn": s.drawn,
+                            "to_update": s.to_update,
+                            "snapshot_ms_total": s.snapshot_nanos_total as f64 / 1e6,
+                            "mesh_ms_total": s.mesh_nanos_total as f64 / 1e6,
+                            "terrain_frame_ms": s.frame_nanos as f64 / 1e6,
+                        })),
+                    });
+                    if let Some(d) = path.parent() {
+                        let _ = std::fs::create_dir_all(d);
+                    }
+                    let text = serde_json::to_string_pretty(&v).unwrap_or_default();
+                    match std::fs::write(&path, text + "\n") {
+                        Ok(()) => info!("script: debug dump written to {}", path.display()),
+                        Err(e) => error!("script: {}: {e}", path.display()),
+                    }
+                });
+            }
         }
     }
 }
@@ -565,6 +628,36 @@ mod tests {
                 x: 0.5,
                 y: 200.0,
                 z: -3.0
+            }
+        );
+    }
+
+    #[test]
+    fn parses_the_wp_3_3a_dev_actions() {
+        let s = Script::parse(
+            r#"[{"action": "set_option", "option": "options.ao"},
+                {"action": "set_option", "option": "options.renderDistance", "step": 2},
+                {"action": "dump_debug", "path": "build/screens/d.json"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::SetOption {
+                option: "options.ao".into(),
+                step: 1
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::SetOption {
+                option: "options.renderDistance".into(),
+                step: 2
+            }
+        );
+        assert_eq!(
+            s.steps[2].action,
+            Action::DumpDebug {
+                path: "build/screens/d.json".into()
             }
         );
     }
