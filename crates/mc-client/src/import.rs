@@ -156,6 +156,45 @@ mod tests {
         assert!(!data.0.join("saves").exists());
     }
 
+    #[test]
+    fn an_unknown_item_id_is_refused_with_its_id_and_nothing_is_copied() {
+        use mc_sim::save::{Tag, TagType};
+        use std::collections::BTreeMap;
+        let src = TempDir::new("import_d5");
+        let data = TempDir::new("import_d5_data");
+        let world = src.0.join("Modded");
+        std::fs::create_dir_all(&world).unwrap();
+        let mut stack = BTreeMap::new();
+        stack.insert("id".to_string(), Tag::Short(4000));
+        stack.insert("Count".to_string(), Tag::Byte(1));
+        stack.insert("Damage".to_string(), Tag::Short(0));
+        stack.insert("Slot".to_string(), Tag::Byte(3));
+        let mut player = BTreeMap::new();
+        player.insert(
+            "Inventory".to_string(),
+            Tag::List {
+                elem: TagType::Compound,
+                items: vec![Tag::Compound(stack)],
+            },
+        );
+        let info = mc_sim::world::info::WorldInfo::new(5, "Modded");
+        let data_c = info.get_nbt_tag_compound_with_player(Some(Tag::Compound(player)), 0);
+        let mut root = BTreeMap::new();
+        root.insert("Data".to_string(), Tag::Compound(data_c));
+        let bytes = mc_sim::save::mc_nbt::write_gzip("", &Tag::Compound(root)).unwrap();
+        std::fs::write(world.join("level.dat"), bytes).unwrap();
+        let e = import_world(&data.0, &world).unwrap_err();
+        let ImportError::Refused(r) = &e else {
+            panic!("{e}");
+        };
+        assert!(
+            matches!(r, ImportRefusal::UnknownItem { id: 4000, .. }),
+            "{r:?}"
+        );
+        assert!(e.to_string().contains("4000"), "{e}");
+        assert!(!data.0.join("saves").exists());
+    }
+
     /// The reference testWorld when present (never committed, D8).
     #[test]
     fn the_reference_test_world_when_present() {

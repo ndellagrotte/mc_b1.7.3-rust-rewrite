@@ -643,6 +643,10 @@ impl Game {
         if self.display_active && !self.in_game_has_focus {
             self.in_game_has_focus = true;
             self.mouse_helper.grab_mouse_cursor();
+            // LWJGL's Mouse.setGrabbed also drops the motion gathered while
+            // the pointer was free.
+            self.input.pending_dx = 0.0;
+            self.input.pending_dy = 0.0;
             self.display_gui_screen(None);
             self.left_click_counter = 10000;
             self.mouse_ticks_ran = self.ticks_ran.wrapping_add(10000);
