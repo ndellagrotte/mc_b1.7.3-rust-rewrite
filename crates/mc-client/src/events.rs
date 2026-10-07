@@ -10,9 +10,16 @@
 //!   directly on `sndManager` (WP-3.8).
 //! - [`ClientEvent`]: everything else the shell does that another part must
 //!   react to (world changes for the renderers, the effect renderer's
-//!   block-hit particles, the chat line, screens, settings side effects).
+//!   block-hit particles, the chat line, screens, settings side effects),
+//!   and the local player's calls into `Minecraft` that the simulation
+//!   raised as [`ClientRequest`]s (the screens it opens, its chat lines, the
+//!   pickup particle, the inventory hint). The player's `usePortal` is the
+//!   shell's own ([`crate::game`]); its sounds become [`ClientSound`]s.
+//!
+//! [`ClientRequest`]: mc_sim::world::client_requests::ClientRequest
 
 use bevy::prelude::*;
+use mc_sim::world::client_requests::{PickupFx, PlayerGui};
 use mc_sim::world::events::WorldEvent;
 
 use crate::app::GuiScreen;
@@ -41,7 +48,9 @@ pub enum ClientSound {
         /// Pitch.
         pitch: f32,
     },
-    /// `sndManager.playSoundFX(name, volume, pitch)` (no position).
+    /// `sndManager.playSoundFX(name, volume, pitch)` (no position): the
+    /// portal sounds `EntityPlayerSP.onLivingUpdate` plays
+    /// (EntityPlayerSP.java:50, :58; the pitch drawn by the simulation).
     PlaySoundFx {
         /// Sound name.
         name: String,
@@ -97,8 +106,28 @@ pub enum ClientEvent {
     /// Minecraft.java:663).
     ChatMessage(String),
     /// `ingameGUI.addChatMessageTranslate(key)` (`EntityPlayerSP.addChatMessage`,
-    /// EntityPlayerSP.java:172-174: "tile.bed.notValid" on respawn).
+    /// EntityPlayerSP.java:172-174: "tile.bed.notValid" on respawn,
+    /// "tile.bed.occupied" / "tile.bed.noSleep" from a bed, BlockBed.java:63,
+    /// :76).
     ChatMessageTranslate(String),
+    /// `EntityPlayerSP.displayGUIChest` / `displayWorkbenchGUI` /
+    /// `displayGUIFurnace` / `displayGUIDispenser` / `displayGUIEditSign`
+    /// (EntityPlayerSP.java:113-131): `mc.displayGuiScreen(new GuiChest(…))`
+    /// etc. The screen's owner (WP-3.6) opens it with
+    /// [`crate::game::Game::display_gui_screen`]; vanilla does it at once,
+    /// inside the click or the update that asked.
+    DisplayGui(PlayerGui),
+    /// `EntityPlayerSP.onItemPickup`: `effectRenderer.addEffect(new
+    /// EntityPickupFX(theWorld, entity, player, -0.5F))`
+    /// (EntityPlayerSP.java:133-135; WP-3.7).
+    PickupFx(PickupFx),
+    /// `guiAchievement.queueAchievementInformation(achievement)`: the
+    /// "open your inventory" hint, every player update until the
+    /// achievement is unlocked (EntityPlayerSP.java:35-37; WP-3.6).
+    AchievementHint {
+        /// The achievement's `statId`.
+        stat_id: i32,
+    },
     /// `ingameGUI.clearChatMessages()` (opening the main menu,
     /// Minecraft.java:427-429).
     ClearChat,

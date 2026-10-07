@@ -261,6 +261,10 @@ pub fn dump_json(g: &Game, state: &str) -> serde_json::Value {
             "dimension": p.kind.player().map(|d| d.dimension),
             "current_item": p.kind.player().map(|d| d.inventory.current_item),
             "username": p.kind.player().and_then(|d| d.username.clone()),
+            "in_portal": p.kind.player().map(|d| d.in_portal),
+            "time_in_portal": p.kind.player().map(|d| d.time_in_portal),
+            "time_until_portal": p.kind.player().map(|d| d.time_until_portal),
+            "y_size": b.y_size,
         })
     });
     json!({

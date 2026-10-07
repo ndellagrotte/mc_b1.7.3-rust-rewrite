@@ -29,7 +29,12 @@
 //! | `effectRenderer.updateEffects()` | [`RunTickHook::UpdateEffects`] (WP-3.7) |
 //!
 //! [`WorldEvent`]s are moved to [`WorldEventMsg`] messages before every hook
-//! and at the end of the frame ([`crate::events`]).
+//! and at the end of the frame ([`crate::events`]), and with them the
+//! player's [`ClientRequest`]s (`EntityPlayerSP`'s calls into `Minecraft`):
+//! screens, chat lines, the pickup particle and the inventory hint become
+//! [`ClientEvent`]s, the portal sounds [`ClientSound::PlaySoundFx`], and
+//! `usePortal` is run by the shell right after the `updateEntities` that
+//! raised it ([`Game::use_portal`]).
 //!
 //! # Seeding
 //!
@@ -37,12 +42,12 @@
 //! the clock, as `new Random()` would be ([`crate::clock::new_random_seed`]):
 //! the world constructor's (`WorldEnvironment`: `rand`, `field_9437_g`,
 //! `lockTimestamp`; the display `Random` derives from `rand`'s seed), then
-//! [`seed_clock_randoms`] for the rest the simulation exposes (the
+//! [`World::seed_clock_randoms`] for the rest the simulation exposes (the
 //! `Math.random()` stream, `Item.itemRand`, the entity `rand`s and the
 //! explosion `Random` keyed off one seed, the container blocks' `Random`s).
-//! A portal's new world takes the old one's Java statics
-//! ([`World::adopt_statics`], `Item.itemRand`). The teleporter gets its own
-//! clock seed.
+//! A portal's new world ([`World::new_for_dimension`]) takes the old one's
+//! Java statics (`Item.itemRand` among them) and gets a new constructor
+//! environment. The teleporter gets its own clock seed.
 //!
 //! # Loading
 //!
@@ -54,13 +59,14 @@
 //! `respawn` do after it runs when the last chunk is in (the "tail").
 //! Vanilla returns into the `runTick` that started the change (the GUI's
 //! input handling, or the player's update for a portal) and finishes it on
-//! the new world. For a portal the tail runs that rest on the new world
-//! (`setAllowedMobSpawns`, `tick`, `randomDisplayUpdates`, then
-//! [`RunTickHook::UpdateEffects`]), so its time matches vanilla's; the
-//! rest of the player's own update (`EntityPlayerSP.onLivingUpdate` after
-//! `usePortal`: `ySize`, `pushOutOfBlocks`, the movement step in the new
-//! world) is not resumed, since the simulation finished it in the old
-//! world (it needs a simulation signal; reported). A GUI-started change
+//! the new world. For a portal raised by the player's update
+//! ([`ClientRequest::UsePortal`]) the tail first finishes that update on
+//! the new world ([`player_fns::sp_on_living_update_after_portal`]:
+//! `inPortal`, the cooldown, `updatePlayerMoveState` on the new
+//! `MovementInputFromOptions`, `ySize`, `pushOutOfBlocks`, the movement
+//! step), then runs the rest of the tick there (`setAllowedMobSpawns`,
+//! `tick`, `randomDisplayUpdates`, then [`RunTickHook::UpdateEffects`]), so
+//! its time matches vanilla's. A GUI-started change
 //! skips the rest of its tick (the screen was the tick's last input
 //! consumer). `systemTime` is set to the time the load ends, as the
 //! `runTick` tail does in vanilla (Minecraft.java:1177).
@@ -96,11 +102,12 @@ use mc_sim::entity::{Entity, EntityKindData, dispatch};
 use mc_sim::player_controller::{self, PlayerControllerSp, send_place_block, send_use_item};
 use mc_sim::save::{SaveConverterMcRegion, SaveFormat, SaveStore, SharedSaveStore};
 use mc_sim::stats::{AchievementMap, StatFileWriter, stat, stat_list};
+use mc_sim::world::client_requests::ClientRequest;
 use mc_sim::world::events::WorldEvent;
 use mc_sim::world::provider::{Dimension, WorldProvider};
 use mc_sim::world::ray_trace::{EnumMovingObjectType, MovingObjectPosition};
 use mc_sim::world::teleporter::Teleporter;
-use mc_sim::world::{World, WorldEnvironment};
+use mc_sim::world::{ClockSeeds, World, WorldEnvironment};
 
 use crate::app::{AppState, GuiScreen, ScaledResolution, ScreenKind};
 use crate::camera::{self, CameraState, EntityRendererCam};
@@ -408,6 +415,9 @@ pub struct Game {
     /// A portal load that resumed its tick finished: the frame driver runs
     /// [`RunTickHook::UpdateEffects`] for that tick (Minecraft.java:1172-1174).
     resume_update_effects: bool,
+    /// The player's update raised [`ClientRequest::UsePortal`] (collected
+    /// by [`Game::collect_world_events`], run after `updateEntities`).
+    portal_requested: bool,
 }
 
 impl Game {
@@ -486,6 +496,7 @@ impl Game {
             last_error: None,
             damage_partial_time: 0.0,
             resume_update_effects: false,
+            portal_requested: false,
         })
     }
 
@@ -620,10 +631,44 @@ impl Game {
         self.save_options();
     }
 
-    /// Moves the world's queued events to the outbox.
+    /// Moves the world's queued events and the player's requests to the
+    /// outbox (module docs); a `usePortal` request is noted for the tick
+    /// ([`Game::portal_requested`]).
     pub fn collect_world_events(&mut self) {
         if let Some(w) = self.the_world.as_mut() {
             self.outbox.world_events.extend(w.events.drain());
+            for r in w.client_requests.drain() {
+                match r {
+                    ClientRequest::DisplayGui(g) => {
+                        self.outbox.events.push(ClientEvent::DisplayGui(g));
+                    }
+                    ClientRequest::ChatMessage { key } => {
+                        self.outbox
+                            .events
+                            .push(ClientEvent::ChatMessageTranslate(key.to_string()));
+                    }
+                    ClientRequest::PickupFx(fx) => {
+                        self.outbox.events.push(ClientEvent::PickupFx(fx));
+                    }
+                    ClientRequest::PlaySoundFx {
+                        name,
+                        volume,
+                        pitch,
+                    } => {
+                        self.outbox.sounds.push(ClientSound::PlaySoundFx {
+                            name: name.to_string(),
+                            volume,
+                            pitch,
+                        });
+                    }
+                    ClientRequest::UsePortal => self.portal_requested = true,
+                    ClientRequest::AchievementHint { stat_id } => {
+                        self.outbox
+                            .events
+                            .push(ClientEvent::AchievementHint { stat_id });
+                    }
+                }
+            }
         }
         if let Some(c) = self.player_controller.as_mut() {
             for s in c.sounds.drain(..) {
@@ -1305,18 +1350,20 @@ impl Game {
                             self.detached_player = Some(Box::new(e.clone()));
                         }
                     }
-                    let portal_before = portal_hits(world);
+                    self.portal_requested = false;
                     world.update_entities();
                     if let Some(pid) = self.the_player
                         && world.entity(pid).is_some()
                     {
                         self.detached_player = None;
                     }
-                    if portal_hits(world) > portal_before {
+                    self.collect_world_events();
+                    if std::mem::take(&mut self.portal_requested) {
                         // Minecraft.usePortal(), reached from
                         // EntityPlayerSP.onLivingUpdate (EntityPlayerSP.java:59).
-                        // The rest of this tick runs on the new world when
-                        // its terrain is in (Game::finish_load).
+                        // The rest of the player's update and of this tick
+                        // run on the new world when its terrain is in
+                        // (Game::finish_load).
                         self.use_portal_impl(false, true);
                         return;
                     }
@@ -1378,6 +1425,17 @@ impl Game {
         }
     }
 
+    /// The seeds `new Random()` would take from the clock for the streams
+    /// of [`World::seed_clock_randoms`] (module docs, "Seeding").
+    fn clock_seeds() -> ClockSeeds {
+        ClockSeeds {
+            math_random: clock::new_random_seed(),
+            item_rand: clock::new_random_seed(),
+            entity_rand: clock::new_random_seed(),
+            container_randoms: clock::new_random_seed(),
+        }
+    }
+
     /// `startWorld(dir, levelName, seed)`.
     // src: Minecraft.java:1191-1211
     pub fn start_world(&mut self, var1: &str, var2: &str, var3: i64) -> Result<(), String> {
@@ -1394,7 +1452,7 @@ impl Game {
             .get_save_loader(var1)
             .map_err(|e| format!("cannot open saves/{var1}: {e}"))?;
         let mut var6 = World::new_from_save(var5, var2, var3, None, Self::clock_environment());
-        seed_clock_randoms(&mut var6);
+        var6.seed_clock_randoms(Self::clock_seeds());
         self.world_dir = Some(var1.to_string());
         if var6.is_new_world {
             self.read_stat(stat_list::CREATE_WORLD_STAT);
@@ -1517,10 +1575,13 @@ impl Game {
                 if let Some(t) = portal {
                     self.use_portal_tail(t.x, t.z);
                     if t.resume_tick {
-                        // usePortal returns into EntityPlayerSP.onLivingUpdate
-                        // and runTick goes on with theWorld = the new world
-                        // (Minecraft.java:1163-1174). The tick was not paused
-                        // (updateEntities ran).
+                        // usePortal returns into EntityPlayerSP.onLivingUpdate,
+                        // which finishes on the new world
+                        // (EntityPlayerSP.java:63-87) ...
+                        self.finish_player_update_after_portal();
+                        // ... and runTick goes on with theWorld = the new
+                        // world (Minecraft.java:1163-1174). The tick was not
+                        // paused (updateEntities ran).
                         if self.run_tick_world_rest(false) {
                             self.resume_update_effects = true;
                         }
@@ -1663,25 +1724,14 @@ impl Game {
         // and copies its WorldInfo (World.java:103-143); changeWorld then saves
         // the old world. Here the old world saves first (the player is no
         // longer in playerEntities, so level.dat gets no Player tag, as
-        // vanilla's), then a new handler on the same save directory opens the
-        // new one.
-        let Some(dir) = self.world_dir.clone() else {
-            return;
-        };
+        // vanilla's), then hands its handler to the new one
+        // (World::new_for_dimension).
         self.loading_screen.print_text(msg);
         world.save_world_indirectly();
         if let Some(e) = world.session_lock_error.take() {
             warn!("{e}");
         }
         self.collect_world_events();
-        let handler = match self.save_loader.get_save_loader(&dir) {
-            Ok(h) => h,
-            Err(e) => {
-                self.last_error = Some(format!("usePortal: {e}"));
-                error!("usePortal: {e}");
-                return;
-            }
-        };
         let mut old = self.the_world.take().expect("checked");
         let player = if in_world {
             old.entity_index(pid)
@@ -1693,12 +1743,8 @@ impl Game {
             self.the_world = Some(old);
             return;
         };
-        let mut var7 = new_world_for_dimension(&old, handler, provider);
-        // The Java statics that outlive a World object in the JVM (module
-        // docs, "Seeding"); the new object's own clock-seeded state came
-        // from its constructor's environment.
-        var7.adopt_statics(&mut old);
-        var7.item_rand = old.item_rand.clone();
+        let handler = old.take_save_handler();
+        let var7 = World::new_for_dimension(&mut old, provider, handler, Self::clock_environment());
         drop(old);
         let tail = PortalTail {
             x: var1,
@@ -1724,6 +1770,25 @@ impl Game {
             let mut t = Teleporter::new(clock::new_random_seed());
             world.with_entity_mut(pid, |w, p| t.func_4107_a(w, p));
         }
+    }
+
+    /// The rest of `EntityPlayerSP.onLivingUpdate()` after `mc.usePortal()`
+    /// returned (EntityPlayerSP.java:63-87), on the new world:
+    /// `movementInput.updatePlayerMoveState(this)` on the
+    /// `MovementInputFromOptions` `changeWorld` just made (no key held,
+    /// Minecraft.java:1303), then
+    /// [`player_fns::sp_on_living_update_after_portal`].
+    fn finish_player_update_after_portal(&mut self) {
+        let (Some(pid), Some(world)) = (self.the_player, self.the_world.as_mut()) else {
+            return;
+        };
+        let mi = self.movement_input.update_player_move_state();
+        world.with_entity_mut(pid, |w, p| {
+            if let EntityKindData::PlayerSp(_, _, sp) = &mut p.kind {
+                sp.movement_input = mi;
+            }
+            player_fns::sp_on_living_update_after_portal(p, w);
+        });
     }
 
     /// `respawn(keepSpawn, dimension)`: a new player at the bed (if it is
@@ -1927,33 +1992,6 @@ enum WorldStage {
     Simulate,
 }
 
-/// Seeds what the simulation draws from a clock-seeded `Random` in vanilla
-/// and the world constructor did not already seed from its
-/// [`WorldEnvironment`] (module docs, "Seeding"): the `Math.random()`
-/// stream, `Item.itemRand`, the entity-`rand` and explosion seed and the
-/// container blocks' `Random`s. Not [`World::make_deterministic`]: that also
-/// restarts the entity and tick-entry counters, which the constructor's
-/// spawn search may already have used.
-pub fn seed_clock_randoms(w: &mut World) {
-    w.math_random = JavaRandom::new(clock::new_random_seed());
-    w.item_rand = JavaRandom::new(clock::new_random_seed());
-    w.entity_rand_seed = clock::new_random_seed();
-    w.block_statics
-        .seed_container_randoms(clock::new_random_seed());
-}
-
-/// How often the player's `Minecraft.usePortal` call was recorded (the
-/// simulation notes it where it would call the client,
-/// `EntityPlayerSP.onLivingUpdate`, EntityPlayerSP.java:59).
-fn portal_hits(world: &World) -> u64 {
-    world
-        .unimplemented_hits
-        .borrow()
-        .get("Minecraft.usePortal")
-        .copied()
-        .unwrap_or(0)
-}
-
 /// `inventory.getCurrentItem()` as the slot holding it.
 fn current_item_slot(p: &Entity) -> Option<usize> {
     let inv = &p.kind.player()?.inventory;
@@ -1982,44 +2020,6 @@ pub fn create_player(world: &mut World, session: &Session) -> Entity {
         sp.client_additions = true;
     }
     e
-}
-
-/// `new World(world, provider)` (World.java:103-143), the dimension-change
-/// constructor `mc-sim` does not have: a world on `handler` (the same save
-/// directory) for `provider`, with a copy of `old`'s `WorldInfo` and lock
-/// timestamp. Seeding it and carrying the Java statics over
-/// ([`World::adopt_statics`]) are the caller's.
-pub fn new_world_for_dimension(
-    old: &World,
-    handler: Box<dyn mc_sim::save::SaveHandler>,
-    provider: WorldProvider,
-) -> World {
-    let seed = old.world_info.random_seed;
-    let generator = provider.get_chunk_provider(seed);
-    let mut w = World::new(
-        handler,
-        &old.world_info.level_name.clone(),
-        provider,
-        seed,
-        generator,
-        Game::clock_environment(),
-    );
-    // src: World.java:134, :136 (lockTimestamp, new WorldInfo(var1.worldInfo))
-    w.lock_timestamp = old.lock_timestamp;
-    w.world_info = old.world_info.clone();
-    // src: World.java:141-142 (calculateInitialSkylight, func_27163_E) on the
-    // copied WorldInfo.
-    w.calculate_initial_skylight();
-    w.raining_strength = 0.0;
-    w.thundering_strength = 0.0;
-    if w.world_info.raining {
-        w.raining_strength = 1.0;
-        if w.world_info.thundering {
-            w.thundering_strength = 1.0;
-        }
-    }
-    w.is_new_world = false;
-    w
 }
 
 impl TerrainPreload {
@@ -2726,6 +2726,56 @@ mod tests {
         assert!(dir.0.join("saves/N/DIM-1/region").exists());
     }
 
+    /// The dev `use_portal` puts the player into the portal the teleporter
+    /// built in the nether (BlockPortal.onEntityCollidedWithBlock →
+    /// setInPortal every tick); with the cooldown run out, the player's own
+    /// update raises `usePortal` after 81 ticks (EntityPlayerSP.java:39-60),
+    /// the shell travels back, and the after-portal step runs on the
+    /// overworld before any further tick.
+    #[test]
+    fn standing_in_a_portal_travels_back() {
+        let dir = TempDir::new("portal_stand");
+        let mut g = game(&dir);
+        g.open_world("S", Some("13")).unwrap();
+        g.run_pending_to_completion();
+        g.use_portal(true);
+        assert_eq!(g.the_world.as_ref().unwrap().world_provider.world_type, -1);
+        // A new player's timeUntilPortal starts at 20 and standing in a
+        // portal keeps it at 10 (EntityPlayer.java:811-817): vanilla needs a
+        // step out and back in. As if the player had done so:
+        if let Some(d) = g.player_in_world_mut().and_then(|e| e.kind.player_mut()) {
+            d.time_until_portal = 0;
+        }
+        let mut ticks = 0;
+        let mut max_time = 0.0f32;
+        while g.the_world.as_ref().unwrap().world_provider.world_type == -1 && ticks < 200 {
+            tick(&mut g);
+            g.run_pending_to_completion();
+            ticks += 1;
+            if let Some(d) = g.player().and_then(|p| p.kind.player()) {
+                max_time = max_time.max(d.time_in_portal);
+            }
+        }
+        let p = g.player().unwrap();
+        let d = p.kind.player().unwrap();
+        assert_eq!(
+            g.the_world.as_ref().unwrap().world_provider.world_type,
+            0,
+            "max timeInPortal {max_time}"
+        );
+        assert_eq!(d.dimension, 0);
+        // The first tick's collision sets inPortal after that tick's timer
+        // check; 81 updates in the portal follow.
+        assert_eq!(ticks, 82);
+        // After the portal: inPortal cleared (:63), the cooldown 10 → 9,
+        // then the movement collides with the overworld portal the
+        // teleporter put the player in, and setInPortal puts the cooldown
+        // back to 10 without setting inPortal.
+        assert_eq!(d.time_until_portal, 10);
+        assert!(!d.in_portal);
+        assert_eq!(d.time_in_portal, 1.0);
+    }
+
     #[test]
     fn dying_in_the_nether_respawns_in_the_overworld() {
         let dir = TempDir::new("nether_death");
@@ -2794,6 +2844,28 @@ mod tests {
         // the copied WorldInfo (the old world's tick never ran).
         assert_eq!(w.get_world_time(), t0 + 1);
         assert!(g.resume_update_effects);
+        // The player's update stopped at usePortal and finished on the new
+        // world (EntityPlayerSP.java:63-87): inPortal cleared (it was still
+        // set when usePortal ran), the cooldown counted down from 10 and set
+        // back to 10 by the nether portal the movement touches (setInPortal,
+        // which leaves inPortal alone while the cooldown runs), and
+        // EntityPlayer.onLivingUpdate's movement after the teleporter's stop
+        // (gravity applied once).
+        let p = g.player().unwrap();
+        let d = p.kind.player().unwrap();
+        assert_eq!(d.dimension, -1);
+        assert!(!d.in_portal);
+        assert_eq!(d.time_until_portal, 10);
+        // src: EntityLiving.java:532-533 (motionY -= 0.08D; motionY *= 0.9800000190734863D)
+        assert_eq!(p.base.motion_y, (0.0 - 0.08) * 0.9800000190734863);
+        // The travel sound went out with its simulation-drawn pitch; the
+        // usePortal request was the shell's.
+        assert!(g.outbox.sounds.iter().any(|s| matches!(
+            s,
+            ClientSound::PlaySoundFx { name, volume, pitch }
+                if name == "portal.travel" && *volume == 1.0 && (0.8..1.2).contains(pitch)
+        )));
+        assert!(!g.portal_requested);
         assert!(g.system_time > 0);
         // respawn's portal (before the tick's world part) does not resume.
         g.resume_update_effects = false;

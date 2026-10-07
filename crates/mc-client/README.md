@@ -49,7 +49,7 @@ naming the path.
 | `screenshot` | `ScreenShotHelper` | F2 → `<data>/screenshots/yyyy-MM-dd_HH.mm.ss[_N].png` |
 | `import` | — (D5) | the import of a vanilla save |
 | `debug` | `GuiIngame`'s F3 block | the F3 text (`DebugText`, `DebugSources`) |
-| `events` | `IWorldAccess`, `SoundManager` call sites | `WorldEventMsg`, `ClientSound`, `ClientEvent` |
+| `events` | `IWorldAccess`, `SoundManager` call sites, `EntityPlayerSP`'s calls into `Minecraft` | `WorldEventMsg`, `ClientSound`, `ClientEvent` |
 | `script` | — | the scripted-input dev mode |
 | `jfmt`, `clock`, `paths` | JDK behaviour | `Float/Double.toString`, `parseFloat`/`parseInt`, `String.split`/`hashCode`; the clocks and `new Random()`'s seed; the default paths |
 
@@ -86,16 +86,28 @@ nether travel.
   perspective),
   `DebugText` / `DebugSources`, `JarAssets`, `Lang`, `ResourcesDir`,
   `PendingScreenshots`; state `AppState`.
-- `EntityPlayerSP` calls the simulation makes but cannot reach the client
-  with yet (each needs a simulation signal; until then they do not happen):
-  `addChatMessage` from `BlockBed` (`tile.bed.occupied`, `tile.bed.noSleep`,
-  BlockBed.java:63, :76), `onItemPickup`'s `EntityPickupFX`
-  (EntityPlayerSP.java:133-135), `displayGUIChest` / `Furnace` /
-  `Dispenser` / `displayWorkbenchGUI` / `displayGUIEditSign`
-  (EntityPlayerSP.java:113-131; only counted in `unimplemented_hits`, with
-  no position), the portal sounds `portal.trigger` / `portal.travel`
-  (EntityPlayerSP.java:49-56; the pitch draw happens in the simulation),
-  and the rest of the player's update after `usePortal` in the new world.
+- `EntityPlayerSP`'s calls into `Minecraft` reach the shell as
+  `mc_sim::world::client_requests::ClientRequest`s on
+  `World::client_requests` (WP-3.1b), collected with the world events
+  (`Game::collect_world_events`) and forwarded in call order:
+  `displayGUIChest` / `displayWorkbenchGUI` / `displayGUIFurnace` /
+  `displayGUIDispenser` / `displayGUIEditSign` as
+  `ClientEvent::DisplayGui(PlayerGui)` (3.6 opens the screen with
+  `Game::display_gui_screen`; the chest carries its `IInventory`, a double
+  chest's `InventoryLargeChest`, the furnace, dispenser and sign their tile
+  entity, the minecart chest its entity id), `addChatMessage` from
+  `BlockBed` (`tile.bed.occupied`, `tile.bed.noSleep`) as
+  `ClientEvent::ChatMessageTranslate`, `onItemPickup`'s `EntityPickupFX`
+  as `ClientEvent::PickupFx` (3.7; a copy of the picked entity as the
+  pickup left it, the player by id, `yOffs` -0.5), the inventory hint
+  `GuiAchievement.queueAchievementInformation(openInventory)` as
+  `ClientEvent::AchievementHint` (every player update while it is not
+  unlocked; 3.6), and the portal sounds `portal.trigger` /
+  `portal.travel` as `ClientSound::PlaySoundFx` (3.8; pitch drawn by the
+  simulation). `usePortal` is the shell's: the player's update stops
+  there, the shell changes the dimension after `updateEntities`, then
+  finishes the update on the new world
+  (`player::sp_on_living_update_after_portal`) and the rest of the tick.
 
 ## Scripted-input dev mode
 
@@ -123,7 +135,7 @@ Actions run in order, as many per frame as are due.
 | `look` | `yaw`, `pitch` | Sets the player's rotation absolutely (and its previous rotation, so nothing is interpolated). Yaw 0 faces south (+z), 90 west, ±180 north; pitch > 0 looks down |
 | `wait` | `ticks`, `frames`, `in_game` (any of them) | Waits that many game ticks / frames, and/or until a world is loaded with its player |
 | `screenshot` | `path` | Captures the window into a PNG (parent directories created); the script waits until it is written |
-| `dump` | `path` | Writes a JSON of the state: app state, `ticks_ran`, screen, focus, pause, third person, F3, the mouse-over, the world (dir, level name, seed, dimension, world time, loaded chunks, entities, spawn, rain) and the player (id, position, rotation, motion, on ground, health, dimension, hotbar slot, name) |
+| `dump` | `path` | Writes a JSON of the state: app state, `ticks_ran`, screen, focus, pause, third person, F3, the mouse-over, the world (dir, level name, seed, dimension, world time, loaded chunks, entities, spawn, rain) and the player (id, position, rotation, motion, on ground, health, dimension, hotbar slot, name, the portal state `in_portal` / `time_in_portal` / `time_until_portal`, `y_size`) |
 | `save` | — | `saveWorldIndirectly` (saves the world and the player now) |
 | `use_portal` | — | Dev: `Minecraft.usePortal()` at once |
 | `respawn` | — | Dev: `Minecraft.respawn(false, 0)` |
