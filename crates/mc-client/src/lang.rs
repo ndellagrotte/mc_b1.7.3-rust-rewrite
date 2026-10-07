@@ -8,23 +8,23 @@
 
 use std::collections::BTreeMap;
 
-/// The first language file (StringTranslate.java:10).
+/// The first language file (StringTranslate.java:12).
 pub const EN_US_LANG: &str = "/lang/en_US.lang";
-/// The second, loaded over the first (StringTranslate.java:11).
+/// The second, loaded over the first (StringTranslate.java:13).
 pub const STATS_US_LANG: &str = "/lang/stats_US.lang";
 
 /// `StringTranslate`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StringTranslate {
     /// `translateTable`.
-    // src: StringTranslate.java:6
+    // src: StringTranslate.java:8
     pub translate_table: BTreeMap<String, String>,
 }
 
 impl StringTranslate {
     /// The private constructor's two `Properties.load` calls, on the bytes
     /// of `/lang/en_US.lang` and `/lang/stats_US.lang`.
-    // src: StringTranslate.java:8-16
+    // src: StringTranslate.java:10-18
     pub fn parse(en_us: &[u8], stats_us: &[u8]) -> Self {
         let mut t = StringTranslate::default();
         parse_properties(en_us, &mut t.translate_table);
@@ -33,7 +33,7 @@ impl StringTranslate {
     }
 
     /// `translateKey(key)`: the value, or the key itself.
-    // src: StringTranslate.java:22-24
+    // src: StringTranslate.java:24-26
     pub fn translate_key(&self, var1: &str) -> String {
         self.translate_table
             .get(var1)
@@ -44,13 +44,13 @@ impl StringTranslate {
     /// `translateKeyFormat(key, args)`: `String.format` of the value (or the
     /// key) with `args`, for the specifiers the lang files use: `%s`,
     /// `%d`, `%n$s`, `%n$d` and `%%`.
-    // src: StringTranslate.java:26-29
+    // src: StringTranslate.java:28-31
     pub fn translate_key_format(&self, var1: &str, var2: &[String]) -> String {
         java_format(&self.translate_key(var1), var2)
     }
 
     /// `translateNamedKey(key)`: the value of `key + ".name"`, or `""`.
-    // src: StringTranslate.java:31-33
+    // src: StringTranslate.java:33-35
     pub fn translate_named_key(&self, var1: &str) -> String {
         self.translate_table
             .get(&format!("{var1}.name"))

@@ -144,10 +144,10 @@ impl InputQueue {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MouseHelper {
     /// `deltaX`.
-    // src: MouseHelper.java:10
+    // src: MouseHelper.java:12
     pub delta_x: i32,
     /// `deltaY` (up positive).
-    // src: MouseHelper.java:11
+    // src: MouseHelper.java:13
     pub delta_y: i32,
     /// `Mouse.setGrabbed`'s state, which [`apply_cursor_grab`] mirrors onto
     /// the window. `field_1115_e` (10, never read) and the blank `Cursor`
@@ -160,7 +160,7 @@ pub struct MouseHelper {
 
 impl MouseHelper {
     /// `grabMouseCursor()`.
-    // src: MouseHelper.java:29-33
+    // src: MouseHelper.java:31-35
     pub fn grab_mouse_cursor(&mut self) {
         self.grabbed = true;
         self.delta_x = 0;
@@ -168,7 +168,7 @@ impl MouseHelper {
     }
 
     /// `ungrabMouseCursor()`.
-    // src: MouseHelper.java:35-38
+    // src: MouseHelper.java:37-40
     pub fn ungrab_mouse_cursor(&mut self) {
         self.recenter = true;
         self.grabbed = false;
@@ -176,7 +176,7 @@ impl MouseHelper {
 
     /// `mouseXYChange()`: takes the motion since the last call. LWJGL's
     /// `getDX`/`getDY` are whole pixels; the fraction is carried.
-    // src: MouseHelper.java:40-43
+    // src: MouseHelper.java:42-45
     pub fn mouse_xy_change(&mut self, q: &mut InputQueue) {
         self.delta_x = q.pending_dx.trunc() as i32;
         self.delta_y = q.pending_dy.trunc() as i32;

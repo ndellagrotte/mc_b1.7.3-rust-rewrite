@@ -222,7 +222,7 @@ mixed-case originals).
 | `LoadingScreenRenderer.field_1004_a` (private) | `mc-client` `loading::LoadingScreenRenderer::field_1004_a` | The loading screen's second line: set by `displayLoadingString`, drawn under the title (LoadingScreenRenderer.java:46-57, :177) |
 | `LoadingScreenRenderer.field_1005_e` (private) | `LoadingScreenRenderer::field_1005_e` | Set by `displayProgressMessage`, cleared by `printText`; while clear, stopping the game during loading throws `MinecraftError` (LoadingScreenRenderer.java:18-26, :94-97) |
 | `LoadingScreenRenderer.field_1006_d` (private) | — (not ported) | The last repaint time, which limits repaints to one per 20 ms (LoadingScreenRenderer.java:11, :130-132); the port's loading screen is drawn every frame |
-| `MouseHelper.field_1115_e` (private) | — (not ported) | `10`, never read (MouseHelper.java:12) |
+| `MouseHelper.field_1115_e` (private) | — (not ported) | `10`, never read (MouseHelper.java:14) |
 | `PlayerController.func_717_a(World)`, `func_6473_b(EntityPlayer)` | — (not ported) | Empty (PlayerController.java:13-14, :72-73; `PlayerControllerSP.func_717_a` only calls super), called by `changeWorld` and `respawn` (Minecraft.java:1281, :1312, :1470) |
 | `SoundManager.func_338_a(EntityLiving, float)` | `mc-client` `events::ClientSound::Listener` (WP-3.8 applies it) | Moves the sound listener to the view entity's interpolated position and yaw, every frame (SoundManager.java:112-131, Minecraft.java:550) |
 

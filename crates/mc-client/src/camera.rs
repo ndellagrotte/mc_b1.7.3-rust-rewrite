@@ -29,8 +29,12 @@
 //! Not here (and where): the fog colour (`updateFogColor`, `setupFog`),
 //! clouds, rain and snow, `hasCloudFog` (WP-3.4); `itemRenderer`,
 //! `renderHand`, `addRainParticles` (WP-3.7, 3.4); anaglyph 3D's two passes
-//! and colour masks (rendering; the eye offsets are transcribed for it in
-//! [`setup_camera_transform`]'s `anaglyph_field`).
+//! and colour masks (rendering, WP-3.3; both eye offsets are transcribed for
+//! it in [`setup_camera_transform`]'s `anaglyph_field`: the modelview shift
+//! in [`CameraSetup::pre`], the projection shift in
+//! [`CameraSetup::projection_shift_x`]). The shell's single-pass camera
+//! passes no field and gets neither, since vanilla never draws one
+//! displaced eye alone.
 
 use bevy::camera::CameraProjection;
 use bevy::math::{DVec3, Mat4, Vec3, Vec3A};
@@ -286,7 +290,11 @@ pub struct CameraSetup {
     pub near: f32,
     /// The far plane (`farPlaneDistance * 2`).
     pub far: f32,
-    /// `G1`: hurt and bobbing.
+    /// The anaglyph eye's `glTranslatef(-(field * 2 - 1) * 0.07, 0, 0)`
+    /// applied to the projection before `gluPerspective` (clip space =
+    /// `translate(shift, 0, 0) · perspective`); 0 without an anaglyph pass.
+    pub projection_shift_x: f32,
+    /// `G1`: the anaglyph eye's modelview shift, hurt and bobbing.
     pub pre: Mat4,
     /// `P`: the portal wobble (identity outside a portal).
     pub portal: Mat4,
@@ -451,6 +459,8 @@ pub fn orient_camera(
 /// modelview, split as in the module docs. `time_in_portal` is the
 /// player's interpolated `prevTimeInPortal + (timeInPortal -
 /// prevTimeInPortal) * partial` (`mc.thePlayer`, not the view entity).
+/// `anaglyph_field` is `renderWorld`'s pass (0 or 1) when anaglyph 3D draws
+/// two eyes, `None` for a single pass (module docs, "Hooks").
 // src: EntityRenderer.java:261-299
 #[allow(clippy::too_many_arguments)]
 pub fn setup_camera_transform(
@@ -462,15 +472,21 @@ pub fn setup_camera_transform(
     display_height: i32,
     time_in_portal: f32,
     var1: f32,
-    anaglyph_field: i32,
+    anaglyph_field: Option<i32>,
 ) -> CameraSetup {
     cam.far_plane_distance = (256 >> s.render_distance) as f32;
-    // Projection: the anaglyph eye shift and the zoom are folded into the
-    // perspective by the renderer; zoom is always 1 in play.
+    // Projection: the zoom (cameraZoom, always 1 in play) is not ported.
+    let var3 = 0.07f32;
+    let mut projection_shift_x = 0.0;
     let fov = cam.get_fov_modifier(world, view, var1);
     let mut pre = GlMatrix::default();
-    if s.anaglyph {
-        pre.translate((anaglyph_field * 2 - 1) as f32 * 0.1, 0.0, 0.0);
+    if s.anaglyph
+        && let Some(var2) = anaglyph_field
+    {
+        // src: EntityRenderer.java:266-268
+        projection_shift_x = (-(var2 * 2 - 1)) as f32 * var3;
+        // src: EntityRenderer.java:280-282
+        pre.translate((var2 * 2 - 1) as f32 * 0.1, 0.0, 0.0);
     }
     hurt_camera_effect(&mut pre, view, var1);
     if s.view_bobbing {
@@ -493,6 +509,7 @@ pub fn setup_camera_transform(
         aspect: display_width as f32 / display_height as f32,
         near: 0.05,
         far: cam.far_plane_distance * 2.0,
+        projection_shift_x,
         pre: pre.0,
         portal: portal.0,
         orient: orient.0,
@@ -715,6 +732,7 @@ mod tests {
             aspect: 1.0,
             near: 0.05,
             far: 512.0,
+            projection_shift_x: 0.0,
             pre: Mat4::IDENTITY,
             portal: Mat4::IDENTITY,
             orient: orient.0,

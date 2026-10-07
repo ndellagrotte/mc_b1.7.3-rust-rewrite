@@ -63,7 +63,10 @@ nether travel.
 - `NonSend<Game>` / `NonSendMut<Game>` is `Minecraft`: `the_world`,
   `the_player`, `player()`, `game_settings`, `current_screen`,
   `loading_screen`, `object_mouse_over`, `timer`, `entity_renderer`,
-  `input` (the LWJGL buffers), `chunks_updated`, `frame_times`/`tick_times`.
+  `input` (the LWJGL buffers), `chunks_updated`, `frame_times`/`tick_times`,
+  `damage_partial_time`, and `is_gui_enabled()` /
+  `is_fancy_graphics_enabled()` / `is_ambient_occlusion_enabled()` /
+  `is_debug_info_enabled()` (the `Minecraft` statics).
 - Where `runTick` calls into your part, add systems to the matching schedule
   (they run inside the tick, with `NonSendMut<Game>`):
   `RunTickHook::IngameGuiUpdateTick` (3.6), `UpdateDynamicTextures` (3.2),
@@ -76,9 +79,23 @@ nether travel.
   `ClientEvent` (world changed, block-hit particles, chat lines, screens
   opened/closed/resized, settings side effects, equipped-item resets).
 - Resources: `FrameView` (partial ticks, interpolated eye and rotation,
-  mouse-over), `CameraState` (the full camera setup, eye in f64),
+  mouse-over, the crack overlay's `damage_partial_time` from
+  `playerController.setPartialTime`), `CameraState` (the full camera setup,
+  eye in f64; anaglyph's two passes call `camera::setup_camera_transform`
+  with `Some(field)` and apply `projection_shift_x` before the
+  perspective),
   `DebugText` / `DebugSources`, `JarAssets`, `Lang`, `ResourcesDir`,
   `PendingScreenshots`; state `AppState`.
+- `EntityPlayerSP` calls the simulation makes but cannot reach the client
+  with yet (each needs a simulation signal; until then they do not happen):
+  `addChatMessage` from `BlockBed` (`tile.bed.occupied`, `tile.bed.noSleep`,
+  BlockBed.java:63, :76), `onItemPickup`'s `EntityPickupFX`
+  (EntityPlayerSP.java:133-135), `displayGUIChest` / `Furnace` /
+  `Dispenser` / `displayWorkbenchGUI` / `displayGUIEditSign`
+  (EntityPlayerSP.java:113-131; only counted in `unimplemented_hits`, with
+  no position), the portal sounds `portal.trigger` / `portal.travel`
+  (EntityPlayerSP.java:49-56; the pitch draw happens in the simulation),
+  and the rest of the player's update after `usePortal` in the new world.
 
 ## Scripted-input dev mode
 

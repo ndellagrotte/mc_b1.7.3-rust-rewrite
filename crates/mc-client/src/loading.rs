@@ -27,7 +27,7 @@ pub trait IProgressUpdate {
 }
 
 /// `LoadingScreenRenderer`'s state.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadingScreenRenderer {
     /// `field_1004_a`: the second line (`displayLoadingString`'s text;
     /// docs/mappings.md).
@@ -44,6 +44,19 @@ pub struct LoadingScreenRenderer {
     /// The last `setLoadingProgress(int)` value, -1 for none (the bar is
     /// drawn only for `>= 0`, LoadingScreenRenderer.java:155).
     pub progress: i32,
+}
+
+impl Default for LoadingScreenRenderer {
+    /// Empty lines, no bar (`progress` -1 until the first
+    /// `setLoadingProgress`).
+    fn default() -> Self {
+        LoadingScreenRenderer {
+            field_1004_a: String::new(),
+            currently_displayed_text: String::new(),
+            field_1005_e: false,
+            progress: -1,
+        }
+    }
 }
 
 impl LoadingScreenRenderer {
@@ -90,6 +103,7 @@ mod tests {
     #[test]
     fn messages() {
         let mut l = LoadingScreenRenderer::default();
+        assert_eq!(l.progress, -1, "no bar before the first progress");
         l.print_text("Generating level");
         l.display_loading_string("Building terrain");
         assert_eq!(l.currently_displayed_text, "Generating level");

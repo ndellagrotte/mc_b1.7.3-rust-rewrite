@@ -210,7 +210,7 @@ impl JarAssets {
     /// `StringTranslate`'s table from `/lang/en_US.lang` and
     /// `/lang/stats_US.lang` (a missing file loads nothing, as
     /// `Properties.load` of a null stream throws and is printed).
-    // src: StringTranslate.java:8-16
+    // src: StringTranslate.java:10-18
     pub fn string_translate(&self) -> StringTranslate {
         StringTranslate::parse(
             self.get(EN_US_LANG).unwrap_or_default(),

@@ -54,7 +54,16 @@
 //! `respawn` do after it runs when the last chunk is in (the "tail").
 //! Vanilla returns into the `runTick` that started the change (the GUI's
 //! input handling, or the player's update for a portal) and finishes it on
-//! the new world; here the rest of that tick is skipped instead.
+//! the new world. For a portal the tail runs that rest on the new world
+//! (`setAllowedMobSpawns`, `tick`, `randomDisplayUpdates`, then
+//! [`RunTickHook::UpdateEffects`]), so its time matches vanilla's; the
+//! rest of the player's own update (`EntityPlayerSP.onLivingUpdate` after
+//! `usePortal`: `ySize`, `pushOutOfBlocks`, the movement step in the new
+//! world) is not resumed, since the simulation finished it in the old
+//! world (it needs a simulation signal; reported). A GUI-started change
+//! skips the rest of its tick (the screen was the tick's last input
+//! consumer). `systemTime` is set to the time the load ends, as the
+//! `runTick` tail does in vanilla (Minecraft.java:1177).
 //!
 //! # The player
 //!
@@ -197,14 +206,28 @@ pub struct TerrainPreload {
     var4: i32,
 }
 
+/// `usePortal`'s remainder after `changeWorld` (module docs, "Loading").
+#[derive(Clone, Copy, Debug)]
+struct PortalTail {
+    /// The scaled `var1` (x).
+    x: f64,
+    /// The scaled `var3` (z).
+    z: f64,
+    /// The portal fired inside `runTick`'s `updateEntities`
+    /// (EntityPlayerSP.java:59): the rest of that tick runs on the new
+    /// world after the tail ([`Game::run_tick_world_rest`]). False for
+    /// `respawn`'s portal, which runs before the tick's world part.
+    resume_tick: bool,
+}
+
 /// What runs after the preload (module docs, "Loading").
 #[derive(Debug)]
 enum LoadTail {
     /// `changeWorld`'s remainder with the player it was given (the
-    /// portal's), then `usePortal`'s remainder at `(x, z)`.
+    /// portal's), then `usePortal`'s remainder.
     ChangeWorld {
         player: Option<Box<Entity>>,
-        portal: Option<(f64, f64)>,
+        portal: Option<PortalTail>,
     },
     /// `respawn`'s remainder (closing the game-over screen).
     Respawn,
@@ -376,6 +399,15 @@ pub struct Game {
     pub exit_requested: bool,
     /// The last error a world change hit (shown by WP-3.6; logged here).
     pub last_error: Option<String>,
+    /// `ingameGUI.damageGuiPartialTime` = `renderGlobal.damagePartialTime`:
+    /// the crack overlay's interpolated progress, set every frame by
+    /// `playerController.setPartialTime(renderPartialTicks)` while the world
+    /// is drawn (Minecraft.java:564-567; PlayerControllerSP.java:97-107) and
+    /// kept otherwise. Published in [`FrameView`].
+    pub damage_partial_time: f32,
+    /// A portal load that resumed its tick finished: the frame driver runs
+    /// [`RunTickHook::UpdateEffects`] for that tick (Minecraft.java:1172-1174).
+    resume_update_effects: bool,
 }
 
 impl Game {
@@ -452,6 +484,8 @@ impl Game {
             screenshot_requested: false,
             exit_requested: false,
             last_error: None,
+            damage_partial_time: 0.0,
+            resume_update_effects: false,
         })
     }
 
@@ -461,6 +495,30 @@ impl Game {
     // src: Minecraft.java:1187-1189
     pub fn is_multiplayer_world(&self) -> bool {
         self.the_world.as_ref().is_some_and(|w| w.multiplayer_world)
+    }
+
+    /// `Minecraft.isGuiEnabled()`: `!gameSettings.hideGUI`.
+    // src: Minecraft.java:1531-1533
+    pub fn is_gui_enabled(&self) -> bool {
+        !self.game_settings.hide_gui
+    }
+
+    /// `Minecraft.isFancyGraphicsEnabled()`.
+    // src: Minecraft.java:1535-1537
+    pub fn is_fancy_graphics_enabled(&self) -> bool {
+        self.game_settings.fancy_graphics
+    }
+
+    /// `Minecraft.isAmbientOcclusionEnabled()`.
+    // src: Minecraft.java:1539-1541
+    pub fn is_ambient_occlusion_enabled(&self) -> bool {
+        self.game_settings.ambient_occlusion
+    }
+
+    /// `Minecraft.isDebugInfoEnabled()`.
+    // src: Minecraft.java:1543-1545
+    pub fn is_debug_info_enabled(&self) -> bool {
+        self.game_settings.show_debug_info
     }
 
     /// `thePlayer`: in the world, else the detached copy.
@@ -949,7 +1007,8 @@ impl Game {
     /// every buffered event is consumed; `GuiScreen.handleKeyboardInput` /
     /// `keyTyped`'s F11 and Escape (close and refocus), and
     /// `GuiContainer.keyTyped`'s Escape or inventory key
-    /// (`thePlayer.closeScreen()`).
+    /// (`thePlayer.closeScreen()`); none for the screens whose `keyTyped`
+    /// is empty.
     // src: GuiScreen.java:31-37, :90-126; GuiContainer.java:155-160
     pub fn default_screen_input(&mut self) {
         let keyboard: Vec<InputEvent> = self.input.keyboard.drain(..).collect();
@@ -966,6 +1025,20 @@ impl Game {
             };
             if key == keys::KEY_F11 {
                 self.toggle_fullscreen();
+                continue;
+            }
+            // GuiMainMenu, GuiGameOver, GuiErrorScreen and GuiUnused override
+            // keyTyped with an empty body (GuiMainMenu.java:41-42,
+            // GuiGameOver.java:16-17, GuiErrorScreen.java:16-17,
+            // GuiUnused.java:17-18): no Escape. F11 above is
+            // handleKeyboardInput's, before keyTyped.
+            if matches!(
+                s.kind,
+                ScreenKind::MainMenu
+                    | ScreenKind::GameOver
+                    | ScreenKind::ErrorScreen
+                    | ScreenKind::Unused
+            ) {
                 continue;
             }
             let container = s.kind == ScreenKind::Inventory;
@@ -1192,10 +1265,27 @@ impl Game {
                 }
             }
             WorldStage::Simulate => {
-                let Some(world) = self.the_world.as_mut() else {
+                if self.the_world.is_none() {
                     return;
-                };
+                }
                 if !paused {
+                    // EntityPlayerSP.onLivingUpdate's `if (inPortal &&
+                    // mc.currentScreen != null) mc.displayGuiScreen(null)`
+                    // (EntityPlayerSP.java:45-47), left to the client by the
+                    // simulation (player.rs). inPortal is set by the previous
+                    // tick's collision and read first thing in the player's
+                    // update, so testing it before updateEntities sees the
+                    // same value; the screen closes before the other
+                    // entities' updates instead of in the middle of them.
+                    let in_portal = self
+                        .the_player
+                        .and_then(|pid| self.the_world.as_ref()?.entity(pid))
+                        .and_then(|p| p.kind.player())
+                        .is_some_and(|d| d.in_portal);
+                    if in_portal && self.current_screen.is_some() {
+                        self.display_gui_screen(None);
+                    }
+                    let world = self.the_world.as_mut().expect("checked");
                     if world.field_27172_i > 0 {
                         world.field_27172_i -= 1;
                     }
@@ -1225,46 +1315,55 @@ impl Game {
                     if portal_hits(world) > portal_before {
                         // Minecraft.usePortal(), reached from
                         // EntityPlayerSP.onLivingUpdate (EntityPlayerSP.java:59).
-                        self.use_portal(false);
+                        // The rest of this tick runs on the new world when
+                        // its terrain is in (Game::finish_load).
+                        self.use_portal_impl(false, true);
                         return;
                     }
                 }
-                let Some(world) = self.the_world.as_mut() else {
-                    return;
-                };
-                if !paused || world.multiplayer_world {
-                    world.set_allowed_mob_spawns(self.game_settings.difficulty > 0, true);
-                    world.tick();
-                    if let Some(e) = world.session_lock_error.take() {
-                        // MinecraftException (Minecraft.java:540-544).
-                        warn!("{e}");
-                        self.the_world = None;
-                        self.change_world1(None);
-                        self.display_gui_screen(Some(GuiScreen::new(ScreenKind::ConflictWarning)));
-                        return;
-                    }
-                }
-                if !paused
-                    && let Some(world) = self.the_world.as_mut()
-                    && let Some(p) = self.the_player.and_then(|pid| {
-                        world
-                            .entity(pid)
-                            .map(|e| (e.base.pos_x, e.base.pos_y, e.base.pos_z))
-                            .or_else(|| {
-                                self.detached_player
-                                    .as_ref()
-                                    .map(|e| (e.base.pos_x, e.base.pos_y, e.base.pos_z))
-                            })
-                    })
-                {
-                    world.random_display_updates(
-                        floor_double(p.0),
-                        floor_double(p.1),
-                        floor_double(p.2),
-                    );
-                }
+                self.run_tick_world_rest(paused);
             }
         }
+    }
+
+    /// `runTick()` after `updateEntities`: `setAllowedMobSpawns`, `tick`,
+    /// `randomDisplayUpdates` on `theWorld`. Returns whether `theWorld` is
+    /// still there (the effect-renderer hook runs next when not paused).
+    // src: Minecraft.java:1163-1170
+    fn run_tick_world_rest(&mut self, paused: bool) -> bool {
+        let Some(world) = self.the_world.as_mut() else {
+            return false;
+        };
+        if !paused || world.multiplayer_world {
+            world.set_allowed_mob_spawns(self.game_settings.difficulty > 0, true);
+            world.tick();
+            if let Some(e) = world.session_lock_error.take() {
+                // MinecraftException (Minecraft.java:540-544).
+                warn!("{e}");
+                self.the_world = None;
+                self.change_world1(None);
+                self.display_gui_screen(Some(GuiScreen::new(ScreenKind::ConflictWarning)));
+                return false;
+            }
+        }
+        let Some(world) = self.the_world.as_mut() else {
+            return false;
+        };
+        if !paused
+            && let Some(p) = self.the_player.and_then(|pid| {
+                world
+                    .entity(pid)
+                    .map(|e| (e.base.pos_x, e.base.pos_y, e.base.pos_z))
+                    .or_else(|| {
+                        self.detached_player
+                            .as_ref()
+                            .map(|e| (e.base.pos_x, e.base.pos_y, e.base.pos_z))
+                    })
+            })
+        {
+            world.random_display_updates(floor_double(p.0), floor_double(p.1), floor_double(p.2));
+        }
+        true
     }
 
     // ---- the world lifecycle -------------------------------------------------------
@@ -1325,7 +1424,7 @@ impl Game {
         var1: Option<World>,
         var2: &str,
         var3: Option<Box<Entity>>,
-        portal: Option<(f64, f64)>,
+        portal: Option<PortalTail>,
         sync: bool,
     ) {
         // statFileWriter.func_27175_b(): empty (StatFileWriter.java:187-188).
@@ -1415,8 +1514,17 @@ impl Game {
         match tail {
             LoadTail::ChangeWorld { player, portal } => {
                 self.change_world_tail(player);
-                if let Some((x, z)) = portal {
-                    self.use_portal_tail(x, z);
+                if let Some(t) = portal {
+                    self.use_portal_tail(t.x, t.z);
+                    if t.resume_tick {
+                        // usePortal returns into EntityPlayerSP.onLivingUpdate
+                        // and runTick goes on with theWorld = the new world
+                        // (Minecraft.java:1163-1174). The tick was not paused
+                        // (updateEntities ran).
+                        if self.run_tick_world_rest(false) {
+                            self.resume_update_effects = true;
+                        }
+                    }
                 }
             }
             LoadTail::Respawn => {
@@ -1430,7 +1538,11 @@ impl Game {
                 }
             }
         }
-        self.system_time = 0; // src: Minecraft.java:1336
+        // changeWorld ends with `systemTime = 0` (Minecraft.java:1336), but
+        // the blocking load returns into the runTick that started it, whose
+        // last statement overwrites it (Minecraft.java:1177) before any
+        // mouse loop reads it; the load finishes outside runTick here.
+        self.system_time = clock::current_time_millis();
     }
 
     /// `changeWorld`'s remainder after `func_6255_d`.
@@ -1478,6 +1590,13 @@ impl Game {
     /// the teleporter there. `sync` loads the new terrain at once.
     // src: Minecraft.java:1213-1258
     pub fn use_portal(&mut self, sync: bool) {
+        self.use_portal_impl(sync, false);
+    }
+
+    /// [`Game::use_portal`]; `resume_tick` when called from the tick's
+    /// `updateEntities` ([`PortalTail::resume_tick`]).
+    // src: Minecraft.java:1213-1258
+    fn use_portal_impl(&mut self, sync: bool, resume_tick: bool) {
         info!("Toggling dimension!!");
         let (Some(pid), Some(world)) = (self.the_player, self.the_world.as_mut()) else {
             return;
@@ -1581,7 +1700,12 @@ impl Game {
         var7.adopt_statics(&mut old);
         var7.item_rand = old.item_rand.clone();
         drop(old);
-        self.change_world(Some(var7), msg, Some(player), Some((var1, var3)), sync);
+        let tail = PortalTail {
+            x: var1,
+            z: var3,
+            resume_tick,
+        };
+        self.change_world(Some(var7), msg, Some(player), Some(tail), sync);
     }
 
     /// `usePortal`'s remainder after `changeWorld`.
@@ -1778,7 +1902,7 @@ impl Game {
         let cam = &mut self.entity_renderer;
         let world = self.the_world.as_mut().expect("checked");
         let mut setup = world.with_entity_mut(view_id, |wd, v| {
-            camera::setup_camera_transform(cam, wd, v, s, w, h, portal, var1, 0)
+            camera::setup_camera_transform(cam, wd, v, s, w, h, portal, var1, None)
         });
         if setup.is_none()
             && let Some(v) = self
@@ -1787,7 +1911,7 @@ impl Game {
                 .filter(|p| p.base.entity_id == view_id)
         {
             setup = Some(camera::setup_camera_transform(
-                cam, world, v, s, w, h, portal, var1, 0,
+                cam, world, v, s, w, h, portal, var1, None,
             ));
         }
         camera_state.setup = setup;
@@ -2039,8 +2163,11 @@ impl Game {
             self.game_settings.third_person_view = false;
         }
         if !self.skip_render_world {
-            // playerController.setPartialTime(partial): the controller's
-            // damage_partial_time is read by the renderer (WP-3.7).
+            // src: Minecraft.java:564-567
+            if let Some(c) = self.player_controller.as_ref() {
+                // playerController.setPartialTime(renderPartialTicks)
+                self.damage_partial_time = c.damage_partial_time(partial);
+            }
             self.update_camera_and_render(partial, camera_state);
         }
         if !self.display_active && self.fullscreen {
@@ -2184,15 +2311,23 @@ pub fn game_frame(bw: &mut bevy::ecs::world::World) {
         bw.write_message(AppExit::Success);
         return;
     }
-    let loading = {
+    let (loading, effects) = {
         let mut g = bw.non_send_mut::<Game>();
         if g.pending.is_some() {
             // The loading screen's frames: no timer, no ticks (vanilla's
             // loop is blocked in func_6255_d).
             g.step_pending(25);
         }
-        g.pending.is_some()
+        (
+            g.pending.is_some(),
+            std::mem::take(&mut g.resume_update_effects),
+        )
     };
+    if effects {
+        // The end of a portal tick resumed by Game::finish_load:
+        // effectRenderer.updateEffects() (Minecraft.java:1172-1174).
+        run_hook(bw, RunTickHook::UpdateEffects);
+    }
     if loading {
         flush_outbox(bw);
         return;
@@ -2345,6 +2480,9 @@ pub struct FrameView {
     pub object_mouse_over: Option<MovingObjectPosition>,
     /// `ticksRan`.
     pub ticks_ran: i32,
+    /// `ingameGUI.damageGuiPartialTime` / `renderGlobal.damagePartialTime`
+    /// ([`Game::damage_partial_time`]).
+    pub damage_partial_time: f32,
 }
 
 /// Fills [`FrameView`].
@@ -2365,6 +2503,7 @@ pub fn publish_frame_view(game: NonSend<Game>, mut view: ResMut<FrameView>) {
     });
     view.object_mouse_over = game.object_mouse_over;
     view.ticks_ran = game.ticks_ran;
+    view.damage_partial_time = game.damage_partial_time;
 }
 
 #[cfg(test)]
@@ -2618,6 +2757,86 @@ mod tests {
         let p = g.player().unwrap();
         assert_eq!(p.kind.living().unwrap().health, 20);
         assert_eq!(p.kind.player().unwrap().dimension, 0);
+    }
+
+    #[test]
+    fn portal_tick_closes_the_screen_and_finishes_on_the_new_world() {
+        let dir = TempDir::new("portal_tick");
+        let mut g = game(&dir);
+        g.open_world("PT", Some("19")).unwrap();
+        g.run_pending_to_completion();
+        // A load leaves systemTime at the time it ended, not 0
+        // (Minecraft.java:1177 follows the blocking load in vanilla).
+        assert!(clock::current_time_millis() - g.system_time < 5_000);
+        tick(&mut g);
+        // The inventory (does not pause) is open while in a portal whose
+        // timer fires this tick.
+        g.display_gui_screen(Some(GuiScreen::new(ScreenKind::Inventory)));
+        g.outbox = Outbox::default();
+        if let Some(p) = g.player_in_world_mut().and_then(|e| e.kind.player_mut()) {
+            p.in_portal = true;
+            p.time_in_portal = 0.99;
+        }
+        let t0 = g.the_world.as_ref().unwrap().get_world_time();
+        tick(&mut g);
+        // EntityPlayerSP.java:45-47: the screen was closed (onGuiClosed).
+        assert!(g.current_screen.is_none());
+        assert!(g.outbox.events.iter().any(|e| matches!(
+            e,
+            ClientEvent::ScreenClosed(s) if s.kind == ScreenKind::Inventory
+        )));
+        assert!(g.pending.is_some());
+        g.system_time = 0;
+        g.run_pending_to_completion();
+        let w = g.the_world.as_ref().unwrap();
+        assert_eq!(w.world_provider.world_type, -1);
+        // The rest of the portal tick ran on the new world: one tick() on
+        // the copied WorldInfo (the old world's tick never ran).
+        assert_eq!(w.get_world_time(), t0 + 1);
+        assert!(g.resume_update_effects);
+        assert!(g.system_time > 0);
+        // respawn's portal (before the tick's world part) does not resume.
+        g.resume_update_effects = false;
+        let t1 = g.the_world.as_ref().unwrap().get_world_time();
+        g.use_portal(true);
+        assert_eq!(g.the_world.as_ref().unwrap().get_world_time(), t1);
+        assert!(!g.resume_update_effects);
+    }
+
+    #[test]
+    fn escape_does_nothing_where_key_typed_is_empty() {
+        let dir = TempDir::new("escape_empty");
+        let mut g = game(&dir);
+        // No world: displayGuiScreen(null) opens the main menu.
+        g.display_gui_screen(None);
+        assert_eq!(
+            g.current_screen.as_ref().map(|s| s.kind.clone()),
+            Some(ScreenKind::MainMenu)
+        );
+        for kind in [
+            ScreenKind::MainMenu,
+            ScreenKind::GameOver,
+            ScreenKind::ErrorScreen,
+        ] {
+            g.display_gui_screen(Some(GuiScreen::new(kind.clone())));
+            g.outbox = Outbox::default();
+            g.input.push_key(keys::KEY_ESCAPE, true, '\0');
+            g.default_screen_input();
+            assert_eq!(
+                g.current_screen.as_ref().map(|s| s.kind.clone()),
+                Some(kind)
+            );
+            assert!(g.outbox.events.is_empty(), "{:?}", g.outbox.events);
+        }
+        // The pause menu's Escape (GuiScreen.keyTyped) still closes it.
+        g.display_gui_screen(Some(GuiScreen::new(ScreenKind::IngameMenu)));
+        g.input.push_key(keys::KEY_ESCAPE, true, '\0');
+        g.default_screen_input();
+        assert_eq!(
+            g.current_screen.as_ref().map(|s| s.kind.clone()),
+            Some(ScreenKind::MainMenu),
+            "no world: closing opens the main menu"
+        );
     }
 
     #[test]
