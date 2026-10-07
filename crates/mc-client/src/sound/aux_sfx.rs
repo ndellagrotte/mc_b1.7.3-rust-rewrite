@@ -248,7 +248,7 @@ mod tests {
                 z: -3,
             })
         };
-        // record13 = 256 + 2000, recordCat = 256 + 2001 (Item.java:118-119)
+        // record13 = 256 + 2000, recordCat = 256 + 2001 (Item.java:378-379)
         assert_eq!(run(1005, 2256), rec(Some("13")));
         assert_eq!(run(1005, 2257), rec(Some("cat")));
         // BlockJukeBox ejecting passes 0 (BlockJukeBox.java:35)

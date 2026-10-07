@@ -44,6 +44,10 @@ use bevy_kira_audio::{
     Audio, AudioControl, AudioInstance, AudioPlugin, AudioSource, AudioSystemSet, AudioTween,
     PlaybackState,
 };
+use kira::sound::FromFileError;
+use kira::sound::PlaybackState as KiraState;
+use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
+use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
 use mc_core::JavaRandom;
 use mc_sim::world::events::WorldEvent;
 
@@ -677,6 +681,7 @@ impl Plugin for SoundPlugin {
         m.log = std::env::var_os("MC_SOUND_LOG").is_some_and(|v| v == "1");
         app.insert_resource(m)
             .init_resource::<KiraBackend>()
+            .insert_non_send(StreamOutput::default())
             .add_message::<RecordPlayingMessage>()
             .add_systems(Startup, sound_startup)
             .add_systems(Update, process_sound_messages.after(GameFrameSet))
@@ -775,22 +780,59 @@ fn process_sound_messages(
     }
 }
 
-/// A sound the backend has started (or is decoding).
+/// A sound the backend has started (or is reading).
 struct Live {
+    /// A static sound's `bevy_kira_audio` instance.
     instance: Option<Handle<AudioInstance>>,
-    decoding: Option<Task<Result<Decoded, String>>>,
+    /// A streaming sound (music, records) on [`StreamOutput`]'s manager.
+    stream: Option<StreamingSoundHandle<FromFileError>>,
+    /// A streaming sound's file being read off the main thread.
+    reading: Option<Task<Result<FileBytes, String>>>,
     mono: bool,
     gain: f32,
     pan: f32,
     pitch: f32,
+    /// An `Update` arrived while the instance was still a queued
+    /// `bevy_kira_audio` command (it becomes an asset in
+    /// `AudioSystemSet::PlayTypedChannels`, after this frame's commands);
+    /// `gain`/`pan` are applied once the asset exists.
+    pending_update: bool,
     queued_frames: u32,
     name: String,
 }
 
-/// A decoded file.
-struct Decoded {
-    sound: StaticSoundData,
+/// A file's bytes (`.mus` already decoded) and whether it is mono.
+struct FileBytes {
+    bytes: Vec<u8>,
     mono: bool,
+}
+
+/// The kira manager that plays the streaming sources (music and records),
+/// as paulscode streamed them (`backgroundMusic` / `newStreamingSource`,
+/// SoundManager.java:103, :148): `bevy_kira_audio` only plays fully decoded
+/// `StaticSoundData`, which for a 3-6 minute track is 60-130 MB of PCM and
+/// seconds of decoding before the first sample. Opened on the first
+/// streaming play (non-send: it owns the output stream).
+#[derive(Default)]
+pub struct StreamOutput {
+    manager: Option<AudioManager<DefaultBackend>>,
+    /// Opening the manager failed (no device): streaming plays end at once.
+    failed: bool,
+}
+
+impl StreamOutput {
+    fn manager(&mut self) -> Option<&mut AudioManager<DefaultBackend>> {
+        if self.manager.is_none() && !self.failed {
+            match AudioManager::<DefaultBackend>::new(AudioManagerSettings::default()) {
+                Ok(m) => self.manager = Some(m),
+                Err(e) => {
+                    warn!("sound: cannot open the streaming output: {e:?}");
+                    self.failed = true;
+                }
+            }
+        }
+        self.manager.as_mut()
+    }
 }
 
 /// The kira side of [`library`]: decoded sounds (cached by `soundName`, as
@@ -817,9 +859,9 @@ fn decibels(gain: f32) -> Decibels {
     }
 }
 
-/// Reads and decodes a file (`.mus` through [`mus::decode_mus`]).
+/// Reads a file (`.mus` through [`mus::decode_mus`]).
 #[allow(clippy::disallowed_methods)]
-fn decode_file(entry: &SoundPoolEntry) -> Result<Decoded, String> {
+fn read_file(entry: &SoundPoolEntry) -> Result<FileBytes, String> {
     let mut bytes =
         std::fs::read(&entry.path).map_err(|e| format!("{}: {e}", entry.path.display()))?;
     if entry.sound_name.to_ascii_lowercase().ends_with(".mus") {
@@ -831,9 +873,36 @@ fn decode_file(entry: &SoundPoolEntry) -> Result<Decoded, String> {
         bytes = mus::decode_mus(&file, bytes);
     }
     let mono = vorbis_channels(&bytes) == Some(1);
-    let sound = StaticSoundData::from_cursor(Cursor::new(bytes))
+    Ok(FileBytes { bytes, mono })
+}
+
+/// Reads and fully decodes a static sound; `(sound, mono)`.
+fn decode_file(entry: &SoundPoolEntry) -> Result<(StaticSoundData, bool), String> {
+    let f = read_file(entry)?;
+    let sound = StaticSoundData::from_cursor(Cursor::new(f.bytes))
         .map_err(|e| format!("{}: {e}", entry.path.display()))?;
-    Ok(Decoded { sound, mono })
+    Ok((sound, f.mono))
+}
+
+/// Starts a streaming sound on the streaming manager with its current gain,
+/// pan and pitch.
+fn start_stream(
+    out: &mut StreamOutput,
+    f: FileBytes,
+    l: &Live,
+    path: &str,
+) -> Result<StreamingSoundHandle<FromFileError>, String> {
+    let mut data = StreamingSoundData::from_cursor(Cursor::new(f.bytes))
+        .map_err(|e| format!("{path}: {e}"))?
+        .volume(decibels(l.gain))
+        .playback_rate(l.pitch as f64);
+    if l.mono {
+        data = data.panning(l.pan);
+    }
+    let m = out
+        .manager()
+        .ok_or_else(|| format!("{path}: no streaming output"))?;
+    m.play(data).map_err(|e| format!("{path}: {e}"))
 }
 
 /// The channel count of an OGG Vorbis stream's identification header.
@@ -852,6 +921,7 @@ fn is_playing_state(s: &PlaybackState) -> bool {
 fn apply_sound_commands(
     mut m: ResMut<SoundManager>,
     mut be: ResMut<KiraBackend>,
+    mut out: NonSendMut<StreamOutput>,
     audio: Res<Audio>,
     mut sources: ResMut<Assets<AudioSource>>,
     mut instances: ResMut<Assets<AudioInstance>>,
@@ -861,12 +931,31 @@ fn apply_sound_commands(
         return;
     };
     let be = &mut *be;
-    // 1. ended sounds, the output check
+    let out = &mut *out;
+    // 1. ended sounds, the output check, updates left pending last frame
     let mut ended = Vec::new();
     for (&id, l) in be.live.iter_mut() {
+        if let Some(h) = l.stream.as_mut() {
+            if let Some(e) = h.pop_error() {
+                warn!("sound: cannot decode {}: {e}", l.name);
+            }
+            if h.state() == KiraState::Stopped {
+                ended.push(id);
+            }
+            continue;
+        }
         let Some(h) = &l.instance else {
             continue;
         };
+        if l.pending_update
+            && let Some(mut i) = instances.get_mut(h)
+        {
+            l.pending_update = false;
+            i.set_decibels(decibels(l.gain), AudioTween::default());
+            if l.mono {
+                i.set_panning(l.pan, AudioTween::default());
+            }
+        }
         let st = audio.state(h);
         if matches!(st, PlaybackState::Queued) {
             l.queued_frames += 1;
@@ -887,24 +976,24 @@ fn apply_sound_commands(
         be.live.remove(&id);
         lib.on_finished(id);
     }
-    // 2. decodes that finished
+    // 2. streaming files that finished reading
     let mut done = Vec::new();
     for (&id, l) in be.live.iter_mut() {
-        if let Some(t) = l.decoding.as_mut()
+        if let Some(t) = l.reading.as_mut()
             && let Some(r) = check_ready(t)
         {
-            l.decoding = None;
+            l.reading = None;
             done.push((id, r));
         }
     }
     for (id, r) in done {
+        let l = be.live.get_mut(&id).expect("live");
+        let r = r.and_then(|f| {
+            l.mono = f.mono;
+            start_stream(out, f, l, &l.name)
+        });
         match r {
-            Ok(d) => {
-                let l = be.live.get_mut(&id).expect("live");
-                l.mono = d.mono;
-                let h = sources.add(AudioSource { sound: d.sound });
-                l.instance = Some(start(&audio, h, l));
-            }
+            Ok(h) => l.stream = Some(h),
             Err(e) => {
                 warn!("sound: cannot decode {e}");
                 be.live.remove(&id);
@@ -930,25 +1019,28 @@ fn apply_sound_commands(
                 }
                 let mut l = Live {
                     instance: None,
-                    decoding: None,
+                    stream: None,
+                    reading: None,
                     mono: false,
                     gain,
                     pan,
                     pitch,
+                    pending_update: false,
                     queued_frames: 0,
                     name: entry.sound_name.clone(),
                 };
                 if streaming {
-                    // music and records: decoded off the main thread, not cached
+                    // music and records: read off the main thread, then
+                    // streamed (StreamOutput), not cached
                     let e = entry.clone();
                     let pool = AsyncComputeTaskPool::get_or_init(Default::default);
-                    l.decoding = Some(pool.spawn(async move { decode_file(&e) }));
+                    l.reading = Some(pool.spawn(async move { read_file(&e) }));
                 } else {
                     let cached =
                         be.cache.entry(entry.sound_name.clone()).or_insert_with(
                             || match decode_file(&entry) {
-                                Ok(d) => {
-                                    Some((sources.add(AudioSource { sound: d.sound }), d.mono))
+                                Ok((sound, mono)) => {
+                                    Some((sources.add(AudioSource { sound }), mono))
                                 }
                                 Err(e) => {
                                     warn!("sound: cannot decode {e}");
@@ -969,18 +1061,33 @@ fn apply_sound_commands(
                 if let Some(l) = be.live.get_mut(&id) {
                     l.gain = gain;
                     l.pan = pan;
-                    if let Some(h) = &l.instance
-                        && let Some(mut i) = instances.get_mut(h)
-                    {
-                        i.set_decibels(decibels(gain), AudioTween::default());
+                    if let Some(s) = l.stream.as_mut() {
+                        s.set_volume(decibels(gain), Tween::default());
                         if l.mono {
-                            i.set_panning(pan, AudioTween::default());
+                            s.set_panning(pan, Tween::default());
+                        }
+                    } else if let Some(h) = &l.instance {
+                        if let Some(mut i) = instances.get_mut(h) {
+                            i.set_decibels(decibels(gain), AudioTween::default());
+                            if l.mono {
+                                i.set_panning(pan, AudioTween::default());
+                            }
+                        } else {
+                            // still a queued play command: apply next frame
+                            l.pending_update = true;
                         }
                     }
+                    // (still reading: start_stream uses gain/pan)
                 }
             }
             Command::Stop { id } => {
-                if let Some(l) = be.live.remove(&id) {
+                if let Some(mut l) = be.live.remove(&id) {
+                    if let Some(s) = l.stream.as_mut() {
+                        s.stop(Tween::default());
+                        if log {
+                            info!("sound: stream {} stopped at {:.2} s", l.name, s.position());
+                        }
+                    }
                     if let Some(h) = &l.instance
                         && let Some(mut i) = instances.get_mut(h)
                     {

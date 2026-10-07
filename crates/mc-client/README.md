@@ -251,8 +251,19 @@ downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
   volume` above 1, 64 for records) recomputed as the listener moves, and
   left/right panning of mono sounds from the listener's yaw (an approximation
   of OpenAL's panner; stereo files are not panned).
-- `.mus` records are decoded (`sound::mus`) before kira sees them; music and
-  records decode on the async task pool.
+- `.mus` records are decoded (`sound::mus`) before kira sees them. Short
+  sounds are decoded once and cached as `bevy_kira_audio` sources; music and
+  records are read on the async task pool and then *streamed*, as paulscode
+  streamed them, on a second kira manager (`sound::StreamOutput`, opened on
+  the first music or record play), since `bevy_kira_audio` only plays fully
+  decoded sounds.
+- Within a frame the shell's `ClientEvent`s, `ClientSound`s and the
+  simulation's `WorldEventMsg`s are handled as three streams in that order,
+  not interleaved in call order, and `RenderGlobal.playSound`'s range check
+  uses the view entity's position at the end of the frame's ticks. This only
+  matters in a frame that runs several ticks: it can change which
+  clock-seeded variant a pool picks, or tip a sound right at the 16-block
+  edge.
 - `MC_SOUND_LOG=1` logs every decision (`sound: <name> -> <file> vol .. pitch
   .. range .. at (x, y, z)` or `fx`), misses (`sound: no such sound: ..`),
   out-of-range skips, music and record starts and stops.

@@ -11,6 +11,10 @@ mc-core = { path = "../mc-core" }
 mc-sim = { path = "../mc-sim" }
 bevy.workspace = true
 bevy_kira_audio.workspace = true
+# Streaming playback of music and records (WP-3.8, sound::StreamOutput):
+# bevy_kira_audio plays only fully decoded sounds. The same kira as
+# bevy_kira_audio's (0.12, `cpal`; its `ogg` feature unifies in).
+kira = { version = "0.12.1", default-features = false, features = ["cpal"] }
 bevy_asset_loader.workspace = true
 # PNG decoding of the jar's textures (D8: read at runtime, never embedded).
 image = { workspace = true, features = ["png"] }

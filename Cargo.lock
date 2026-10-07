@@ -3503,6 +3503,7 @@ dependencies = [
  "bevy_asset_loader",
  "bevy_kira_audio",
  "image",
+ "kira",
  "libc",
  "log",
  "mc-core",
