@@ -11,6 +11,9 @@
 //! (jar and `resources/`), [`screenshot`], [`script`] (the scripted-input dev
 //! mode), [`import`], [`loading`], [`debug`] (F3 text), [`events`] (messages
 //! for the other client parts), [`app`] (states, the screen slot).
+//!
+//! WP-3.2: [`textures`] (`RenderEngine`, the `TextureFX` family, the
+//! colorizers).
 
 pub mod app;
 pub mod assets;
@@ -31,6 +34,7 @@ pub mod script;
 pub mod session;
 pub mod settings;
 pub mod storage;
+pub mod textures;
 pub mod timer;
 
 use bevy::prelude::*;
@@ -127,6 +131,8 @@ impl Plugin for ClientPlugin {
         if let Some(s) = &c.script {
             script::install(app, s.clone());
         }
+        // WP-3.2: RenderEngine (textures, the FX, the colour maps).
+        app.add_plugins(textures::TexturesPlugin { jar: c.jar.clone() });
         app.add_systems(Startup, (camera::spawn_camera, run_startup_action))
             .add_systems(
                 Update,
