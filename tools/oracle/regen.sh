@@ -8,8 +8,8 @@
 # Nobody edits expected.jsonl by hand; run this instead.
 #
 # SOAK (env.sh): unset or 0 regenerates every fixture except the long-run soak
-# set tests/golden/soak/* (the default, about 10 s); SOAK=only regenerates the
-# soak set alone (about 2.5 min of oracle time); SOAK=1 both. Fixtures outside
+# set tests/golden/soak/* (the default); SOAK=only regenerates the
+# soak set alone (about 2 min of oracle time); SOAK=1 both. Fixtures outside
 # the selected set are not touched.
 set -eu
 

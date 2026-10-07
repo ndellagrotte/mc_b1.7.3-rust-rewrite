@@ -2,7 +2,7 @@
 # Harness acceptance, PLAN_v4 §4.4 item 1: Tier A regenerates byte-identically
 # across three runs. Needs a built oracle (tools/oracle/build.sh).
 # SOAK (env.sh) selects the scenarios as for regen.sh; SOAK=only compares two
-# runs of the soak set (tests/golden/soak, about 2.5 min each) instead of three.
+# runs of the soak set (tests/golden/soak, about 2 min each) instead of three.
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)

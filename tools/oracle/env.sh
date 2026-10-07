@@ -38,6 +38,8 @@ oracle_run() {
     _out=$1
     shift
     _ids=$(golden_ids) || return 1
+    # harness.Main treats an empty id list as "every scenario" (java/harness/Main.java:47,60)
+    [ -n "$_ids" ] || { echo "oracle_run: SOAK=${SOAK:-0} selects no scenarios" >&2; return 1; }
     # shellcheck disable=SC2086 # word splitting of the flags and of the id list is intended
     java $JAVA_MATH_FLAGS "$@" -cp "$ROOT/build/oracle:$CP" harness.Main "$ROOT/tests/golden" "$_out" $_ids
 }

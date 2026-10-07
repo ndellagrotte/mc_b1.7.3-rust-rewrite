@@ -11,9 +11,15 @@
 //!
 //! (`--nocapture` shows each fixture's ticks per second). The Rust trace of
 //! every run is in `target/golden/soak/<name>/actual.jsonl`. A fixture whose
-//! first difference is a port bug stays registered with that line in its
-//! ignore reason. [`every_soak_fixture_has_a_test`] is not ignored: a new
-//! fixture directory without a test function fails the ordinary test run.
+//! first difference is a port bug stays registered, with that line as its
+//! ignore reason in place of the generic one:
+//!
+//! ```text
+//! soak_seed_123 => "seed-123", "port bug: first differing line <t, kind, field>";
+//! ```
+//!
+//! [`every_soak_fixture_has_a_test`] is not ignored: a new fixture directory
+//! without a test function fails the ordinary test run.
 
 use mc_golden::tick_driver::drive_in;
 use mc_golden::{Scenario, ScenarioKind, fixture_dir};
@@ -40,16 +46,30 @@ fn check(name: &str) {
     );
 }
 
+/// One ignored soak test: the generic reason, or `$why` (a port bug's first
+/// differing line) when given.
+macro_rules! soak_test {
+    ($(#[$attr:meta])* $test:ident, $name:literal) => {
+        soak_test!(
+            $(#[$attr])* $test,
+            $name,
+            "soak: minutes; run with cargo test -p mc-golden --test golden_soak -- --ignored"
+        );
+    };
+    ($(#[$attr:meta])* $test:ident, $name:literal, $why:literal) => {
+        #[test]
+        #[ignore = $why]
+        $(#[$attr])*
+        fn $test() {
+            check($name);
+        }
+    };
+}
+
+/// `test => "fixture"[, "ignore reason"];` per soak fixture.
 macro_rules! soak {
-    ($( $(#[$attr:meta])* $test:ident => $name:literal; )*) => {
-        $(
-            #[test]
-            #[ignore = "soak: minutes; run with cargo test -p mc-golden --test golden_soak -- --ignored"]
-            $(#[$attr])*
-            fn $test() {
-                check($name);
-            }
-        )*
+    ($( $(#[$attr:meta])* $test:ident => $name:literal $(, $why:literal)?; )*) => {
+        $( soak_test!($(#[$attr])* $test, $name $(, $why)?); )*
         /// Every `tests/golden/soak/<name>` that has a test function above.
         const COVERED: &[&str] = &[$($name),*];
     };

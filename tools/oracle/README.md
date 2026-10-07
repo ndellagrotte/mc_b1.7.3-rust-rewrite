@@ -10,7 +10,7 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `build.sh` | `rewrite-math-random.sh`, then `javac` of `build/oracle-src` + `java/` into `build/oracle` (§4.1) |
 | `rewrite-math-random.sh` | Copies `src/minecraft` to `build/oracle-src`, rewrites `Math.random()` |
 | `regen.sh` | `build.sh`, runs the harness into `build/golden-out`, copies the results into `tests/golden`, prints `git status --short tests/golden` |
-| `check-reproducible.sh` | Three harness runs, byte-compared (§4.4 item 1) |
+| `check-reproducible.sh` | Three harness runs (two with `SOAK=only`), byte-compared (§4.4 item 1) |
 | `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table`, `stat_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5), `golden_ids` (the scenario set, chosen by `SOAK`) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
