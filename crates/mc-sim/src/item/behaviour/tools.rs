@@ -33,7 +33,7 @@ const FIRE: i32 = 51;
 
 /// `ItemTool.hitEntity`: two points of wear; true.
 // src: ItemTool.java:29-32
-pub fn tool_hit_entity(var1: &mut ItemStack, var3: &Entity) -> bool {
+pub fn tool_hit_entity(var1: &mut ItemStack, var3: &mut Entity) -> bool {
     var1.damage_item_by(2, var3);
     true
 }
@@ -41,14 +41,14 @@ pub fn tool_hit_entity(var1: &mut ItemStack, var3: &Entity) -> bool {
 /// `ItemTool.onBlockDestroyed`: one point of wear (whatever the block);
 /// true.
 // src: ItemTool.java:34-37
-pub fn tool_on_block_destroyed(var1: &mut ItemStack, var6: &Entity) -> bool {
+pub fn tool_on_block_destroyed(var1: &mut ItemStack, var6: &mut Entity) -> bool {
     var1.damage_item_by(1, var6);
     true
 }
 
 /// `ItemSword.hitEntity`: one point of wear; true.
 // src: ItemSword.java:17-20
-pub fn sword_hit_entity(var1: &mut ItemStack, var3: &Entity) -> bool {
+pub fn sword_hit_entity(var1: &mut ItemStack, var3: &mut Entity) -> bool {
     var1.damage_item_by(1, var3);
     true
 }
@@ -56,7 +56,7 @@ pub fn sword_hit_entity(var1: &mut ItemStack, var3: &Entity) -> bool {
 /// `ItemSword.onBlockDestroyed`: two points of wear (whatever the block);
 /// true.
 // src: ItemSword.java:22-25
-pub fn sword_on_block_destroyed(var1: &mut ItemStack, var6: &Entity) -> bool {
+pub fn sword_on_block_destroyed(var1: &mut ItemStack, var6: &mut Entity) -> bool {
     var1.damage_item_by(2, var6);
     true
 }
@@ -64,7 +64,7 @@ pub fn sword_on_block_destroyed(var1: &mut ItemStack, var6: &Entity) -> bool {
 /// `ItemShears.onBlockDestroyed`: one point of wear on leaves and webs,
 /// then `super` (`Item`'s false: no use stat).
 // src: ItemShears.java:10-16
-pub fn shears_on_block_destroyed(var1: &mut ItemStack, var2: i32, var6: &Entity) -> bool {
+pub fn shears_on_block_destroyed(var1: &mut ItemStack, var2: i32, var6: &mut Entity) -> bool {
     if var2 == LEAVES || var2 == WEB {
         var1.damage_item_by(1, var6);
     }

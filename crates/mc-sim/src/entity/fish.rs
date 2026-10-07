@@ -20,8 +20,8 @@
 //! `inTile` 0: once in the ground the bobber stays there until it despawns
 //! (1200 ticks) or the angler stops holding the rod.
 //!
-//! Gaps: `catchFish`'s `angler.addStat(StatList.fishCaughtStat, 1)` (WP-2.7,
-//! recorded as `"EntityPlayer.addStat"`).
+//! `catchFish`'s `angler.addStat(StatList.fishCaughtStat, 1)` goes to
+//! [`super::player::add_stat`].
 
 use mc_core::Vec3D;
 use mc_core::math::{self, floor_double};
@@ -36,6 +36,7 @@ use crate::block::Material;
 use crate::item::ItemStack;
 use crate::save::SaveError;
 use crate::save::nbt::{self as n, Compound};
+use crate::stats::stat_list::FISH_CAUGHT_STAT;
 use crate::world::World;
 use mc_core::Aabb;
 
@@ -522,8 +523,8 @@ pub fn catch_fish(e: &mut Entity, world: &mut World, angler: &mut Entity) -> i32
         var13.base.motion_y = var5 * var11 + math::sqrt_double(var9) as f64 * 0.08;
         var13.base.motion_z = var7 * var11;
         world.spawn_entity_in_world(var13);
-        // src: EntityFish.java:372: angler.addStat(StatList.fishCaughtStat, 1) (WP-2.7)
-        world.note_unimplemented("EntityPlayer.addStat");
+        // src: EntityFish.java:372
+        super::player::add_stat(angler, crate::stats::stat(FISH_CAUGHT_STAT), 1);
         var1 = 1;
     }
     if data(e).in_ground {

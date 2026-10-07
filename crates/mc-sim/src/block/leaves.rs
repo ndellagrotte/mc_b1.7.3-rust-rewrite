@@ -24,8 +24,9 @@
 
 use super::dispatch;
 use super::ids;
-use crate::entity::Entity;
+use crate::entity::{Entity, player};
 use crate::item::ItemStack;
+use crate::stats::StatList;
 use crate::world::World;
 
 /// `Item.shears.shiftedIndex` (Item.java:377: `new ItemShears(103)`, 256 + 103).
@@ -44,10 +45,17 @@ pub const FOLIAGE_COLOR_BASIC: i32 = 4764952;
 /// The base `Block.harvestBlock` body (`super` of leaves, logs and ice; the
 /// dispatch's copy is private to it): the statistic, then the normal drops.
 // src: Block.java:551-554
-pub(super) fn base_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
-    // src: Block.java:552: player.addStat(StatList.mineBlockStatArray[blockID], 1),
-    // statistics (WP-2.7), recorded as the dispatch's base does.
-    world.note_unimplemented("EntityPlayer.addStat");
+pub(super) fn base_harvest_block(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    player: &mut Entity,
+    meta: i32,
+) {
+    // src: Block.java:552
+    player::add_stat(player, StatList::get().mine_block_stat(id), 1);
     dispatch::drop_block_as_item(world, id, x, y, z, meta);
 }
 
@@ -252,8 +260,8 @@ pub fn harvest_block(
         .and_then(|p| p.inventory.get_current_item())
         .is_some_and(|s| s.item_id == SHEARS);
     if !world.multiplayer_world && shears {
-        // src: BlockLeaves.java:165: player.addStat(...) (statistics, WP-2.7).
-        world.note_unimplemented("EntityPlayer.addStat");
+        // src: BlockLeaves.java:165 (leaves have no mine stat: disableStats, Block.java:610)
+        player::add_stat(player, StatList::get().mine_block_stat(id), 1);
         dispatch::drop_block_as_item_do(
             world,
             id,
@@ -263,7 +271,7 @@ pub fn harvest_block(
             ItemStack::new(ids::LEAVES, 1, meta & 3),
         );
     } else {
-        base_harvest_block(world, id, x, y, z, meta);
+        base_harvest_block(world, id, x, y, z, player, meta);
     }
 }
 
@@ -296,6 +304,14 @@ pub fn log_on_block_removal(world: &mut World, x: i32, y: i32, z: i32) {
 
 /// `BlockLog.harvestBlock`: only `super`.
 // src: BlockLog.java:19-21
-pub fn log_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
-    base_harvest_block(world, id, x, y, z, meta);
+pub fn log_harvest_block(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    player: &mut Entity,
+    meta: i32,
+) {
+    base_harvest_block(world, id, x, y, z, player, meta);
 }

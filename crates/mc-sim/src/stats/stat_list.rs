@@ -130,8 +130,8 @@ const SIMILAR_BLOCKS: [(i32, i32); 11] = [
     (60, 3),  // tilledField, dirt
 ];
 
-/// One of the `StatBase[]` arrays: entries are indices into
-/// [`StatList::stats`].
+/// One of the `StatBase[]` arrays: entries are indices into the list of
+/// every stat constructed.
 pub type StatArray = Vec<Option<u32>>;
 
 /// `StatList`'s static state after the static initialisers.

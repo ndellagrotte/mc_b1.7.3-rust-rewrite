@@ -176,16 +176,11 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
             }
         }
         // var2.damageItem(1, var1) (ItemStack.java:124-141).
-        let broke = var1.kind.player_mut().is_some_and(|p| {
+        if let Some(p) = var1.kind.player_mut() {
             let slot = p.inventory.current_item as usize;
-            p.inventory.main_inventory[slot]
-                .as_mut()
-                .is_some_and(|s| s.damage_item(1))
-        });
-        if broke {
-            // ItemStack.java:128-130: addStat(objectBreakStats[itemID], 1),
-            // EntityPlayerSP's stat writer (client) / WP-2.7.
-            world.note_unimplemented("EntityPlayer.addStat (ItemStack.damageItem)");
+            if let Some(s) = p.inventory.main_inventory[slot].as_mut() {
+                s.damage_item_by_player(1, &mut p.stat_file_writer);
+            }
         }
     }
     false

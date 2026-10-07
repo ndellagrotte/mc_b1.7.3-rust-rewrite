@@ -75,6 +75,7 @@ use mc_core::math;
 use super::{ItemDef, ItemKind, ItemStack};
 use crate::block::{self, BlockDef, dispatch as block_dispatch};
 use crate::entity::{Entity, player};
+use crate::stats::StatBase;
 use crate::world::World;
 use crate::world::ray_trace::MovingObjectPosition;
 
@@ -448,10 +449,10 @@ pub(crate) fn player_look_trace(
     ([var7, var9, var11], hit)
 }
 
-/// `EntityPlayer.addStat(stat, n)` for the player `e` (a no-op in
-/// `EntityPlayer`; statistics are WP-2.7), or nothing when `e` is not a
-/// player (`ItemStack.damageItem`'s `instanceof EntityPlayer`).
-pub(crate) fn add_stat_if_player(e: &Entity, stat: &'static str, n: i32) {
+/// `EntityPlayer.addStat(stat, n)` for the player `e`
+/// ([`player::add_stat`], `EntityPlayerSP`'s stat file), or nothing when
+/// `e` is not a player (`ItemStack.damageItem`'s `instanceof EntityPlayer`).
+pub(crate) fn add_stat_if_player(e: &mut Entity, stat: Option<&'static StatBase>, n: i32) {
     if e.kind.is_player() {
         player::add_stat(e, stat, n);
     }

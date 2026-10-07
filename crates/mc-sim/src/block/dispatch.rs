@@ -77,6 +77,7 @@ use mc_core::{Aabb, Vec3D};
 use super::{BlockKind, block};
 use crate::entity::Entity;
 use crate::item::ItemStack;
+use crate::stats::StatList;
 use crate::world::World;
 
 /// Which `java.util.Random` a block callback receives (module docs).
@@ -2223,8 +2224,7 @@ pub fn set_block_bounds_for_item_render(world: &mut World, id: i32) {
 /// `harvestBlock(world, player, x, y, z, meta)`: a player broke the block
 /// (PlayerControllerSP.java:37). The parameters follow this module's order
 /// (`world, id, x, y, z`, then Java's remaining `player`, `meta`). Base:
-/// `player.addStat(StatList.mineBlockStatArray[blockID], 1)` (statistics,
-/// WP-2.7: recorded as `"EntityPlayer.addStat"`), then
+/// `player.addStat(StatList.mineBlockStatArray[blockID], 1)`, then
 /// `dropBlockAsItem(world, x, y, z, meta)`.
 // src: Block.java:551-554
 pub fn harvest_block(
@@ -2240,25 +2240,30 @@ pub fn harvest_block(
     use BlockKind as K;
     match b.kind {
         // src: BlockLog.java:19-21
-        K::Log => super::leaves::log_harvest_block(world, id, x, y, z, meta),
+        K::Log => super::leaves::log_harvest_block(world, id, x, y, z, player, meta),
         // src: BlockLeaves.java:163-171
         K::Leaves => super::leaves::harvest_block(world, id, x, y, z, player, meta),
         // src: BlockSnow.java:50-61
         K::Snow => super::snow::harvest_block(world, x, y, z, player),
         // src: BlockIce.java:20-27
-        K::Ice => super::snow::ice_harvest_block(world, id, x, y, z, meta),
-        _ => base_harvest_block(world, id, x, y, z, meta),
+        K::Ice => super::snow::ice_harvest_block(world, id, x, y, z, player, meta),
+        _ => base_harvest_block(world, id, x, y, z, player, meta),
     }
 }
 
 /// The base `harvestBlock` body (see [`harvest_block`]).
 // src: Block.java:551-554
-fn base_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
-    // src: Block.java:552: player.addStat(StatList.mineBlockStatArray[blockID], 1).
-    // EntityPlayer's addStat is empty (EntityPlayer.java:718-719); the local
-    // player's EntityPlayerSP.addStat (EntityPlayerSP.java:176-196) is
-    // statistics (WP-2.7).
-    world.note_unimplemented("EntityPlayer.addStat");
+fn base_harvest_block(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    player: &mut Entity,
+    meta: i32,
+) {
+    // src: Block.java:552
+    crate::entity::player::add_stat(player, StatList::get().mine_block_stat(id), 1);
     drop_block_as_item(world, id, x, y, z, meta);
 }
 

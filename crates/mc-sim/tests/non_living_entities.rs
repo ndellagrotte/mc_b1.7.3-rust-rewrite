@@ -97,9 +97,10 @@ fn catch_fish_with_a_fish_on_throws_a_raw_fish() {
         dy * 0.1 + math::sqrt_double(d) as f64 * 0.08
     );
     assert_eq!(it.base.motion_z, dz * 0.1);
+    let caught = mc_sim::stats::stat(mc_sim::stats::stat_list::FISH_CAUGHT_STAT).unwrap();
     assert_eq!(
-        w.unimplemented_hits.borrow().get("EntityPlayer.addStat"),
-        Some(&1)
+        p.kind.player().unwrap().stat_file_writer.write_stat(caught),
+        1
     );
 }
 

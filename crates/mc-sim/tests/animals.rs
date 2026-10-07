@@ -13,6 +13,7 @@ use mc_sim::entity::{Entity, EntityKindData, chicken, cow, creature, dispatch, n
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
 use mc_sim::save::entity_list::{FromNbt, create_entity_from_nbt, create_entity_in_world};
+use mc_sim::stats::StatList;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::provider::{Dimension, WorldProvider};
 use mc_sim::world::{World, WorldEnvironment};
@@ -230,10 +231,16 @@ fn shearing_coloured_sheep_breaks_the_shears() {
     assert!((2..=4).contains(&drops.len()));
     assert!(drops.iter().all(|d| d.item_id == 35 && d.item_damage == 5));
     assert_eq!(held(&p), Some(ItemStack::new(sheep::SHEARS, 0, 0)));
-    assert!(
-        w.unimplemented_hits
-            .borrow()
-            .contains_key("EntityPlayer.addStat (ItemStack.damageItem)")
+    // ItemStack.java:128-130: the shears' break stat (16973824 + 359).
+    let shears_broken = StatList::get().object_break_stat(sheep::SHEARS).unwrap();
+    assert_eq!(shears_broken.stat_id, 16973824 + 359);
+    assert_eq!(
+        p.kind
+            .player()
+            .unwrap()
+            .stat_file_writer
+            .write_stat(shears_broken),
+        1
     );
     // An unsheared, coloured sheep's death drop.
     let mut s2 = place(sheep::new_entity_sheep(&mut w), 4.5, 61.0, 4.5);

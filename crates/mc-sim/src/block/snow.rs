@@ -16,11 +16,12 @@
 use mc_core::Aabb;
 
 use super::dispatch;
-use super::ids::{WATER_MOVING, WATER_STILL};
+use super::ids::{SNOW, WATER_MOVING, WATER_STILL};
 use super::leaves::{base_harvest_block, base_should_side_be_rendered};
 use crate::entity::Entity;
 use crate::entity::item::new_entity_item;
 use crate::item::{ItemStack, ids as items};
+use crate::stats::StatList;
 use crate::world::World;
 use crate::world::lighting::EnumSkyBlock;
 
@@ -99,7 +100,6 @@ fn can_snow_stay(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
 /// the block removed, then the statistic. No `super`.
 // src: BlockSnow.java:50-61
 pub fn harvest_block(world: &mut World, x: i32, y: i32, z: i32, player: &mut Entity) {
-    let _ = player;
     let var7 = items::SNOWBALL;
     let var8 = 0.7f32;
     let var9 = (world.rand.next_float() * var8) as f64 + (1.0f32 - var8) as f64 * 0.5;
@@ -117,8 +117,8 @@ pub fn harvest_block(world: &mut World, x: i32, y: i32, z: i32, player: &mut Ent
     }
     world.spawn_entity_in_world(var15);
     world.set_block_with_notify(x, y, z, 0);
-    // src: BlockSnow.java:60: player.addStat(...) (statistics, WP-2.7).
-    world.note_unimplemented("EntityPlayer.addStat");
+    // src: BlockSnow.java:60: mineBlockStatArray[this.blockID] (78, the snow layer)
+    crate::entity::player::add_stat(player, StatList::get().mine_block_stat(SNOW), 1);
 }
 
 /// `BlockSnow.updateTick` and `BlockSnowBlock.updateTick` (identical):
@@ -177,8 +177,16 @@ pub fn ice_should_side_be_rendered(
 /// `quantityDropped` is 0), then flowing water where the ice stood when the
 /// block below is solid or liquid.
 // src: BlockIce.java:20-27
-pub fn ice_harvest_block(world: &mut World, id: i32, x: i32, y: i32, z: i32, meta: i32) {
-    base_harvest_block(world, id, x, y, z, meta);
+pub fn ice_harvest_block(
+    world: &mut World,
+    id: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+    player: &mut Entity,
+    meta: i32,
+) {
+    base_harvest_block(world, id, x, y, z, player, meta);
     let var7 = world.get_block_material(x, y - 1, z);
     if var7.get_is_solid() || var7.get_is_liquid() {
         world.set_block_with_notify(x, y, z, WATER_MOVING);

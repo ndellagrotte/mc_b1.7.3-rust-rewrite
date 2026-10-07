@@ -449,23 +449,23 @@ pub fn decrement_animations(world: &mut World, player: &mut Entity) {
 }
 
 /// `inventory.damageArmor(amount)` of `player`: `damageItem(amount,
-/// player)` on every worn `ItemArmor`; a piece that breaks adds
-/// `objectBreakStats` to the player (`EntityPlayer.addStat`, WP-2.7,
-/// recorded) and, left at size 0, is removed (`onItemDestroyedByUse` is
-/// empty).
+/// player)` on every worn `ItemArmor` (a piece that breaks adds
+/// `objectBreakStats` to the player, [`ItemStack::damage_item_by_player`]);
+/// a piece left at size 0 is removed (`onItemDestroyedByUse` is empty).
 // src: InventoryPlayer.java:308-319, ItemStack.java:124-141, :167-168
 pub fn damage_armor(world: &mut World, player: &mut Entity, var1: i32) {
-    let inv = super::inventory_of_mut(player);
-    for var2 in 0..inv.armor_inventory.len() {
-        let slot = &mut inv.armor_inventory[var2];
+    let _ = world;
+    let p = player
+        .kind
+        .player_mut()
+        .expect("an inventory's player is an EntityPlayer (Java ClassCastException)");
+    for var2 in 0..p.inventory.armor_inventory.len() {
+        let slot = &mut p.inventory.armor_inventory[var2];
         let Some(s) = slot.as_mut() else { continue };
         if !matches!(s.get_item().map(|d| d.kind), Some(ItemKind::Armor { .. })) {
             continue;
         }
-        if s.damage_item(var1) {
-            // src: ItemStack.java:128-130 (var2 is the EntityPlayer)
-            world.note_unimplemented("EntityPlayer.addStat");
-        }
+        s.damage_item_by_player(var1, &mut p.stat_file_writer);
         if s.stack_size == 0 {
             *slot = None;
         }

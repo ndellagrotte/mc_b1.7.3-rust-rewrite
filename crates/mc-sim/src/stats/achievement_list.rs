@@ -1,7 +1,7 @@
 //! `AchievementList` (AchievementList.java): the sixteen achievements in
 //! registration order. Their registration runs inside `StatList`'s static
 //! initialiser (`AchievementList.func_27374_a()`, StatList.java:194), so
-//! [`super::StatList`] builds them through [`register_achievements`].
+//! [`super::StatList`] builds them through `register_achievements`.
 //!
 //! The `System.out.println(size + " achievements")` (AchievementList.java:49)
 //! is left out.

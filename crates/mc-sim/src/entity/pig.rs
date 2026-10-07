@@ -16,6 +16,7 @@ use super::data_watcher::WatchValue;
 use super::{
     AnimalData, CreatureData, Entity, EntityBase, EntityKindData, LivingData, base, living,
 };
+use crate::stats::achievement_list::FLY_PIG;
 use crate::world::World;
 
 /// `Item.porkRaw.shiftedIndex` (`256 + 63`).
@@ -104,15 +105,21 @@ pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World) {
 }
 
 /// `EntityPig.fall(distance)`: `EntityLiving`'s, and the `flyPig`
-/// achievement for a player riding it down more than 5 blocks
-/// (`triggerAchievement` is `addStat`: WP-2.7, recorded).
+/// achievement for a player riding it down more than 5 blocks. A rider
+/// that is out of its slot (never: the pig falls in its own tick) is
+/// recorded.
 // src: EntityPig.java:71-77
 pub fn fall(e: &mut Entity, world: &mut World, var1: f32) {
     living::fall(e, world, var1);
     if var1 > 5.0
         && let Some(r) = e.base.ridden_by_entity
-        && world.entity(r).is_some_and(|p| p.kind.is_player())
     {
-        world.note_unimplemented("EntityPlayer.triggerAchievement");
+        match world.entity_mut(r) {
+            Some(p) if p.kind.is_player() => {
+                super::player::trigger_achievement(p, crate::stats::stat(FLY_PIG));
+            }
+            Some(_) => {}
+            None => world.note_unimplemented("EntityPig.fall: the rider is not in its slot"),
+        }
     }
 }

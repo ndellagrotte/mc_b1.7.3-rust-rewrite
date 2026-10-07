@@ -19,9 +19,10 @@
 //! the sneak `ySize`, `pushOutOfBlocks` at the four corners) runs only with
 //! [`PlayerSpData::client_additions`] set; the golden driver leaves it off,
 //! which is `HarnessPlayer` (tools/oracle/README.md, "`HarnessPlayer`").
-//! Out of scope, client: the achievement toast and the stat file
-//! (`mc.statFileWriter`, `addStat`: WP-2.7; `EntityPlayer.addStat` is
-//! empty, [`add_stat`]), the GUI calls (`displayGUI*`, `closeScreen`'s
+//! `EntityPlayerSP.addStat` writes the stat file the player carries
+//! ([`add_stat`], [`crate::stats`]); the achievement toast is the
+//! client's ([`crate::stats::StatFileWriter::taken_achievements`]).
+//! Out of scope, client: the GUI calls (`displayGUI*`, `closeScreen`'s
 //! `displayGuiScreen`), `onItemPickup`'s particle, `addChatMessage`,
 //! `setHealth` (multiplayer packets), the `MouseFilter`s.
 //!
@@ -49,7 +50,7 @@
 //! | 537-651 | `sleepInBedAt`, `setRenderOffsetForSleep`, `wakeUpPlayer`, `isInBed` | [`sleep_in_bed_at`], [`wake_up_player`] |
 //! | 653-665 | `func_25060_a` (static) | [`verify_respawn_coordinates`] |
 //! | 667-712 | `getBedOrientationInDegrees`, sleep and spawn getters | [`get_bed_orientation_in_degrees`], [`PlayerData`] |
-//! | 714-724 | `triggerAchievement`, `addStat` (empty), `jump` | [`add_stat`], [`jump`] |
+//! | 714-724 | `triggerAchievement`, `addStat` (empty; `EntityPlayerSP`'s writes the stat file), `jump` | [`trigger_achievement`], [`add_stat`], [`jump`] |
 //! | 726-793 | `moveEntityWithHeading`, `addMovementStat`, `addMountedMovementStat`, `fall` | [`move_entity_with_heading`], [`fall`] |
 //! | 795-817 | `onKillEntity`, `getItemIcon` (render), `setInPortal` | [`on_kill_entity`], [`set_in_portal`] |
 //!
@@ -72,6 +73,9 @@ use super::{Entity, EntityKindData, PlayerData, base, dispatch};
 use crate::block::bed;
 use crate::block::{BlockDef, Material};
 use crate::item::ItemStack;
+use crate::stats::achievement_list as al;
+use crate::stats::stat_list as sl;
+use crate::stats::{StatBase, stat};
 use crate::world::World;
 use crate::world::is_instance_of;
 
@@ -344,7 +348,7 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
     p.chasing_pos_x += var1 * 0.25;
     p.chasing_pos_z += var5 * 0.25;
     p.chasing_pos_y += var3 * 0.25;
-    add_stat(e, "StatList.minutesPlayedStat", 1);
+    add_stat(e, stat(sl::MINUTES_PLAYED_STAT), 1);
     if e.base.riding_entity.is_none() {
         player_mut(e).start_minecart_riding_coordinate = None;
     }
@@ -497,7 +501,7 @@ pub fn on_death(e: &mut Entity, world: &mut World, var1: Option<&Entity>) {
         e.base.motion_z = 0.0;
     }
     e.base.y_offset = 0.1;
-    add_stat(e, "StatList.deathsStat", 1);
+    add_stat(e, stat(sl::DEATHS_STAT), 1);
 }
 
 /// `EntityPlayer.addToPlayerScore(victim, score)`.
@@ -506,9 +510,9 @@ pub fn add_to_player_score(e: &mut Entity, victim: &Entity, var2: i32) {
     let p = player_mut(e);
     p.score = p.score.wrapping_add(var2);
     if victim.kind.is_player() {
-        add_stat(e, "StatList.playerKillsStat", 1);
+        add_stat(e, stat(sl::PLAYER_KILLS_STAT), 1);
     } else {
-        add_stat(e, "StatList.mobKillsStat", 1);
+        add_stat(e, stat(sl::MOB_KILLS_STAT), 1);
     }
 }
 
@@ -573,7 +577,7 @@ pub fn drop_player_item_with_random_choice(
         m.motion_z += jmath::sin(var5 as f64) * var4 as f64;
     }
     join_entity_item_with_world(world, var3);
-    add_stat(e, "StatList.dropStat", 1);
+    add_stat(e, stat(sl::DROP_STAT), 1);
 }
 
 /// `joinEntityItemWithWorld(item)`: `worldObj.entityJoinedWorld(item)`.
@@ -691,7 +695,7 @@ pub fn attack_entity_from(
             }
         }
     }
-    add_stat(e, "StatList.damageTakenStat", var2);
+    add_stat(e, stat(sl::DAMAGE_TAKEN_STAT), var2);
     living::attack_entity_from(e, world, var1, var2)
 }
 
@@ -839,7 +843,7 @@ pub fn attack_target_entity_with_current_item(
             if dispatch::is_entity_alive(var1) {
                 alert_wolves(e, world, &var1.kind, true);
             }
-            add_stat(e, "StatList.damageDealtStat", var2);
+            add_stat(e, stat(sl::DAMAGE_DEALT_STAT), var2);
         }
     }
 }
@@ -1084,22 +1088,31 @@ pub fn get_bed_orientation_in_degrees(e: &Entity, world: &mut World) -> f32 {
 
 // ---- statistics, movement -------------------------------------------------------------
 
-/// `addStat(stat, amount)` / `triggerAchievement(stat)` (which is
-/// `addStat(stat, 1)`, EntityPlayer.java:714-716). `EntityPlayer`'s body is
-/// empty, and that is what the oracle's `HarnessPlayer` runs;
-/// `EntityPlayerSP`'s writes the client's stat file and queues achievement
-/// toasts (EntityPlayerSP.java:176-192, WP-2.7). `stat` names the
-/// `StatList` / `AchievementList` field.
-// src: EntityPlayer.java:718-719
-pub fn add_stat(e: &Entity, stat: &'static str, amount: i32) {
-    let _ = (e, stat, amount);
+/// `addStat(stat, amount)`. `EntityPlayer`'s body is empty, and that is
+/// what the oracle's `HarnessPlayer` runs; the port's player is the local
+/// `EntityPlayerSP`, whose override writes `mc.statFileWriter`
+/// ([`PlayerData::stat_file_writer`],
+/// [`crate::stats::StatFileWriter::entity_player_sp_add_stat`]: null
+/// stats are ignored, an achievement needs its parent). Stats never reach a
+/// golden trace.
+// src: EntityPlayer.java:718-719, EntityPlayerSP.java:176-192
+pub fn add_stat(e: &mut Entity, stat: Option<&'static StatBase>, amount: i32) {
+    if let Some(p) = e.kind.player_mut() {
+        p.stat_file_writer.entity_player_sp_add_stat(stat, amount);
+    }
+}
+
+/// `triggerAchievement(stat)`: `addStat(stat, 1)`.
+// src: EntityPlayer.java:714-716
+pub fn trigger_achievement(e: &mut Entity, stat: Option<&'static StatBase>) {
+    add_stat(e, stat, 1);
 }
 
 /// `EntityPlayer.jump()`: `EntityLiving`'s, then the jump stat.
 // src: EntityPlayer.java:721-724
 pub fn jump(e: &mut Entity) {
     living::jump(e);
-    add_stat(e, "StatList.jumpStat", 1);
+    add_stat(e, stat(sl::JUMP_STAT), 1);
 }
 
 /// `EntityPlayer.moveEntityWithHeading(strafe, forward)`: `EntityLiving`'s,
@@ -1128,30 +1141,30 @@ fn add_movement_stat(e: &mut Entity, world: &mut World, var1: f64, var3: f64, va
         let var7 =
             java_round_f32(math::sqrt_double(var1 * var1 + var3 * var3 + var5 * var5) * 100.0);
         if var7 > 0 {
-            add_stat(e, "StatList.distanceDoveStat", var7);
+            add_stat(e, stat(sl::DISTANCE_DOVE_STAT), var7);
         }
     } else if dispatch::is_in_water(e, world) {
         let var7 = java_round_f32(math::sqrt_double(var1 * var1 + var5 * var5) * 100.0);
         if var7 > 0 {
-            add_stat(e, "StatList.distanceSwumStat", var7);
+            add_stat(e, stat(sl::DISTANCE_SWUM_STAT), var7);
         }
     } else if dispatch::is_on_ladder(e, world) {
         if var3 > 0.0 {
             add_stat(
                 e,
-                "StatList.distanceClimbedStat",
+                stat(sl::DISTANCE_CLIMBED_STAT),
                 java_round_f64_to_int(var3 * 100.0),
             );
         }
     } else if e.base.on_ground {
         let var7 = java_round_f32(math::sqrt_double(var1 * var1 + var5 * var5) * 100.0);
         if var7 > 0 {
-            add_stat(e, "StatList.distanceWalkedStat", var7);
+            add_stat(e, stat(sl::DISTANCE_WALKED_STAT), var7);
         }
     } else {
         let var7 = java_round_f32(math::sqrt_double(var1 * var1 + var5 * var5) * 100.0);
         if var7 > 25 {
-            add_stat(e, "StatList.distanceFlownStat", var7);
+            add_stat(e, stat(sl::DISTANCE_FLOWN_STAT), var7);
         }
     }
 }
@@ -1179,7 +1192,7 @@ fn add_mounted_movement_stat(e: &mut Entity, world: &mut World, var1: f64, var3:
     };
     match kind {
         "EntityMinecart" => {
-            add_stat(e, "StatList.distanceByMinecartStat", var7);
+            add_stat(e, stat(sl::DISTANCE_BY_MINECART_STAT), var7);
             let here = (
                 floor_double(e.base.pos_x),
                 floor_double(e.base.pos_y),
@@ -1203,13 +1216,13 @@ fn add_mounted_movement_stat(e: &mut Entity, world: &mut World, var1: f64, var3:
                         .wrapping_add(var6.wrapping_mul(var6)) as f64)
                         .sqrt();
                     if d >= 1000.0 {
-                        add_stat(e, "AchievementList.onARail", 1);
+                        add_stat(e, stat(al::ON_A_RAIL), 1);
                     }
                 }
             }
         }
-        "EntityBoat" => add_stat(e, "StatList.distanceByBoatStat", var7),
-        "EntityPig" => add_stat(e, "StatList.distanceByPigStat", var7),
+        "EntityBoat" => add_stat(e, stat(sl::DISTANCE_BY_BOAT_STAT), var7),
+        "EntityPig" => add_stat(e, stat(sl::DISTANCE_BY_PIG_STAT), var7),
         _ => {}
     }
 }
@@ -1221,7 +1234,7 @@ pub fn fall(e: &mut Entity, world: &mut World, var1: f32) {
     if var1 >= 2.0 {
         add_stat(
             e,
-            "StatList.distanceFallenStat",
+            stat(sl::DISTANCE_FALLEN_STAT),
             java_round_f64_to_int(var1 as f64 * 100.0),
         );
     }
@@ -1233,7 +1246,7 @@ pub fn fall(e: &mut Entity, world: &mut World, var1: f32) {
 // src: EntityPlayer.java:795-800
 pub fn on_kill_entity(e: &mut Entity, victim: &Entity) {
     if is_instance_of(&victim.kind, "EntityMob") {
-        add_stat(e, "AchievementList.killEnemy", 1);
+        add_stat(e, stat(al::KILL_ENEMY), 1);
     }
 }
 

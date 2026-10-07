@@ -22,6 +22,7 @@ use super::behaviour::{self, RightClickResult};
 use super::{ItemDef, JavaException, item};
 use crate::block::BlockDef;
 use crate::entity::Entity;
+use crate::stats::{StatFileWriter, StatList};
 use crate::world::World;
 
 /// `ItemStack` (ItemStack.java:3-7).
@@ -225,8 +226,8 @@ impl ItemStack {
     /// `damageItem(n, entity)`, data part: adds `n` to the damage; past the
     /// maximum the stack loses one item (not below 0) and the damage resets.
     /// Returns true when the item broke, where Java adds
-    /// `StatList.objectBreakStats[itemID]` if `entity` is an `EntityPlayer`
-    /// (the caller's job, WP-2.7).
+    /// `StatList.objectBreakStats[itemID]` if `entity` is an `EntityPlayer`:
+    /// [`Self::damage_item_by`] and [`Self::damage_item_by_player`] do both.
     // src: ItemStack.java:124-141
     pub fn damage_item(&mut self, n: i32) -> bool {
         if self.is_item_stack_damageable() {
@@ -244,14 +245,35 @@ impl ItemStack {
     }
 
     /// `damageItem(n, entity)`: the wear ([`ItemStack::damage_item`]), and
-    /// when the stack breaks, `objectBreakStats` for a player `entity`.
+    /// when the stack breaks, `objectBreakStats` for a player `entity`
+    /// ([`behaviour::add_stat_if_player`]). Where the stack still lives in
+    /// the player's own inventory, [`Self::damage_item_by_player`] does the
+    /// same against the player's stat writer.
     // src: ItemStack.java:124-141
-    pub fn damage_item_by(&mut self, n: i32, entity: &Entity) {
+    pub fn damage_item_by(&mut self, n: i32, entity: &mut Entity) {
+        let id = self.item_id;
         if self.damage_item(n) {
             // src: ItemStack.java:128-130 (before the decrement in Java; the
-            // stat does not read the stack)
-            behaviour::add_stat_if_player(entity, "StatList.objectBreakStats[itemID]", 1);
+            // stat reads only itemID, which the wear leaves alone)
+            behaviour::add_stat_if_player(entity, StatList::get().object_break_stat(id), 1);
         }
+    }
+
+    /// `damageItem(n, player)` with an `EntityPlayer` as the entity: the
+    /// data part ([`Self::damage_item`]) and, when the item breaks,
+    /// `player.addStat(StatList.objectBreakStats[itemID], 1)` into that
+    /// player's stat writer (`EntityPlayerSP.addStat`,
+    /// [`crate::entity::PlayerData::stat_file_writer`]; the stack usually
+    /// lives in the same `PlayerData`, a disjoint field). Returns whether
+    /// it broke.
+    // src: ItemStack.java:124-141 (the stat: :128-130)
+    pub fn damage_item_by_player(&mut self, n: i32, stats: &mut StatFileWriter) -> bool {
+        let id = self.item_id;
+        let broke = self.damage_item(n);
+        if broke {
+            stats.entity_player_sp_add_stat(StatList::get().object_break_stat(id), 1);
+        }
+        broke
     }
 
     /// `useItem(player, world, x, y, z, side)`: `Item.onItemUse`, and on
@@ -269,7 +291,12 @@ impl ItemStack {
     ) -> bool {
         let var7 = behaviour::on_item_use(self, player, world, x, y, z, side);
         if var7 {
-            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+            // src: ItemStack.java:61
+            crate::entity::player::add_stat(
+                player,
+                StatList::get().object_use_stat(self.item_id),
+                1,
+            );
         }
         var7
     }
@@ -290,7 +317,12 @@ impl ItemStack {
     pub fn hit_entity(&mut self, target: &mut Entity, player: &mut Entity, world: &mut World) {
         let var3 = behaviour::hit_entity(self, target, player, world);
         if var3 {
-            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+            // src: ItemStack.java:145-147
+            crate::entity::player::add_stat(
+                player,
+                StatList::get().object_use_stat(self.item_id),
+                1,
+            );
         }
     }
 
@@ -309,7 +341,12 @@ impl ItemStack {
     ) {
         let var6 = behaviour::on_block_destroyed(self, block_id, x, y, z, player, world);
         if var6 {
-            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+            // src: ItemStack.java:153-155
+            crate::entity::player::add_stat(
+                player,
+                StatList::get().object_use_stat(self.item_id),
+                1,
+            );
         }
     }
 
@@ -339,9 +376,10 @@ impl ItemStack {
     /// stack size), then `Item.onCreated`.
     // src: ItemStack.java:220-223
     pub fn on_crafting(&mut self, world: &mut World, player: &mut Entity) {
+        // src: ItemStack.java:221
         crate::entity::player::add_stat(
             player,
-            "StatList.objectCraftStats[itemID]",
+            StatList::get().object_craft_stat(self.item_id),
             self.stack_size,
         );
         behaviour::on_created(self, world, player);

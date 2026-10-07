@@ -28,6 +28,7 @@ use mc_sim::inventory::player::{
 use mc_sim::inventory::{InventoryPlayer, InventoryRef};
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
+use mc_sim::stats::StatList;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::provider::{Dimension, WorldProvider};
 use mc_sim::world::tile_entity::TileEntityKindData;
@@ -198,11 +199,13 @@ fn armor_wears_out_and_the_owner_drops_everything() {
     inv_mut(&mut p).armor_inventory[0] = Some(ItemStack::new(PUMPKIN, 1, 0));
     damage_armor(&mut w, &mut p, 1);
     assert_eq!(inv(&p).armor_inventory[3].unwrap().item_damage, 264);
-    assert_eq!(hits(&w, "EntityPlayer.addStat"), 0);
+    let broken = StatList::get().object_break_stat(HELMET_DIAMOND).unwrap();
+    let writer = |p: &Entity| p.kind.player().unwrap().stat_file_writer.clone();
+    assert_eq!(writer(&p).write_stat(broken), 0);
     damage_armor(&mut w, &mut p, 1);
-    // Broken: objectBreakStats (recorded) and the slot emptied; the pumpkin is no ItemArmor.
+    // Broken: objectBreakStats and the slot emptied; the pumpkin is no ItemArmor.
     assert_eq!(inv(&p).armor_inventory[3], None);
-    assert_eq!(hits(&w, "EntityPlayer.addStat"), 1);
+    assert_eq!(writer(&p).write_stat(broken), 1);
     assert!(inv(&p).armor_inventory[0].is_some());
 
     inv_mut(&mut p).main_inventory[5] = Some(ItemStack::new(STICK, 3, 0));
@@ -325,7 +328,7 @@ fn armor_slots_take_a_pumpkin_as_a_helmet() {
 
 /// A map from the workbench: `ItemMap.onCreated` gives the cursor's map a
 /// fresh id and a `MapData` centred on the player (ItemMap.java:228-238);
-/// the crafting stat is recorded (WP-2.7).
+/// the crafting stat counts the map.
 #[test]
 fn crafting_a_map_runs_on_created() {
     let mut w = empty_world(5);
@@ -342,7 +345,16 @@ fn crafting_a_map_runs_on_created() {
     assert_eq!((held.item_id, held.item_damage), (358, 1));
     assert!(w.load_item_data("map_1").is_some());
     assert_eq!(hits(&w, "ItemMap.onCreated"), 0);
-    assert_eq!(hits(&w, "EntityPlayer.addStat"), 1);
+    assert_eq!(hits(&w, "EntityPlayer.addStat"), 0);
+    let crafted = StatList::get().object_craft_stat(358).unwrap();
+    assert_eq!(
+        p.kind
+            .player()
+            .unwrap()
+            .stat_file_writer
+            .write_stat(crafted),
+        1
+    );
     assert!((1..=9).all(|k| c.slot_get_stack(&mut w, &mut p, k).is_none()));
 }
 

@@ -21,6 +21,7 @@ use mc_sim::entity::player::new_entity_player_sp;
 use mc_sim::entity::{Entity, EntityKindData};
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
+use mc_sim::stats::StatList;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::events::WorldEvent;
 use mc_sim::world::provider::{Dimension, WorldProvider};
@@ -278,7 +279,7 @@ fn drop_block_as_item_with_chance_per_class() {
     }
 }
 
-/// `harvestBlock` (Block.java:551-554): the stat (recorded, WP-2.7) and
+/// `harvestBlock` (Block.java:551-554): the mine stat and
 /// `dropBlockAsItem` with chance 1. Glowstone: 2 + nextInt(3) dust.
 #[test]
 fn harvest_block_drops_like_drop_block_as_item() {
@@ -295,13 +296,12 @@ fn harvest_block_drops_like_drop_block_as_item() {
         want.iter().map(|g| g.0).collect::<Vec<_>>()
     );
     assert_eq!(w.rand.state(), state);
+    assert!(w.unimplemented_hits.borrow().is_empty());
+    let mined = StatList::get().mine_block_stat(89).unwrap();
+    assert_eq!(mined.stat_id, 16777216 + 89);
     assert_eq!(
-        w.unimplemented_hits
-            .borrow()
-            .keys()
-            .copied()
-            .collect::<Vec<_>>(),
-        vec!["EntityPlayer.addStat"]
+        p.kind.player().unwrap().stat_file_writer.write_stat(mined),
+        1
     );
 }
 

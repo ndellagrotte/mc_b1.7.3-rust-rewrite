@@ -38,9 +38,9 @@
 //!
 //! # Gaps (recorded in [`World::unimplemented_hits`])
 //!
-//! - `EntityPlayer.addStat` (statistics and achievements, WP-2.7): crafting
-//!   and smelting pickups (`ItemStack.onCrafting`, `SlotCrafting`,
-//!   `SlotFurnace`) and armour breaking record it.
+//! None: `EntityPlayer.addStat` (statistics and achievements, WP-2.7)
+//! and `ItemMap.onCreated` / `ItemMap.onUpdate` (item behaviour, WP-2.6)
+//! are both transcribed.
 //!
 //! The client-side parts of `Container` are left out: `crafters`
 //! (`ICrafting` listeners, which only the GUI and the network code
@@ -102,13 +102,13 @@ pub fn drop_player_item(world: &mut World, player: &mut Entity, stack: Option<It
 }
 
 /// `stack.onCrafting(world, player)` ([`ItemStack::on_crafting`]):
-/// `player.addStat(objectCraftStats[id], stackSize)` (WP-2.7, recorded) and
-/// `Item.onCreated` (empty in `Item`; `ItemMap.onCreated` gives a crafted map
-/// a new map id and a `MapData` centred on the player, WP-2.6). `stack` is
-/// the picked-up object's copy; the caller stores it back (module docs).
+/// `player.addStat(objectCraftStats[id], stackSize)`
+/// ([`crate::entity::player::add_stat`]) and `Item.onCreated` (empty in
+/// `Item`; `ItemMap.onCreated` gives a crafted map a new map id and a
+/// `MapData` centred on the player, WP-2.6). `stack` is the picked-up
+/// object's copy; the caller stores it back (module docs).
 // src: ItemStack.java:220-223, Item.java:270-271, ItemMap.java:228-238
 pub fn item_stack_on_crafting(world: &mut World, player: &mut Entity, stack: &mut ItemStack) {
-    world.note_unimplemented("EntityPlayer.addStat");
     stack.on_crafting(world, player);
 }
 

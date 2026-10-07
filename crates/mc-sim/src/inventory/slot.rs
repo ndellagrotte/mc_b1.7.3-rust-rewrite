@@ -10,7 +10,10 @@ use super::container::Container;
 use super::{InventoryRef, item_stack_on_crafting};
 use crate::crafting::ids;
 use crate::entity::Entity;
+use crate::entity::player::add_stat;
 use crate::item::{ItemKind, ItemStack};
+use crate::stats::achievement_list as al;
+use crate::stats::stat;
 use crate::world::World;
 
 /// Which `Slot` class, with its own fields.
@@ -213,13 +216,12 @@ impl Container {
     /// - `Slot`, `SlotArmor`: `onSlotChanged`.
     /// - `SlotCrafting`: `stack.onCrafting` and the crafting achievements
     ///   (workbench, wooden pickaxe, furnace, wooden hoe, bread, cake,
-    ///   stone pickaxe, wooden sword: `EntityPlayer.addStat`, WP-2.7,
-    ///   recorded), then one item off every non-empty grid cell (each
+    ///   stone pickaxe, wooden sword), then one item off every non-empty grid cell (each
     ///   `decrStackSize` re-runs `onCraftMatrixChanged`), a cell whose item
     ///   has a container item (the milk bucket) getting a new stack of it.
     ///   Not `super`: no `onSlotChanged`.
-    /// - `SlotFurnace`: `stack.onCrafting`, the iron and fish achievements
-    ///   (recorded), then `super`.
+    /// - `SlotFurnace`: `stack.onCrafting`, the iron and fish achievements,
+    ///   then `super`.
     ///
     /// Returns `stack` as `onCrafting` left it (`ItemMap.onCreated` sets a
     /// crafted map's damage): the caller writes it back where Java's object
@@ -241,22 +243,20 @@ impl Container {
                 let mut var1 =
                     var1.expect("SlotCrafting.onPickupFromSlot(null): Java NullPointerException");
                 item_stack_on_crafting(world, player, &mut var1);
-                // src: SlotCrafting.java:19-35 (AchievementList.buildWorkBench,
-                // buildPickaxe, buildFurnace, buildHoe, makeBread, bakeCake,
-                // buildBetterPickaxe, buildSword)
-                if [
-                    ids::WORKBENCH,
-                    ids::PICKAXE_WOOD,
-                    ids::STONE_OVEN_IDLE,
-                    ids::HOE_WOOD,
-                    ids::BREAD,
-                    ids::CAKE,
-                    ids::PICKAXE_STONE,
-                    ids::SWORD_WOOD,
-                ]
-                .contains(&var1.item_id)
-                {
-                    world.note_unimplemented("EntityPlayer.addStat");
+                // src: SlotCrafting.java:19-35
+                let achievement = match var1.item_id {
+                    ids::WORKBENCH => Some(al::BUILD_WORK_BENCH),
+                    ids::PICKAXE_WOOD => Some(al::BUILD_PICKAXE),
+                    ids::STONE_OVEN_IDLE => Some(al::BUILD_FURNACE),
+                    ids::HOE_WOOD => Some(al::BUILD_HOE),
+                    ids::BREAD => Some(al::MAKE_BREAD),
+                    ids::CAKE => Some(al::BAKE_CAKE),
+                    ids::PICKAXE_STONE => Some(al::BUILD_BETTER_PICKAXE),
+                    ids::SWORD_WOOD => Some(al::BUILD_SWORD),
+                    _ => None,
+                };
+                if let Some(a) = achievement {
+                    add_stat(player, stat(a), 1);
                 }
                 let matrix = InventoryRef::CraftMatrix;
                 let size = self.inv_get_size_inventory(world, &matrix);
@@ -288,12 +288,12 @@ impl Container {
                 let mut var1 =
                     var1.expect("SlotFurnace.onPickupFromSlot(null): Java NullPointerException");
                 item_stack_on_crafting(world, player, &mut var1);
-                // src: SlotFurnace.java:17-23 (AchievementList.acquireIron, cookFish)
+                // src: SlotFurnace.java:17-23
                 if var1.item_id == ids::INGOT_IRON {
-                    world.note_unimplemented("EntityPlayer.addStat");
+                    add_stat(player, stat(al::ACQUIRE_IRON), 1);
                 }
                 if var1.item_id == ids::FISH_COOKED {
-                    world.note_unimplemented("EntityPlayer.addStat");
+                    add_stat(player, stat(al::COOK_FISH), 1);
                 }
                 self.slot_on_slot_changed(world, player, slot);
                 Some(var1)

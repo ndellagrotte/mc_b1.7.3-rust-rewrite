@@ -267,6 +267,13 @@ pub struct PlayerData {
     /// bobber dies (EntityFish.java:148, :381). Read by
     /// `ItemFishingRod.onItemRightClick` (WP-2.6).
     pub fish_entity: Option<i32>,
+    /// `Minecraft.statFileWriter`, which `EntityPlayerSP.addStat` writes
+    /// (EntityPlayerSP.java:176-192; [`crate::stats`]). Not an
+    /// `EntityPlayer` field: the client's, carried by the local player
+    /// (the port's only player kind) so the simulation's `addStat` calls
+    /// reach it; the client moves it to a replacement player. Never saved
+    /// in the player NBT.
+    pub stat_file_writer: crate::stats::StatFileWriter,
 }
 
 impl Default for PlayerData {
@@ -303,6 +310,7 @@ impl Default for PlayerData {
             prev_time_in_portal: 0.0,
             damage_remainder: 0,
             fish_entity: None,
+            stat_file_writer: crate::stats::StatFileWriter::default(),
         }
     }
 }
