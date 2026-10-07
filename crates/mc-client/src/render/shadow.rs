@@ -1,4 +1,4 @@
-//! `Render.renderShadow` / `renderShadowOnBlock` (Render.java:90-159): the
+//! `Render.renderShadow` / `renderShadowOnBlock` (Render.java:91-160): the
 //! round `/misc/shadow.png` (clamped) projected on the top faces of the
 //! normal cubes under the entity, `shadowSize` around it and from its feet
 //! down `shadowSize` blocks, each face's quad at `1/64` above the block,
@@ -16,7 +16,7 @@ use super::base::RenderBase;
 use crate::gui::batch::gl;
 
 /// The shadow texture.
-// src: Render.java:94
+// src: Render.java:95
 pub const SHADOW_PNG: &str = "%clamp%/misc/shadow.png";
 
 /// `entity.getShadowSize()` with the render overrides: 0 for the arrow,
@@ -42,7 +42,7 @@ pub fn get_shadow_size(e: &Entity) -> f32 {
 }
 
 /// `renderShadow(entity, x, y, z, opacity, partial)`.
-// src: Render.java:90-128
+// src: Render.java:91-129
 #[allow(clippy::too_many_arguments)]
 pub fn render_shadow(
     r: &RenderBase,
@@ -105,7 +105,7 @@ pub fn render_shadow(
 
 /// The shadow's alpha on the face at height `var9` (block y): `(opacity -
 /// (y - (var9 + offset)) / 2) × 0.5 × light`, `None` below 0, at most 1.
-// src: Render.java:137-143
+// src: Render.java:138-144
 pub fn shadow_alpha(var11: f32, var4: f64, var9: i32, var15: f64, light: f32) -> Option<f64> {
     let mut var20 = (var11 as f64 - (var4 - (var9 as f64 + var15)) / 2.0) * 0.5 * light as f64;
     if var20 >= 0.0 {
@@ -121,7 +121,7 @@ pub fn shadow_alpha(var11: f32, var4: f64, var9: i32, var15: f64, light: f32) ->
 /// `renderShadowOnBlock(block, x, y, z, bx, by, bz, opacity, size, dx, dy,
 /// dz)`: the quad on the block's top at its current bounds (the
 /// singleton's `minX` … `maxZ`).
-// src: Render.java:134-159
+// src: Render.java:135-160
 #[allow(clippy::too_many_arguments)]
 fn render_shadow_on_block(
     cx: &mut Ctx,

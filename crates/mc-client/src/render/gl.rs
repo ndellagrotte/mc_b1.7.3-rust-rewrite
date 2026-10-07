@@ -144,7 +144,7 @@ impl GlState {
     /// The state `renderEntities` starts from: texturing on, the alpha test
     /// at 0.1 (Minecraft.java:266-267), depth test and writes with
     /// `GL_LEQUAL` (Minecraft.java:264-265), `GL_CULL_FACE` on
-    /// (EntityRenderer.java:467), blending off, `GL_FOG` on with
+    /// (EntityRenderer.java:468), blending off, `GL_FOG` on with
     /// `setupFog(0)` (EntityRenderer.java:494-495), `GL_FLAT` and the
     /// standard item lighting (EntityRenderer.java:499-500), the
     /// `GL_TEXTURE_2D` binding of `/terrain.png` (EntityRenderer.java:496),
@@ -581,7 +581,7 @@ impl EntityGl {
     }
 
     /// `setTextureUV(u, v)`.
-    // src: Tessellator.java:162-165
+    // src: Tessellator.java:161-164
     pub fn set_texture_uv(&mut self, u: f64, v: f64) {
         self.tess.uv = [u, v];
     }

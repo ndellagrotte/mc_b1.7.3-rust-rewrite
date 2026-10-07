@@ -636,3 +636,28 @@ fn in_range_overrides() {
     assert!(!is_in_range_to_render_vec3d(&l, DVec3::ZERO));
     assert_eq!(shadow::get_shadow_size(&e), 0.0);
 }
+
+#[test]
+fn dev_actions_parse() {
+    let s = crate::script::Script::parse(
+        r#"{"actions": [
+            {"action": "spawn_entity", "kind": "Pig", "ahead": 3, "saddled": true},
+            {"action": "set_block", "ahead": 2, "id": 63, "meta": 8, "text": ["a", "b", "c", "d"]}
+        ]}"#,
+    )
+    .unwrap();
+    let crate::script::Action::SpawnEntity(a) = &s.steps[0].action else {
+        panic!("spawn_entity");
+    };
+    assert_eq!(
+        (a.kind.as_str(), a.ahead, a.saddled),
+        ("Pig", Some(3.0), true)
+    );
+    let crate::script::Action::SetBlock(b) = &s.steps[1].action else {
+        panic!("set_block");
+    };
+    assert_eq!(
+        (b.id, b.meta, b.text.as_ref().map(|t| t[1].as_str())),
+        (63, 8, Some("b"))
+    );
+}

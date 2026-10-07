@@ -13,16 +13,16 @@ use crate::gui::batch::gl;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RenderBase {
     /// `shadowSize`.
-    // src: Render.java:8
+    // src: Render.java:9
     pub shadow_size: f32,
     /// `field_194_c`: the shadow's opacity factor (later MCP:
     /// `shadowOpaque`).
-    // src: Render.java:9
+    // src: Render.java:10
     pub field_194_c: f32,
 }
 
 impl Default for RenderBase {
-    // src: Render.java:8-9
+    // src: Render.java:9-10
     fn default() -> Self {
         RenderBase {
             shadow_size: 0.0,
@@ -45,7 +45,7 @@ impl RenderBase {
 /// graphics and a shadow, the shadow at `(1 - d²/256) × field_194_c`
 /// opacity of the squared distance to the viewer; then the fire on a
 /// burning entity.
-// src: Render.java:236-249
+// src: Render.java:237-250
 #[allow(clippy::too_many_arguments)]
 pub fn do_render_shadow_and_fire(
     r: &RenderBase,
@@ -72,14 +72,14 @@ pub fn do_render_shadow_and_fire(
 }
 
 /// `(float)((1.0D - d² / 256.0D) * (double)field_194_c)`.
-// src: Render.java:238-239
+// src: Render.java:239-240
 pub fn shadow_opacity(dist_sq: f64, field_194_c: f32) -> f32 {
     ((1.0 - dist_sq / 256.0) * field_194_c as f64) as f32
 }
 
 /// `renderOffsetAABB(box, x, y, z)`: the box's six faces, untextured,
 /// white, with their normals, offset by `(x, y, z)`.
-// src: Render.java:161-200
+// src: Render.java:162-201
 pub fn render_offset_aabb(cx: &mut Ctx, var0: &Aabb, var1: f64, var3: f64, var5: f64) {
     let g = &mut *cx.gl;
     g.disable(gl::TEXTURE_2D);
@@ -124,7 +124,7 @@ pub fn render_offset_aabb(cx: &mut Ctx, var0: &Aabb, var1: f64, var3: f64, var5:
 
 /// `renderAABB(box)`: the six faces without normals or colour (vanilla
 /// calls it from no renderer in b1.7.3; kept for completeness).
-// src: Render.java:202-230
+// src: Render.java:203-231
 pub fn render_aabb(cx: &mut Ctx, var0: &Aabb) {
     let g = &mut *cx.gl;
     let b = var0;

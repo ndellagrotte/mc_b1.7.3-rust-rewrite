@@ -1,4 +1,4 @@
-//! `Render.renderEntityOnFire` (Render.java:29-88): the fire tiles of
+//! `Render.renderEntityOnFire` (Render.java:30-89): the fire tiles of
 //! `/terrain.png` (`Block.fire.blockIndexInTexture`, 31, and the tile below
 //! it, 47, alternating; their texture is WP-3.2's animated fire) as a column
 //! of quads facing the camera, scaled to the entity's width, each step 0.45
@@ -14,8 +14,8 @@ use crate::gui::batch::gl;
 pub const FIRE_TEXTURE: i32 = 31;
 
 /// The texture rectangle of step `var23`: `(u0, u1, v0, v1)` after the
-/// swap of every other pair (Render.java:56-72).
-// src: Render.java:56-72
+/// swap of every other pair (Render.java:57-73).
+// src: Render.java:57-73
 pub fn fire_uv(var23: i32) -> (f32, f32, f32, f32) {
     let var9 = FIRE_TEXTURE;
     let var10 = (var9 & 15) << 4;
@@ -39,7 +39,7 @@ pub fn fire_uv(var23: i32) -> (f32, f32, f32, f32) {
 }
 
 /// `renderEntityOnFire(entity, x, y, z, partial)`.
-// src: Render.java:29-88
+// src: Render.java:30-89
 pub fn render_entity_on_fire(
     cx: &mut Ctx,
     var1: &Entity,

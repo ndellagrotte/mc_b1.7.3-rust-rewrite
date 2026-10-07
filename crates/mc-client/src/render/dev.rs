@@ -208,6 +208,14 @@ pub struct SetBlockSpec {
     /// A sign's four lines.
     #[serde(default)]
     pub text: Option<[String; 4]>,
+    /// WP-3.3d: `setBlockAndMetadata` (no neighbour notification), then the
+    /// metadata forced with `setBlockMetadata` and `markBlockNeedsUpdate`.
+    #[serde(default)]
+    pub raw: bool,
+    /// WP-3.7b: `x, y, z` are offsets from the player's block (`floor(posX)`,
+    /// `floor(posY)`, `floor(posZ)`; `posY` is the eye).
+    #[serde(default)]
+    pub rel: bool,
 }
 
 /// The point `ahead` blocks in front of the player at its feet, or the
@@ -229,7 +237,15 @@ fn base_point(game: &Game, ahead: Option<f64>) -> Option<(f64, f64, f64)> {
 
 /// Sets the blocks of `s` (module docs of [`SetBlockSpec`]).
 pub fn set_block(game: &mut Game, s: &SetBlockSpec) -> bool {
-    let Some((bx, by, bz)) = base_point(game, s.ahead) else {
+    let base = if s.rel {
+        game.player().map(|p| {
+            let b = &p.base;
+            (b.pos_x.floor(), b.pos_y.floor(), b.pos_z.floor())
+        })
+    } else {
+        base_point(game, s.ahead)
+    };
+    let Some((bx, by, bz)) = base else {
         return false;
     };
     let Some(world) = game.the_world.as_mut() else {
@@ -250,7 +266,13 @@ pub fn set_block(game: &mut Game, s: &SetBlockSpec) -> bool {
     for x in a[0].min(b[0])..=a[0].max(b[0]) {
         for y in a[1].min(b[1])..=a[1].max(b[1]) {
             for z in a[2].min(b[2])..=a[2].max(b[2]) {
-                world.set_block_and_metadata_with_notify(x, y, z, s.id, s.meta);
+                if s.raw {
+                    world.set_block_and_metadata(x, y, z, s.id, s.meta);
+                    world.set_block_metadata(x, y, z, s.meta);
+                    world.mark_block_needs_update(x, y, z);
+                } else {
+                    world.set_block_and_metadata_with_notify(x, y, z, s.id, s.meta);
+                }
                 if let Some(text) = &s.text
                     && let Some(r) = world.get_block_tile_entity(x, y, z)
                     && let Some(te) = world.tile_entities.get_mut(&r)

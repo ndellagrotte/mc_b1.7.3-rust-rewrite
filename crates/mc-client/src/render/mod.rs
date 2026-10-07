@@ -186,7 +186,7 @@ pub struct Ctx<'a> {
 
 impl Ctx<'_> {
     /// `Render.loadTexture(name)`.
-    // src: Render.java:13-16
+    // src: Render.java:14-17
     pub fn load_texture(&mut self, name: &'static str) {
         self.gl.bind_texture(name);
     }

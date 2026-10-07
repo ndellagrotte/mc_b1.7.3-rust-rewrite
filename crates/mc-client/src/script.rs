@@ -286,37 +286,22 @@ pub enum Action {
         /// `Entity.fire`.
         ticks: i32,
     },
-    /// Dev (WP-3.3b, WP-3.3d, WP-3.7b): `world.setBlockAndMetadataWithNotify(x, y,
-    /// z, id, meta)` (the block's `onBlockAdded` and its neighbours'
-    /// `onNeighborBlockChange` run, as for a placed block; a placed fluid
-    /// source flows as the simulation runs it). With `raw`,
-    /// `setBlockAndMetadata` (no neighbour notification; `onBlockAdded`
-    /// still runs), then the metadata forced again with `setBlockMetadata`
-    /// (an `onBlockAdded` such as the rail's may have changed it) and
-    /// `markBlockNeedsUpdate`: a shape the game would not keep (a lone
-    /// curved rail, a powered wire with no source).
-    /// With `rel`, `x, y, z` are offsets from the player's block
-    /// (`floor(posX)`, `floor(posY)`, `floor(posZ)`; `posY` is the eye),
-    /// e.g. still water, 9, around the eye for the water overlay.
-    SetBlock {
-        /// x (or the offset with `rel`).
-        x: i32,
-        /// y.
-        y: i32,
-        /// z.
-        z: i32,
-        /// The block id.
-        id: i32,
-        /// The metadata.
-        #[serde(default)]
-        meta: i32,
-        /// No neighbour notification, the metadata forced.
-        #[serde(default)]
-        raw: bool,
-        /// Relative to the player.
-        #[serde(default)]
-        rel: bool,
-    },
+    /// Dev (WP-3.5b): spawns an entity (`crate::render::dev`): an
+    /// `EntityList` name at `x, y, z` (or ahead of the player) with a few
+    /// render-visible fields.
+    SpawnEntity(crate::render::dev::SpawnEntitySpec),
+    /// Dev (WP-3.3b, WP-3.3d, WP-3.5b, WP-3.7b): sets a block or a box of
+    /// blocks (`crate::render::dev::SetBlockSpec`), with a sign's text:
+    /// `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` (the block's
+    /// `onBlockAdded` and its neighbours' `onNeighborBlockChange` run, as for
+    /// a placed block; a placed fluid source flows as the simulation runs
+    /// it). With `raw`, `setBlockAndMetadata` (no neighbour notification;
+    /// `onBlockAdded` still runs), then the metadata forced again with
+    /// `setBlockMetadata` and `markBlockNeedsUpdate`: a shape the game would
+    /// not keep (a lone curved rail, a powered wire with no source). With
+    /// `rel`, `x, y, z` are offsets from the player's block (`posY` is the
+    /// eye), e.g. still water, 9, around the eye for the water overlay.
+    SetBlock(crate::render::dev::SetBlockSpec),
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -811,37 +796,11 @@ pub fn run_script(
                     p.base.fire = ticks;
                 }
             }
-            Action::SetBlock {
-                x,
-                y,
-                z,
-                id,
-                meta,
-                raw,
-                rel,
-            } => {
-                let origin = if rel {
-                    game.player().map(|p| {
-                        let b = &p.base;
-                        (
-                            mc_core::math::floor_double(b.pos_x),
-                            mc_core::math::floor_double(b.pos_y),
-                            mc_core::math::floor_double(b.pos_z),
-                        )
-                    })
-                } else {
-                    Some((0, 0, 0))
-                };
-                if let (Some((ox, oy, oz)), Some(w)) = (origin, game.the_world.as_mut()) {
-                    let (x, y, z) = (ox + x, oy + y, oz + z);
-                    if raw {
-                        w.set_block_and_metadata(x, y, z, id, meta);
-                        w.set_block_metadata(x, y, z, meta);
-                        w.mark_block_needs_update(x, y, z);
-                    } else {
-                        w.set_block_and_metadata_with_notify(x, y, z, id, meta);
-                    }
-                }
+            Action::SpawnEntity(spec) => {
+                crate::render::dev::spawn_entity(&mut game, &spec);
+            }
+            Action::SetBlock(spec) => {
+                crate::render::dev::set_block(&mut game, &spec);
             }
         }
     }
@@ -1051,27 +1010,29 @@ mod tests {
         .unwrap();
         assert_eq!(
             s.steps[0].action,
-            Action::SetBlock {
-                x: 1,
-                y: 70,
-                z: -2,
+            Action::SetBlock(crate::render::dev::SetBlockSpec {
+                x: 1.0,
+                y: 70.0,
+                z: -2.0,
                 id: 9,
                 meta: 0,
                 raw: false,
-                rel: false
-            }
+                rel: false,
+                ..Default::default()
+            })
         );
         assert_eq!(
             s.steps[1].action,
-            Action::SetBlock {
-                x: 1,
-                y: 70,
-                z: -2,
+            Action::SetBlock(crate::render::dev::SetBlockSpec {
+                x: 1.0,
+                y: 70.0,
+                z: -2.0,
                 id: 8,
                 meta: 3,
                 raw: false,
-                rel: false
-            }
+                rel: false,
+                ..Default::default()
+            })
         );
     }
 
@@ -1084,27 +1045,29 @@ mod tests {
         .unwrap();
         assert_eq!(
             s.steps[0].action,
-            Action::SetBlock {
-                x: 1,
-                y: 64,
-                z: -2,
+            Action::SetBlock(crate::render::dev::SetBlockSpec {
+                x: 1.0,
+                y: 64.0,
+                z: -2.0,
                 id: 66,
                 meta: 7,
                 raw: true,
-                rel: false
-            }
+                rel: false,
+                ..Default::default()
+            })
         );
         assert_eq!(
             s.steps[1].action,
-            Action::SetBlock {
-                x: 0,
-                y: 65,
-                z: 0,
+            Action::SetBlock(crate::render::dev::SetBlockSpec {
+                x: 0.0,
+                y: 65.0,
+                z: 0.0,
                 id: 85,
                 meta: 0,
                 raw: false,
-                rel: false
-            }
+                rel: false,
+                ..Default::default()
+            })
         );
     }
 
@@ -1138,15 +1101,16 @@ mod tests {
         assert_eq!(s.steps[2].action, Action::SetFire { ticks: 300 });
         assert_eq!(
             s.steps[3].action,
-            Action::SetBlock {
-                x: 0,
-                y: 0,
-                z: 0,
+            Action::SetBlock(crate::render::dev::SetBlockSpec {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
                 id: 9,
                 meta: 0,
                 raw: false,
-                rel: true
-            }
+                rel: true,
+                ..Default::default()
+            })
         );
     }
 
