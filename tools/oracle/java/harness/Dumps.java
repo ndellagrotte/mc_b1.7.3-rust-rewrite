@@ -17,6 +17,8 @@ import net.minecraft.src.EntityPlayer;
 import net.minecraft.src.EnumSkyBlock;
 import net.minecraft.src.InventoryPlayer;
 import net.minecraft.src.ItemStack;
+import net.minecraft.src.MapData;
+import net.minecraft.src.MapStorage;
 import net.minecraft.src.MathHelper;
 import net.minecraft.src.MovingObjectPosition;
 import net.minecraft.src.NextTickListEntry;
@@ -335,6 +337,29 @@ final class Dumps {
                 .raw("main", stacks(inv.mainInventory)).raw("armor", stacks(inv.armorInventory))
                 .raw("held", stack(inv.getItemStack()))
                 .raw("craft_matrix", stacks(grid)).raw("craft_result", stack(c.craftResult.getStackInSlot(0))));
+    }
+
+    /**
+     * {@code map_data}: the MapData {@code "map_<id>"} as the world's MapStorage
+     * ({@code World.field_28108_z}, World.java:46) holds it in its private {@code loadedDataMap}
+     * (MapStorage.java:16), read by reflection so that no file is read and nothing is added to the
+     * storage (loadItemData would do both). {@code present}, and when present BLAKE3 over
+     * {@code colors} (MapData.java:13), {@code scale}, {@code xCenter}, {@code zCenter},
+     * {@code dimension} and {@code step} (MapData.java:9-14).
+     */
+    static void mapData(Trace t, long tick, World w, int id) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> loaded = (Map<String, Object>) Reflect.get(MapStorage.class, "loadedDataMap", w.field_28108_z);
+        MapData d = (MapData) loaded.get("map_" + id);
+        Json.Line l = line(tick, "map_data").put("id", id);
+        if (d == null) {
+            l.put("present", false);
+        } else {
+            l.put("present", true).put("colors", Blake3.hex(d.colors)).put("scale", d.scale)
+                    .put("xCenter", d.xCenter).put("zCenter", d.zCenter).put("dimension", d.dimension)
+                    .put("step", d.step);
+        }
+        t.add(l);
     }
 
     static Map<String, Object> map(Object o, String what) {

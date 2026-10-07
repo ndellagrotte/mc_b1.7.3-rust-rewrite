@@ -59,9 +59,9 @@
 //! | `spawn` | `construct` (the kind's constructor; `Item`: [`new_entity_item`] and `delayBeforeCanPickup = pickup_delay` (10); the harness-defined `Egg`, `Fireball`, `LightningBolt`, `FishingHook`, a `Painting` with `direction` and a `Minecart` with `type`), `setLocationAndAngles` unless the constructor took the position, then [`World::spawn_entity_in_world`] (`LightningBolt`: [`World::add_weather_effect`]) → `id`, `kind`, `joined` |
 //! | `set_motion` / `set_pos` / `set_rotation` | fields of the loaded entity / [`EntityBase::set_position`](mc_sim::entity::EntityBase::set_position) / fields |
 //! | `attack` | `attack`: the player as attacker: [`swing_item`], [`player_controller::attack_entity`] (both out of their slots) → `target_id`, `via` `"player"`; otherwise `target.attackEntityFrom(attacker or null, damage)` through [`mc_sim::entity::dispatch::attack_entity_from`] (target out of its slot, attacker a copy) → `target_id`, `via` `"direct"`, `result` |
-//! | `interact` | `TickScenario.interact` in `interact`: the stack into slot `currentItem`, `EntityPlayer.useCurrentItemOnEntity` ([`use_current_item_on_entity`] with the player and the target both in hand; when false, `ItemStack.useItemOnEntity` on a living target is a recorded gap, WP-2.6), then `sendUseItem` ([`send_use_item`]) → `id`, `result`, `used`, `stack` |
+//! | `interact` | `TickScenario.interact` in `interact`: the stack into slot `currentItem`, `EntityPlayer.useCurrentItemOnEntity` ([`use_current_item_on_entity`] with the player and the target both in hand; when false, `ItemStack.useItemOnEntity` on a living target: `Item.saddleEntity`, item behaviour WP-2.6), then `sendUseItem` ([`send_use_item`]) → `id`, `result`, `used`, `stack` |
 //! | `explode` | [`World::create_explosion`] (no exploder), or [`World::new_explosion`] with `flaming` → `destroyed` (the size of `destroyedBlockPositions`) |
-//! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. Recorded gaps: `Item.onItemUse` (taken as false) and `Item.onItemRightClick` (taken as returning the stack unchanged), item behaviour WP-2.6; the `blockActivated` overrides the block dispatch records (WP-1.6) |
+//! | `use_item` | `TickScenario.useItem` in `use_item`: the stack into slot `currentItem`, `PlayerController.sendPlaceBlock` (block dispatch `block_activated`, else `ItemStack.useItem`), `swingItem`, the size-0 removal, `sendUseItem` → `placed`, `used`, `stack`. `Item.onItemUse` / `Item.onItemRightClick` are the item behaviour dispatch ([`mc_sim::item::behaviour`], WP-2.6) |
 //! | `craft` | `craft`: [`CraftingManager::find_matching_recipe`] over a new [`InventoryCrafting`] (3×3 or 2×2) filled in slot order → `result` |
 //! | `slot_click` | `open_container` (the player's `ContainerPlayer`, built by the `player` op and held in the harness, or the last opened / a new workbench, chest (on [`chest_inventory`]), furnace or dispenser container), then [`Container::slot_click`] with the player in hand → `slot`, `result`, `stack`, `held` |
 //! | `inventory` | `inventory_line`: the player's `InventoryPlayer` and its `ContainerPlayer` grid and result |
@@ -72,6 +72,7 @@
 //! | `world_time` / `rng_state` | [`World::get_world_time`] / [`World::rng_state`] |
 //! | `weather` | [`World::world_info`] timers and flags, the `World` rain/thunder strengths |
 //! | `player_state` | the player's [`PlayerData`](mc_sim::entity::PlayerData) fields, box and offsets (`player_state_line`) |
+//! | `map_data` | `map_data_line`: the `MapData` `map_<id>` loaded in [`World::field_28108_z`] (no file read; WP-2.6) |
 //! | `ray_trace` | [`World::ray_trace_between`] (`rayTraceBlocks_do` on fresh vectors) |
 //! | `power` | [`World::is_block_getting_powered`], then [`World::is_block_indirectly_getting_powered`] |
 //! | `save` | [`World::try_save_world`]`(true)`, then [`emit_tier_s`] on the in-memory save (masked) |
@@ -80,10 +81,7 @@
 //! `spawn` of the mobs other than `Pig`, `Sheep`, `Cow`, `Chicken`, `Wolf`,
 //! `Minecart` and `Boat` (their `(World)` constructors); an op that needs
 //! the player after it left `loadedEntityList` (the oracle keeps the
-//! `HarnessPlayer` object). `use_item` runs, but every item's `onItemUse` /
-//! `onItemRightClick` is a recorded gap (see the table), so a fixture whose
-//! item does something diverges at the first block or inventory dump after
-//! the op.
+//! `HarnessPlayer` object).
 //!
 //! # Entity kind names
 //!
@@ -1406,21 +1404,16 @@ fn construct(
 /// `ItemBlock` placement decrements `stackSize`). Stacks are values here, so
 /// the held stack is passed as the hotbar *slot* that holds it
 /// (`Option<usize>`, `None` for Java's `null`):
-/// [`mc_sim::entity::player::item_stack_use_item`] runs
-/// on the stack in that slot and the mutation lands in the slot, and the
+/// [`ItemStack::use_item`] runs on the stack moved out of that slot
+/// ([`send_place_block`]) and the mutation lands in the slot, and the
 /// size-0 test reads the slot, which is Java's `held` because nothing in
 /// sendPlaceBlock stores another stack into the slot (no b1.7.3
 /// `blockActivated` or `onItemUse` assigns `mainInventory`). Java's identity
 /// test in `sendUseItem` (`var5 != var3`) is the explicit
-/// [`mc_sim::entity::player::RightClickResult`] instead. WP-2.6 transcribes `onItemUse` and
-/// `onItemRightClick` against these signatures (`&mut ItemStack`), never on
-/// a copy.
-///
-/// Recorded gaps (WP-2.6, item behaviour): `Item.onItemUse` (treated as
-/// returning false, so `ItemStack.useItem` returns false and adds no stat)
-/// and `Item.onItemRightClick` (treated as returning the same stack
-/// unchanged, so `sendUseItem` returns false). `blockActivated` goes through
-/// the block dispatch, whose untranscribed overrides record themselves.
+/// [`mc_sim::item::RightClickResult`] instead. `Item.onItemUse` and
+/// `Item.onItemRightClick` are the item behaviour dispatch
+/// ([`mc_sim::item::behaviour`], WP-2.6); `blockActivated` goes through the
+/// block dispatch.
 fn use_item(
     world: &mut World,
     p: &mut mc_sim::entity::Entity,
@@ -1474,9 +1467,9 @@ fn use_item(
 ///    `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469,
 ///    [`use_current_item_on_entity`], the target taken out of its slot
 ///    too): `result = target.interact(player)`; when false, the held
-///    stack's `useItemOnEntity` on a living target (`Item.saddleEntity`,
-///    item behaviour WP-2.6: recorded, taken as doing nothing), and a stack
-///    at size 0 or less leaves the hotbar.
+///    stack's `useItemOnEntity` on a living target (`Item.saddleEntity`:
+///    the saddle on a pig, a dye on a sheep), and a stack at size 0 or less
+///    leaves the hotbar.
 /// 3. `used = sendUseItem` ([`send_use_item`]) on the slot's stack, if any:
 ///    the entity branch leaves `clickMouse`'s `var2` true.
 fn interact(
@@ -1764,6 +1757,7 @@ fn dump(
             let r = world.rng_state();
             w.push(TraceLine::rng_state(ti, r.world_rand, r.lcg, r.math_random));
         }
+        DumpKind::MapData { id } => w.push(map_data_line(world, ti, id)),
         DumpKind::PlayerState => {
             let pid = h
                 .player
@@ -1778,6 +1772,28 @@ fn dump(
         }
     }
     Ok(())
+}
+
+/// `Dumps.mapData`: the `MapData` `"map_<id>"` as the world's `MapStorage`
+/// holds it (`loadedDataMap.get`, no file read): `present`, and when present
+/// BLAKE3 over its `colors` bytes, `scale`, `xCenter`, `zCenter`,
+/// `dimension` and `step`.
+fn map_data_line(world: &World, t: i64, id: i32) -> TraceLine {
+    let name = mc_sim::item::behaviour::map::map_name(id);
+    let l = TraceLine::new(t, "map_data").with("id", id);
+    match world.field_28108_z.loaded(&name) {
+        None => l.with("present", false),
+        Some(d) => {
+            let d = d.borrow();
+            l.with("present", true)
+                .with("colors", crate::blake3_hex(&d.colors))
+                .with("scale", d.scale)
+                .with("xCenter", d.x_center)
+                .with("zCenter", d.z_center)
+                .with("dimension", d.dimension)
+                .with("step", d.step)
+        }
+    }
 }
 
 /// `Dumps.playerState`: the `EntityPlayer` state an `entity` line does not

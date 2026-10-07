@@ -63,7 +63,8 @@ final class TickScenario {
             "player", "spawn", "set_motion", "set_pos", "set_rotation", "use_item", "attack", "save", "explode",
             "interact", "craft", "slot_click", "input", "dig", "sleep");
     private static final List<String> DUMPS = List.of("chunk_digest", "block", "block_box", "scheduled_ticks",
-            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory", "player_state");
+            "entity_state", "world_time", "rng_state", "ray_trace", "power", "weather", "inventory", "player_state",
+            "map_data");
 
     @SuppressWarnings("unchecked")
     static Trace run(Map<String, Object> sc, Path dir) throws Exception {
@@ -930,6 +931,7 @@ final class TickScenario {
                 Dumps.inventory(trace, t, hw.player);
                 break;
             case "player_state": Dumps.playerState(trace, t, requirePlayer(hw, "player_state")); break;
+            case "map_data": Dumps.mapData(trace, t, w, i(d, "id")); break;
             default: throw new IllegalArgumentException("unknown dump " + d.get("what"));
         }
     }

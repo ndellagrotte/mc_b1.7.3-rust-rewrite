@@ -780,6 +780,12 @@ pub enum DumpKind {
     Inventory,
     /// `player_state` line: the player's `EntityPlayer` state.
     PlayerState,
+    /// `map_data` line: the `MapData` `"map_<id>"` loaded in the world's
+    /// `MapStorage` (WP-2.6).
+    MapData {
+        /// The map id (an `ItemMap` stack's damage).
+        id: i32,
+    },
     /// `power` line: `isBlockGettingPowered` and
     /// `isBlockIndirectlyGettingPowered` at a block.
     Power {
