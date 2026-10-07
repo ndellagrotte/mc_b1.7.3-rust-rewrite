@@ -58,8 +58,11 @@
 //!
 //! `getMPMapData` (ItemMap.java:9-20, the multiplayer client's map packet)
 //! is transcribed for completeness in [`map`] but has no caller.
-//! `EntityPlayerSP.displayGUIEditSign` (the sign editor, client GUI) is
-//! recorded where `ItemSign` calls it; `EntityPlayer`'s is empty.
+//! `ItemSign` calls `displayGUIEditSign` (ItemSign.java:47), which is
+//! empty in `EntityPlayer` and opens the sign editor in `EntityPlayerSP`
+//! (EntityPlayerSP.java:113-115): [`crate::entity::player::display_gui`]
+//! raises [`crate::world::client_requests::PlayerGui::EditSign`]
+//! ([`crate::world::client_requests`]) for the client.
 
 pub mod block_items;
 pub mod bucket;

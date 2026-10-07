@@ -535,9 +535,10 @@ impl World {
     /// (module docs, "Conventions"): `Entity.nextEntityID` (Entity.java:7),
     /// `NextTickListEntry.nextTickEntryID` (NextTickListEntry.java:4),
     /// `World.lightingUpdatesScheduled` (World.java:52), the `Math.random()`
-    /// stream, the entity-RNG seed of the harness protocol, the block
-    /// singletons ([`BlockStatics`]), `SpawnerAnimals.eligibleChunksForSpawning`
-    /// (SpawnerAnimals.java:9) and the display `Random` (not Java state).
+    /// stream, `Item.itemRand` (Item.java:6), the entity-RNG seed of the
+    /// harness protocol, the block singletons ([`BlockStatics`]),
+    /// `SpawnerAnimals.eligibleChunksForSpawning` (SpawnerAnimals.java:9)
+    /// and the display `Random` (not Java state).
     /// The diagnostics move too. The fields that are moved (the `Random`
     /// streams, the block singletons, the spawning set, the diagnostics) are
     /// left fresh in `old`; the counters are copied.
@@ -548,6 +549,7 @@ impl World {
         self.next_tick_entry_id = old.next_tick_entry_id;
         self.lighting_updates_scheduled = old.lighting_updates_scheduled;
         self.math_random = std::mem::replace(&mut old.math_random, JavaRandom::new(0));
+        self.item_rand = std::mem::replace(&mut old.item_rand, JavaRandom::new(0));
         self.entity_rand_seed = old.entity_rand_seed;
         self.block_statics = std::mem::take(&mut old.block_statics);
         self.eligible_chunks_for_spawning =
@@ -596,8 +598,8 @@ impl World {
     /// Minecraft.java:1276) or another on the same save.
     ///
     /// The Java statics live on in the JVM when the old `World` object is
-    /// dropped: they are moved from `old` ([`World::adopt_statics`]), with
-    /// `Item.itemRand` ([`World::item_rand`]), so `old` is `&mut`.
+    /// dropped: they are moved from `old` ([`World::adopt_statics`], which
+    /// includes `Item.itemRand`), so `old` is `&mut`.
     // src: World.java:103-143
     pub fn new_for_dimension(
         old: &mut World,
@@ -616,7 +618,6 @@ impl World {
         w.lock_timestamp = old.lock_timestamp;
         // The JVM statics (module docs, "Conventions").
         w.adopt_statics(old);
-        w.item_rand = std::mem::replace(&mut old.item_rand, JavaRandom::new(0));
         w.calculate_initial_skylight(); // src: World.java:141
         w.func_27163_e(); // src: World.java:142
         w

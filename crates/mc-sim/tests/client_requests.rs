@@ -12,7 +12,7 @@ use mc_sim::block::dispatch as bd;
 use mc_sim::entity::item::new_entity_item;
 use mc_sim::entity::minecart::new_entity_minecart;
 use mc_sim::entity::player::{self, MovementInput, new_entity_player_sp};
-use mc_sim::entity::{Entity, EntityKindData, PlayerSpData, dispatch};
+use mc_sim::entity::{Entity, EntityKindData, PlayerSpData, dispatch, zombie};
 use mc_sim::inventory::InventoryRef;
 use mc_sim::item::ItemStack;
 use mc_sim::save::NoSave;
@@ -343,17 +343,32 @@ fn the_portal_timer_raises_use_portal_and_the_rest_runs_after() {
                 volume: 1.0,
                 pitch: travel,
             },
-            ClientRequest::UsePortal,
+            ClientRequest::UsePortal {
+                x: 4.5 / 8.0,
+                z: 4.5 / 8.0
+            },
         ]
     );
+    // usePortal's head (Minecraft.java:1215-1230): into the nether, x and z
+    // divided by 8, alive again after setEntityDead.
+    assert_eq!((p.base.pos_x, p.base.pos_z), (4.5 / 8.0, 4.5 / 8.0));
+    assert!(!p.base.is_dead);
     let d = p.kind.player().unwrap();
+    assert_eq!(d.dimension, -1);
     assert_eq!(d.time_in_portal, 1.0);
     assert_eq!(
         d.time_until_portal, 10,
         "the cooldown counts after the portal"
     );
     assert!(d.in_portal, ":63 runs after usePortal returns");
-    assert_eq!(p.base.pos_y, y_before, "no movement before the portal");
+    // No movement before the portal; setLocationAndAngles adds yOffset to
+    // the y it is given (Entity.java:671).
+    assert_eq!(
+        p.base.pos_y,
+        y_before + p.base.y_offset as f64,
+        "no movement before the portal"
+    );
+    let y_head = p.base.pos_y;
     assert_eq!(p.base.y_size, 0.0);
 
     player::sp_on_living_update_after_portal(&mut p, &mut w);
@@ -362,7 +377,7 @@ fn the_portal_timer_raises_use_portal_and_the_rest_runs_after() {
     assert_eq!(d.time_until_portal, 9);
     assert!(p.base.y_size > 0.0, "the sneak dip (decayed by moveEntity)");
     assert!(
-        p.base.pos_y < y_before,
+        p.base.pos_y < y_head,
         "EntityPlayer.onLivingUpdate moved it"
     );
     assert!(w.client_requests.is_empty());
@@ -375,6 +390,60 @@ fn the_portal_timer_raises_use_portal_and_the_rest_runs_after() {
         dispatch::on_living_update(&mut h, &mut w);
     }
     assert!(w.client_requests.is_empty());
+}
+
+/// Minecraft.java:1215-1230 runs inside the player's update
+/// (EntityPlayerSP.java:59), within the old world's `updateEntities`: a
+/// zombie updated after the player on the travel tick finds it out of
+/// `playerEntities` and moved to x/8, z/8, and cannot hit it. Without the
+/// portal, the same zombie hits it on that tick.
+#[test]
+fn a_mob_after_the_player_cannot_hit_it_on_the_travel_tick() {
+    let run = |travel: bool| {
+        let mut w = world();
+        for dz in -3..=3 {
+            for dx in -3..=3 {
+                w.get_chunk_from_chunk_coords(dx, dz);
+            }
+        }
+        w.difficulty_setting = 2;
+        let mut p = client_player(&mut w, 4.5, 61.0, 4.5);
+        p.kind.player_mut().unwrap().time_until_portal = 0;
+        let pid = p.base.entity_id;
+        w.spawn_entity_in_world(p);
+        let mut z = zombie::new_entity_zombie(&mut w);
+        z.base.set_location_and_angles(5.6, 61.0, 4.5, 0.0, 0.0);
+        w.spawn_entity_in_world(z);
+        // The first update targets the player (EntityCreature.java:19-24);
+        // the second attacks it (EntityCreature.java:25-30, EntityMob.java:49-55).
+        w.update_entities();
+        requests(&mut w);
+        assert_eq!(w.entity(pid).unwrap().kind.living().unwrap().health, 20);
+        if travel {
+            let d = w.entity_mut(pid).unwrap().kind.player_mut().unwrap();
+            d.in_portal = true;
+            d.time_in_portal = 0.999;
+        }
+        w.update_entities();
+        let p = w.entity(pid).unwrap();
+        let health = p.kind.living().unwrap().health;
+        let (x, z) = (p.base.pos_x, p.base.pos_z);
+        let in_list = w.player_entities.contains(&pid);
+        let used = requests(&mut w)
+            .into_iter()
+            .any(|r| r == ClientRequest::UsePortal { x, z });
+        (health, in_list, used)
+    };
+    assert_eq!(
+        run(false),
+        (15, true, false),
+        "the zombie hits (5 at normal)"
+    );
+    assert_eq!(
+        run(true),
+        (20, false, true),
+        "gone before the zombie's turn"
+    );
 }
 
 /// World.java:103-143: the new world copies `worldInfo` and
@@ -447,4 +516,17 @@ fn seed_clock_randoms_leaves_the_counters() {
         x.chest_random.next_long(),
         w.block_statics.chest_random.next_long()
     );
+}
+
+/// EntityPlayerSP.java:108-111: `closeScreen` closes the client's screen;
+/// `EntityPlayer`'s (the harness's) does not reach the client.
+#[test]
+fn close_screen_asks_the_client() {
+    let mut w = world();
+    let p = client_player(&mut w, 0.5, 61.0, 0.5);
+    player::close_screen(&p, &mut w);
+    assert_eq!(requests(&mut w), vec![ClientRequest::CloseScreen]);
+    let h = harness_player(&mut w, 0.5, 61.0, 0.5);
+    player::close_screen(&h, &mut w);
+    assert!(requests(&mut w).is_empty());
 }

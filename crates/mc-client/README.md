@@ -104,10 +104,25 @@ nether travel.
   `ClientEvent::AchievementHint` (every player update while it is not
   unlocked; 3.6), and the portal sounds `portal.trigger` /
   `portal.travel` as `ClientSound::PlaySoundFx` (3.8; pitch drawn by the
-  simulation). `usePortal` is the shell's: the player's update stops
-  there, the shell changes the dimension after `updateEntities`, then
-  finishes the update on the new world
+  simulation). `closeScreen` (`ClientRequest::CloseScreen`,
+  EntityPlayerSP.java:108-111) closes the screen
+  (`Game::display_gui_screen(None)`); its simulation caller, the
+  `craftingInventory.isUsableByPlayer` check of `EntityPlayer.onUpdate`,
+  waits for the GUI containers (3.6). `usePortal` is split: its head (the
+  dimension toggle, `setEntityDead`, x and z scaled by 8) runs inside the
+  player's update (`player::use_portal_head`), so the rest of the old
+  world's `updateEntities` no longer sees the player there, as in vanilla;
+  the update stops there and raises `ClientRequest::UsePortal { x, z }`.
+  The shell runs the rest of `usePortal` after `updateEntities` (the
+  old-world `updateEntityWithOptionalForce`, the new world, `changeWorld`,
+  the teleporter), then finishes the update on the new world
   (`player::sp_on_living_update_after_portal`) and the rest of the tick.
+- For 3.6: vanilla opens a `displayGUI*` screen inside the click or update
+  that asked for it, so the rest of that `runTick`'s key and mouse events
+  go to the screen. `ClientEvent::DisplayGui` arrives when the shell
+  collects the world events; the screen owner should open it before the
+  next input event is dispatched (drain right after each player-controller
+  call in the click path).
 
 ## Scripted-input dev mode
 

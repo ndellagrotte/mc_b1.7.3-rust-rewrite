@@ -259,7 +259,7 @@ fn client_additions_push_sneak_and_portal() {
     let use_portal = |w: &World| {
         w.client_requests
             .iter()
-            .any(|r| *r == ClientRequest::UsePortal)
+            .any(|r| matches!(r, ClientRequest::UsePortal { .. }))
     };
     assert!(!use_portal(&w));
     dispatch::set_in_portal(&mut q, &mut w);

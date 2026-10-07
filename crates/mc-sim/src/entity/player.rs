@@ -37,10 +37,22 @@
 //! of the player's update and returns into it: the rest of `onLivingUpdate`
 //! (:63 `inPortal = false`, :74-87: the portal cooldown, the sneak `ySize`,
 //! `pushOutOfBlocks`, `EntityPlayer.onLivingUpdate` with its movement) runs
-//! on the new world. Here [`sp_on_living_update`] raises
-//! [`ClientRequest::UsePortal`] and returns at that point; the client
-//! changes the dimension and then calls [`sp_on_living_update_after_portal`]
-//! on the new world. What follows `onLivingUpdate` in its callers
+//! on the new world. Here [`sp_on_living_update`] runs `usePortal`'s
+//! deterministic head ([`use_portal_head`]: the dimension toggle,
+//! `setEntityDead` out of `playerEntities`, x and z scaled), so every
+//! entity the old world's `updateEntities` reaches after the player sees
+//! it gone and moved, as in vanilla; then it raises
+//! [`ClientRequest::UsePortal`] and returns. The client runs the rest of
+//! `usePortal` and then calls [`sp_on_living_update_after_portal`] on the
+//! new world. `usePortal`'s old-world
+//! `updateEntityWithOptionalForce(player, false)` (Minecraft.java:1231-1233,
+//! :1242-1244: `lastTickPos*`, `prevRotation*`) runs in the client after the
+//! old world's `updateEntities` pass instead of inside it; the chunk
+//! membership it also fixes is fixed anyway by the pass's own
+//! `updateEntityWithOptionalForce(player, true)` tail right after the
+//! player's update, so for the rest of the pass only the player's
+//! `lastTickPos*`/`prevRotation*` differ, which no other entity reads. What
+//! follows `onLivingUpdate` in its callers
 //! (`EntityLiving.onUpdate`'s body-yaw tail, EntityLiving.java:206-290;
 //! `EntityPlayer.onUpdate`'s tail, the cape position and `minutesPlayed`,
 //! EntityPlayer.java:80-124; the old world's `updateEntityWithOptionalForce`
@@ -50,8 +62,12 @@
 //! stat counter that counts either way, and the old world, which is
 //! discarded.
 //!
-//! Out of scope, client: `closeScreen`'s `displayGuiScreen` (the client
-//! closes its screen), `setHealth` (multiplayer packets), the
+//! `closeScreen`'s `mc.displayGuiScreen(null)` (EntityPlayerSP.java:108-111)
+//! is [`close_screen`] ([`ClientRequest::CloseScreen`]); its caller,
+//! `EntityPlayer.onUpdate`'s `craftingInventory.isUsableByPlayer` check
+//! (EntityPlayer.java:81-84), needs the GUI containers (WP-3.6).
+//!
+//! Out of scope, client: `setHealth` (multiplayer packets), the
 //! `MouseFilter`s.
 //!
 //! # Audit of EntityPlayer.java
@@ -340,7 +356,8 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
     living::on_update(e, world);
     // src: EntityPlayer.java:81-84: `craftingInventory.isUsableByPlayer(this)`
     // is ContainerPlayer's `true` (ContainerPlayer.java:61-63) while no GUI
-    // replaced it (WP-2.5b), so closeScreen never runs here.
+    // replaced it (WP-2.5b), so closeScreen ([`close_screen`]) never runs
+    // here until the GUI containers exist (WP-3.6).
 
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     let p = player_mut(e);
@@ -689,6 +706,17 @@ pub fn on_item_pickup(e: &mut Entity, world: &mut World, picked: &Entity, _count
 pub fn display_gui(e: &Entity, world: &mut World, gui: PlayerGui) {
     if is_client_player(e) {
         world.client_requests.push(ClientRequest::DisplayGui(gui));
+    }
+}
+
+/// `closeScreen()`: `EntityPlayer`'s resets `craftingInventory` to
+/// `inventorySlots` (EntityPlayer.java:131-133; not modelled, WP-2.5b);
+/// `EntityPlayerSP`'s then closes the screen (`mc.displayGuiScreen(null)`),
+/// here [`ClientRequest::CloseScreen`].
+// src: EntityPlayerSP.java:108-111
+pub fn close_screen(e: &Entity, world: &mut World) {
+    if is_client_player(e) {
+        world.client_requests.push(ClientRequest::CloseScreen);
     }
 }
 
@@ -1423,9 +1451,14 @@ pub fn sp_on_living_update(e: &mut Entity, world: &mut World) {
                     volume: 1.0,
                     pitch,
                 });
-                // src: EntityPlayerSP.java:59: mc.usePortal(); the update
-                // goes on on the new world (sp_on_living_update_after_portal).
-                world.client_requests.push(ClientRequest::UsePortal);
+                // src: EntityPlayerSP.java:59: mc.usePortal(). Its head runs
+                // here, inside the old world's updateEntities; the client
+                // runs the rest, then the update goes on on the new world
+                // (sp_on_living_update_after_portal).
+                let (x, z) = use_portal_head(e, world);
+                world
+                    .client_requests
+                    .push(ClientRequest::UsePortal { x, z });
                 return;
             }
         }
@@ -1441,6 +1474,43 @@ pub fn sp_on_living_update(e: &mut Entity, world: &mut World) {
         }
     }
     sp_on_living_update_tail(e, world);
+}
+
+/// The head of `Minecraft.usePortal()`, up to the old world's
+/// `updateEntityWithOptionalForce`: the dimension toggled between -1 and 0,
+/// `theWorld.setEntityDead(thePlayer)` (out of `playerEntities`, the
+/// crafting grid dropped, World.java:934-946) and `isDead` set back, then
+/// x and z divided by 8 into the nether or multiplied by 8 out of it and
+/// `setLocationAndAngles` there. Returns `(var1, var3)`, the scaled x and z
+/// the rest of `usePortal` puts the player at again in the new world
+/// (Minecraft.java:1253). Called from [`sp_on_living_update`], where
+/// vanilla calls `usePortal`, and by the client for a `usePortal` of its
+/// own (`respawn` in the nether), with the player in hand and `world` the
+/// world it is in.
+// src: Minecraft.java:1215-1230, :1238-1241
+pub fn use_portal_head(e: &mut Entity, world: &mut World) -> (f64, f64) {
+    let p = player_mut(e);
+    p.dimension = if p.dimension == -1 { 0 } else { -1 };
+    let dim = p.dimension;
+    world.set_entity_dead(e);
+    e.base.is_dead = false;
+    let mut var1 = e.base.pos_x;
+    let mut var3 = e.base.pos_z;
+    let var5 = 8.0f64;
+    if dim == -1 {
+        var1 /= var5;
+        var3 /= var5;
+    } else {
+        var1 *= var5;
+        var3 *= var5;
+    }
+    // vanilla bug: setLocationAndAngles adds yOffset to the y it is given
+    // (Entity.java:671), and usePortal passes posY, which already includes
+    // it: the player rises 1.62 here (and again at Minecraft.java:1253)
+    // until the teleporter places it.
+    let (y, yaw, pitch) = (e.base.pos_y, e.base.rotation_yaw, e.base.rotation_pitch);
+    e.base.set_location_and_angles(var1, y, var3, yaw, pitch);
+    (var1, var3)
 }
 
 /// The rest of `EntityPlayerSP.onLivingUpdate()` after `mc.usePortal()`

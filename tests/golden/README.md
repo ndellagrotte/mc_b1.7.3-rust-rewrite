@@ -1139,6 +1139,11 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   unseeded display `Random` (census, World.java:1999) and emits only particles and sounds,
   so the fixture pins only that it draws nothing from `World.rand` and changes no block;
   its own draw order is unverified.
+- `tick/portal-player-collide` (WP-3.1b): the player moved (`set_pos`) into silently
+  filled portal blocks and out again. `BlockPortal.onEntityCollidedWithBlock` →
+  `EntityPlayer.setInPortal` drops `timeUntilPortal` from 20 to 10 on the first tick in
+  the portal; the harness's `EntityPlayer` never counts it down (only `EntityPlayerSP`
+  does), so `inPortal` stays false. `player_state` every tick.
 - `tick/door-iron-powered` (redstone torch: doors and trapdoors opened by power, and the
   trapdoor's power branch running on its emptied cell, BlockTrapDoor.java:115-123),
   `tick/door-upper-powered` (lever: the upper half forwarding a power notification to the

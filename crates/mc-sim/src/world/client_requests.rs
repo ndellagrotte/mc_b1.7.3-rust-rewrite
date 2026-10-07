@@ -30,7 +30,8 @@
 //! | `addChatMessage` (:172-174) from `BlockBed.blockActivated` (BlockBed.java:63, :76) | [`ClientRequest::ChatMessage`] |
 //! | `onItemPickup` (:133-135): `new EntityPickupFX(theWorld, entity, this, -0.5F)` | [`ClientRequest::PickupFx`] |
 //! | `mc.sndManager.playSoundFX("portal.trigger" / "portal.travel", 1.0F, pitch)` (:49-51, :58) | [`ClientRequest::PlaySoundFx`] |
-//! | `mc.usePortal()` (:59) | [`ClientRequest::UsePortal`] |
+//! | `mc.usePortal()` (:59), after its head ([`crate::entity::player::use_portal_head`]) | [`ClientRequest::UsePortal`] |
+//! | `closeScreen` (:108-111) from `EntityPlayer.onUpdate` (EntityPlayer.java:81-84) | [`ClientRequest::CloseScreen`] |
 //! | `mc.guiAchievement.queueAchievementInformation(AchievementList.openInventory)` (:35-37) | [`ClientRequest::AchievementHint`] |
 
 use crate::entity::Entity;
@@ -172,12 +173,26 @@ pub enum ClientRequest {
         /// Pitch.
         pitch: f32,
     },
-    /// `mc.usePortal()` (EntityPlayerSP.java:59). The player's update
-    /// stopped there (`EntityPlayerSP.onLivingUpdate` returned early): the
-    /// client changes the dimension, then runs the rest of the update on
+    /// `mc.usePortal()` (EntityPlayerSP.java:59). Its head already ran in
+    /// the player's update ([`crate::entity::player::use_portal_head`]: the
+    /// dimension toggled, the player out of the old world's
+    /// `playerEntities`, x and z scaled), so the rest of the old world's
+    /// `updateEntities` sees the player gone, as vanilla's does. The
+    /// player's update stopped there (`EntityPlayerSP.onLivingUpdate`
+    /// returned early): the client runs the rest of `usePortal` (the old
+    /// world's `updateEntityWithOptionalForce(player, false)`, the new
+    /// world, `changeWorld`, the teleporter), then the rest of the update on
     /// the new world with
     /// [`crate::entity::player::sp_on_living_update_after_portal`].
-    UsePortal,
+    UsePortal {
+        /// `var1`: the scaled x (Minecraft.java:1228-1229, :1239-1240).
+        x: f64,
+        /// `var3`: the scaled z.
+        z: f64,
+    },
+    /// `closeScreen()`: `mc.displayGuiScreen(null)` (EntityPlayerSP.java:108-111),
+    /// raised by [`crate::entity::player::close_screen`].
+    CloseScreen,
     /// `mc.guiAchievement.queueAchievementInformation(achievement)`: the
     /// "open your inventory" hint, raised every update while the
     /// achievement is not unlocked (EntityPlayerSP.java:35-37).
@@ -230,10 +245,10 @@ mod tests {
             volume: 1.0,
             pitch: 0.9,
         });
-        q.push(ClientRequest::UsePortal);
+        q.push(ClientRequest::UsePortal { x: 1.0, z: -2.0 });
         assert_eq!(q.len(), 2);
         let v = q.drain();
-        assert_eq!(v[1], ClientRequest::UsePortal);
+        assert_eq!(v[1], ClientRequest::UsePortal { x: 1.0, z: -2.0 });
         assert!(matches!(
             v[0],
             ClientRequest::PlaySoundFx {

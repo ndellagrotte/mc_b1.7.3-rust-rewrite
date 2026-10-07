@@ -140,6 +140,8 @@ fixtures! {
     tick_portal_display => "tick" / "portal-display";
     tick_portal_frame => "tick" / "portal-frame";
     tick_portal_ignite => "tick" / "portal-ignite";
+    // WP-3.1b: BlockPortal.onEntityCollidedWithBlock -> EntityPlayer.setInPortal.
+    tick_portal_player_collide => "tick" / "portal-player-collide";
     tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
     // WP-2.5a: Gate 2's long run, testWorld loaded and ticked 6000 times.
     tick_testworld_6000 => "tick" / "testworld-6000";

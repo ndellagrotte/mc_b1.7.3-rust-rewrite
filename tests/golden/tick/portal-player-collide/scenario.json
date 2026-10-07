@@ -1,0 +1,9 @@
+{"name":"portal-player-collide","tier":"B","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":12,"mob_spawning":"none",
+ "comment":"WP-3.1b. BlockPortal.onEntityCollidedWithBlock (BlockPortal.java:150-155) calls setInPortal on an entity that rides nothing and carries nothing; EntityPlayer.setInPortal (EntityPlayer.java:811-817) sets timeUntilPortal to 10 while it is above 0, else inPortal. Portal blocks (id 90) filled silently (fill does not notify, so no frame is needed) at x 0..1, y 61..63, z 0; the player (id 0) starts outside at (0.5, 61, -2.5) with timeUntilPortal 20 (EntityPlayer.java:33), is moved into the portal at t 3 and out again at t 8 (set_pos, posY 62.62 = 61 + yOffset). The harness player is an EntityPlayer: only EntityPlayerSP.onLivingUpdate counts timeUntilPortal down or clears inPortal (EntityPlayerSP.java:39-76), so it stays at 10 from the first tick in the portal on: player_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":0,"y0":61,"z0":0,"x1":1,"y1":63,"z1":0,"id":90},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0xc004000000000000"},
+        {"t":3,"op":"set_pos","id":0,"pos":["0x3fe0000000000000","0x404f4f5c29000000","0x3fe0000000000000"]},
+        {"t":8,"op":"set_pos","id":0,"pos":["0x3fe0000000000000","0x404f4f5c29000000","0xc004000000000000"]}],
+ "dumps":[{"every":1,"what":"player_state"},
+          {"every":1,"what":"rng_state"}]}

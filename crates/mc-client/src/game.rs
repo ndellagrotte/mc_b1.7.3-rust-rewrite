@@ -32,9 +32,11 @@
 //! and at the end of the frame ([`crate::events`]), and with them the
 //! player's [`ClientRequest`]s (`EntityPlayerSP`'s calls into `Minecraft`):
 //! screens, chat lines, the pickup particle and the inventory hint become
-//! [`ClientEvent`]s, the portal sounds [`ClientSound::PlaySoundFx`], and
-//! `usePortal` is run by the shell right after the `updateEntities` that
-//! raised it ([`Game::use_portal`]).
+//! [`ClientEvent`]s, the portal sounds [`ClientSound::PlaySoundFx`],
+//! `closeScreen` closes the screen, and the rest of `usePortal` (its head
+//! ran in the player's update, `player_fns::use_portal_head`) is run by
+//! the shell right after the `updateEntities` that raised it
+//! ([`Game::use_portal`]).
 //!
 //! # Seeding
 //!
@@ -415,9 +417,10 @@ pub struct Game {
     /// A portal load that resumed its tick finished: the frame driver runs
     /// [`RunTickHook::UpdateEffects`] for that tick (Minecraft.java:1172-1174).
     resume_update_effects: bool,
-    /// The player's update raised [`ClientRequest::UsePortal`] (collected
-    /// by [`Game::collect_world_events`], run after `updateEntities`).
-    portal_requested: bool,
+    /// The player's update raised [`ClientRequest::UsePortal`] with the
+    /// scaled x and z of `usePortal`'s head (collected by
+    /// [`Game::collect_world_events`], run after `updateEntities`).
+    portal_requested: Option<(f64, f64)>,
 }
 
 impl Game {
@@ -496,7 +499,7 @@ impl Game {
             last_error: None,
             damage_partial_time: 0.0,
             resume_update_effects: false,
-            portal_requested: false,
+            portal_requested: None,
         })
     }
 
@@ -633,8 +636,9 @@ impl Game {
 
     /// Moves the world's queued events and the player's requests to the
     /// outbox (module docs); a `usePortal` request is noted for the tick
-    /// ([`Game::portal_requested`]).
+    /// ([`Game::portal_requested`]) and a `closeScreen` closes the screen.
     pub fn collect_world_events(&mut self) {
+        let mut close_screen = false;
         if let Some(w) = self.the_world.as_mut() {
             self.outbox.world_events.extend(w.events.drain());
             for r in w.client_requests.drain() {
@@ -661,7 +665,9 @@ impl Game {
                             pitch,
                         });
                     }
-                    ClientRequest::UsePortal => self.portal_requested = true,
+                    ClientRequest::UsePortal { x, z } => self.portal_requested = Some((x, z)),
+                    // src: EntityPlayerSP.java:108-111
+                    ClientRequest::CloseScreen => close_screen = true,
                     ClientRequest::AchievementHint { stat_id } => {
                         self.outbox
                             .events
@@ -669,6 +675,11 @@ impl Game {
                     }
                 }
             }
+        }
+        if close_screen {
+            // EntityPlayerSP.closeScreen: mc.displayGuiScreen(null)
+            // (EntityPlayerSP.java:108-111).
+            self.display_gui_screen(None);
         }
         if let Some(c) = self.player_controller.as_mut() {
             for s in c.sounds.drain(..) {
@@ -1350,7 +1361,7 @@ impl Game {
                             self.detached_player = Some(Box::new(e.clone()));
                         }
                     }
-                    self.portal_requested = false;
+                    self.portal_requested = None;
                     world.update_entities();
                     if let Some(pid) = self.the_player
                         && world.entity(pid).is_some()
@@ -1358,13 +1369,14 @@ impl Game {
                         self.detached_player = None;
                     }
                     self.collect_world_events();
-                    if std::mem::take(&mut self.portal_requested) {
+                    if let Some(head) = self.portal_requested.take() {
                         // Minecraft.usePortal(), reached from
-                        // EntityPlayerSP.onLivingUpdate (EntityPlayerSP.java:59).
-                        // The rest of the player's update and of this tick
-                        // run on the new world when its terrain is in
-                        // (Game::finish_load).
-                        self.use_portal_impl(false, true);
+                        // EntityPlayerSP.onLivingUpdate (EntityPlayerSP.java:59),
+                        // whose head the player's update already ran
+                        // (player_fns::use_portal_head). The rest of the
+                        // player's update and of this tick run on the new
+                        // world when its terrain is in (Game::finish_load).
+                        self.use_portal_impl(false, Some(head));
                         return;
                     }
                 }
@@ -1651,62 +1663,65 @@ impl Game {
     /// the teleporter there. `sync` loads the new terrain at once.
     // src: Minecraft.java:1213-1258
     pub fn use_portal(&mut self, sync: bool) {
-        self.use_portal_impl(sync, false);
+        self.use_portal_impl(sync, None);
     }
 
-    /// [`Game::use_portal`]; `resume_tick` when called from the tick's
-    /// `updateEntities` ([`PortalTail::resume_tick`]).
+    /// [`Game::use_portal`]. `head` is `Some((var1, var3))` when the
+    /// player's update raised it ([`ClientRequest::UsePortal`]): the head
+    /// (dimension toggle, `setEntityDead`, scaling) already ran inside the
+    /// tick's `updateEntities` ([`player_fns::use_portal_head`]) and the
+    /// tick resumes on the new world ([`PortalTail::resume_tick`]).
     // src: Minecraft.java:1213-1258
-    fn use_portal_impl(&mut self, sync: bool, resume_tick: bool) {
+    fn use_portal_impl(&mut self, sync: bool, head: Option<(f64, f64)>) {
         info!("Toggling dimension!!");
+        let resume_tick = head.is_some();
         let (Some(pid), Some(world)) = (self.the_player, self.the_world.as_mut()) else {
             return;
         };
         let in_world = world.entity(pid).is_some();
-        // thePlayer.dimension toggled; theWorld.setEntityDead(thePlayer);
-        // thePlayer.isDead = false. A dead player the world already dropped
-        // (respawning in the nether) is the detached copy.
-        let toggle = |p: &mut Entity| {
-            let pd = p.kind.player_mut().expect("player");
-            pd.dimension = if pd.dimension == -1 { 0 } else { -1 };
-            pd.dimension
-        };
-        let dim = if in_world {
-            world.with_entity_mut(pid, |w, p| {
-                let d = toggle(p);
-                w.set_entity_dead(p);
+        // src: Minecraft.java:1215-1230, :1238-1241: thePlayer.dimension
+        // toggled; theWorld.setEntityDead(thePlayer); thePlayer.isDead =
+        // false; x and z scaled (player_fns::use_portal_head). A dead player
+        // the world already dropped (respawning in the nether) is the
+        // detached copy, which no world holds.
+        let (var1, var3) = match head {
+            Some(h) => h,
+            None if in_world => world
+                .with_entity_mut(pid, |w, p| player_fns::use_portal_head(p, w))
+                .expect("in its slot"),
+            None => {
+                let Some(p) = self.detached_player.as_deref_mut() else {
+                    return;
+                };
+                let pd = p.kind.player_mut().expect("player");
+                pd.dimension = if pd.dimension == -1 { 0 } else { -1 };
+                let dim = pd.dimension;
                 p.base.is_dead = false;
-                d
-            })
+                let var5 = 8.0f64;
+                let (mut var1, mut var3) = (p.base.pos_x, p.base.pos_z);
+                if dim == -1 {
+                    var1 /= var5;
+                    var3 /= var5;
+                } else {
+                    var1 *= var5;
+                    var3 *= var5;
+                }
+                let (y, yaw, pitch) = (p.base.pos_y, p.base.rotation_yaw, p.base.rotation_pitch);
+                p.base.set_location_and_angles(var1, y, var3, yaw, pitch);
+                (var1, var3)
+            }
+        };
+        let player_ref = if in_world {
+            world.entity(pid)
         } else {
-            self.detached_player.as_deref_mut().map(|p| {
-                let d = toggle(p);
-                p.base.is_dead = false;
-                d
-            })
+            self.detached_player.as_deref()
         };
-        let Some(dim) = dim else {
+        let Some(p) = player_ref else {
             return;
         };
-        let var5 = 8.0f64;
-        let scale = |p: &mut Entity| {
-            let (mut var1, mut var3) = (p.base.pos_x, p.base.pos_z);
-            if dim == -1 {
-                var1 /= var5;
-                var3 /= var5;
-            } else {
-                var1 *= var5;
-                var3 *= var5;
-            }
-            let (y, yaw, pitch) = (p.base.pos_y, p.base.rotation_yaw, p.base.rotation_pitch);
-            p.base.set_location_and_angles(var1, y, var3, yaw, pitch);
-            (var1, var3, dispatch::is_entity_alive(p))
-        };
-        let (var1, var3, alive) = if in_world {
-            scale(world.entity_mut(pid).expect("in its slot"))
-        } else {
-            scale(self.detached_player.as_deref_mut().expect("checked"))
-        };
+        let dim = p.kind.player().expect("player").dimension;
+        let alive = dispatch::is_entity_alive(p);
+        // src: Minecraft.java:1231-1233, :1242-1244
         if alive && in_world {
             world.update_entity_with_optional_force(pid, false);
         }
@@ -2865,7 +2880,7 @@ mod tests {
             ClientSound::PlaySoundFx { name, volume, pitch }
                 if name == "portal.travel" && *volume == 1.0 && (0.8..1.2).contains(pitch)
         )));
-        assert!(!g.portal_requested);
+        assert!(g.portal_requested.is_none());
         assert!(g.system_time > 0);
         // respawn's portal (before the tick's world part) does not resume.
         g.resume_update_effects = false;
