@@ -305,6 +305,19 @@ pub enum Action {
     /// Dev (WP-3.5b): puts a stack into one of the player's inventory or
     /// armour slots (`crate::render::dev`).
     Equip(crate::render::dev::EquipSpec),
+    /// Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` (a chat line, as
+    /// the screenshot key's line is added).
+    Chat {
+        /// The line.
+        text: String,
+    },
+    /// Dev (WP-3.6b): writes the player's inventory as JSON: the 36 main
+    /// slots, the 4 armour slots and the stack on the cursor
+    /// (`InventoryPlayer.itemStack`), each `[id, count, damage]` or null.
+    DumpInventory {
+        /// The file.
+        path: PathBuf,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -808,7 +821,44 @@ pub fn run_script(
             Action::Equip(spec) => {
                 crate::render::dev::equip(&mut game, &spec);
             }
+            Action::Chat { text } => {
+                commands.queue(move |w: &mut World| {
+                    w.resource_scope(|w, mut ing: Mut<crate::gui::ingame::GuiIngame>| {
+                        if let Some(f) = w.get_resource::<crate::gui::font::FontRenderer>() {
+                            ing.add_chat_message(f, &text);
+                        }
+                    });
+                });
+            }
+            Action::DumpInventory { path } => {
+                let v = inventory_json(&game);
+                if let Some(d) = path.parent() {
+                    let _ = std::fs::create_dir_all(d);
+                }
+                let text = serde_json::to_string_pretty(&v).unwrap_or_default();
+                match std::fs::write(&path, text + "\n") {
+                    Ok(()) => info!("script: inventory written to {}", path.display()),
+                    Err(e) => error!("script: {}: {e}", path.display()),
+                }
+            }
         }
+    }
+}
+
+/// The player's inventory for the `dump_inventory` action.
+pub fn inventory_json(g: &Game) -> serde_json::Value {
+    use serde_json::json;
+    let st = |s: &Option<mc_sim::item::ItemStack>| {
+        s.map(|s| json!([s.item_id, s.stack_size, s.item_damage]))
+    };
+    match g.player().and_then(|p| p.kind.player()) {
+        Some(d) => json!({
+            "main": d.inventory.main_inventory.iter().map(st).collect::<Vec<_>>(),
+            "armor": d.inventory.armor_inventory.iter().map(st).collect::<Vec<_>>(),
+            "cursor": st(&d.inventory.item_stack),
+            "current_item": d.inventory.current_item,
+        }),
+        None => serde_json::Value::Null,
     }
 }
 

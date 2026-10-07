@@ -63,6 +63,7 @@ naming the path.
 | `terrain` (WP-3.3a) | `RenderBlocks`, `WorldRenderer`, `RenderGlobal` (terrain half: `loadRenderers`, `updateRenderers`, `sortAndRender`, `clipRenderersByFrustrum`, `markBlock*NeedsUpdate`, `drawBlockBreaking`), `RenderSorter`, `EntitySorter`, `ChunkCache`, `Tessellator`, `Frustrum`, `ClippingHelper(Impl)` | the terrain meshes, two passes, the crack overlay, `renderBlockOnInventory` (below) |
 | `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
 | `gui` (WP-3.6a) | `Gui`, `GuiScreen`, `GuiButton`, `GuiSmallButton`, `GuiSlider`, `GuiTextField`, `GuiSlot`, `GuiYesNo`, `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused`, `FontRenderer`, `ChatAllowedCharacters`, `ScaledResolution` (arithmetic) | the screen objects bound to `currentScreen`, their input and drawing; `GuiGl` (the GL state and Tessellator as data) and the two GUI cameras (below) |
+| `gui` (WP-3.6b) | `GuiIngame`, `ChatLine`, `GuiChat`, `GuiAchievement`, `RenderItem` (GUI half), `RenderHelper` (item lighting), `GuiContainer`, `GuiInventory`, `GuiChest`, `GuiFurnace`, `GuiCrafting`, `GuiDispenser`, `GuiEditSign`, `GuiSleepMP`, `GuiGameOver`, `Minecraft.displayDebugInfo` (graph) | the HUD, the chat, the achievement popup, the container and in-world screens (below) |
 | `particles` (WP-3.7a) | `EffectRenderer`, `EntityFX` and every `Entity*FX`, `RenderGlobal.spawnParticle`, `playAuxSFX` (particle half), `EntityRenderer.addRainParticles` | the `EffectRenderer` resource, the particle updates in `RunTickHook::UpdateEffects`, the rain splashes in `UpdateRenderer`, the particle meshes (below) |
 | `item_renderer` (WP-3.7b) | `ItemRenderer`, `MapItemRenderer`, `EntityRenderer.renderHand`, `RenderPlayer.drawFirstPersonHand` (the call) | the first-person hand and held item, the fire / inside-a-block / water overlays, `updateEquippedItem`, `renderItem` for the entity renderers (`HeldItemHook`), the hand camera (below) |
 | `render` (WP-3.5b) | `RenderManager`, `Render` and every `Render*` subclass, `RenderGlobal.renderEntities`, `TileEntityRenderer`, `TileEntitySpecialRenderer`, `TileEntitySignRenderer`, `TileEntityMobSpawnerRenderer`, `TileEntityRendererPiston`, `SignModel`, `RenderHelper` (the lit Tessellator draws), `EffectRenderer.renderLitParticles` (the pickups' entities) | the entity and tile-entity draws (below), `HeldItemHook` for 3.7b, the `spawn_entity` / `set_block` dev actions |
@@ -685,6 +686,62 @@ destination alpha anyway.
   feature (off in the workspace): without it `getClipboardString` reads
   Bevy's in-process buffer.
 
+## In-game GUI (WP-3.6b)
+
+- **HUD:** `gui::ingame::GuiIngame` (a resource, `Minecraft.ingameGUI`)
+  draws in `GuiSet::Overlay` when vanilla's `renderGameOverlay` runs (a
+  world drawn, GUI shown or a screen open): vignette (fancy), pumpkin blur,
+  portal overlay, hotbar with its items, crosshair (`glBlendFunc(775,
+  769)`), armour/hearts/air (flash, jitter from `updateCounter * 312871`),
+  sleep fade, F3 text (`DebugText`), the record line (`RecordPlayingMessage`)
+  and the chat (last 10 lines, 20 with `GuiChat` open; 200-tick fade).
+  `updateTick` runs in `RunTickHook::IngameGuiUpdateTick`. The F3
+  frame-time graph (`displayDebugInfo`) and the achievement popup
+  (`gui::achievement::GuiAchievement`) draw after the screen
+  (`GuiSet::Screen`), as vanilla draws them after `updateCameraAndRender`.
+- **Messages:** `gui::ingame::collect_gui_messages` runs in every tick hook
+  (before `screen_input`) and after the frame: `ClientEvent::ChatMessage` /
+  `ChatMessageTranslate` / `ClearChat` (chat), `AchievementHint` (the
+  popup's hint), `DisplayGui` (queued in `container::PendingPlayerGuis` and
+  opened by `open_pending_player_guis` with a `ScreenCtx`). A click that
+  opens a chest therefore opens it in the same tick's next hook
+  (`UpdateRenderer`), not inside the click: the rest of that tick's input
+  events still go to the game. Unlocked achievements come from the player's
+  `StatFileWriter::taken_achievements`, drained every frame.
+- **Items in the GUI:** `gui::render_item` (`renderItemIntoGUI`,
+  `renderItemOverlayIntoGUI`). `GuiGl` has no lighting, normals or face
+  culling, so `render_item::ItemGl` mirrors the modelview matrix (every
+  matrix call around an item goes through it), keeps the two lights of the
+  last `enableStandardItemLighting` (transformed by the matrix of that
+  moment), and lights (`0.4 c + Σ 0.6 c max(n·L, 0)`, `GL_RESCALE_NORMAL`)
+  and culls (`GL_CULL_FACE`, back faces) each quad on the CPU before it
+  reaches the batcher. Block items come from
+  `terrain::render_blocks::render_block_as_item` with the world's
+  `block_statics` (stale singleton bounds show, as in vanilla).
+  `draw_quads` / `draw_tessellator` serve any lit 3D draw in the GUI.
+- **Screens:** registered by class name: `GuiInventory`, `GuiGameOver`,
+  `GuiChat`, `GuiSleepMP` (`gui::container::register`). `GuiChest`,
+  `GuiFurnace`, `GuiCrafting`, `GuiDispenser`, `GuiEditSign` are built from
+  `PlayerGui` (`gui::container::open_player_gui`). A `GuiContainer` owns its
+  `mc_sim` `Container` (the simulation keeps no `inventorySlots` /
+  `craftingInventory`): clicks are `Container::slot_click` with the world
+  and the player, closing runs `on_craft_gui_closed`, and the
+  `isUsableByPlayer` check of `EntityPlayer.onUpdate` runs in
+  `updateScreen`. Not openable: the chest minecart (`InventoryRef` has no
+  entity variant), a chest/furnace/dispenser request without its tile
+  entity (vanilla would throw); both are logged.
+- **Previews drawn through the batcher:** the inventory's player
+  (`container::inventory::render_player_preview`: `RenderPlayer` /
+  `RenderLiving` matrices, `ModelBiped` and the armour passes, lit; no held
+  item, hurt overlay, shadow or fire) and the sign being edited
+  (`container::edit_sign::render_tile_entity_sign_at`, `SignModel` and the
+  text). WP-3.5b's renderers may replace them.
+- **Draw order:** `gui::render` sorts batches by `GuiMaterial::sort_bias`
+  = index × 4096, which outweighs the batch meshes' AABB centre depth Bevy
+  adds (z −1000..1000); with the plain index the HUD's counts, drawn with
+  the depth test off, went under the 3D block icons.
+- **Clipboard:** the workspace enables Bevy's `system_clipboard` (`arboard`).
+
 ## Particles (WP-3.7a)
 
 `particles::ParticlesPlugin` (added by `ClientPlugin`) owns
@@ -974,6 +1031,8 @@ Actions run in order, as many per frame as are due.
 | `spawn_entity` | `kind` (an `EntityList` name, or `"LightningBolt"`, `"Fireball"`, `"Egg"`), `x`, `y`, `z`, `ahead`, `yaw`, `pitch`; per kind `item` (`[id, count, damage]`), `minecart_type`, `direction` (painting), `block_id` (falling block), `fuse` (primed TNT, default 80), `fire`, `hurt_time`, `health`, `powered`, `saddled`, `sheared`, `fleece`, `size`, `angry`, `tamed`, `shake` | Dev (WP-3.5b): spawns the entity as the simulation would (its constructor, `spawnEntityInWorld`; a bolt with `addWeatherEffect`); with `ahead: d`, `x, y, z` are offsets from the point `d` blocks ahead of the player horizontally, at its feet |
 | `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0), `to` (`[x, y, z]`: a box), `ahead`, `text` (a sign's four lines), `raw` (default false), `rel` (default false) | Dev (WP-3.3b, WP-3.3d, WP-3.5b, WP-3.7b): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (`onBlockAdded` and the neighbours' updates run, as for a placed block: a redstone torch powers its wire, a piston beside a torch extends, a placed flowing source, id 8 or 10, then flows); with `raw`, `setBlockAndMetadata` without neighbour updates, the metadata forced again (`onBlockAdded`, e.g. a rail's, may change it) and the block marked for re-render: shapes the game would not keep (a lone curved rail, a powered wire with no source). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks). With `rel` (WP-3.7b), the coordinates are offsets from the player's block (`floor(posX)`, `floor(posY)`, `floor(posZ)`; `posY` is the eye): `{"id": 9, "rel": true}` puts water at the eye (the water overlay), `1` stone (the inside-of-block overlay). With `to` (WP-3.5b), every block of the box from `x, y, z` to `to`; with `ahead: d`, the coordinates are offsets from the point `d` blocks ahead of the player horizontally, at its feet; with `text`, a sign's four lines (walls for paintings, signs, mob spawners) |
 | `equip` | `slot` (0-35 inventory, 100-103 armour: boots … helmet), `item` (`[id, count, damage]`, absent: empty) | Dev (WP-3.5b): puts a stack into one of the player's slots (armour on the third-person player) |
+| `chat` | `text` | Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` |
+| `dump_inventory` | `path` | Dev (WP-3.6b): the player's 36 main and 4 armour slots and the cursor stack, each `[id, count, damage]` or null, as JSON |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
