@@ -8,8 +8,11 @@
 //! `Random` ([`super::BlockStatics::chest_random`]).
 
 use super::{block, container, opaque_cube_lookup};
-use crate::entity::Entity;
+use crate::entity::{Entity, player};
+use crate::inventory::InventoryRef;
+use crate::inventory::large_chest::InventoryLargeChest;
 use crate::world::World;
+use crate::world::client_requests::PlayerGui;
 
 /// `blockIndexInTexture` of the chest (26, BlockChest.java:10).
 fn tex(id: i32) -> i32 {
@@ -151,12 +154,13 @@ pub fn on_block_removal(world: &mut World, x: i32, y: i32, z: i32) {
 /// the chest, or above the other half of a double chest, blocks opening;
 /// otherwise the halves' tile entities are looked up in Java's order
 /// (`InventoryLargeChest` wrapping, -x, +x, -z, +z) and, off a multiplayer
-/// client, `player.displayGUIChest(inventory)`. The GUI and its
-/// `ContainerChest` are the client and WP-2.5 (`EntityPlayer`'s own body is
-/// empty, EntityPlayer.java:340-341; `EntityPlayerSP` opens `GuiChest`,
-/// EntityPlayerSP.java:117-119): recorded as `"EntityPlayerSP.displayGUIChest"`.
-/// The lookups are kept because `getBlockTileEntity` can create a missing
-/// tile entity (Chunk.java:401-421).
+/// client, `player.displayGUIChest(inventory)`: `EntityPlayer`'s body is
+/// empty (EntityPlayer.java:340-341), `EntityPlayerSP` opens `GuiChest`
+/// (EntityPlayerSP.java:117-119): [`player::display_gui`] with
+/// [`PlayerGui::Chest`]. The lookups run whatever they find, because
+/// `getBlockTileEntity` can create a missing tile entity
+/// (Chunk.java:401-421); a null one makes the inventory `None` (Java would
+/// wrap the null and the GUI would throw).
 // src: BlockChest.java:185-221
 pub fn block_activated(
     world: &mut World,
@@ -166,8 +170,13 @@ pub fn block_activated(
     z: i32,
     player: &mut Entity,
 ) -> bool {
-    let _ = player;
-    let _var6 = world.get_block_tile_entity(x, y, z);
+    let te = |r: Option<crate::world::tile_entity::TileEntityRef>| r.map(InventoryRef::TileEntity);
+    let large = |a: Option<InventoryRef>, b: Option<InventoryRef>| {
+        Some(InventoryRef::LargeChest(Box::new(
+            InventoryLargeChest::new("Large chest", a?, b?),
+        )))
+    };
+    let mut var6 = te(world.get_block_tile_entity(x, y, z));
     if world.is_block_normal_cube(x, y + 1, z) {
         return true;
     }
@@ -184,21 +193,31 @@ pub fn block_activated(
         return true;
     }
     // src: BlockChest.java:198-212: `new InventoryLargeChest("Large chest", a, b)`
-    // around each neighbouring half (the wrapper itself is WP-2.5 data).
+    // around each neighbouring half.
     if world.get_block_id(x - 1, y, z) == id {
-        world.get_block_tile_entity(x - 1, y, z);
+        var6 = large(te(world.get_block_tile_entity(x - 1, y, z)), var6);
     }
     if world.get_block_id(x + 1, y, z) == id {
-        world.get_block_tile_entity(x + 1, y, z);
+        var6 = large(var6, te(world.get_block_tile_entity(x + 1, y, z)));
     }
     if world.get_block_id(x, y, z - 1) == id {
-        world.get_block_tile_entity(x, y, z - 1);
+        var6 = large(te(world.get_block_tile_entity(x, y, z - 1)), var6);
     }
     if world.get_block_id(x, y, z + 1) == id {
-        world.get_block_tile_entity(x, y, z + 1);
+        var6 = large(var6, te(world.get_block_tile_entity(x, y, z + 1)));
     }
     if !world.multiplayer_world {
-        world.note_unimplemented("EntityPlayerSP.displayGUIChest");
+        // src: BlockChest.java:217
+        player::display_gui(
+            player,
+            world,
+            PlayerGui::Chest {
+                x,
+                y,
+                z,
+                inventory: var6,
+            },
+        );
     }
     true
 }

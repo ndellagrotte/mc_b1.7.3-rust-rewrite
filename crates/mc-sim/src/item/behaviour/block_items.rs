@@ -259,7 +259,9 @@ pub fn bed_on_item_use(
 /// top face places a sign post turned to the player's yaw (16 steps), a side
 /// face a wall sign with the face as metadata. Then one item off and, with
 /// a sign tile entity there, `displayGUIEditSign` (the editor GUI of
-/// `EntityPlayerSP`, client; empty in `EntityPlayer`): recorded.
+/// `EntityPlayerSP`, empty in `EntityPlayer`:
+/// [`crate::entity::player::display_gui`],
+/// [`crate::world::client_requests::PlayerGui::EditSign`]).
 // src: ItemSign.java:9-53
 #[allow(clippy::too_many_arguments)]
 pub fn sign_on_item_use(
@@ -291,15 +293,25 @@ pub fn sign_on_item_use(
     }
     var1.stack_size -= 1;
     let var8 = var3.get_block_tile_entity(var4, var5, var6);
-    if var8.is_some_and(|r| {
-        matches!(
+    if let Some(r) = var8
+        && matches!(
             var3.tile_entities.get(&r).map(|t| &t.kind),
             Some(crate::world::tile_entity::TileEntityKindData::Sign(_))
         )
-    }) {
-        // var2.displayGUIEditSign(var8): EntityPlayer.java:454-455 is empty;
-        // EntityPlayerSP opens GuiEditSign (client GUI, Phase 3).
-        var3.note_unimplemented("EntityPlayerSP.displayGUIEditSign");
+    {
+        // src: ItemSign.java:47: var2.displayGUIEditSign(var8)
+        // (EntityPlayer.java:454-455 is empty; EntityPlayerSP opens
+        // GuiEditSign, EntityPlayerSP.java:113-115).
+        crate::entity::player::display_gui(
+            var2,
+            var3,
+            crate::world::client_requests::PlayerGui::EditSign {
+                x: var4,
+                y: var5,
+                z: var6,
+                tile_entity: r,
+            },
+        );
     }
     true
 }

@@ -20,7 +20,7 @@
 //! |---|---|
 //! | `addLoadedEntities` (:2077-2084) | the entities a chunk loader read join `loadedEntityList` in `ChunkProvider.prepareChunk` ([`chunk_provider`]); the method itself adds nothing new |
 //! | `tick` (:1745-1780) | `SpawnerAnimals.performSleepSpawning` WP-2.3, mob constructors in `performSpawning` WP-2.3 (recorded); a `MinecraftException` from the save paths ends the tick and is kept in [`World::session_lock_error`] |
-//! | `World(World, WorldProvider)` (:103-143) | not ported: the dimension-change constructor (portals, WP-2.5) shares one save handler between two worlds |
+//! | `World(World, WorldProvider)` (:103-143) | [`World::new_for_dimension`] (WP-3.1b): the save handler is passed in rather than shared |
 //! | `getSkyColor`, `drawClouds`, `getFogColor`, `getStarBrightness` (:1017-1150) | not ported: client rendering (Phase 3) |
 //! | `setChunkData`, `sendQuittingDisconnectingPacket` (:2222-2268) | not ported: multiplayer (D3) |
 //! | `addWorldAccess`, `removeWorldAccess` (:951-957) | replaced by [`World::events`] |
@@ -46,6 +46,7 @@
 
 pub mod chunk;
 pub mod chunk_provider;
+pub mod client_requests;
 mod entities;
 pub use entities::{is_instance_of, java_class_chain};
 pub mod events;
@@ -74,6 +75,7 @@ use crate::entity::{Entity, EntityBase, EntitySlot};
 use crate::save::{SaveError, SaveHandler};
 
 use self::chunk_provider::{ChunkGenerator, ChunkProviderCache};
+use self::client_requests::ClientRequestQueue;
 use self::events::{EventQueue, WorldEvent};
 use self::info::WorldInfo;
 use self::lighting::{EnumSkyBlock, MetadataChunkBlock};
@@ -192,6 +194,12 @@ pub struct World {
     /// `worldAccesses`, as an event queue ([`events`]).
     // src: World.java:40
     pub events: EventQueue,
+    /// The local player's calls into `Minecraft` (`displayGUI*`,
+    /// `addChatMessage`, `onItemPickup`'s particle, the portal sounds,
+    /// `usePortal`, the inventory hint), queued for the client
+    /// ([`client_requests`]). Not Java state: `EntityPlayerSP` reaches the
+    /// client through its `mc` field.
+    pub client_requests: ClientRequestQueue,
     /// `chunkProvider` (the caching `ChunkProvider`).
     // src: World.java:41
     pub(crate) chunk_provider: ChunkProviderCache,
@@ -306,6 +314,22 @@ pub struct WorldEnvironment {
     pub field_9437_g: i32,
     /// `lockTimestamp = System.currentTimeMillis()` (World.java:80).
     pub lock_timestamp: i64,
+}
+
+/// The seeds of [`World::seed_clock_randoms`]: what `new Random()` would
+/// take from the clock for each stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClockSeeds {
+    /// The `Math.random()` stream (`Math`'s own `new Random()`).
+    pub math_random: i64,
+    /// `Item.itemRand` (Item.java:6).
+    pub item_rand: i64,
+    /// The entity-RNG seed (every `Entity.rand = new Random()`, Entity.java:96;
+    /// the explosion's `ExplosionRNG`, Explosion.java:11).
+    pub entity_rand: i64,
+    /// The container blocks' `Random`s (`BlockChest.random`,
+    /// `BlockFurnace.furnaceRand`, `BlockDispenser.random`).
+    pub container_randoms: i64,
 }
 
 impl World {
@@ -439,6 +463,7 @@ impl World {
             is_new_world: false,
             world_provider: provider,
             events: EventQueue::default(),
+            client_requests: ClientRequestQueue::default(),
             chunk_provider: ChunkProviderCache::new(loader, generator),
             save_handler,
             session_lock_error: None,
@@ -541,6 +566,87 @@ impl World {
         self.rand = old.rand.clone();
         self.field_9437_g = old.field_9437_g;
         self.sound_counter = old.sound_counter;
+    }
+
+    /// `new World(world, provider)`, the dimension-change constructor
+    /// `Minecraft.usePortal` uses (World.java:103-143; Minecraft.java:1236,
+    /// :1247): a world on `old`'s save for `provider`'s dimension.
+    ///
+    /// Taken from `old`: `lockTimestamp` (World.java:134, overwriting the
+    /// clock value of :121), the save handler (:135), a copy of `worldInfo`
+    /// (:136, `new WorldInfo(var1.worldInfo)`: every field, WorldInfo.java:48-64,
+    /// so the seed, spawn, time, weather, level name and the `Dimension`
+    /// read from the player tag at load). The `MapStorage` is a new one on
+    /// that handler (:137). Not taken: everything else is the field
+    /// initialisers' (:104-133): empty entity, tile-entity, player and tick
+    /// lists, no chunks, a new `rand` and `field_9437_g` from the clock
+    /// (`env`, as `new Random()` would be; `env.lock_timestamp` is the
+    /// overwritten :121 value and unused), `isNewWorld` and
+    /// `multiplayerWorld` false, `difficultySetting` 0 (the client sets it
+    /// every tick), no listeners (`changeWorld` adds `RenderGlobal`'s), and
+    /// [`World::client_requests`] empty. Then `registerWorld`,
+    /// `getChunkProvider` (the provider's generator for the copied seed),
+    /// `calculateInitialSkylight` and `func_27163_E` on the copied
+    /// `WorldInfo` (:139-142).
+    ///
+    /// Java shares one `ISaveHandler` object between both worlds; a `Box`
+    /// cannot be shared, so the caller passes the handler in: `old`'s own
+    /// ([`World::take_save_handler`], after `old` has saved for the last
+    /// time, as `changeWorld` saves it right after this constructor,
+    /// Minecraft.java:1276) or another on the same save.
+    ///
+    /// The Java statics live on in the JVM when the old `World` object is
+    /// dropped: they are moved from `old` ([`World::adopt_statics`]), with
+    /// `Item.itemRand` ([`World::item_rand`]), so `old` is `&mut`.
+    // src: World.java:103-143
+    pub fn new_for_dimension(
+        old: &mut World,
+        provider: WorldProvider,
+        save_handler: Box<dyn SaveHandler>,
+        env: WorldEnvironment,
+    ) -> World {
+        // src: World.java:136 (new WorldInfo(var1.worldInfo))
+        let info = old.world_info.clone();
+        // src: World.java:139-140 (registerWorld, getChunkProvider)
+        let generator = provider.get_chunk_provider(info.random_seed);
+        // src: World.java:104-133 (the initialisers), :135, :137 (the shared
+        // handler and a new MapStorage on it)
+        let mut w = World::construct(save_handler, provider, info, generator, env);
+        // src: World.java:134
+        w.lock_timestamp = old.lock_timestamp;
+        // The JVM statics (module docs, "Conventions").
+        w.adopt_statics(old);
+        w.item_rand = std::mem::replace(&mut old.item_rand, JavaRandom::new(0));
+        w.calculate_initial_skylight(); // src: World.java:141
+        w.func_27163_e(); // src: World.java:142
+        w
+    }
+
+    /// Takes this world's save handler out, leaving one that saves nothing
+    /// ([`crate::save::NoSave`]): for handing the handler to the next world
+    /// of the same save ([`World::new_for_dimension`]) once this one is done
+    /// saving.
+    pub fn take_save_handler(&mut self) -> Box<dyn SaveHandler> {
+        std::mem::replace(&mut self.save_handler, Box::new(crate::save::NoSave))
+    }
+
+    /// Seeds the `Random`s vanilla seeds from the clock (`new Random()`)
+    /// that live outside the world constructor's [`WorldEnvironment`]: the
+    /// `Math.random()` stream ([`World::math_random`]), `Item.itemRand`
+    /// ([`World::item_rand`]), the entity-RNG seed ([`World::entity_rand_seed`]:
+    /// every entity's `rand` and the explosion `Random` derive from it) and
+    /// the container blocks' singleton `Random`s
+    /// ([`BlockStatics::seed_container_randoms`]). The client calls it once
+    /// per opened save with seeds from the clock. Unlike
+    /// [`World::make_deterministic`] it leaves the counters alone
+    /// (`next_entity_id`, `next_tick_entry_id`), which the loading
+    /// constructor's spawn search may already have advanced.
+    pub fn seed_clock_randoms(&mut self, seeds: ClockSeeds) {
+        self.math_random = JavaRandom::new(seeds.math_random);
+        self.item_rand = JavaRandom::new(seeds.item_rand);
+        self.entity_rand_seed = seeds.entity_rand;
+        self.block_statics
+            .seed_container_randoms(seeds.container_randoms);
     }
 
     /// Replaces the terrain generator of the caching `ChunkProvider` (its

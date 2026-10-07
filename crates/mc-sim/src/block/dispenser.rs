@@ -11,9 +11,10 @@
 use mc_core::math::floor_double;
 
 use super::{block, container, dispatch, opaque_cube_lookup};
-use crate::entity::{Entity, EntityKindData, arrow, egg, snowball};
+use crate::entity::{Entity, EntityKindData, arrow, egg, player, snowball};
 use crate::tile_entity::dispenser::get_random_stack_from_inventory;
 use crate::world::World;
+use crate::world::client_requests::PlayerGui;
 
 // src: Item.java:280 (arrow 6), :362 (egg 88), :350 (snowball 76)
 const ARROW: i32 = 256 + 6;
@@ -74,15 +75,23 @@ pub fn get_block_texture(world: &mut World, id: i32, x: i32, y: i32, z: i32, sid
 }
 
 /// `blockActivated(world, x, y, z, player)`: true; off a multiplayer client
-/// `player.displayGUIDispenser(tileEntity)` (client GUI and
-/// `ContainerDispenser`; recorded as `"EntityPlayerSP.displayGUIDispenser"`
-/// after the tile-entity lookup).
+/// `player.displayGUIDispenser(tileEntity)` after the tile-entity lookup:
+/// the client's `GuiDispenser` ([`player::display_gui`],
+/// [`PlayerGui::Dispenser`]).
 // src: BlockDispenser.java:74-82
 pub fn block_activated(world: &mut World, x: i32, y: i32, z: i32, player: &mut Entity) -> bool {
-    let _ = player;
     if !world.multiplayer_world {
-        let _var6 = world.get_block_tile_entity(x, y, z);
-        world.note_unimplemented("EntityPlayerSP.displayGUIDispenser");
+        let var6 = world.get_block_tile_entity(x, y, z);
+        player::display_gui(
+            player,
+            world,
+            PlayerGui::Dispenser {
+                x,
+                y,
+                z,
+                tile_entity: var6,
+            },
+        );
     }
     true
 }

@@ -1231,7 +1231,7 @@ pub fn block_activated(
         // src: BlockChest.java:185-221
         K::Chest => super::chest::block_activated(world, id, x, y, z, player),
         // src: BlockWorkbench.java:19-26
-        K::Workbench => super::workbench::block_activated(world),
+        K::Workbench => super::workbench::block_activated(world, x, y, z, player),
         // src: BlockFurnace.java:102-110
         K::Furnace { .. } => super::furnace::block_activated(world, x, y, z, player),
         // src: BlockDoor.java:89-111

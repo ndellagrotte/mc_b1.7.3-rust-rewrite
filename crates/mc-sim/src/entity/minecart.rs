@@ -37,11 +37,14 @@
 //! # Gaps
 //!
 //! `interact` of a chest cart opens its GUI (`displayGUIChest`, a client
-//! screen and `ContainerChest`, WP-2.5): recorded as
-//! `"EntityPlayerSP.displayGUIChest"`. Only EntityPlayerSP opens the
-//! GuiChest (EntityPlayerSP.java:117-119); EntityPlayer's version is empty
+//! screen and `ContainerChest`): [`super::player::display_gui`] with
+//! [`PlayerGui::MinecartChest`]. Only EntityPlayerSP opens the GuiChest
+//! (EntityPlayerSP.java:117-119); EntityPlayer's version is empty
 //! (EntityPlayer.java:340-341), so the oracle's HarnessPlayer (an
-//! EntityPlayer) does nothing here, as the Rust side does.
+//! EntityPlayer) does nothing here, as the Rust side does for a player
+//! without `client_additions`. The cart's container (its `IInventory` in
+//! a `ContainerChest`) is not modelled by [`crate::inventory`] yet: the
+//! request names the cart by id.
 
 use mc_core::Vec3D;
 use mc_core::math::{self, floor_double, jmath};
@@ -55,6 +58,7 @@ use crate::item::ItemStack;
 use crate::save::SaveError;
 use crate::save::nbt::{self as n, Compound};
 use crate::world::World;
+use crate::world::client_requests::PlayerGui;
 
 /// `Item.minecartEmpty.shiftedIndex` (`new ItemMinecart(72, 0)`).
 // src: Item.java:346 (shiftedIndex = 256 + id, Item.java:124)
@@ -1012,10 +1016,15 @@ pub fn interact(e: &mut Entity, world: &mut World, var1: &mut Entity) -> bool {
         if !world.multiplayer_world {
             // src: EntityMinecart.java:774 (`var1.displayGUIChest(this)`:
             // EntityPlayerSP opens GuiChest over a ContainerChest,
-            // EntityPlayerSP.java:117-119, WP-2.5). EntityPlayer's version
-            // is empty (EntityPlayer.java:340-341), so the oracle's
-            // HarnessPlayer does nothing here.
-            world.note_unimplemented("EntityPlayerSP.displayGUIChest");
+            // EntityPlayerSP.java:117-119; EntityPlayer's version is
+            // empty, EntityPlayer.java:340-341).
+            super::player::display_gui(
+                var1,
+                world,
+                PlayerGui::MinecartChest {
+                    entity_id: e.base.entity_id,
+                },
+            );
         }
     } else if ty == 2 {
         if let Some(p) = var1.kind.player_mut() {

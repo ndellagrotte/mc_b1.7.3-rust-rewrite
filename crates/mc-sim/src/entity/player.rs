@@ -15,16 +15,44 @@
 //! `EntityPlayerSP` overrides that need no client: `updatePlayerActionState`
 //! applying a [`MovementInput`] (EntityPlayerSP.java:27-32) and
 //! `isSneaking` (:144-146). The port has both always. `EntityPlayerSP`'s
-//! `onLivingUpdate` body (:34-88: the portal timer and `Minecraft.usePortal`,
-//! the sneak `ySize`, `pushOutOfBlocks` at the four corners) runs only with
+//! `onLivingUpdate` body (:34-88: the inventory hint, the portal timer and
+//! `Minecraft.usePortal`, the sneak `ySize`, `pushOutOfBlocks` at the four
+//! corners) and its other overrides that call into `Minecraft`
+//! (`displayGUI*`, `addChatMessage`, `onItemPickup`) run only with
 //! [`PlayerSpData::client_additions`] set; the golden driver leaves it off,
 //! which is `HarnessPlayer` (tools/oracle/README.md, "`HarnessPlayer`").
 //! `EntityPlayerSP.addStat` writes the stat file the player carries
 //! ([`add_stat`], [`crate::stats`]); the achievement toast is the
 //! client's ([`crate::stats::StatFileWriter::taken_achievements`]).
-//! Out of scope, client: the GUI calls (`displayGUI*`, `closeScreen`'s
-//! `displayGuiScreen`), `onItemPickup`'s particle, `addChatMessage`,
-//! `setHealth` (multiplayer packets), the `MouseFilter`s.
+//!
+//! # Calls into `Minecraft` (WP-3.1b)
+//!
+//! What `EntityPlayerSP` asks of `mc` becomes a [`ClientRequest`] on
+//! [`World::client_requests`] ([`crate::world::client_requests`]):
+//! [`display_gui`], [`add_chat_message`], [`on_item_pickup`]'s particle, the
+//! portal sounds, `usePortal` and the inventory hint
+//! ([`sp_on_living_update`]).
+//!
+//! `mc.usePortal()` (EntityPlayerSP.java:59) changes the world in the middle
+//! of the player's update and returns into it: the rest of `onLivingUpdate`
+//! (:63 `inPortal = false`, :74-87: the portal cooldown, the sneak `ySize`,
+//! `pushOutOfBlocks`, `EntityPlayer.onLivingUpdate` with its movement) runs
+//! on the new world. Here [`sp_on_living_update`] raises
+//! [`ClientRequest::UsePortal`] and returns at that point; the client
+//! changes the dimension and then calls [`sp_on_living_update_after_portal`]
+//! on the new world. What follows `onLivingUpdate` in its callers
+//! (`EntityLiving.onUpdate`'s body-yaw tail, EntityLiving.java:206-290;
+//! `EntityPlayer.onUpdate`'s tail, the cape position and `minutesPlayed`,
+//! EntityPlayer.java:80-124; the old world's `updateEntityWithOptionalForce`
+//! bookkeeping) still runs on the old world, before the dimension change
+//! instead of after it. Those read the position, which in vanilla is
+//! already the new world's; they only feed rendering (body yaw, cape), a
+//! stat counter that counts either way, and the old world, which is
+//! discarded.
+//!
+//! Out of scope, client: `closeScreen`'s `displayGuiScreen` (the client
+//! closes its screen), `setHealth` (multiplayer packets), the
+//! `MouseFilter`s.
 //!
 //! # Audit of EntityPlayer.java
 //!
@@ -41,15 +69,16 @@
 //! | 249-289 | `dropCurrentItem`, `dropPlayerItem`, `dropPlayerItemWithRandomChoice`, `joinEntityItemWithWorld` | [`drop_current_item`], [`drop_player_item`], [`drop_player_item_with_random_choice`], [`join_entity_item_with_world`] |
 //! | 291-306 | `getCurrentPlayerStrVsBlock`, `canHarvestBlock` | [`get_current_player_str_vs_block`], [`can_harvest_block`] |
 //! | 308-338 | NBT | [`super::nbt`] (the sleeping player's wake-up: [`read_entity_from_nbt_tail`]) |
-//! | 340-355 | `displayGUIChest`, `displayWorkbenchGUI`, `onItemPickup` (empty), `getEyeHeight`, `resetHeight` | GUI: client; [`on_item_pickup`]; [`EYE_HEIGHT`], [`reset_height`] |
+//! | 340-355 | `displayGUIChest`, `displayWorkbenchGUI`, `onItemPickup` (empty), `getEyeHeight`, `resetHeight` | [`display_gui`] (`EntityPlayerSP`'s); [`on_item_pickup`]; [`EYE_HEIGHT`], [`reset_height`] |
 //! | 357-437 | `attackEntityFrom`, `isPVPEnabled`, `alertWolves` | [`attack_entity_from`], [`alert_wolves`] |
 //! | 439-446 | `damageEntity` | [`damage_entity`] |
-//! | 448-486 | `displayGUI*` (empty), `useCurrentItemOnEntity`, `getCurrentEquippedItem`, `destroyCurrentEquippedItem`, `getYOffset`, `swingItem` | [`use_current_item_on_entity`]; [`get_current_equipped_item`]; [`destroy_current_equipped_item`]; [`get_y_offset`]; [`swing_item`] |
+//! | 448-486 | `displayGUI*` (empty; `EntityPlayerSP`'s: [`display_gui`]), `useCurrentItemOnEntity`, `getCurrentEquippedItem`, `destroyCurrentEquippedItem`, `getYOffset`, `swingItem` | [`use_current_item_on_entity`]; [`get_current_equipped_item`]; [`destroy_current_equipped_item`]; [`get_y_offset`]; [`swing_item`] |
 //! | 488-514 | `attackTargetEntityWithCurrentItem` | [`attack_target_entity_with_current_item`] |
 //! | 516-535 | `respawnPlayer` (empty), `func_6420_o` (abstract), `onItemStackChanged` (empty), `setEntityDead`, `isEntityInsideOpaqueBlock` | [`set_entity_dead`], [`is_entity_inside_opaque_block`] |
 //! | 537-651 | `sleepInBedAt`, `setRenderOffsetForSleep`, `wakeUpPlayer`, `isInBed` | [`sleep_in_bed_at`], [`wake_up_player`] |
 //! | 653-665 | `func_25060_a` (static) | [`verify_respawn_coordinates`] |
 //! | 667-712 | `getBedOrientationInDegrees`, sleep and spawn getters | [`get_bed_orientation_in_degrees`], [`PlayerData`] |
+//! | 698-699 | `addChatMessage` (empty) | `EntityPlayerSP`'s: [`add_chat_message`] |
 //! | 714-724 | `triggerAchievement`, `addStat` (empty; `EntityPlayerSP`'s writes the stat file), `jump` | [`trigger_achievement`], [`add_stat`], [`jump`] |
 //! | 726-793 | `moveEntityWithHeading`, `addMovementStat`, `addMountedMovementStat`, `fall` | [`move_entity_with_heading`], [`fall`] |
 //! | 795-817 | `onKillEntity`, `getItemIcon` (render), `setInPortal` | [`on_kill_entity`], [`set_in_portal`] |
@@ -77,6 +106,7 @@ use crate::stats::achievement_list as al;
 use crate::stats::stat_list as sl;
 use crate::stats::{StatBase, stat};
 use crate::world::World;
+use crate::world::client_requests::{ClientRequest, PickupFx, PlayerGui};
 use crate::world::is_instance_of;
 
 /// `Block.blockBed.blockID`.
@@ -632,12 +662,55 @@ pub fn read_entity_from_nbt_tail(e: &mut Entity, world: &mut World) {
 /// `onItemPickup(entity, count)`: called by the three pickups
 /// (`EntityItem`, `EntityArrow`, `EntitySnowball`/`EntityEgg`
 /// `.onCollideWithPlayer`) after the stack went into the inventory.
-/// `EntityPlayer`'s body is empty, and so is the oracle's `HarnessPlayer`'s.
-/// `EntityPlayerSP`'s override only adds an `EntityPickupFX` (the item flying
-/// to the player) to the client's effect renderer (EntityPlayerSP.java:133-135):
-/// client, no simulation state, not ported here.
-// src: EntityPlayer.java:346-347
-pub fn on_item_pickup(_e: &mut Entity, _world: &mut World, _picked: &Entity, _count: i32) {}
+/// `EntityPlayer`'s body is empty (EntityPlayer.java:346-347), and so is
+/// the oracle's `HarnessPlayer`'s. `EntityPlayerSP`'s adds an
+/// `EntityPickupFX(theWorld, entity, this, -0.5F)` (the entity flying to
+/// the player) to the effect renderer: [`ClientRequest::PickupFx`], with
+/// the picked entity as it is now ([`PickupFx`]). No simulation state.
+// src: EntityPlayerSP.java:133-135
+pub fn on_item_pickup(e: &mut Entity, world: &mut World, picked: &Entity, _count: i32) {
+    if is_client_player(e) {
+        world
+            .client_requests
+            .push(ClientRequest::PickupFx(PickupFx {
+                picked: Box::new(picked.clone()),
+                player_id: e.base.entity_id,
+                y_offs: -0.5,
+            }));
+    }
+}
+
+/// `displayGUIChest` / `displayWorkbenchGUI` / `displayGUIFurnace` /
+/// `displayGUIDispenser` / `displayGUIEditSign`: empty in `EntityPlayer`
+/// (EntityPlayer.java:340-344, :448-456); `EntityPlayerSP` opens the screen
+/// (`mc.displayGuiScreen(new Gui…)`, EntityPlayerSP.java:113-131), here
+/// [`ClientRequest::DisplayGui`].
+// src: EntityPlayerSP.java:113-131
+pub fn display_gui(e: &Entity, world: &mut World, gui: PlayerGui) {
+    if is_client_player(e) {
+        world.client_requests.push(ClientRequest::DisplayGui(gui));
+    }
+}
+
+/// `addChatMessage(key)`: empty in `EntityPlayer` (EntityPlayer.java:698-699);
+/// `EntityPlayerSP` writes the translated line to the chat
+/// (`mc.ingameGUI.addChatMessageTranslate(key)`), here
+/// [`ClientRequest::ChatMessage`].
+// src: EntityPlayerSP.java:172-174
+pub fn add_chat_message(e: &Entity, world: &mut World, key: &'static str) {
+    if is_client_player(e) {
+        world
+            .client_requests
+            .push(ClientRequest::ChatMessage { key });
+    }
+}
+
+/// Whether `e` is the client's `EntityPlayerSP` with its own bodies on
+/// ([`PlayerSpData::client_additions`]; module docs), which is where the
+/// `Minecraft` calls are.
+pub fn is_client_player(e: &Entity) -> bool {
+    matches!(&e.kind, EntityKindData::PlayerSp(_, _, s) if s.client_additions)
+}
 
 /// `resetHeight()`: `yOffset = 1.62F`.
 // src: EntityPlayer.java:353-355
@@ -1295,72 +1368,122 @@ pub fn sp_is_sneaking(e: &Entity) -> bool {
 }
 
 /// `EntityPlayerSP.onLivingUpdate()`: with
-/// [`PlayerSpData::client_additions`] (module docs), the portal timer
-/// (two `rand` draws for the portal sounds' pitch, `Minecraft.usePortal`
-/// recorded), the sneak `ySize` dip and `pushOutOfBlocks` at the four
-/// corners of the box; then `EntityPlayer`'s.
+/// [`PlayerSpData::client_additions`] (module docs), the inventory hint,
+/// the portal timer (two `rand` draws for the portal sounds' pitch, both
+/// sounds and `Minecraft.usePortal` raised as [`ClientRequest`]s), the
+/// sneak `ySize` dip and `pushOutOfBlocks` at the four corners of the box;
+/// then `EntityPlayer`'s. When the timer fires `usePortal` this returns
+/// right after raising [`ClientRequest::UsePortal`]; the client finishes
+/// the update on the new world with [`sp_on_living_update_after_portal`]
+/// (module docs, "Calls into `Minecraft`").
 // src: EntityPlayerSP.java:34-88
 pub fn sp_on_living_update(e: &mut Entity, world: &mut World) {
-    if sp(e).client_additions {
-        // src: EntityPlayerSP.java:35-37: the openInventory achievement toast
-        // (client).
-        {
-            let p = player_mut(e);
-            p.prev_time_in_portal = p.time_in_portal;
+    if !sp(e).client_additions {
+        on_living_update(e, world);
+        return;
+    }
+    // src: EntityPlayerSP.java:35-37
+    if let Some(open) = stat(al::OPEN_INVENTORY)
+        && !player(e).stat_file_writer.has_achievement_unlocked(open)
+    {
+        world.client_requests.push(ClientRequest::AchievementHint {
+            stat_id: al::OPEN_INVENTORY,
+        });
+    }
+    {
+        let p = player_mut(e);
+        p.prev_time_in_portal = p.time_in_portal;
+    }
+    if player(e).in_portal {
+        if !world.multiplayer_world && e.base.riding_entity.is_some() {
+            base::mount_entity(e, world, None);
         }
-        if player(e).in_portal {
-            if !world.multiplayer_world && e.base.riding_entity.is_some() {
-                base::mount_entity(e, world, None);
-            }
-            // mc.currentScreen closed (client).
-            if player(e).time_in_portal == 0.0 {
-                // mc.sndManager.playSoundFX("portal.trigger", 1.0F, pitch): the
-                // pitch's draw happens; the sound is the client's.
-                let _pitch = e.base.rand.next_float() * 0.4 + 0.8;
-            }
-            let p = player_mut(e);
-            p.time_in_portal += 0.0125;
-            if p.time_in_portal >= 1.0 {
-                p.time_in_portal = 1.0;
-                if !world.multiplayer_world {
-                    p.time_until_portal = 10;
-                    let _pitch = e.base.rand.next_float() * 0.4 + 0.8; // "portal.travel"
-                    world.note_unimplemented("Minecraft.usePortal");
-                }
-            }
-            player_mut(e).in_portal = false;
-        } else {
-            let p = player_mut(e);
-            if p.time_in_portal > 0.0 {
-                p.time_in_portal -= 0.05;
-            }
-            if p.time_in_portal < 0.0 {
-                p.time_in_portal = 0.0;
-            }
+        // src: EntityPlayerSP.java:45-47: `mc.currentScreen` closed. The
+        // client does it before the tick's updateEntities (mc-client
+        // game.rs), where `inPortal` has the value read here.
+        if player(e).time_in_portal == 0.0 {
+            // src: EntityPlayerSP.java:50
+            let pitch = e.base.rand.next_float() * 0.4 + 0.8;
+            world.client_requests.push(ClientRequest::PlaySoundFx {
+                name: "portal.trigger",
+                volume: 1.0,
+                pitch,
+            });
         }
         let p = player_mut(e);
-        if p.time_until_portal > 0 {
-            p.time_until_portal -= 1;
+        p.time_in_portal += 0.0125;
+        if p.time_in_portal >= 1.0 {
+            p.time_in_portal = 1.0;
+            if !world.multiplayer_world {
+                p.time_until_portal = 10;
+                // src: EntityPlayerSP.java:58
+                let pitch = e.base.rand.next_float() * 0.4 + 0.8;
+                world.client_requests.push(ClientRequest::PlaySoundFx {
+                    name: "portal.travel",
+                    volume: 1.0,
+                    pitch,
+                });
+                // src: EntityPlayerSP.java:59: mc.usePortal(); the update
+                // goes on on the new world (sp_on_living_update_after_portal).
+                world.client_requests.push(ClientRequest::UsePortal);
+                return;
+            }
         }
-        // movementInput.updatePlayerMoveState(this): the client's input
-        // source fills movement_input (MovementInput::from_keys).
-        if sp(e).movement_input.sneak && e.base.y_size < 0.2 {
-            e.base.y_size = 0.2;
+        // src: EntityPlayerSP.java:63
+        player_mut(e).in_portal = false;
+    } else {
+        let p = player_mut(e);
+        if p.time_in_portal > 0.0 {
+            p.time_in_portal -= 0.05;
         }
-        let w = e.base.width as f64 * 0.35;
-        let (x, z) = (e.base.pos_x, e.base.pos_z);
-        let y = e.base.bounding_box.min_y + 0.5;
-        dispatch::push_out_of_blocks(e, world, x - w, y, z + w);
-        let (x, z) = (e.base.pos_x, e.base.pos_z);
-        let y = e.base.bounding_box.min_y + 0.5;
-        dispatch::push_out_of_blocks(e, world, x - w, y, z - w);
-        let (x, z) = (e.base.pos_x, e.base.pos_z);
-        let y = e.base.bounding_box.min_y + 0.5;
-        dispatch::push_out_of_blocks(e, world, x + w, y, z - w);
-        let (x, z) = (e.base.pos_x, e.base.pos_z);
-        let y = e.base.bounding_box.min_y + 0.5;
-        dispatch::push_out_of_blocks(e, world, x + w, y, z + w);
+        if p.time_in_portal < 0.0 {
+            p.time_in_portal = 0.0;
+        }
     }
+    sp_on_living_update_tail(e, world);
+}
+
+/// The rest of `EntityPlayerSP.onLivingUpdate()` after `mc.usePortal()`
+/// returned (EntityPlayerSP.java:63, :74-87): `inPortal = false`, then the
+/// portal cooldown, the sneak `ySize`, `pushOutOfBlocks` and
+/// `EntityPlayer.onLivingUpdate`, on the world the player is in now. The
+/// client calls it once [`ClientRequest::UsePortal`] has moved the player
+/// there, with the player taken out of its slot (module docs). Nothing
+/// without [`PlayerSpData::client_additions`].
+// src: EntityPlayerSP.java:63-88
+pub fn sp_on_living_update_after_portal(e: &mut Entity, world: &mut World) {
+    if !sp(e).client_additions {
+        return;
+    }
+    player_mut(e).in_portal = false; // src: EntityPlayerSP.java:63
+    sp_on_living_update_tail(e, world);
+}
+
+/// `EntityPlayerSP.onLivingUpdate()` from the portal cooldown on.
+// src: EntityPlayerSP.java:74-87
+fn sp_on_living_update_tail(e: &mut Entity, world: &mut World) {
+    let p = player_mut(e);
+    if p.time_until_portal > 0 {
+        p.time_until_portal -= 1;
+    }
+    // movementInput.updatePlayerMoveState(this): the client's input
+    // source fills movement_input (MovementInput::from_keys).
+    if sp(e).movement_input.sneak && e.base.y_size < 0.2 {
+        e.base.y_size = 0.2;
+    }
+    let w = e.base.width as f64 * 0.35;
+    let (x, z) = (e.base.pos_x, e.base.pos_z);
+    let y = e.base.bounding_box.min_y + 0.5;
+    dispatch::push_out_of_blocks(e, world, x - w, y, z + w);
+    let (x, z) = (e.base.pos_x, e.base.pos_z);
+    let y = e.base.bounding_box.min_y + 0.5;
+    dispatch::push_out_of_blocks(e, world, x - w, y, z - w);
+    let (x, z) = (e.base.pos_x, e.base.pos_z);
+    let y = e.base.bounding_box.min_y + 0.5;
+    dispatch::push_out_of_blocks(e, world, x + w, y, z - w);
+    let (x, z) = (e.base.pos_x, e.base.pos_z);
+    let y = e.base.bounding_box.min_y + 0.5;
+    dispatch::push_out_of_blocks(e, world, x + w, y, z + w);
     on_living_update(e, world);
 }
 

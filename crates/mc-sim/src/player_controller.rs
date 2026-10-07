@@ -23,13 +23,13 @@
 //! | :84-86 | `createPlayer` | [`crate::entity::player::new_entity_player_sp`] (client: the session) |
 //! | :88-94 | `interactWithEntity`, `attackEntity` | [`interact_with_entity`], [`attack_entity`] |
 //! | :96-103 | `handleMouseClick`, `onCraftGuiClosed` | containers, WP-2.5b |
-//! | PlayerControllerSP.java:110-116 | fields | [`PlayerControllerSp`] |
-//! | :122-124 | `flipPlayer` | [`flip_player`] |
-//! | :126-145 | `sendBlockRemoved` | [`PlayerControllerSp::send_block_removed`] |
-//! | :147-158 | `clickBlock` | [`PlayerControllerSp::click_block`] |
-//! | :160-199 | `resetBlockRemoving`, `sendBlockRemoving` | [`PlayerControllerSp::reset_block_removing`], [`PlayerControllerSp::send_block_removing`] |
-//! | :201-211 | `setPartialTime` | [`PlayerControllerSp::damage_partial_time`] (render) |
-//! | :213-224 | `getBlockReachDistance`, `func_717_a`, `updateController` | [`PlayerControllerSp::get_block_reach_distance`]; nothing; [`PlayerControllerSp::update_controller`] |
+//! | PlayerControllerSP.java:6-16 | fields, constructor | [`PlayerControllerSp`] |
+//! | :18-20 | `flipPlayer` | [`flip_player`] |
+//! | :22-41 | `sendBlockRemoved` | [`PlayerControllerSp::send_block_removed`] |
+//! | :43-54 | `clickBlock` | [`PlayerControllerSp::click_block`] |
+//! | :56-95 | `resetBlockRemoving`, `sendBlockRemoving` | [`PlayerControllerSp::reset_block_removing`], [`PlayerControllerSp::send_block_removing`] |
+//! | :97-107 | `setPartialTime` | [`PlayerControllerSp::damage_partial_time`] (render) |
+//! | :109-120 | `getBlockReachDistance`, `func_717_a`, `updateController` | [`PlayerControllerSp::get_block_reach_distance`]; nothing; [`PlayerControllerSp::update_controller`] |
 //!
 //! Sounds the controller plays straight through `mc.sndManager` (the dig
 //! step sound) are queued in [`PlayerControllerSp::sounds`] for the client;
@@ -62,7 +62,7 @@ pub struct ControllerSound {
 }
 
 /// `PlayerControllerSP`'s state (PlayerController.java:7,
-/// PlayerControllerSP.java:110-116).
+/// PlayerControllerSP.java:6-12).
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlayerControllerSp {
     /// `field_1064_b` (PlayerController.java:7): true only for the
@@ -90,7 +90,7 @@ pub struct PlayerControllerSp {
 }
 
 impl Default for PlayerControllerSp {
-    // src: PlayerController.java:7, PlayerControllerSP.java:110-116
+    // src: PlayerController.java:7, PlayerControllerSP.java:6-12
     fn default() -> Self {
         PlayerControllerSp {
             is_in_test_mode: false,
@@ -108,7 +108,7 @@ impl Default for PlayerControllerSp {
 
 /// `PlayerControllerSP.flipPlayer(player)`: faces the player north (the
 /// client's world start).
-// src: PlayerControllerSP.java:122-124
+// src: PlayerControllerSP.java:18-20
 pub fn flip_player(p: &mut Entity) {
     p.base.rotation_yaw = -180.0;
 }
@@ -234,7 +234,7 @@ impl PlayerControllerSp {
     /// broken stack leaves the hand) and, when the block went and the player
     /// could harvest it (asked before the wear), the block's `harvestBlock`
     /// (the drops).
-    // src: PlayerControllerSP.java:126-145
+    // src: PlayerControllerSP.java:22-41
     pub fn send_block_removed(
         &mut self,
         world: &mut World,
@@ -278,7 +278,7 @@ impl PlayerControllerSp {
     /// out fire in front of the face (`World.onBlockHit`), the block's
     /// `onBlockClicked` when no damage is in progress, and an instant break
     /// for a block the player breaks in one tick.
-    // src: PlayerControllerSP.java:147-158
+    // src: PlayerControllerSP.java:43-54
     pub fn click_block(
         &mut self,
         world: &mut World,
@@ -301,7 +301,7 @@ impl PlayerControllerSp {
     }
 
     /// `resetBlockRemoving()`: the button was released.
-    // src: PlayerControllerSP.java:160-163
+    // src: PlayerControllerSP.java:56-59
     pub fn reset_block_removing(&mut self) {
         self.cur_block_damage = 0.0;
         self.block_hit_wait = 0;
@@ -313,7 +313,7 @@ impl PlayerControllerSp {
     /// 4th tick) and the block breaks at 1; a new block restarts at 0 (no
     /// damage that tick). Returns whether this call broke the block (the
     /// return value of `sendBlockRemoved`).
-    // src: PlayerControllerSP.java:165-199
+    // src: PlayerControllerSP.java:61-95
     pub fn send_block_removing(
         &mut self,
         world: &mut World,
@@ -371,7 +371,7 @@ impl PlayerControllerSp {
     /// `setPartialTime(partial)`: the crack overlay's interpolated progress
     /// (`ingameGUI.damageGuiPartialTime`, `renderGlobal.damagePartialTime`);
     /// 0 with no damage.
-    // src: PlayerControllerSP.java:201-211
+    // src: PlayerControllerSP.java:97-107
     pub fn damage_partial_time(&self, var1: f32) -> f32 {
         if self.cur_block_damage <= 0.0 {
             0.0
@@ -381,7 +381,7 @@ impl PlayerControllerSp {
     }
 
     /// `getBlockReachDistance()`: 4 in survival (`PlayerController`'s is 5).
-    // src: PlayerControllerSP.java:213-215
+    // src: PlayerControllerSP.java:109-111
     pub fn get_block_reach_distance(&self) -> f32 {
         4.0
     }
@@ -389,7 +389,7 @@ impl PlayerControllerSp {
     /// `updateController()`: once per client tick (Minecraft.java:962-964):
     /// keeps last tick's progress. The random music it also starts is the
     /// client's (WP-3.8).
-    // src: PlayerControllerSP.java:221-224
+    // src: PlayerControllerSP.java:117-120
     pub fn update_controller(&mut self) {
         self.prev_block_damage = self.cur_block_damage;
     }

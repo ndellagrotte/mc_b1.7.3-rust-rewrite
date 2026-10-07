@@ -15,6 +15,7 @@ use mc_sim::item::ItemStack;
 use mc_sim::player_controller::PlayerControllerSp;
 use mc_sim::save::NoSave;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+use mc_sim::world::client_requests::ClientRequest;
 use mc_sim::world::provider::{Dimension, WorldProvider};
 use mc_sim::world::{World, WorldEnvironment};
 
@@ -228,8 +229,10 @@ fn nbt_round_trip_wakes_a_sleeper() {
 
 /// `EntityPlayerSP.onLivingUpdate` with the client parts on: a player whose
 /// feet are in a stone block is pushed toward the open side, the sneak dips
-/// `ySize`, and the portal timer reaches `Minecraft.usePortal` (recorded)
-/// after 81 ticks in a portal; off (the harness), none of it.
+/// `ySize`, and the portal timer reaches `Minecraft.usePortal` (raised as a
+/// client request, the update finished by
+/// `sp_on_living_update_after_portal`) after 81 ticks in a portal; off (the
+/// harness), none of it.
 #[test]
 fn client_additions_push_sneak_and_portal() {
     let mut w = world(Dimension::Surface);
@@ -253,23 +256,26 @@ fn client_additions_push_sneak_and_portal() {
         dispatch::on_living_update(&mut q, &mut w);
     }
     assert!(pd(&q).time_in_portal < 1.0);
-    assert!(
-        !w.unimplemented_hits
-            .borrow()
-            .contains_key("Minecraft.usePortal")
-    );
+    let use_portal = |w: &World| {
+        w.client_requests
+            .iter()
+            .any(|r| *r == ClientRequest::UsePortal)
+    };
+    assert!(!use_portal(&w));
     dispatch::set_in_portal(&mut q, &mut w);
     dispatch::on_living_update(&mut q, &mut w);
     assert_eq!(pd(&q).time_in_portal, 1.0);
+    assert!(use_portal(&w));
+    assert_eq!(
+        pd(&q).time_until_portal,
+        10,
+        "the update stopped at usePortal"
+    );
+    player::sp_on_living_update_after_portal(&mut q, &mut w);
     assert_eq!(
         pd(&q).time_until_portal,
         9,
         "10, then the countdown of the same update"
-    );
-    assert!(
-        w.unimplemented_hits
-            .borrow()
-            .contains_key("Minecraft.usePortal")
     );
     // The harness player: setInPortal only resets the timer, nothing counts.
     let mut h = player_at(&mut w, -4.5, 61.0, -4.5);

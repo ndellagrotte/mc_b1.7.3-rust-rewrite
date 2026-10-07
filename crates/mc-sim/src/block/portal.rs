@@ -11,9 +11,10 @@
 //!
 //! `onEntityCollidedWithBlock` calls `entity.setInPortal()`, which is empty
 //! for every entity but a player (Entity.java:1038-1039); the player's
-//! override (EntityPlayer.java:811-817) writes `timeUntilPortal` / `inPortal`,
-//! which `PlayerData` does not have yet (portal travel, Phase 2): recorded as
-//! `"EntityPlayer.setInPortal"` with [`World::note_unimplemented`].
+//! override (EntityPlayer.java:811-817,
+//! [`crate::entity::player::set_in_portal`]) writes `timeUntilPortal` /
+//! `inPortal`, which `EntityPlayerSP.onLivingUpdate` turns into portal
+//! travel (WP-3.1b; the call was a recorded gap until then).
 
 use mc_core::java_random::JavaRandom;
 
@@ -179,11 +180,8 @@ pub fn should_side_be_rendered(
 // src: BlockPortal.java:150-155
 pub fn on_entity_collided_with_block(world: &mut World, e: &mut Entity) {
     if e.base.riding_entity.is_none() && e.base.ridden_by_entity.is_none() {
-        // src: BlockPortal.java:152: var5.setInPortal(); Entity's body is empty
-        // (Entity.java:1038-1039), EntityPlayer's is Phase 2 (module docs).
-        if e.kind.is_player() {
-            world.note_unimplemented("EntityPlayer.setInPortal");
-        }
+        // src: BlockPortal.java:152
+        crate::entity::dispatch::set_in_portal(e, world);
     }
 }
 

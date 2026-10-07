@@ -10,8 +10,9 @@ use mc_core::java_random::JavaRandom;
 use mc_core::math::floor_double;
 
 use super::{block, container, opaque_cube_lookup};
-use crate::entity::Entity;
+use crate::entity::{Entity, player};
 use crate::world::World;
+use crate::world::client_requests::PlayerGui;
 
 /// `Block.stoneOvenIdle.blockID` / `Block.stoneOvenActive.blockID`.
 // src: Block.java:653-654
@@ -121,15 +122,23 @@ pub fn random_display_tick(
 }
 
 /// `blockActivated(world, x, y, z, player)`: true; off a multiplayer client
-/// `player.displayGUIFurnace(tileEntity)` (client GUI and `ContainerFurnace`,
-/// WP-2.5/Phase 3; recorded as `"EntityPlayerSP.displayGUIFurnace"`, after
-/// the `getBlockTileEntity` lookup, which can create the tile entity).
+/// `player.displayGUIFurnace(tileEntity)` after the `getBlockTileEntity`
+/// lookup (which can create the tile entity): the client's `GuiFurnace`
+/// ([`player::display_gui`], [`PlayerGui::Furnace`]).
 // src: BlockFurnace.java:102-110
 pub fn block_activated(world: &mut World, x: i32, y: i32, z: i32, player: &mut Entity) -> bool {
-    let _ = player;
     if !world.multiplayer_world {
-        let _var6 = world.get_block_tile_entity(x, y, z);
-        world.note_unimplemented("EntityPlayerSP.displayGUIFurnace");
+        let var6 = world.get_block_tile_entity(x, y, z);
+        player::display_gui(
+            player,
+            world,
+            PlayerGui::Furnace {
+                x,
+                y,
+                z,
+                tile_entity: var6,
+            },
+        );
     }
     true
 }

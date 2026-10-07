@@ -19,7 +19,8 @@
 //! overworld is [`World::new_explosion`] (WP-1.8).
 //! `addChatMessage` is a client-only message: `EntityPlayer`'s body is empty
 //! (EntityPlayer.java:698-699), `EntityPlayerSP`'s writes to the chat GUI
-//! (EntityPlayerSP.java:172-174); a no-op here.
+//! (EntityPlayerSP.java:172-174): [`crate::entity::player::add_chat_message`]
+//! ([`crate::world::client_requests::ClientRequest::ChatMessage`]).
 
 use mc_core::java_hash::ChunkCoordinates;
 
@@ -144,17 +145,20 @@ pub fn block_activated(
             }
         }
         if var14.is_some() {
-            // src: BlockBed.java:63: var5.addChatMessage("tile.bed.occupied")
-            // (client, module docs).
+            // src: BlockBed.java:63
+            crate::entity::player::add_chat_message(player, world, "tile.bed.occupied");
             return true;
         }
         set_bed_occupied(world, var2, var3, var4, false);
     }
     // src: BlockBed.java:70-80: OK marks the bed occupied; NOT_POSSIBLE_NOW
-    // adds the chat message "tile.bed.noSleep" (client); true either way.
+    // adds the chat message "tile.bed.noSleep"; true either way.
     let var15 = crate::entity::player::sleep_in_bed_at(player, world, var2, var3, var4);
     if var15 == crate::entity::player::EnumStatus::Ok {
         set_bed_occupied(world, var2, var3, var4, true);
+    } else if var15 == crate::entity::player::EnumStatus::NotPossibleNow {
+        // src: BlockBed.java:76
+        crate::entity::player::add_chat_message(player, world, "tile.bed.noSleep");
     }
     true
 }
