@@ -27,6 +27,10 @@
 //! WP-3.6a: [`gui`] (`Gui`, `GuiScreen`, the widgets, `FontRenderer`, the
 //! screen objects bound to the shell's slot, the 2D batcher and its
 //! cameras).
+//! WP-3.6c: [`gui::menu`] (the title, pause, options, world select /
+//! create / rename / import, achievements, statistics and texture-pack
+//! screens), [`gui::loading`] (the loading screen's drawing),
+//! [`gui::screens_menu`] (their registration).
 //! WP-3.7a: [`particles`] (`EffectRenderer`, the `EntityFX` family,
 //! `RenderGlobal.spawnParticle`, `addRainParticles`).
 //! WP-3.7b: [`item_renderer`] (`ItemRenderer`: the first-person hand and
@@ -197,6 +201,9 @@ impl Plugin for ClientPlugin {
         app.add_plugins(model::ModelPlugin);
         // WP-3.6a: the GUI (screens, widgets, font, the 2D batcher).
         app.add_plugins(gui::GuiPlugin);
+        // WP-3.6c: the menus, options, achievements, statistics, the world
+        // screens and import, the loading screen.
+        app.add_plugins(gui::screens_menu::MenuPlugin);
         // WP-3.7a: EffectRenderer and the particles.
         app.add_plugins(particles::ParticlesPlugin);
         // WP-3.7b: ItemRenderer (the hand, held items, the overlays).
