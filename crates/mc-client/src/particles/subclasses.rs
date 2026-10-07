@@ -13,6 +13,8 @@ use mc_sim::world::World;
 
 use super::fx::{Billboard, EntityFx, FxKind, FxRandom, PickupData};
 use crate::gl_material::TessBatch;
+use crate::textures::Colorizers;
+use crate::textures::colorizer;
 
 /// `Block.blockSnow.blockID` (BlockSnowBlock, read by `EntitySlimeFX` for
 /// its gravity).
@@ -29,6 +31,77 @@ pub struct SpawnRequest {
     pub pos: DVec3,
     /// Motion.
     pub motion: DVec3,
+}
+
+/// `Block.colorMultiplier(world, x, y, z)` of block `id` as the client sees
+/// it, with `meta` standing for the `getBlockMetadata(x, y, z)` the
+/// overrides read, and the biome colours from the client's colour maps.
+///
+/// Two reasons it is not `mc_sim::block::dispatch::color_multiplier`: the
+/// simulation has no colour map (its lookup answers 0, the headless
+/// oracle's empty `grassBuffer`), and `playAuxSFX` 2001 reaches the
+/// particles after `sendBlockRemoved` has set the block to air, while
+/// vanilla built the debris before (PlayerController.java:22-26): the
+/// event's metadata is the one vanilla read. The kinds are those of the
+/// dispatch: every override of `colorMultiplier` in the tree.
+// src: Block.java:530, BlockGrass.java:23-28, BlockFluid.java:14-16,
+// src: BlockLeaves.java:23-35, BlockTallGrass.java:22-37,
+// src: BlockRedstoneWire.java:37-39
+pub fn block_color_multiplier(
+    world: &mut World,
+    colorizers: &Colorizers,
+    id: i32,
+    meta: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> i32 {
+    const WHITE: i32 = 16777215;
+    let Some(b) = block::block(id) else {
+        return WHITE;
+    };
+    use block::BlockKind as K;
+    match b.kind {
+        K::Grass => biome_color(world, x, z, |t, h| colorizers.get_grass_color(t, h)),
+        K::Flowing | K::Stationary => WHITE,
+        K::Leaves => {
+            if (meta & 1) == 1 {
+                colorizer::get_foliage_color_pine()
+            } else if (meta & 2) == 2 {
+                colorizer::get_foliage_color_birch()
+            } else {
+                biome_color(world, x, z, |t, h| colorizers.get_foliage_color(t, h))
+            }
+        }
+        K::TallGrass => {
+            if meta == 0 {
+                return WHITE;
+            }
+            // (long)(x * 3129871 + z * 6129781 + y): the sum is an int.
+            let mut var6 = x
+                .wrapping_mul(3129871)
+                .wrapping_add(z.wrapping_mul(6129781))
+                .wrapping_add(y) as i64;
+            var6 = var6
+                .wrapping_mul(var6)
+                .wrapping_mul(42317861)
+                .wrapping_add(var6.wrapping_mul(11));
+            let x = (x as i64).wrapping_add(var6 >> 14 & 31) as i32;
+            let z = (z as i64).wrapping_add(var6 >> 24 & 31) as i32;
+            biome_color(world, x, z, |t, h| colorizers.get_grass_color(t, h))
+        }
+        K::RedstoneWire => 8388608,
+        _ => WHITE,
+    }
+}
+
+/// `getWorldChunkManager().getBiomeGenBaseAt(x, z, 1, 1)`, then `f` of
+/// `temperature[0]`, `humidity[0]`.
+// src: BlockGrass.java:24-27
+fn biome_color(world: &mut World, x: i32, z: i32, f: impl Fn(f64, f64) -> i32) -> i32 {
+    let m = world.get_world_chunk_manager();
+    m.get_biome_gen_base_at(x, z, 1, 1);
+    f(m.temperature[0], m.humidity[0])
 }
 
 /// `(float)(Math.random() * 2.0D - 1.0D) * k` as a double.
@@ -108,16 +181,38 @@ impl EntityFx {
 
     /// `EntityDiggingFX.applyColourMultiplier(x, y, z)`: tinted by the
     /// block's `colorMultiplier` there, except grass (whose particle shows
-    /// the dirt bottom).
+    /// the dirt bottom). `meta` is what `colorMultiplier` reads with
+    /// `getBlockMetadata(x, y, z)` at the call ([`block_color_multiplier`]).
     // src: EntityDiggingFX.java:17-27
-    pub fn apply_colour_multiplier(mut self, world: &mut World, x: i32, y: i32, z: i32) -> Self {
+    pub fn apply_colour_multiplier(
+        self,
+        world: &mut World,
+        colorizers: &Colorizers,
+        x: i32,
+        y: i32,
+        z: i32,
+        meta: i32,
+    ) -> Self {
         let FxKind::Digging { block_id, .. } = self.kind else {
             return self;
         };
         if block_id == block::ids::GRASS {
             return self;
         }
-        let var4 = block::dispatch::color_multiplier(world, block_id, x, y, z);
+        let var4 = block_color_multiplier(world, colorizers, block_id, meta, x, y, z);
+        self.apply_colour(var4)
+    }
+
+    /// `applyColourMultiplier`'s tint with its multiplier `var4` already
+    /// computed (the grass exception kept).
+    // src: EntityDiggingFX.java:17-27
+    pub fn apply_colour(mut self, var4: i32) -> Self {
+        let FxKind::Digging { block_id, .. } = self.kind else {
+            return self;
+        };
+        if block_id == block::ids::GRASS {
+            return self;
+        }
         self.particle_red *= (var4 >> 16 & 255) as f32 / 255.0;
         self.particle_green *= (var4 >> 8 & 255) as f32 / 255.0;
         self.particle_blue *= (var4 & 255) as f32 / 255.0;

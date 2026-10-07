@@ -28,9 +28,12 @@
 //! until then, as in Java). A world change (`clearEffects`) is applied at
 //! once even between ticks. Each request still reads the world when it is
 //! applied; between the request and the hook the world does not change in
-//! the shell's tick order, except that `spawnParticle`'s 16-block range is
-//! measured from the view entity's position at the hook (vanilla: at the
-//! call; it moves at most one tick's motion).
+//! the shell's tick order, with two exceptions: `spawnParticle`'s 16-block
+//! range is measured from the view entity's position at the hook (vanilla:
+//! at the call; it moves at most one tick's motion), and `playAuxSFX` 2001
+//! comes from `sendBlockRemoved`, which then sets the block to air, so the
+//! debris takes its tint's metadata from the event
+//! ([`EffectRenderer::add_block_destroy_effects`]).
 //!
 //! # Randomness
 //!
@@ -65,8 +68,10 @@ use mc_sim::world::events::WorldEvent;
 
 use crate::GameFrameSet;
 use crate::clock;
+use crate::debug::DebugSources;
 use crate::events::{ClientEvent, WorldEventMsg};
 use crate::game::{Game, RunTickHook};
+use crate::textures::Colorizers;
 use crate::weather::WeatherRandom;
 
 pub use fx::{Billboard, EntityFx, FxKind, FxRandom};
@@ -138,6 +143,11 @@ pub struct EffectRenderer {
     pub interp_pos: DVec3,
     /// Requests not yet applied (module docs).
     pub pending: Vec<PendingFx>,
+    /// `ColorizerGrass.grassBuffer` and `ColorizerFoliage.foliageBuffer`
+    /// (statics in vanilla) as the digging particles' `colorMultiplier`
+    /// reads them: [`crate::textures::Colorizers`], copied in by
+    /// [`apply_pending`].
+    pub colorizers: Colorizers,
 }
 
 impl Default for EffectRenderer {
@@ -161,6 +171,7 @@ impl EffectRenderer {
             aux_world_rand,
             interp_pos: DVec3::ZERO,
             pending: Vec::new(),
+            colorizers: Colorizers::default(),
         }
     }
 
@@ -221,6 +232,13 @@ impl EffectRenderer {
     /// particles through the block, each moving out from its centre, with
     /// a random `nextInt(6)` side. Nothing for air (or an id without a
     /// block, where Java would throw).
+    ///
+    /// The tint is the block's `colorMultiplier` with `var5`, the event's
+    /// metadata, for the world's: vanilla ran this inside
+    /// `sendBlockRemoved` before `setBlockWithNotify(x, y, z, 0)`
+    /// (PlayerController.java:22-26), where `getBlockMetadata` answered the
+    /// metadata `playAuxSFX` 2001 carries; here the block is already air
+    /// (module docs). One value for all 64, as the 64 Java calls agree.
     // src: EffectRenderer.java:111-129
     pub fn add_block_destroy_effects(
         &mut self,
@@ -234,6 +252,7 @@ impl EffectRenderer {
         if var4 == 0 || mc_sim::block::block(var4).is_none() {
             return;
         }
+        let tint = subclasses::block_color_multiplier(world, &self.colorizers, var4, var5, x, y, z);
         let var7 = 4;
         for var8 in 0..var7 {
             for var9 in 0..var7 {
@@ -255,7 +274,8 @@ impl EffectRenderer {
                         var5,
                         &mut self.fx_random,
                     ) {
-                        let fx = fx.apply_colour_multiplier(world, x, y, z);
+                        // .applyColourMultiplier(x, y, z) with `tint`
+                        let fx = fx.apply_colour(tint);
                         self.add_effect(fx);
                     }
                 }
@@ -312,7 +332,7 @@ impl EffectRenderer {
             &mut self.fx_random,
         ) {
             let fx = fx
-                .apply_colour_multiplier(world, x, y, z)
+                .apply_colour_multiplier(world, &self.colorizers, x, y, z, meta)
                 .multiply_velocity(0.2)
                 .multiple_particle_scale_by(0.6);
             self.add_effect(fx);
@@ -439,8 +459,18 @@ pub fn view_pos(game: &Game) -> Option<DVec3> {
         .map(|e| DVec3::new(e.base.pos_x, e.base.pos_y, e.base.pos_z))
 }
 
-/// Applies the pending requests at a tick point (module docs).
-pub fn apply_pending(mut game: NonSendMut<Game>, mut er: ResMut<EffectRenderer>) {
+/// Applies the pending requests at a tick point (module docs), with the
+/// colour maps as they are now.
+pub fn apply_pending(
+    mut game: NonSendMut<Game>,
+    mut er: ResMut<EffectRenderer>,
+    colorizers: Option<Res<Colorizers>>,
+) {
+    if let Some(c) = colorizers
+        && c.is_changed()
+    {
+        er.colorizers = c.clone();
+    }
     let view = view_pos(&game);
     match game.the_world.as_mut() {
         Some(w) => er.apply_pending(w, view),
@@ -452,6 +482,17 @@ pub fn apply_pending(mut game: NonSendMut<Game>, mut er: ResMut<EffectRenderer>)
 /// for the next tick point.
 pub fn apply_pending_clear(mut er: ResMut<EffectRenderer>) {
     er.apply_pending_clear();
+}
+
+/// F3's `P: ` + `effectRenderer.getStatistics()` (Minecraft.java:1415),
+/// published after the frame's ticks and clears and before the shell's
+/// `publish_debug_text`, so the in-game GUI reads this frame's count.
+// src: Minecraft.java:1172-1174, 1415
+pub fn publish_statistics(er: Res<EffectRenderer>, mut debug: ResMut<DebugSources>) {
+    let s = er.get_statistics();
+    if debug.particles != s {
+        debug.particles = s;
+    }
 }
 
 /// `effectRenderer.updateEffects()` (the end of an unpaused `runTick`).
@@ -526,11 +567,15 @@ impl Plugin for ParticlesPlugin {
                 }
             }
         }
+        // Every flush happens inside game_frame: after it, the frame's
+        // world change is cleared and the count published for F3.
         app.add_systems(
             Update,
-            (collect_messages, apply_pending_clear)
+            (collect_messages, apply_pending_clear, publish_statistics)
                 .chain()
-                .after(GameFrameSet),
+                .in_set(GameFrameSet)
+                .after(crate::game::game_frame)
+                .before(crate::debug::publish_debug_text),
         );
         render::build(app);
     }

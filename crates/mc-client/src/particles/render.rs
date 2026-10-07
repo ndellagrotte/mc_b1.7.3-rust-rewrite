@@ -28,6 +28,11 @@
 //! frame's movement off (vanilla bug, transcribed: the lit mesh sits at
 //! this frame's position with last frame's offsets).
 //!
+//! With anaglyph 3D vanilla runs both calls once per eye
+//! (EntityRenderer.java:455-575), so its second eye's lit pass reads this
+//! frame's `interpPos`. The shell renders one eye (`camera` module docs):
+//! these meshes are vanilla's first pass, whose lag is the one above.
+//!
 //! # Textures
 //!
 //! [`GlMaterial`] expects `Rgba8Unorm` textures (its module docs:
@@ -51,7 +56,6 @@ use bevy::render::render_resource::TextureFormat;
 use super::fx::Billboard;
 use super::{EffectRenderer, FxKind};
 use crate::GameFrameSet;
-use crate::debug::DebugSources;
 use crate::fog::FogState;
 use crate::game::Game;
 use crate::gl_material::{GlBlend, GlKey, GlMaterial, TessBatch};
@@ -176,16 +180,14 @@ pub fn spawn_particles(
 }
 
 /// `renderLitParticles` then `renderParticles` for this frame (module
-/// docs), and F3's particle count.
+/// docs). F3's particle count is [`super::publish_statistics`].
 // src: EntityRenderer.java:501-505, EffectRenderer.java:49-100
 pub fn compute_particles(
     mut game: NonSendMut<Game>,
     mut er: ResMut<EffectRenderer>,
     mut frame: ResMut<ParticlesFrame>,
     mut pickups: ResMut<PickupFxFrame>,
-    mut debug: ResMut<DebugSources>,
 ) {
-    debug.particles = er.get_statistics();
     pickups.draws.clear();
     for b in &mut frame.batches {
         *b = TessBatch::default();

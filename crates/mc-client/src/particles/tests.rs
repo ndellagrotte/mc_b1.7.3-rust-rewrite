@@ -552,3 +552,102 @@ fn pending_clear_drops_what_came_before() {
     assert_eq!(er.fx_layers[0].len(), 10);
     assert!(er.pending.is_empty());
 }
+
+/// Colour maps with one colour each (grass 0x336699, foliage 0x55aa11).
+fn flat_colorizers() -> crate::textures::Colorizers {
+    crate::textures::Colorizers {
+        water: vec![0; 65536].into(),
+        grass: vec![0x336699; 65536].into(),
+        foliage: vec![0x55aa11; 65536].into(),
+    }
+}
+
+/// The 0.6 grey of a digging particle times a multiplier's channels.
+fn tinted(m: i32) -> (f32, f32, f32) {
+    (
+        0.6 * ((m >> 16 & 255) as f32 / 255.0),
+        0.6 * ((m >> 8 & 255) as f32 / 255.0),
+        0.6 * ((m & 255) as f32 / 255.0),
+    )
+}
+
+fn rgb(fx: &EntityFx) -> (f32, f32, f32) {
+    (fx.particle_red, fx.particle_green, fx.particle_blue)
+}
+
+#[test]
+fn destroy_effects_tint_with_the_event_metadata() {
+    // sendBlockRemoved: playAuxSFX(2001, id + meta * 256), then the block
+    // becomes air (PlayerController.java:22-26); the debris is applied
+    // after that and must still see the tall grass's metadata.
+    let mut w = world();
+    let mut er = renderer(10);
+    er.colorizers = flat_colorizers();
+    let (x, y, z) = (4, 64, 7);
+    w.set_block_and_metadata(x, y, z, block::ids::TALL_GRASS, 1);
+    w.set_block(x, y, z, 0);
+    er.play_aux_sfx(&mut w, None, 2001, x, y, z, block::ids::TALL_GRASS + 256);
+    assert_eq!(er.fx_layers[1].len(), 64);
+    assert!(er.fx_layers[1].iter().all(|f| rgb(f) == tinted(0x336699)));
+    // Meta 0 (the dead shrub): white, the 0.6 grey.
+    er.clear_effects();
+    er.play_aux_sfx(&mut w, None, 2001, x, y, z, block::ids::TALL_GRASS);
+    assert!(er.fx_layers[1].iter().all(|f| rgb(f) == (0.6, 0.6, 0.6)));
+    // Leaves: pine (meta 1), birch (meta 2), else the foliage map.
+    for (meta, m) in [(1, 0x619961), (2, 0x80a755), (0, 0x55aa11), (8, 0x55aa11)] {
+        er.clear_effects();
+        er.play_aux_sfx(&mut w, None, 2001, x, y, z, block::ids::LEAVES + meta * 256);
+        assert_eq!(rgb(&er.fx_layers[1][0]), tinted(m), "leaves meta {meta}");
+    }
+    // Grass: never tinted.
+    er.clear_effects();
+    er.play_aux_sfx(&mut w, None, 2001, x, y, z, block::ids::GRASS);
+    assert_eq!(rgb(&er.fx_layers[1][0]), (0.6, 0.6, 0.6));
+}
+
+#[test]
+fn hit_effects_tint_with_the_world_metadata() {
+    let mut w = world();
+    let mut er = renderer(11);
+    er.colorizers = flat_colorizers();
+    w.set_block_and_metadata(1, 64, 1, block::ids::TALL_GRASS, 2);
+    er.add_block_hit_effects(&mut w, 1, 64, 1, 1);
+    w.set_block_and_metadata(2, 64, 1, block::ids::LEAVES, 1);
+    er.add_block_hit_effects(&mut w, 2, 64, 1, 1);
+    assert_eq!(rgb(&er.fx_layers[1][0]), tinted(0x336699));
+    assert_eq!(rgb(&er.fx_layers[1][1]), tinted(0x619961));
+}
+
+#[test]
+fn block_color_multiplier_table() {
+    use super::subclasses::block_color_multiplier;
+    let mut w = world();
+    let c = flat_colorizers();
+    let mut m = |id, meta| block_color_multiplier(&mut w, &c, id, meta, 0, 64, 0);
+    assert_eq!(m(block::ids::STONE, 0), 0xffffff);
+    assert_eq!(m(block::ids::GRASS, 0), 0x336699);
+    assert_eq!(m(block::ids::WATER_MOVING, 0), 0xffffff);
+    assert_eq!(m(block::ids::REDSTONE_WIRE, 15), 0x800000);
+    assert_eq!(m(block::ids::TALL_GRASS, 0), 0xffffff);
+    assert_eq!(m(block::ids::TALL_GRASS, 1), 0x336699);
+    assert_eq!(m(block::ids::LEAVES, 3), 0x619961);
+}
+
+#[test]
+fn publish_statistics_writes_the_count_for_f3() {
+    use bevy::prelude::*;
+    let mut w = world();
+    let mut er = renderer(12);
+    er.add_block_destroy_effects(&mut w, 0, 64, 0, block::ids::STONE, 0);
+    let mut app = App::new();
+    app.init_resource::<crate::debug::DebugSources>()
+        .insert_resource(er)
+        .add_systems(Update, super::publish_statistics);
+    app.update();
+    assert_eq!(
+        app.world()
+            .resource::<crate::debug::DebugSources>()
+            .particles,
+        "64"
+    );
+}

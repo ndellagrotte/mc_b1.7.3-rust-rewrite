@@ -668,7 +668,13 @@ GL's.
   frame (position relative to `ParticlesFrame::anchor`, yaw, partial tick,
   light) for `RenderManager.renderEntityWithPosYaw`; the particle module
   draws no entity.
-- F3's `P:` count is written into `DebugSources::particles` every frame.
+- F3's `P:` count is written into `DebugSources::particles` every frame,
+  inside `GameFrameSet` after `game_frame` and before
+  `debug::publish_debug_text` (the HUD reads this frame's count).
+- The digging particles' tint (`applyColourMultiplier`) uses the client's
+  `textures::Colorizers` (the simulation's colour map lookup answers 0)
+  and, for the 2001 debris, the metadata in the event (the block is air by
+  the time the request is applied).
 - No simulation `Random` is drawn: the particles' `rand` (one clock-seeded
   `JavaRandom` per particle, as `new Random()`), `Math.random()` (a client
   stream) and `playAuxSFX` 2000's `worldObj.rand` (a stand-in, as in the
