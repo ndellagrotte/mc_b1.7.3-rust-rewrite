@@ -333,6 +333,15 @@ fn stats_file_parse_failures() {
     );
 
     let s = |body: &str| format!("{{\"stats-change\":[{body}],\"checksum\":\"{sum}\"}}");
+    // Integer.parseInt("-0") is 0.
+    let zero = md5_string(Some("local"), "bbbb,0,");
+    assert_eq!(
+        func_27177_a(
+            &format!("{{\"stats-change\":[{{\"2010\":-0}}],\"checksum\":\"{zero}\"}}"),
+            &g
+        ),
+        Some(BTreeMap::from([(2010, 0)]))
+    );
     assert_eq!(func_27177_a(&s("{\"2010\":5.0}"), &g), None);
     assert_eq!(func_27177_a(&s("{}"), &g), None);
     assert_eq!(func_27177_a(&s("5"), &g), None);

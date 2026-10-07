@@ -215,11 +215,20 @@ fn java_parse_int(s: &str) -> Option<i32> {
 
 /// `J_JsonNode.getText()` then `Integer.parseInt`: a string node's text,
 /// or a number node's literal (an integer literal; `1.0` or `1e2` do not
-/// parse). Anything else throws in Java.
+/// parse). Anything else throws in Java. `serde_json` keeps no literal: an
+/// integer literal is an `i64`/`u64` except `-0`, which it reads as the
+/// float `-0.0`; that float is taken as `-0` (so `-0.0` and `-0e0`, which
+/// Java rejects, are accepted as 0 here).
 fn json_text_int(v: &Value) -> Option<i32> {
     match v {
         Value::String(s) => java_parse_int(s),
-        Value::Number(n) => n.as_i64().and_then(|x| i32::try_from(x).ok()),
+        Value::Number(n) => match n.as_i64() {
+            Some(x) => i32::try_from(x).ok(),
+            None => n
+                .as_f64()
+                .filter(|f| *f == 0.0 && f.is_sign_negative())
+                .map(|_| 0),
+        },
         _ => None,
     }
 }
