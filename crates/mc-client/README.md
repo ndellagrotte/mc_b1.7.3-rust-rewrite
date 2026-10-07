@@ -60,6 +60,7 @@ naming the path.
 | `weather` | `EntityRenderer.renderRainSnow` | rain and snow columns |
 | `selection` | `RenderGlobal.drawSelectionBox` | the block outline |
 | `gl_material` | — (GL state) | `GlMaterial`: glColor × vertex colour × texture, alpha test, GL fog, blend/depth/colour masks, draw-order biases; Tessellator helpers |
+| `terrain` (WP-3.3a) | `RenderBlocks`, `WorldRenderer`, `RenderGlobal` (terrain half: `loadRenderers`, `updateRenderers`, `sortAndRender`, `clipRenderersByFrustrum`, `markBlock*NeedsUpdate`, `drawBlockBreaking`), `RenderSorter`, `EntitySorter`, `ChunkCache`, `Tessellator`, `Frustrum`, `ClippingHelper(Impl)` | the terrain meshes, two passes, the crack overlay, `renderBlockOnInventory` (below) |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -271,6 +272,108 @@ downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
   that never leave the queue the plugin logs one warning and keeps deciding
   (and logging) without output.
 
+## Terrain (WP-3.3a)
+
+`terrain::TerrainPlugin` (added by `ClientPlugin`) draws the world's blocks.
+Module docs: `terrain/mod.rs` (the frame, the entities), `render_blocks.rs`
+(the shared state and the dispatch), `world_renderer.rs` (grid, rebuild
+policy), `snapshot.rs` (what a mesh job reads).
+
+- **Sections.** `RenderGlobal`'s grid of 16×16×16 `WorldRenderer`s
+  (`64 << (3 - renderDistance)` blocks wide, at most 400: 26, 17, 9 or 5
+  sections across, 8 tall), wrapped around the view as
+  `markRenderersForNewPosition` does. A section with geometry in a pass is
+  one Bevy entity (`terrain::SectionMesh`) with a `Mesh3d` in the section's
+  coordinates and `terrain::material::TerrainMaterial`: pass 0 in the opaque
+  phase (alpha test `> 0.1`, back faces culled), pass 1 blended in the
+  transparent phase at `terrain::order::TRANSLUCENT`, preceded with fancy
+  graphics by a depth-only draw (`TRANSLUCENT_DEPTH`), as `renderWorld`
+  does (EntityRenderer.java:494-545). Bevy culls the entities; vanilla's
+  own frustum flag (`clipRenderersByFrustrum`, transcribed with
+  `ClippingHelperImpl`'s planes) hides the sections vanilla would skip and
+  drives the rebuild priority and the F3 counts.
+- **Rebuilds.** Marks come from `WorldEventMsg`
+  (`MarkBlockAndNeighborsNeedsUpdate`, `MarkBlockRangeNeedsUpdate`,
+  `UpdateAllRenderers`), the grid moving with the view, `loadRenderers`
+  (world change, render distance, the options that ask for it). Each frame
+  `updateRenderers` runs as vanilla runs it: every dirty section within 16
+  blocks (nearest first) plus one more (the best by `RenderSorter`), once
+  per frame without a frame-rate limit, repeated until the limit's time is
+  up with one. The near ones are meshed at once, the far one on Bevy's
+  `AsyncComputeTaskPool`. No separate chunk load/unload trigger: as
+  `ChunkCache` does, a rebuild loads (or generates) the 3×3 chunks around
+  its section first, and blocks a populator writes into a neighbour arrive
+  as marks.
+- **Snapshot** (`terrain::snapshot::ChunkSnapshot`, built on the main
+  thread): ids, metadata, sky and block light of the section grown by 3
+  blocks, `skylightSubtracted`, the brightness table, the `Block`
+  singletons' bounds and leaves state (`BlockStatics`, a copy the job
+  mutates), the `getBlockTexture` and `setBlockBoundsBasedOnState` results
+  of the kinds that read the world (computed by `mc-sim`), the special-render
+  tile entities, a copy of the `WorldChunkManager` (biome colours) and the
+  `Colorizers`.
+- **Colours.** Vertex colours are the Tessellator's bytes; brightness is
+  `lightBrightnessTable[max(sky - skylightSubtracted, block, lightValue)]`
+  (`ChunkCache.getBrightness`), the AO corners averaged in the Java's float
+  order. With AO on and fast graphics pass 1 is drawn flat-shaded (GL's
+  provoking vertex), as `renderWorld` leaves `GL_FLAT` set for it.
+- **Render types.** `RenderBlocks::render_block_by_render_type` dispatches
+  on `getRenderType()` (RenderBlocks.java:92-132); each arm is a method in
+  the file of the WP that owns it. Until filled, an arm draws nothing and
+  logs `terrain: render type N (…) is not drawn yet` once.
+
+  | Type | Java | Blocks | Owner, file |
+  |---|---|---|---|
+  | 0 | `renderStandardBlock` (+ AO, colour multiplier, the six faces) | cubes and cuboids (stone, dirt, grass with its side overlay, logs, leaves, glass, slabs, ice, …) | 3.3a, `render_blocks.rs` |
+  | 1 | `renderBlockReed` (`renderCrossedSquares`) | saplings, flowers, mushrooms, reeds, tall grass, dead bush, web | 3.3c, `plants.rs` |
+  | 2 | `renderBlockTorch` (`renderTorchAtAngle`) | torches | 3.3c, `plants.rs` |
+  | 3 | `renderBlockFire` | fire | 3.3c, `plants.rs` |
+  | 4 | `renderBlockFluids` (`func_1224_a`) | water, lava | 3.3b, `fluids.rs` |
+  | 5 | `renderBlockRedstoneWire` | redstone dust | 3.3d, `special.rs` |
+  | 6 | `renderBlockCrops` (`func_1245_b`) | wheat | 3.3c, `plants.rs` |
+  | 7 | `renderBlockDoor` | doors | 3.3d, `special.rs` |
+  | 8 | `renderBlockLadder` | ladder | 3.3d, `special.rs` |
+  | 9 | `renderBlockMinecartTrack` | rails | 3.3d, `special.rs` |
+  | 10 | `renderBlockStairs` | stairs | 3.3d, `special.rs` |
+  | 11 | `renderBlockFence` | fence | 3.3d, `special.rs` |
+  | 12 | `renderBlockLever` | lever | 3.3d, `special.rs` |
+  | 13 | `renderBlockCactus` (`func_1230_b`) | cactus | 3.3c, `plants.rs` |
+  | 14 | `renderBlockBed` | bed | 3.3d, `special.rs` |
+  | 15 | `renderBlockRepeater` | repeater | 3.3d, `special.rs` |
+  | 16 | `func_31074_b(…, false)` | piston base | 3.3d, `special.rs` |
+  | 17 | `func_31080_c(…, true)` | piston extension | 3.3d, `special.rs` |
+
+  To fill an arm, replace the stub's body in your file (same signature);
+  the shared state is `RenderBlocks`' fields (`override_block_texture`,
+  `flip_texture`, `render_all_faces`, `uv_rotate_*`, `enable_ao`, the AO
+  values), the `Block` methods are `RenderBlocks::{brightness,
+  block_texture, should_side, set_block_bounds}` and
+  `terrain::blocks::*` on the snapshot, and the Tessellator is
+  `RenderBlocks::tess`. A renderer must not read more than 3 blocks from the
+  block it draws (the snapshot logs a read outside it once).
+- **Crack overlay** (`drawBlockBreaking`): the mouse-over block drawn again
+  with tile `240 + (int)(damagePartialTime * 10)`, colours off, `glColor(1,
+  1, 1, 0.5)`, blended `(DST_COLOR, SRC_COLOR)` with a polygon offset,
+  before the selection box (`terrain::order::{CRACK, CRACK_IN_WATER}`).
+- **For WP-3.5b:** `terrain::TerrainTileEntities` is `RenderGlobal.tileEntities`
+  (positions of the sign, mob spawner and moving-piston tile entities of
+  the built sections) with `renderEntitiesStartupCounter`; `renderEntities`
+  runs between the two passes (bands in the README's "Draw order").
+- **For WP-3.7b:** `terrain::render_blocks::render_block_as_item(statics,
+  colorizers, id, meta, brightness)` is `new RenderBlocks().renderBlockOnInventory`
+  for render types 0 and 16 (and 10, 11, 13 built from faces; 1, 2, 6 call
+  the 3.3c stubs): the quads around the origin with per-face normals, and
+  `glColor` from `getRenderColor(meta) × brightness`.
+- **Stats:** `terrain::TerrainStats` (rebuilds this frame and in total,
+  jobs in flight, sections drawn per pass, the update list's length, the
+  snapshot and meshing time) and the F3 line `RenderGlobal.getDebugInfoRenders`
+  in `DebugSources::renders`.
+- Not done: occlusion queries (`advancedOpengl`; wgpu has none, so
+  `occlusionEnabled` is false as on a GL without `ARB_occlusion_query`, F3
+  `O: 0`); `RenderList`'s 1024-block anchoring (Bevy's transforms are
+  already camera-relative in f32 at the section). b1.7.3 has no
+  `bytesDrawn` statistic.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -307,6 +410,8 @@ Actions run in order, as many per frame as are due.
 | `set_rain` | `strength` (0..1), `thunder` (bool, default false) | Dev (WP-3.4): sets `rainingStrength` (and the previous value), `raining`/`thundering` with long timers, and the thunder strength to 1 or 0; `updateWeather` then moves the strength 0.01 a tick toward 1 or 0 |
 | `set_pos` | `x`, `y`, `z` | Dev (WP-3.4): moves the player (`posY` is the eye, as `dump` prints it), no interpolation, motion and fall distance cleared |
 | `aux_sfx` | `kind`, `x`, `y`, `z`, `data` | Dev (WP-3.8): queues `world.playAuxSFX(kind, x, y, z, data)` as the simulation would (`1005` with `data` 2256 plays record `13` at the block, `data` 0 stops it; `2001` with a block id plays its break sound) |
+| `set_option` | `option`, `step` (default 1) | Dev (WP-3.3a): `gameSettings.setOptionValue(option, step)` with its side effects and `saveOptions`, as the options screen's button (`option` is the translation key: `"options.ao"`, `"options.graphics"`, `"options.renderDistance"`, …) |
+| `dump_debug` | `path` | Dev (WP-3.3a): writes the F3 text (`DebugText`, `DebugSources`, the fps line) and `terrain::TerrainStats` as JSON |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
