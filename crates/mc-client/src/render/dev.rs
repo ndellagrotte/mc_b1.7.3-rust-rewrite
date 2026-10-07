@@ -292,3 +292,33 @@ pub fn set_block(game: &mut Game, s: &SetBlockSpec) -> bool {
     }
     true
 }
+
+/// An `equip` request: puts a stack into one of the player's slots.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct EquipSpec {
+    /// The slot: 0-35 the main inventory (0-8 the hotbar), 100-103 the
+    /// armour (boots, leggings, chestplate, helmet: `armorInventory[slot -
+    /// 100]`).
+    pub slot: i32,
+    /// `[id, count, damage]`; absent: empty the slot.
+    #[serde(default)]
+    pub item: Option<[i32; 3]>,
+}
+
+/// Puts the stack of `s` into the player's slot.
+pub fn equip(game: &mut Game, s: &EquipSpec) -> bool {
+    let Some(p) = game.player_in_world_mut() else {
+        return false;
+    };
+    let Some(d) = p.kind.player_mut() else {
+        return false;
+    };
+    let stack = s.item.map(|[id, n, dmg]| ItemStack::new(id, n, dmg));
+    let inv = &mut d.inventory;
+    match s.slot {
+        0..=35 => inv.main_inventory[s.slot as usize] = stack,
+        100..=103 => inv.armor_inventory[(s.slot - 100) as usize] = stack,
+        _ => return false,
+    }
+    true
+}

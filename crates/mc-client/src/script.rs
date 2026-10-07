@@ -302,6 +302,9 @@ pub enum Action {
     /// `rel`, `x, y, z` are offsets from the player's block (`posY` is the
     /// eye), e.g. still water, 9, around the eye for the water overlay.
     SetBlock(crate::render::dev::SetBlockSpec),
+    /// Dev (WP-3.5b): puts a stack into one of the player's inventory or
+    /// armour slots (`crate::render::dev`).
+    Equip(crate::render::dev::EquipSpec),
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -801,6 +804,9 @@ pub fn run_script(
             }
             Action::SetBlock(spec) => {
                 crate::render::dev::set_block(&mut game, &spec);
+            }
+            Action::Equip(spec) => {
+                crate::render::dev::equip(&mut game, &spec);
             }
         }
     }
