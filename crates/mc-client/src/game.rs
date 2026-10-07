@@ -319,6 +319,11 @@ pub struct Game {
     /// `currentScreen`.
     // src: Minecraft.java:127
     pub current_screen: Option<GuiScreen>,
+    /// Counts the screens [`Game::display_gui_screen`] has set (WP-3.6a):
+    /// each new `currentScreen` object gets a new number, so the GUI
+    /// ([`crate::gui`]) can tell a new screen of the same kind from the one
+    /// it already holds and bind its own object to the slot.
+    pub screen_serial: u64,
     /// `loadingScreen`.
     // src: Minecraft.java:128
     pub loading_screen: LoadingScreenRenderer,
@@ -464,6 +469,7 @@ impl Game {
             render_view_entity: None,
             is_game_paused: false,
             current_screen: None,
+            screen_serial: 0,
             loading_screen: LoadingScreenRenderer::default(),
             entity_renderer: EntityRendererCam::new(now),
             ticks_ran: 0,
@@ -739,6 +745,8 @@ impl Game {
                 // setWorldAndResolution(mc, scaledWidth, scaledHeight)
                 s.width = r.scaled_width;
                 s.height = r.scaled_height;
+                // WP-3.6a: a new screen object (field docs).
+                self.screen_serial = self.screen_serial.wrapping_add(1);
                 self.current_screen = Some(s.clone());
                 self.set_ingame_not_in_focus();
                 self.outbox.events.push(ClientEvent::ScreenOpened(s));

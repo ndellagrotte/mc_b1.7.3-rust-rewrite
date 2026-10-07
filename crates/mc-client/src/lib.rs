@@ -24,6 +24,9 @@
 //! of `RenderGlobal`, the crack overlay).
 //! WP-3.5a: [`model`] (the `Model*` family, `ModelRenderer` as meshes and
 //! transforms, the lit model material).
+//! WP-3.6a: [`gui`] (`Gui`, `GuiScreen`, the widgets, `FontRenderer`, the
+//! screen objects bound to the shell's slot, the 2D batcher and its
+//! cameras).
 
 pub mod app;
 pub mod assets;
@@ -35,6 +38,7 @@ pub mod events;
 pub mod fog;
 pub mod game;
 pub mod gl_material;
+pub mod gui;
 pub mod import;
 pub mod input;
 pub mod jfmt;
@@ -179,6 +183,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(terrain::TerrainPlugin);
         // WP-3.5a: entity models (material, mesh cache, debug_model).
         app.add_plugins(model::ModelPlugin);
+        // WP-3.6a: the GUI (screens, widgets, font, the 2D batcher).
+        app.add_plugins(gui::GuiPlugin);
     }
 }
 
