@@ -53,22 +53,13 @@
 //! | 726-793 | `moveEntityWithHeading`, `addMovementStat`, `addMountedMovementStat`, `fall` | [`move_entity_with_heading`], [`fall`] |
 //! | 795-817 | `onKillEntity`, `getItemIcon` (render), `setInPortal` | [`on_kill_entity`], [`set_in_portal`] |
 //!
-//! # Code owned by other work packages, transcribed here for now
+//! # The held stack's item calls
 //!
-//! - `ItemStack.hitEntity` / `onDestroyBlock` and the `Item` overrides they
-//!   reach (`ItemSword`, `ItemTool`, `ItemShears`): item behaviour (WP-2.6),
-//!   transcribed in [`item_stack_hit_entity`] /
-//!   [`item_stack_on_destroy_block`] because the tool damage they apply is
-//!   in the player's `inventory` digest that every `entity_state` dump
-//!   carries.
-//! - `ItemStack.useItem` / `useItemRightClick` / `useItemOnEntity`, the
-//!   item calls of `PlayerController.sendPlaceBlock` / `sendUseItem` and of
-//!   `useCurrentItemOnEntity`: [`item_stack_use_item`],
-//!   [`item_stack_use_item_right_click`] and
-//!   [`item_stack_use_item_on_entity`], whose `Item` calls (`onItemUse`,
-//!   `onItemRightClick`, `saddleEntity`) are recorded gaps (WP-2.6).
-//! - `InventoryPlayer.addItemStackToInventory` (item pick-up) is not here:
-//!   [`super::item::on_collide_with_player`] records it (WP-2.5b).
+//! `ItemStack.hitEntity` / `onDestroyBlock` / `useItemOnEntity` on the held
+//! stack are [`item_stack_hit_entity`], [`item_stack_on_destroy_block`] and
+//! [`item_stack_use_item_on_entity`]: thin forwards to the
+//! [`ItemStack`] methods (item behaviour, WP-2.6, [`crate::item::behaviour`])
+//! that move the stack out of its main slot for the call.
 
 use mc_core::Aabb;
 use mc_core::java_hash::ChunkCoordinates;
@@ -80,19 +71,13 @@ use super::living::{self, LivingData, lv, lv_mut};
 use super::{Entity, EntityKindData, PlayerData, base, dispatch};
 use crate::block::bed;
 use crate::block::{BlockDef, Material};
-use crate::item::{ItemKind, ItemStack};
+use crate::item::ItemStack;
 use crate::world::World;
 use crate::world::is_instance_of;
 
 /// `Block.blockBed.blockID`.
 // src: Block.java:618
 const BED: i32 = 26;
-/// `Block.leaves.blockID`.
-// src: Block.java:610
-const LEAVES: i32 = 18;
-/// `Block.web.blockID`.
-// src: Block.java:622
-const WEB: i32 = 30;
 /// `Item.appleRed.shiftedIndex`.
 // src: Item.java:278 (new ItemFood(4, ...): 256 + 4)
 const APPLE_RED: i32 = 260;
@@ -844,7 +829,7 @@ pub fn attack_target_entity_with_current_item(
         if let Some(slot) = held
             && var1.kind.living().is_some()
         {
-            item_stack_hit_entity(e, world, slot);
+            item_stack_hit_entity(e, world, slot, var1);
             if player(e).inventory.main_inventory[slot].is_some_and(|s| s.stack_size <= 0) {
                 // var3.onItemDestroyedByUse(this): empty (ItemStack.java:167-168)
                 destroy_current_equipped_item(e);
@@ -1414,143 +1399,57 @@ pub fn sp_push_out_of_blocks(
     false
 }
 
-// ---- item behaviour the player reaches (WP-2.6 owns item/; module docs) --------------
+// ---- the held stack's item calls (ItemStack methods on a main slot) -------------------
 
-/// `ItemStack.damageItem(amount, entity)` with this player as the entity,
-/// for the stack in main slot `slot` (the armour's is
-/// [`crate::inventory::player::damage_armor`]): the wear
-/// ([`ItemStack::damage_item`]), and when it breaks the `objectBreakStats`
-/// stat of the player ([`add_stat`]).
-// src: ItemStack.java:124-141
-fn item_stack_damage_item(e: &mut Entity, slot: usize, n: i32) -> bool {
-    let broke = player_mut(e).inventory.main_inventory[slot]
-        .as_mut()
-        .is_some_and(|s| s.damage_item(n));
-    if broke {
-        add_stat(e, "StatList.objectBreakStats[itemID]", 1);
-    }
-    broke
+/// Runs `f` on the stack in main slot `slot`, moved out of the slot for the
+/// call so that it and the player can both be borrowed mutably, and puts it
+/// back: what the item does to it lands in the slot, as on Java's shared
+/// object (nothing on these paths stores another stack into the slot).
+/// Nothing when the slot is empty.
+fn with_main_stack(e: &mut Entity, slot: usize, f: impl FnOnce(&mut ItemStack, &mut Entity)) {
+    let Some(mut s) = player_mut(e).inventory.main_inventory[slot].take() else {
+        return;
+    };
+    f(&mut s, e);
+    player_mut(e).inventory.main_inventory[slot] = Some(s);
 }
 
 /// `ItemStack.hitEntity(target, player)` for the held stack in main slot
-/// `slot`: `Item.hitEntity` (false; `ItemSword` wears by 1, `ItemTool` by 2,
-/// both true), then the `objectUseStats` stat when true. The target only
-/// matters to items that ignore it.
-// src: ItemStack.java:143-149, Item.java:197-199, ItemSword.java:17-20, ItemTool.java:29-32
-pub fn item_stack_hit_entity(e: &mut Entity, world: &mut World, slot: usize) {
-    let _ = world;
-    let kind = player(e).inventory.main_inventory[slot]
-        .and_then(|s| s.get_item())
-        .map(|i| &i.kind);
-    let var3 = match kind {
-        Some(ItemKind::Sword { .. }) => {
-            item_stack_damage_item(e, slot, 1);
-            true
-        }
-        Some(ItemKind::Spade(..) | ItemKind::Pickaxe(..) | ItemKind::Axe(..)) => {
-            item_stack_damage_item(e, slot, 2);
-            true
-        }
-        _ => false,
-    };
-    if var3 {
-        add_stat(e, "StatList.objectUseStats[itemID]", 1);
-    }
+/// `slot` ([`ItemStack::hit_entity`]: `Item.hitEntity`, the tools' wear,
+/// the saddle on a pig).
+// src: ItemStack.java:143-149
+pub fn item_stack_hit_entity(e: &mut Entity, world: &mut World, slot: usize, target: &mut Entity) {
+    with_main_stack(e, slot, |s, e| s.hit_entity(target, e, world));
 }
 
 /// `ItemStack.useItemOnEntity(target)` for the held stack in main slot
-/// `slot`: `Item.saddleEntity(stack, target)`, empty in `Item` and
-/// overridden by `ItemSaddle`. Item behaviour (WP-2.6): recorded and taken
-/// as doing nothing, so the stack keeps its size.
-// src: ItemStack.java:170-172, Item.java:213-214
+/// `slot` ([`ItemStack::use_item_on_entity`]: `Item.saddleEntity`, the
+/// saddle on a pig, a dye on a sheep).
+// src: ItemStack.java:170-172
 pub fn item_stack_use_item_on_entity(
     e: &mut Entity,
     world: &mut World,
     slot: usize,
     target: &mut Entity,
 ) {
-    let _ = (e, slot, target);
-    world.note_unimplemented("Item.saddleEntity");
-}
-
-/// `ItemStack.useItem(player, world, x, y, z, side)`:
-/// `getItem().onItemUse(...)`, and on success
-/// `player.addStat(StatList.objectUseStats[itemID], 1)`. `Item.onItemUse` is
-/// item behaviour (WP-2.6): recorded and treated as false, so no stat is
-/// added. While it runs, `stack` is out of the player's inventory (the slot
-/// is empty; [`crate::player_controller::send_place_block`]); WP-2.6
-/// transcribes `onItemUse` against this signature (`&mut ItemStack`, the
-/// slot's own stack), never on a copy.
-// src: ItemStack.java:58-65
-pub fn item_stack_use_item(
-    stack: &mut ItemStack,
-    world: &mut World,
-    p: &mut Entity,
-    x: i32,
-    y: i32,
-    z: i32,
-    side: i32,
-) -> bool {
-    let _ = (stack, p, x, y, z, side);
-    world.note_unimplemented("Item.onItemUse");
-    false
-}
-
-/// What `ItemStack.useItemRightClick` returned, standing in for Java's
-/// identity test `var5 != var3` in `PlayerController.sendUseItem`.
-pub enum RightClickResult {
-    /// `var3` itself (possibly mutated in place, in the slot).
-    Same,
-    /// Another object (`ItemBucket`, `ItemSoup`, ...). Never `null` in
-    /// b1.7.3: no `onItemRightClick` override returns `null`.
-    Replaced(ItemStack),
-}
-
-/// `ItemStack.useItemRightClick(world, player)`:
-/// `getItem().onItemRightClick(this, world, player)`. Item behaviour
-/// (WP-2.6): recorded and taken to return `this` unchanged
-/// ([`RightClickResult::Same`]).
-// src: ItemStack.java:71-73
-pub fn item_stack_use_item_right_click(
-    stack: &mut ItemStack,
-    world: &mut World,
-    p: &mut Entity,
-) -> RightClickResult {
-    let _ = (stack, p);
-    world.note_unimplemented("Item.onItemRightClick");
-    RightClickResult::Same
+    with_main_stack(e, slot, |s, _| s.use_item_on_entity(target, world));
 }
 
 /// `ItemStack.onDestroyBlock(blockId, x, y, z, player)` for the held stack
-/// in main slot `slot`: `Item.onBlockDestroyed` (false; `ItemTool` wears by
-/// 1, `ItemSword` by 2, both true; `ItemShears` wears by 1 on leaves and
-/// webs, then `Item`'s false), then the `objectUseStats` stat when true.
-// src: ItemStack.java:151-157, Item.java:201-203, ItemTool.java:34-37, ItemSword.java:22-25, ItemShears.java:10-16
-pub fn item_stack_on_destroy_block(e: &mut Entity, world: &mut World, slot: usize, var1: i32) {
-    let _ = world;
-    let kind = player(e).inventory.main_inventory[slot]
-        .and_then(|s| s.get_item())
-        .map(|i| &i.kind);
-    let var6 = match kind {
-        Some(ItemKind::Spade(..) | ItemKind::Pickaxe(..) | ItemKind::Axe(..)) => {
-            item_stack_damage_item(e, slot, 1);
-            true
-        }
-        Some(ItemKind::Sword { .. }) => {
-            item_stack_damage_item(e, slot, 2);
-            true
-        }
-        Some(ItemKind::Shears) => {
-            if var1 == LEAVES || var1 == WEB {
-                item_stack_damage_item(e, slot, 1);
-            }
-            false
-        }
-        _ => false,
-    };
-    if var6 {
-        add_stat(e, "StatList.objectUseStats[itemID]", 1);
-    }
+/// in main slot `slot` ([`ItemStack::on_destroy_block`]:
+/// `Item.onBlockDestroyed`, the tools' wear).
+// src: ItemStack.java:151-157
+#[allow(clippy::too_many_arguments)]
+pub fn item_stack_on_destroy_block(
+    e: &mut Entity,
+    world: &mut World,
+    slot: usize,
+    var1: i32,
+    x: i32,
+    y: i32,
+    z: i32,
+) {
+    with_main_stack(e, slot, |s, e| s.on_destroy_block(var1, x, y, z, e, world));
 }
 
 #[cfg(test)]

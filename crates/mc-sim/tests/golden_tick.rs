@@ -125,7 +125,7 @@ fixtures! {
     tick_activate_workbench_stairs => "tick" / "activate-workbench-stairs";
     tick_bed_nether => "tick" / "bed-nether";
     tick_bed_place_and_break => "tick" / "bed-place-and-break";
-    #[ignore = "needs ItemBlock / ItemReed / ItemDoor / ItemBed / ItemSlab.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match"]
+    // WP-2.6: item behaviour (ItemStack.useItem through the item dispatch).
     tick_block_item_placement => "tick" / "block-item-placement";
     tick_cake_eat => "tick" / "cake-eat";
     tick_door_iron_powered => "tick" / "door-iron-powered";
@@ -143,7 +143,7 @@ fixtures! {
     tick_trapdoor_toggle => "tick" / "trapdoor-toggle";
     // WP-2.5a: Gate 2's long run, testWorld loaded and ticked 6000 times.
     tick_testworld_6000 => "tick" / "testworld-6000";
-    #[ignore = "ItemDye.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 7 (t=1 op use_item, field placed); lines 1-6 match. BlockSapling.growTree (WP-1.6) and population (WP-1.7) are in"]
+    // WP-2.6: item behaviour (ItemStack.useItem through the item dispatch).
     tick_bonemeal_sapling => "tick" / "bonemeal-sapling";
     tick_cactus_reed_growth => "tick" / "cactus-reed-growth";
     tick_chest_double_and_break => "tick" / "chest-double-and-break";
@@ -207,7 +207,7 @@ fixtures! {
     // ---- redstone (WP-1.6 task c) --------------------------------------------------
     tick_button_lever => "tick" / "button-lever";
     tick_pressure_plate => "tick" / "pressure-plate";
-    #[ignore = "needs ItemBlock / ItemReed / ItemRedstone.onItemUse (WP-2.6; the use_item op records Item.onItemUse and takes it as false): first diff line 8 (t=1 op use_item, field placed); lines 1-7 match. The block hooks it reaches (BlockTorch / BlockLever / BlockButton.onBlockPlaced, BlockRedstoneRepeater.onBlockPlacedBy) are transcribed"]
+    // WP-2.6: item behaviour (ItemStack.useItem through the item dispatch).
     tick_redstone_item_placement => "tick" / "redstone-item-placement";
     tick_redstone_ore_touch => "tick" / "redstone-ore-touch";
     tick_redstone_removal => "tick" / "redstone-removal";

@@ -38,7 +38,10 @@
 //! - `EntityPlayer.addStat` (statistics and achievements, WP-2.7): crafting
 //!   and smelting pickups (`ItemStack.onCrafting`, `SlotCrafting`,
 //!   `SlotFurnace`) and armour breaking record it.
-//! - `ItemMap.onCreated` / `ItemMap.onUpdate` (item behaviour, WP-2.6).
+//! - `ItemMap.onCreated` on a crafted map (`ItemStack.onCrafting`): the item
+//!   behaviour is transcribed (WP-2.6, [`ItemStack::on_crafting`]) but not
+//!   called here yet, because it changes the damage of the picked-up stack
+//!   object (the cursor's) and `slot_on_pickup_from_slot` passes a copy.
 //!
 //! The client-side parts of `Container` are left out: `crafters`
 //! (`ICrafting` listeners, which only the GUI and the network code

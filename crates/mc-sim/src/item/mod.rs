@@ -18,7 +18,8 @@
 //!   `getItemNameIS`, `canHarvestBlock`, …) are methods on [`ItemDef`] that
 //!   `match` on the kind. Item *behaviour* (`onItemUse`, `onItemRightClick`,
 //!   `hitEntity`, `onBlockDestroyed`, `saddleEntity`, `onUpdate`,
-//!   `onCreated`) is WP-2.6 and not here.
+//!   `onCreated`) is [`behaviour`] (WP-2.6): free functions dispatched on
+//!   the kind, reached through the [`ItemStack`] methods.
 //! - [`ItemStack`] ([`stack`]): the value type with its NBT form.
 //! - [`EnumToolMaterial`] ([`tool_material`]).
 //! - [`crate::block::block_texture`]: `Block.getBlockTextureFromSide(AndMetadata)`, which
@@ -41,10 +42,12 @@
 //! initialisation (leaves 52, full bounds), which is what the oracle sees and
 //! what every `ItemBlock` constructor saw.
 
+pub mod behaviour;
 pub mod stack;
 mod table;
 pub mod tool_material;
 
+pub use behaviour::RightClickResult;
 pub use stack::ItemStack;
 pub use table::{ITEMS, RECORDS};
 pub use tool_material::EnumToolMaterial;

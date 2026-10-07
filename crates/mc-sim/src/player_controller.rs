@@ -19,7 +19,7 @@
 //! | :21-32 | `sendBlockRemoved` | [`player_controller_send_block_removed`], called by the override |
 //! | :34-38 | `sendBlockRemoving`, `resetBlockRemoving` (empty) | overridden |
 //! | :43-45 | `getBlockReachDistance` (5) | overridden (4) |
-//! | :47-61, :75-82 | `sendUseItem`, `sendPlaceBlock` | [`send_use_item`], [`send_place_block`] (their `Item` calls are WP-2.6: [`player::item_stack_use_item_right_click`], [`player::item_stack_use_item`]) |
+//! | :47-61, :75-82 | `sendUseItem`, `sendPlaceBlock` | [`send_use_item`], [`send_place_block`] (the item calls: [`ItemStack::use_item_right_click`](crate::item::ItemStack::use_item_right_click), [`ItemStack::use_item`](crate::item::ItemStack::use_item), item behaviour WP-2.6) |
 //! | :84-86 | `createPlayer` | [`crate::entity::player::new_entity_player_sp`] (client: the session) |
 //! | :88-94 | `interactWithEntity`, `attackEntity` | [`interact_with_entity`], [`attack_entity`] |
 //! | :96-103 | `handleMouseClick`, `onCraftGuiClosed` | containers, WP-2.5b |
@@ -40,6 +40,7 @@
 use crate::block::{self, dispatch as block_dispatch};
 use crate::entity::{Entity, player};
 use crate::inventory::InventoryPlayer;
+use crate::item::RightClickResult;
 use crate::world::World;
 
 /// A sound the controller asks the client to play
@@ -119,21 +120,21 @@ pub fn flip_player(p: &mut Entity) {
 /// `stack` is the `mainInventory` slot holding Java's `var3` (the caller's
 /// `getCurrentItem()`), and the stack is moved out of it while the item
 /// runs so that whatever `onItemRightClick` does to it lands in the slot.
-/// Java's identity test `var5 != var3` is [`player::RightClickResult`].
+/// Java's identity test `var5 != var3` is [`RightClickResult`].
 // src: PlayerController.java:47-61
 pub fn send_use_item(world: &mut World, p: &mut Entity, stack: usize) -> bool {
     let mut var3 = player_inventory(p).main_inventory[stack]
         .take()
         .expect("sendUseItem's stack is the slot's stack");
     let var4 = var3.stack_size;
-    let r = player::item_stack_use_item_right_click(&mut var3, world, p);
+    let r = var3.use_item_right_click(world, p);
     let inv = player_inventory(p);
     // var3 goes back into its slot first: Java's var3 never left it.
     inv.main_inventory[stack] = Some(var3);
     let var5 = match r {
-        player::RightClickResult::Same if var3.stack_size == var4 => return false,
-        player::RightClickResult::Same => var3,
-        player::RightClickResult::Replaced(s) => s,
+        RightClickResult::Same if var3.stack_size == var4 => return false,
+        RightClickResult::Same => var3,
+        RightClickResult::Replaced(s) => s,
     };
     let cur = inv.current_item as usize;
     inv.main_inventory[cur] = Some(var5);
@@ -173,7 +174,7 @@ pub fn send_place_block(
                 let mut s = player_inventory(p).main_inventory[slot]
                     .take()
                     .expect("sendPlaceBlock's stack is the slot's stack");
-                let r = player::item_stack_use_item(&mut s, world, p, x, y, z, side);
+                let r = s.use_item(p, world, x, y, z, side);
                 player_inventory(p).main_inventory[slot] = Some(s);
                 r
             }
@@ -254,7 +255,7 @@ impl PlayerControllerSp {
             None => false,
         };
         if let Some(slot) = var8 {
-            player::item_stack_on_destroy_block(p, world, slot, var5);
+            player::item_stack_on_destroy_block(p, world, slot, var5, x, y, z);
             if p.kind
                 .player()
                 .expect("the controller's player")

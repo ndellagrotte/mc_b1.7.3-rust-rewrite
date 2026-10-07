@@ -5,18 +5,24 @@
 //! stores stacks by value and copies where Java aliases, which every current
 //! call site allows.
 //!
-//! Not here (item behaviour, WP-2.6, and stats, WP-2.7): `useItem`
-//! (ItemStack.java:58-65), `useItemRightClick` (:71-73), `hitEntity` /
-//! `onDestroyBlock` (:143-157), `onItemDestroyedByUse` / `useItemOnEntity`
-//! (:167-172), and `updateAnimation` (whose `Item.onUpdate` call is
-//! behaviour) / `onCrafting` (:212-223).
+//! The behaviour methods (`useItem`, `useItemRightClick`, `hitEntity`,
+//! `onDestroyBlock`, `useItemOnEntity`, `updateAnimation`, `onCrafting`,
+//! `damageItem` with its entity) call into [`super::behaviour`] (WP-2.6);
+//! they take the stack as `&mut self` while it is out of its inventory slot
+//! (the caller puts it back), see the module docs there. The statistics
+//! they add (`EntityPlayer.addStat`) go through
+//! [`crate::entity::player::add_stat`] (WP-2.7). `onItemDestroyedByUse`
+//! (ItemStack.java:167-168) is empty and not ported; its callers note it.
 
 use std::collections::BTreeMap;
 
 use mc_nbt::Tag;
 
+use super::behaviour::{self, RightClickResult};
 use super::{ItemDef, JavaException, item};
 use crate::block::BlockDef;
+use crate::entity::Entity;
+use crate::world::World;
 
 /// `ItemStack` (ItemStack.java:3-7).
 ///
@@ -235,6 +241,110 @@ impl ItemStack {
             }
         }
         false
+    }
+
+    /// `damageItem(n, entity)`: the wear ([`ItemStack::damage_item`]), and
+    /// when the stack breaks, `objectBreakStats` for a player `entity`.
+    // src: ItemStack.java:124-141
+    pub fn damage_item_by(&mut self, n: i32, entity: &Entity) {
+        if self.damage_item(n) {
+            // src: ItemStack.java:128-130 (before the decrement in Java; the
+            // stat does not read the stack)
+            behaviour::add_stat_if_player(entity, "StatList.objectBreakStats[itemID]", 1);
+        }
+    }
+
+    /// `useItem(player, world, x, y, z, side)`: `Item.onItemUse`, and on
+    /// success the player's `objectUseStats`.
+    // src: ItemStack.java:58-65
+    #[allow(clippy::too_many_arguments)]
+    pub fn use_item(
+        &mut self,
+        player: &mut Entity,
+        world: &mut World,
+        x: i32,
+        y: i32,
+        z: i32,
+        side: i32,
+    ) -> bool {
+        let var7 = behaviour::on_item_use(self, player, world, x, y, z, side);
+        if var7 {
+            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+        }
+        var7
+    }
+
+    /// `useItemRightClick(world, player)`: `Item.onItemRightClick`.
+    // src: ItemStack.java:71-73
+    pub fn use_item_right_click(
+        &mut self,
+        world: &mut World,
+        player: &mut Entity,
+    ) -> RightClickResult {
+        behaviour::on_item_right_click(self, world, player)
+    }
+
+    /// `hitEntity(target, player)`: `Item.hitEntity(this, target, player)`,
+    /// and when true the player's `objectUseStats`.
+    // src: ItemStack.java:143-149
+    pub fn hit_entity(&mut self, target: &mut Entity, player: &mut Entity, world: &mut World) {
+        let var3 = behaviour::hit_entity(self, target, player, world);
+        if var3 {
+            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+        }
+    }
+
+    /// `onDestroyBlock(blockId, x, y, z, player)`: `Item.onBlockDestroyed`,
+    /// and when true the player's `objectUseStats`.
+    // src: ItemStack.java:151-157
+    #[allow(clippy::too_many_arguments)]
+    pub fn on_destroy_block(
+        &mut self,
+        block_id: i32,
+        x: i32,
+        y: i32,
+        z: i32,
+        player: &mut Entity,
+        world: &mut World,
+    ) {
+        let var6 = behaviour::on_block_destroyed(self, block_id, x, y, z, player, world);
+        if var6 {
+            crate::entity::player::add_stat(player, "StatList.objectUseStats[itemID]", 1);
+        }
+    }
+
+    /// `useItemOnEntity(target)`: `Item.saddleEntity(this, target)`.
+    // src: ItemStack.java:170-172
+    pub fn use_item_on_entity(&mut self, target: &mut Entity, world: &mut World) {
+        behaviour::saddle_entity(self, target, world);
+    }
+
+    /// `updateAnimation(world, entity, slot, isCurrentItem)`: the pick-up
+    /// animation counter down by one, then `Item.onUpdate`.
+    // src: ItemStack.java:212-218
+    pub fn update_animation(
+        &mut self,
+        world: &mut World,
+        entity: &mut Entity,
+        slot: i32,
+        is_current: bool,
+    ) {
+        if self.animations_to_go > 0 {
+            self.animations_to_go -= 1;
+        }
+        behaviour::on_update(self, world, entity, slot, is_current);
+    }
+
+    /// `onCrafting(world, player)`: the player's `objectCraftStats` (by the
+    /// stack size), then `Item.onCreated`.
+    // src: ItemStack.java:220-223
+    pub fn on_crafting(&mut self, world: &mut World, player: &mut Entity) {
+        crate::entity::player::add_stat(
+            player,
+            "StatList.objectCraftStats[itemID]",
+            self.stack_size,
+        );
+        behaviour::on_created(self, world, player);
     }
 
     /// `getDamageVsEntity(entity)`.

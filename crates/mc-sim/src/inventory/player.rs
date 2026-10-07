@@ -429,22 +429,22 @@ impl InventoryPlayer {
 }
 
 /// `inventory.decrementAnimations()` of `player`: each main stack's
-/// `updateAnimation(world, player, slot, slot == currentItem)`, i.e. the
-/// pick-up animation counter down by one, then `Item.onUpdate` (empty in
-/// `Item`; `ItemMap.onUpdate` updates map data: item behaviour, WP-2.6,
-/// recorded).
-// src: InventoryPlayer.java:110-117, ItemStack.java:212-218, Item.java:267-268, ItemMap.java:213-226
+/// `updateAnimation(world, player, slot, slot == currentItem)`
+/// ([`ItemStack::update_animation`]: the pick-up animation counter down by
+/// one, then `Item.onUpdate`, which only `ItemMap` overrides). The stack is
+/// moved out of its slot for the call and put back, so the item can change
+/// it with the player borrowed too (item behaviour, WP-2.6).
+// src: InventoryPlayer.java:110-117
 pub fn decrement_animations(world: &mut World, player: &mut Entity) {
-    let inv = super::inventory_of_mut(player);
-    for var1 in 0..inv.main_inventory.len() {
-        if let Some(s) = inv.main_inventory[var1].as_mut() {
-            if s.animations_to_go > 0 {
-                s.animations_to_go -= 1;
-            }
-            if s.item_id == crate::crafting::ids::MAP_ITEM {
-                world.note_unimplemented("ItemMap.onUpdate");
-            }
-        }
+    let len = super::inventory_of(player).main_inventory.len();
+    for var1 in 0..len {
+        let inv = super::inventory_of_mut(player);
+        let current = inv.current_item == var1 as i32;
+        let Some(mut s) = inv.main_inventory[var1].take() else {
+            continue;
+        };
+        s.update_animation(world, player, var1 as i32, current);
+        super::inventory_of_mut(player).main_inventory[var1] = Some(s);
     }
 }
 
