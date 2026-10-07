@@ -251,7 +251,7 @@ fixtures! {
     tick_reload_generated => "tick" / "reload-generated";
     tick_reload_nether => "tick" / "reload-nether";
     // Gate 2's scripted session; the reload part alone passes in tick/reload-generated.
-    #[ignore = "needs EntityItem.onCollideWithPlayer's pickup (a recorded gap: InventoryPlayer.addItemStackToInventory is not called yet) and ItemBlock / ItemBed.onItemUse, ItemFood.onItemRightClick, ItemSword.hitEntity (WP-2.6): first diff line 745 (t=78 entity 0 state.inventory: the oracle's player picks up the dug dirt); lines 1-744 match (walk, dig, shovel wear, the parked zombie)"]
+    #[ignore = "needs EntityItem.onCollideWithPlayer's pickup (a recorded gap: entity::item::on_collide_with_player records InventoryPlayer.addItemStackToInventory instead of calling it; WP-2.6's item behaviour is merged but cannot be reached past it): first diff line 745 (t=78 entity 0 state.inventory: the oracle's player picks up the dug dirt); lines 1-744 match (walk, dig, shovel wear, the parked zombie)"]
     tick_gate2_session => "tick" / "gate2-session";
 }
 

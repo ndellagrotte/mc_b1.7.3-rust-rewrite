@@ -1580,8 +1580,9 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   compared by the `chunk_digest` dumps every 20 ticks instead of ~165 kB `chunk_nbt` lines),
   `reload`, 100 more ticks, a final `save` (same chunks). The
   scenario's `comment` lists the steps and ticks. In the port it needs `EntityItem`'s pickup
-  (`EntityItem.onCollideWithPlayer`, a recorded gap) and the item behaviour of WP-2.6
-  (`ItemBlock`, `ItemBed`, `ItemFood`, `ItemSword.hitEntity`).
+  (`EntityItem.onCollideWithPlayer`, a recorded gap; first diff at line 745, t = 78) before
+  the item behaviour of WP-2.6 (`ItemBlock`, `ItemBed`, `ItemFood`, `ItemSword.hitEntity`,
+  merged) is reached.
 
 Vanilla behaviour these fixtures pin down:
 
