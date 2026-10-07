@@ -302,6 +302,7 @@ pub fn spawn_clouds(
                 depth_write: true,
                 color_write,
                 far: false,
+                wide_lines: false,
             },
             bias,
         )

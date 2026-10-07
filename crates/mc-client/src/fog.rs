@@ -229,14 +229,14 @@ pub fn apply_fog(
     mut commands: Commands,
     fog: Res<FogState>,
     mut clear: ResMut<ClearColor>,
-    cams: Query<Entity, With<MainCamera>>,
+    cams: Query<(Entity, Option<&DistanceFog>), With<MainCamera>>,
 ) {
     let c = if fog.active { fog.color } else { [0.0; 3] };
     let want = Color::srgb(c[0], c[1], c[2]);
     if clear.0 != want {
         clear.0 = want;
     }
-    for e in &cams {
+    for (e, current) in &cams {
         if fog.active {
             let falloff = match fog.world.mode {
                 GlFogMode::Linear => FogFalloff::Linear {
@@ -247,15 +247,33 @@ pub fn apply_fog(
                     density: fog.world.density,
                 },
             };
-            commands.entity(e).insert(DistanceFog {
-                color: want,
-                directional_light_color: Color::NONE,
-                directional_light_exponent: 8.0,
-                falloff,
-            });
-        } else {
+            // Only on a change, so Changed<DistanceFog> means one.
+            let same = current.is_some_and(|f| f.color == want && falloff_eq(&f.falloff, &falloff));
+            if !same {
+                commands.entity(e).insert(DistanceFog {
+                    color: want,
+                    directional_light_color: Color::NONE,
+                    directional_light_exponent: 8.0,
+                    falloff,
+                });
+            }
+        } else if current.is_some() {
             commands.entity(e).remove::<DistanceFog>();
         }
+    }
+}
+
+/// Whether two of the falloffs [`apply_fog`] sets are equal (`FogFalloff`
+/// has no `PartialEq`).
+fn falloff_eq(a: &FogFalloff, b: &FogFalloff) -> bool {
+    match (a, b) {
+        (FogFalloff::Linear { start, end }, FogFalloff::Linear { start: s2, end: e2 }) => {
+            start == s2 && end == e2
+        }
+        (FogFalloff::Exponential { density }, FogFalloff::Exponential { density: d2 }) => {
+            density == d2
+        }
+        _ => false,
     }
 }
 

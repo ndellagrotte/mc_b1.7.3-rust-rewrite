@@ -307,6 +307,7 @@ pub fn spawn_weather(
                 depth_write: true,
                 color_write: true,
                 far: false,
+                wide_lines: false,
             },
             bias,
         )

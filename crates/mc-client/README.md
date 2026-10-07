@@ -191,16 +191,34 @@ downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
   colours are not byte-exact).
 - **Draw order:** everything here is in `Transparent3d`, sorted by
   `gl_material::order` biases: the sky first (drawn at the far plane, no
-  depth writes, so any opaque world covers it), then (after the opaque pass
-  and your own transparent items near bias 0) the selection box, snow, rain,
-  the fancy clouds' depth pass and the clouds. Keep translucent terrain
-  between −0.9e6 and 0.7e6. Do not draw anything that writes depth with
+  depth writes, so any opaque world covers it), then (after the opaque pass)
+  the selection box at `SELECTION_IN_WATER` (−0.91e6) when the eye is in
+  water, then translucent terrain, then the selection box at `SELECTION`
+  (0.7e6) otherwise, snow, rain, the fancy clouds' depth pass and the
+  clouds (EntityRenderer.java:507-564). Bands: transparent items vanilla
+  draws before the translucent terrain pass (entities, particles) between
+  −0.95e6 and −0.91e6; translucent terrain between −0.9e6 and 0.7e6. Do not
+  draw anything that writes depth with
   `TransparentSortingInfo3d::AlwaysOnTop` (Bevy gizmos do): it is drawn
   before the sky and punches the clear colour through it.
 - **Colours:** `GlMaterial` does GL's arithmetic on the Java values and
   converts to linear at the end, so opaque pixels are the bytes vanilla
   writes (checked: the sky plane's pixels equal `getSkyColor` fogged by
   `setupFog(-1)` exactly). Textures it samples are uploaded as `Rgba8Unorm`.
+  Blending: on the default sRGB target the hardware blends linear values,
+  not GL's bytes; additive draws (sun, moon, stars) return `linear(c·a)/a`,
+  exact over black (midnight stars: byte 64 as in GL, 92 before), and
+  alpha-blended draws are off where `0 < a < 1` (clouds 1-3 bytes; the
+  selection outline 147 where GL writes 111; the sun's halo nearly
+  invisible by day). With `bevy::camera::CompositingSpace::Srgb` on the
+  world camera (main target `Rgba8Unorm`) `GlMaterial` returns the Java
+  values unconverted and every blend is GL's (checked in an experiment:
+  outline 111, stars 64, halo visible). Switching the camera is a
+  client-wide decision (WP-3.1's `spawn_camera`): every other material must
+  then return the Java values unconverted too (`gl_material` module docs).
+- **Wide lines:** `GlKey::wide_lines` + `gl_material::wide_line_mesh` draw
+  `glLineWidth` lines (`GlParams::line_width` pixels, widened along the
+  minor screen axis as GL's aliased lines); wgpu itself draws 1-pixel lines.
 - `clouds::RenderGlobalClouds::cloud_offset_x` is `RenderGlobal.cloudOffsetX`
   (WP-3.3's occlusion stagger reads it).
 - Textures held locally (could move to WP-3.2's cache): `/terrain/sun.png`,

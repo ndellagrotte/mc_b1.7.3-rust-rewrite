@@ -230,8 +230,8 @@ pub fn star_batch() -> TessBatch {
     b
 }
 
-/// The sun's quad (30 wide at y 100, facing down) or the moon's (20 wide at
-/// y -100, facing up), with their texture coordinates.
+/// The sun's quad (±30 at y 100, facing down) or the moon's (±20 at y -100,
+/// facing up), with their texture coordinates.
 // src: RenderGlobal.java:683-698
 pub fn sun_moon_batch(moon: bool) -> TessBatch {
     let mut b = TessBatch::default();
@@ -525,6 +525,7 @@ pub fn spawn_sky(
         depth_write: false,
         color_write: true,
         far: true,
+        wide_lines: false,
     };
     let sunrise_mesh = meshes.add(Mesh::new(
         PrimitiveTopology::TriangleList,

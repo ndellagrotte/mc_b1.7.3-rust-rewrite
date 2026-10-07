@@ -10,18 +10,19 @@
 //! block hit (`typeOfHit == TILE`) of a non-air block. Nothing depends on
 //! the held item (the `ItemStack` argument is unused).
 //!
-//! Drawn as a line-list mesh with [`GlMaterial`] (blend (770, 771), no
-//! depth writes, fog `setupFog(0)`), sorted before the weather
-//! ([`order::SELECTION`]). Two deviations: wgpu draws 1-pixel lines only, so
-//! `glLineWidth(2.0F)` is not reproduced; and the box always sorts after
-//! WP-3.3's translucent pass (vanilla's in-water call site draws it before).
-//! (Bevy gizmos were tried: they sort "always on top", before the sky, and
-//! write depth, so the sky drawn later left the clear colour in the lines.)
+//! Drawn with [`GlMaterial`] (blend (770, 771), no depth writes, fog
+//! `setupFog(0)`) as wide lines ([`GlKey::wide_lines`]: wgpu draws 1-pixel
+//! lines only, so each edge is a quad the shader widens to
+//! `glLineWidth(2.0F)`'s 2 pixels along its minor screen axis, as GL
+//! rasterises aliased wide lines). Sorted by the call site: with the eye in
+//! water before WP-3.3's translucent pass ([`order::SELECTION_IN_WATER`]),
+//! which then blends over it, otherwise after it and before the weather
+//! ([`order::SELECTION`]). (Bevy gizmos were tried: they sort "always on
+//! top", before the sky, and write depth, so the sky drawn later left the
+//! clear colour in the lines.)
 
-use bevy::asset::RenderAssetUsages;
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::math::DVec3;
-use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use mc_core::Aabb;
 use mc_sim::block::dispatch;
@@ -29,7 +30,7 @@ use mc_sim::world::World;
 use mc_sim::world::ray_trace::{EnumMovingObjectType, MovingObjectPosition};
 
 use crate::fog::FogState;
-use crate::gl_material::{GlBlend, GlKey, GlMaterial, order};
+use crate::gl_material::{GlBlend, GlKey, GlMaterial, order, wide_line_mesh};
 use crate::sky::ViewInfo;
 
 /// The selection box of this frame, if any.
@@ -41,6 +42,10 @@ pub struct SelectionFrame {
     pub r#box: Option<(DVec3, DVec3)>,
     /// The eye.
     pub anchor: Vec3,
+    /// `renderViewEntity.isInsideOfMaterial(Material.water)`: which of
+    /// `renderWorld`'s two call sites draws the box.
+    // src: EntityRenderer.java:507, :549
+    pub in_water: bool,
 }
 
 /// `expand(0.002, 0.002, 0.002)` of the selected box.
@@ -78,6 +83,7 @@ pub fn compute(
             DVec3::new(bb.max_x, bb.max_y, bb.max_z),
         )),
         anchor: Vec3::ZERO,
+        in_water: view.in_water,
     }
 }
 
@@ -107,22 +113,24 @@ pub fn outline(min: Vec3, max: Vec3) -> ([Vec3; 5], [Vec3; 5], [(Vec3, Vec3); 4]
     )
 }
 
-/// The outline's line list (`GL_LINE_STRIP`s as segments).
-pub fn line_list(min: Vec3, max: Vec3) -> Vec<[f32; 3]> {
+/// The outline's 12 segments (the `GL_LINE_STRIP`s split into segments).
+pub fn segments(min: Vec3, max: Vec3) -> Vec<([f32; 3], [f32; 3])> {
     let (bottom, top, verticals) = outline(min, max);
-    let mut v = Vec::with_capacity(24);
+    let mut v = Vec::with_capacity(12);
     for strip in [bottom, top] {
         for w in strip.windows(2) {
-            v.push(w[0].to_array());
-            v.push(w[1].to_array());
+            v.push((w[0].to_array(), w[1].to_array()));
         }
     }
     for (a, b) in verticals {
-        v.push(a.to_array());
-        v.push(b.to_array());
+        v.push((a.to_array(), b.to_array()));
     }
     v
 }
+
+/// `glLineWidth(2.0F)`.
+// src: RenderGlobal.java:1151
+pub const LINE_WIDTH: f32 = 2.0;
 
 /// The box's mesh and material.
 #[derive(Resource, Clone, Debug)]
@@ -137,35 +145,27 @@ pub struct SelectionHandles {
 #[derive(Component, Clone, Copy, Debug)]
 pub struct SelectionBox;
 
-fn line_mesh(v: Vec<[f32; 3]>) -> Mesh {
-    let n = v.len();
-    let mut m = Mesh::new(PrimitiveTopology::LineList, RenderAssetUsages::default());
-    m.insert_attribute(Mesh::ATTRIBUTE_POSITION, v);
-    m.insert_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0f32; 2]; n]);
-    m.insert_attribute(Mesh::ATTRIBUTE_COLOR, vec![[1.0f32; 4]; n]);
-    m.insert_indices(Indices::U32((0..n as u32).collect()));
-    m
-}
-
 /// Spawns the (hidden) box: `glColor4f(0, 0, 0, 0.4)`, blend (770, 771),
-/// `glDepthMask(false)`, texturing off.
+/// `glLineWidth(2.0F)`, `glDepthMask(false)`, texturing off.
 // src: RenderGlobal.java:1148-1153
 pub fn spawn_selection(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<GlMaterial>>,
 ) {
-    let mesh = meshes.add(line_mesh(line_list(Vec3::ZERO, Vec3::ONE)));
+    let mesh = meshes.add(wide_line_mesh(&segments(Vec3::ZERO, Vec3::ONE)));
     let mut m = GlMaterial::new(
         GlKey {
             blend: GlBlend::Alpha,
             depth_write: false,
             color_write: true,
             far: false,
+            wide_lines: true,
         },
         order::SELECTION,
     );
     m.params.color = Vec4::new(0.0, 0.0, 0.0, 0.4);
+    m.params.line_width = LINE_WIDTH;
     let material = materials.add(m);
     commands.spawn((
         Mesh3d(mesh.clone()),
@@ -176,6 +176,17 @@ pub fn spawn_selection(
         SelectionBox,
     ));
     commands.insert_resource(SelectionHandles { mesh, material });
+}
+
+/// The box's draw order: `renderWorld` draws it before the translucent
+/// terrain pass with the eye in water, after it otherwise.
+// src: EntityRenderer.java:507-513, :549-555
+pub fn sort_bias(in_water: bool) -> f32 {
+    if in_water {
+        order::SELECTION_IN_WATER
+    } else {
+        order::SELECTION
+    }
 }
 
 /// Applies [`SelectionFrame`].
@@ -205,11 +216,18 @@ pub fn apply_selection(
         return;
     };
     if let Some(mut m) = meshes.get_mut(&h.mesh) {
-        *m = line_mesh(line_list(min.as_vec3(), max.as_vec3()));
+        *m = wide_line_mesh(&segments(min.as_vec3(), max.as_vec3()));
     }
-    if let Some(mut m) = materials.get_mut(&h.material) {
-        m.params.fog = fog.world.to_vec4();
-        m.params.fog_color = Vec4::new(fog.color[0], fog.color[1], fog.color[2], 1.0);
+    let bias = sort_bias(frame.in_water);
+    let fog_v = fog.world.to_vec4();
+    let fog_c = Vec4::new(fog.color[0], fog.color[1], fog.color[2], 1.0);
+    let changed = materials.get(&h.material).is_some_and(|m| {
+        m.sort_bias != bias || m.params.fog != fog_v || m.params.fog_color != fog_c
+    });
+    if changed && let Some(mut m) = materials.get_mut(&h.material) {
+        m.sort_bias = bias;
+        m.params.fog = fog_v;
+        m.params.fog_color = fog_c;
     }
 }
 
@@ -224,9 +242,21 @@ mod tests {
         assert_eq!(t[0], t[4]);
         assert!(b.iter().all(|p| p.y == 0.0) && t.iter().all(|p| p.y == 1.0));
         assert_eq!(v[1], (Vec3::new(1.0, 0.0, 0.0), Vec3::new(1.0, 1.0, 0.0)));
-        let l = line_list(Vec3::ZERO, Vec3::ONE);
-        assert_eq!(l.len(), 24);
-        assert_eq!(l[0], [0.0, 0.0, 0.0]);
-        assert_eq!(l[1], [1.0, 0.0, 0.0]);
+        let l = segments(Vec3::ZERO, Vec3::ONE);
+        assert_eq!(l.len(), 12);
+        assert_eq!(l[0], ([0.0, 0.0, 0.0], [1.0, 0.0, 0.0]));
+        assert_eq!(l[11], ([0.0, 0.0, 1.0], [0.0, 1.0, 1.0]));
+    }
+
+    #[test]
+    fn line_width_and_call_site_order() {
+        assert_eq!(LINE_WIDTH, 2.0);
+        assert_eq!(sort_bias(false), order::SELECTION);
+        assert_eq!(sort_bias(true), order::SELECTION_IN_WATER);
+        // In water: after the sky (the void plane is its last part), before
+        // the translucent band; otherwise before snow, rain and clouds.
+        const { assert!(order::VOID < order::SELECTION_IN_WATER) };
+        const { assert!(order::SELECTION_IN_WATER < -0.9e6) };
+        const { assert!(order::SELECTION < order::SNOW) };
     }
 }
