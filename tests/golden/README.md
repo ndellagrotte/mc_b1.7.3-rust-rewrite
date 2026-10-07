@@ -664,6 +664,7 @@ were not loaded yet (population and moving entities may load more).
 | `craft` | `grid`: 9 (3×3) or 4 (2×2) entries, each `null` or `[id, count, damage]` | `CraftingManager.getInstance().findMatchingRecipe(grid)` (CraftingManager.java:160-169) over a new `InventoryCrafting` of that size, entry `i` put into slot `i` (column `i % w`, row `i / w`) with `setInventorySlotContents`; the grid's event handler is a `Container` without slots, so nothing else runs. Needs no player (WP-2.5) | `result` (`{id,count,damage}` or `null`: the first matching recipe's `getCraftingResult`) |
 | `slot_click` | `container`, `slot`, `button`, `shift?` (false) | needs a player. `container.slotClick(slot, button, shift, player)` (Container.java:47-150), as `PlayerController.handleMouseClick` passes a GUI click (PlayerController.java:96-98), with the player's `inventory.getItemStack()` as the stack on the cursor. `container`: `"player"` is the player's own `inventorySlots` (the `ContainerPlayer` its constructor built, EntityPlayer.java:42); any other spec is opened by the op: `"workbench"` (`new ContainerWorkbench(inventory, world, 0, 0, 0)`; the position only feeds `isUsableByPlayer`, which `slotClick` never calls), `"workbench at x,y,z"`, `"chest at x,y,z"` (`new ContainerChest(inventory, chest)` on the inventory `BlockChest.blockActivated` would open, BlockChest.java:186, :198-212: the chest's tile entity wrapped in `InventoryLargeChest("Large chest", …)` with each neighbouring chest, −x and −z as the upper half, +x and +z as the lower; the normal-cube checks that may refuse to open are not applied), `"furnace at x,y,z"` (`ContainerFurnace` on the `TileEntityFurnace` there), `"dispenser at x,y,z"` (`ContainerDispenser`). A spec equal to the previous non-`"player"` one reuses that container (its crafting grid survives); a different spec replaces it without `onCraftGuiClosed` (a workbench grid's stacks are then lost). `slot` is a slot number of the container (each container class's module documents its layout, e.g. player: 0 output, 1–4 grid, 5–8 armour helmet first, 9–35 main, 36–44 hotbar) or −999 (outside the window: the held stack, or one item of it, goes to `dropPlayerItem`); any other value is a scenario error. `button` 0 left, 1 right (others do nothing). `shift` runs the container's `getStackInSlot(slot)` override (b1.7.3's shift-click move) | `slot`, `result` (`slotClick`'s return value: a copy of the slot's stack before the click, or `null`), `stack` (`getSlot(slot).getStack()` afterwards; `null` for −999), `held` (`inventory.getItemStack()` afterwards) |
 | `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` or `"world": "load"` | — then the Tier S lines |
+| `reload` | — | quit the world and open its save again in the same run; needs `"save_format": "mcregion"` or `"world": "load"`; see "Reload" below (WP-2.G) | `chunks` (loaded chunks afterwards), `entities` (`loadedEntityList` size), `tile_entities` (`loadedTileEntityList` size), `player` (the new player's entity id, or `null` without a `player` op) |
 
 **Loaded worlds** (`"world": "load"`, WP-2.5a). The save directory `dir` is copied to a
 temp directory and opened with the loading constructor `World(SaveOldDir, "harness", seed,
@@ -674,6 +675,58 @@ world's save, so autosaves (every 40 ticks) and `save` ops write there, and a ch
 from it is generated and populated as vanilla does. The `level.dat` player is not applied
 (`spawnPlayerWithLoadedChunks` is the client's); a `player` op adds the harness player. The
 Rust side needs the fixture directory: `mc_golden::tick_driver::drive_in`.
+
+**Reload** (`reload` op, WP-2.G; oracle `HarnessWorld.reload`, Rust
+`tick_driver::reload`). What a player does by quitting to the title screen and loading the
+world again, in one run, so a scenario can check that everything that matters survives a
+save: in this order
+
+1. the old world's loaded chunks are listed in `ChunkProvider.chunkList` (load) order;
+2. `World.saveWorld(true, null)` (World.java:278-291), as `Minecraft.changeWorld` saves the
+   world it leaves (`saveWorldIndirectly`, Minecraft.java:1276, World.java:1653-1655); the old
+   `World` is then dropped;
+3. the save is opened with the loading constructor `World(SaveOldDir(<save root>, "world"),
+   "harness", seed, null)` (World.java:149-208), as `"world": "load"` opens one (dimension,
+   seed, time, weather and the `Player` compound from `level.dat`); `"world": "empty"` gets
+   its empty generator again;
+4. **what is carried over and why.** The constructor draws `field_9437_g` and `rand` from
+   clock-seeded `new Random()`s and `soundCounter` from that `rand` (World.java:162, :170,
+   :177): they have no vanilla-reproducible value, so the harness defines them as the old
+   world's: the `World.rand` object itself (its 48-bit state and a pending
+   `nextNextGaussian`), `field_9437_g` and `soundCounter`. Nothing is reseeded
+   (`makeDeterministic`/`resetStatics` do not run): the JVM statics go on as they would in the
+   game: `Entity.nextEntityID` (so reloaded and new entities keep counting up),
+   `NextTickListEntry.nextTickEntryID`, the `Math.random()` stream, `Item.itemRand`, the
+   block singletons' `Random`s and flags, `World.lightingUpdatesScheduled`,
+   `SpawnerAnimals.eligibleChunksForSpawning`. The seeding hook is registered on the new
+   world (same seed); the `dig` controller, the last dug block and the container of the last
+   `slot_click` are dropped (they belong to the old world);
+5. the listed chunks are loaded again in that order, each followed by draining the light
+   queue (as a preload does): saved ones from the region files with their entities (new ids,
+   seeded `mix(seed, id)` by the join hook) and tile entities; chunks that were never saved
+   (`Chunk.needsSaving`, Chunk.java:536-550: unmodified and without entities) are generated
+   again, and population follows the new load order;
+6. if the scenario has a player: a new `HarnessPlayer`, seeded after construction as the
+   `player` op does, then `world.spawnPlayerWithLoadedChunks(player)` (World.java:256-276:
+   `readFromNBT` of `level.dat`'s `Player` compound, which is then cleared, and
+   `entityJoinedWorld`), as `Minecraft.changeWorld` ends (Minecraft.java:1325). The client's
+   `preparePlayerToSpawn`/`flipPlayer` (Minecraft.java:1298-1300) are not called, as the
+   `player` op does not call them (`readFromNBT` overwrites what they set). The new player has
+   a new id (the line's `player`), a new `ContainerPlayer` with an empty crafting grid and no
+   stack on the cursor (neither is saved), hotbar selection 0 (`currentItem` is not saved) and
+   no movement input until the next `input` op; a sleeping player is woken by `readFromNBT`
+   (EntityPlayer.java:315-318).
+
+Not carried over, as in vanilla: **scheduled ticks** (b1.7.3 does not save them:
+`ChunkLoader.storeChunkInCompound`, ChunkLoader.java:108-149, writes no tick list, so the
+reload drops them on both sides; `tick/reload-roundtrip` shows sand left in the air), the
+light queue, rain/thunder strengths (the constructor's `func_27163_E` sets them to 1 when it
+rains, World.java:1782-1790), `InventoryPlayer.currentItem`, the cursor stack and the crafting
+grid, `EntityItem.delayBeforeCanPickup` and the other fields entity NBT does not hold.
+The Rust side: `World::new_from_save` on a new `SaveOldDir` over the same in-memory store,
+`World::set_chunk_generator` for an empty world, `World::adopt_clock_seeded_state` (rand,
+`field_9437_g`, `soundCounter`) and `World::adopt_statics` (the Java statics the port keeps
+per world), `World::loaded_chunk_coords` for the chunk order, `World::spawn_player_with_loaded_chunks`.
 
 **`spawn` kinds beyond `EntityList`'s `(World)` constructors** (WP-2.4). Each is seeded right
 after construction like every `spawn`; where the vanilla constructor draws from the then
@@ -1491,6 +1544,31 @@ squid, sheep, a spider) together with the loaded world. Only region `r.0.-1` is 
 chunk (1,-4) random-ticks a 19x19 chunk square around it (World.java:1868-1965), chunks x
 -8..10, z -13..5: the ones outside that region are generated and populated on both sides,
 so the fixture also covers generating chunks missing from a loaded save.
+
+Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
+
+- `tick/reload-roundtrip` (Tier S, empty world, 40 ticks): a player, a pig, an item entity and
+  a chest filled by `slot_click`; sand set in the air at t = 19 schedules a tick; at t = 20 a
+  `save` and the `reload`. The pig and the item come back from their chunks with new ids
+  (3, 4), the player from `level.dat` (id 5), the chest from its chunk; the sand's tick is gone
+  (`scheduled_ticks` count 0) and the sand stays in the air; `entity_state` and `rng_state`
+  every tick, a final `save` at t = 39.
+- `tick/reload-generated` (seed 123 terrain, 80 ticks): a reload at t = 30 while the
+  population's falling sand is still settling and the player walks: saved chunks come back
+  from the region files with their entities, unsaved ones are generated (and populated)
+  again in the new load order.
+- `tick/gate2-session` (Tier S, seed 123 terrain, difficulty 1, natural spawning off, 411
+  ticks): PLAN_v4 Gate 2's headless session. Walk (60 ticks downhill from the grass at
+  (−25.5, 67, −57.5)), dig the grass in front with a stone shovel and walk into the hole to
+  pick up the dirt, place dirt (`use_item`), craft in the player's 2×2 grid by `slot_click`
+  (logs → planks, planks → sticks, planks → crafting table) plus three `craft` ops, place the
+  crafting table, fight a zombie (spawned at t = 0 out of the player's sight, so its id does not depend on the terrain and the flipped-seed check can run the scenario, then moved 6 blocks from the player by `set_pos`; three sword hits), eat bread, set the
+  time to night, place the bed (`use_item` with the bed item: ItemBed.onItemUse; no
+  `set_block` fallback), `sleep` (`OK`; `World.tick` skips to the next morning after 100
+  ticks and wakes the player), `save`, `reload`, 100 more ticks, a final `save`. The
+  scenario's `comment` lists the steps and ticks. In the port it needs `EntityItem`'s pickup
+  (`EntityItem.onCollideWithPlayer`, a recorded gap) and the item behaviour of WP-2.6
+  (`ItemBlock`, `ItemBed`, `ItemFood`, `ItemSword.hitEntity`).
 
 Vanilla behaviour these fixtures pin down:
 

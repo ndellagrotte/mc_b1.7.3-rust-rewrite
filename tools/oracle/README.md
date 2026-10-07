@@ -14,7 +14,7 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table`, `stat_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `StatTable` (`stat_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power`, `inventory` and `map_data`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `StatTable` (`stat_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power`, `inventory` and `map_data`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets, the `reload` op), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
@@ -233,6 +233,27 @@ unloading stay vanilla. Its chunks are all air with `generateSkylightMap()` appl
 - After a `save` op the oracle does not build `Chunk`s from the files: that constructs the
   saved entities (entity ids, `Math.random()` draws) and would perturb the running
   scenario. `world_read` does, for `chunk_digest` stage `loaded`.
+
+### The `reload` op (WP-2.G)
+
+`HarnessWorld.reload` (format and rationale: tests/golden/README.md "Reload"). `HarnessWorld`'s
+`world` and `access` are therefore not final: the op replaces them in place, so the tick loop
+and the dumps keep using the same `HarnessWorld`. Sequence: the old `ChunkProvider.chunkList`
+read by reflection (chunk coordinates in load order); `world.saveWorld(true, null)`; `new
+World(new SaveOldDir(saveRoot, "world", createPlayersDir), "harness", seed, null)` (the flag
+the save was first opened with: `true` after `"save_format": "mcregion"`, `false` for
+`"world": "load"`; `EmptyChunkProvider` swapped in again for `"world": "empty"`); `w.rand =
+old.rand` (the same `Random` object, so its state and any pending `nextNextGaussian` carry
+over without reading private `Random` fields), `field_9437_g` and `soundCounter` copied by
+reflection; a new `HarnessWorldAccess(seed)` added; `controller`, `lastDig` and
+`TickScenario.openContainer` cleared; the chunks loaded again in order with the light queue
+drained after each; then, if there was a player, `new HarnessPlayer(w)`,
+`TickScenario.seedAfterConstruction` and `w.spawnPlayerWithLoadedChunks(p)`. No static is
+reset: `resetStatics` and `HarnessMath.seed` run once per scenario, so `Entity.nextEntityID`,
+`NextTickListEntry.nextTickEntryID`, the `Math.random()` stream, the singleton `Random`s and
+the static `RegionFileCache` (its open files stay valid: the save directory is the same) go
+on as in the game. The constructor's own `rand.nextInt(12000)` draw lands on its fresh
+unseeded `Random`, which is then replaced, so it has no effect.
 
 ### Determinism checks
 
