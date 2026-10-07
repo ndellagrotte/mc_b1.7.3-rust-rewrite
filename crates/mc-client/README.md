@@ -892,7 +892,17 @@ same `EntityGl` under the hand's matrix (transcribe `renderItem` on it:
 entity, the stack (`Item.stick` while fishing), `getEntityBrightness(1.0F)`
 and the block statics and colour maps. Without a hook nothing is drawn
 (skeletons hold no bow, the player's hand is empty). The first-person hand
-is not drawn here. WP-3.6b reuses nothing of this module
+is not drawn by this pass: `ItemRenderer.renderItemInFirstPerson` gets
+`RenderPlayer` from `RenderManager` and calls `drawFirstPersonHand`, which
+is `render::living::RenderLiving::draw_first_person_hand(&mut EntityGl)` on
+`NonSendMut<RenderManager>`'s `renderers.living_mut(RendererId::Player)`
+(RenderPlayer.java:226-230: `onGround = 0`, the rest pose, then only
+`bipedRightArm`, on the shared `modelBipedMain`, so `isSneak` and
+`heldItemRight` carry over from the last third-person draw as in vanilla);
+the arm lands in that `EntityGl`'s `out.models` as one `ModelDraw` (the
+modelview and GL state at the call), which 3.7b draws in its own hand pass
+(`render::apply` only places `EntityFrame`'s world-space draws). WP-3.6b reuses
+nothing of this module
 (`renderItemIntoGUI` is GUI drawing).
 
 ### Not drawn

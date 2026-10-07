@@ -256,6 +256,35 @@ fn living_renderers_own_their_pass_models() {
     );
 }
 
+#[test]
+fn first_person_hand_is_the_rest_posed_right_arm() {
+    // src: RenderPlayer.java:226-230, ModelBiped.java:69-160
+    use crate::model::biped;
+    let mut r = RenderManager::default();
+    let p = r.renderers.living_mut(RendererId::Player).unwrap();
+    p.main_model.on_ground = 0.5;
+    p.main_model.is_sneak = true;
+    let mut g = EntityGl::new(false);
+    p.draw_first_person_hand(&mut g);
+    assert_eq!(p.main_model.on_ground, 0.0);
+    // the model keeps the rest of its state, as the shared modelBipedMain
+    assert!(p.main_model.is_sneak);
+    assert_eq!(g.out.models.len(), 1);
+    let d = &g.out.models[0];
+    assert_eq!(d.parts.len(), 1);
+    assert_eq!(d.parts[0].part, biped::RIGHT_ARM);
+    // the idle sway at ticks 0: rotateAngleZ += cos(0) * 0.05 + 0.05
+    let arm = &p.main_model.parts[biped::RIGHT_ARM];
+    assert!(close(arm.rotate_angle_z, 0.1));
+    // RenderPlayer only
+    let mut g = EntityGl::new(false);
+    r.renderers
+        .living_mut(RendererId::Zombie)
+        .unwrap()
+        .draw_first_person_hand(&mut g);
+    assert!(g.out.models.is_empty());
+}
+
 // ---- the other renderers ---------------------------------------------------------
 
 #[test]

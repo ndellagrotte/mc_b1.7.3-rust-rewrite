@@ -202,7 +202,7 @@ impl Ctx<'_> {
             return;
         };
         // ItemRenderer.renderItem reads getEntityBrightness(1.0F) for blocks
-        // (ItemRenderer.java:23).
+        // (ItemRenderer.java:24).
         let brightness = self.brightness(e, 1.0);
         let args = HeldItemArgs {
             entity: e,
@@ -722,6 +722,13 @@ pub fn render_entities(
     if rm.render_entities_startup_counter > 0 {
         // src: RenderGlobal.java:255-257
         rm.render_entities_startup_counter -= 1;
+        // With anaglyph on, vanilla calls renderEntities once per eye
+        // (EntityRenderer.java:454, :501, :572-574), so the counter goes
+        // down twice a frame. The port draws the first eye only; the second
+        // eye's call is this decrement.
+        if settings.anaglyph && rm.render_entities_startup_counter > 0 {
+            rm.render_entities_startup_counter -= 1;
+        }
         return;
     }
     // TileEntityRenderer.cacheActiveRenderInfo, RenderManager.cacheActiveRenderInfo

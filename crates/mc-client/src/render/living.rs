@@ -519,7 +519,7 @@ pub fn render_living_label(
         return;
     };
     let b = &var1.base;
-    // getDistanceToEntity(livingPlayer) (Entity.java:653-658)
+    // getDistanceToEntity(livingPlayer) (Entity.java:678-683)
     let (dx, dy, dz) = (
         (b.pos_x - lp.x) as f32,
         (b.pos_y - lp.y) as f32,

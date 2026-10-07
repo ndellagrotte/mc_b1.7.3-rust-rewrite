@@ -19,7 +19,7 @@
 //! args.statics, args.colorizers, id, meta, args.brightness)`, drawn with
 //! `gl.color4f` of its `gl_color` and `gl.draw_tessellator(&d.tess)`.
 //! `args.brightness` is `entity.getEntityBrightness(1.0F)`
-//! (ItemRenderer.java:23). Without a hook nothing is drawn.
+//! (ItemRenderer.java:24). Without a hook nothing is drawn.
 
 use std::sync::Arc;
 

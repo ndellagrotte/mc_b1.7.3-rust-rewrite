@@ -14,7 +14,9 @@ use mc_sim::entity::{Entity, EntityKindData as K, dispatch, player as eplayer};
 use mc_sim::item::{self, ItemKind, ItemStack};
 
 use super::Ctx;
-use super::living::RenderLiving;
+use super::gl::EntityGl;
+use super::living::{LivingClass, RenderLiving};
+use crate::model::RenderMode;
 use crate::model::biped;
 use crate::terrain::{blocks, render_blocks};
 
@@ -216,6 +218,30 @@ pub fn held_item_transform(cx: &mut Ctx, var21: &ItemStack, rotate_around: bool)
 pub fn func_186_b(cx: &mut Ctx) {
     let var3 = 0.9375f32;
     cx.gl.scalef(var3, var3, var3);
+}
+
+impl RenderLiving {
+    /// `RenderPlayer.drawFirstPersonHand()`: the shared `modelBipedMain`
+    /// with `onGround = 0` posed at rest, then only `bipedRightArm` drawn
+    /// on `gl` under its current matrix and state. The model keeps the rest
+    /// of its state (`isSneak`, `heldItemRight`, `isRiding`) from the last
+    /// third-person draw, as vanilla's single `RenderPlayer` instance does.
+    /// For `ItemRenderer.renderItemInFirstPerson` (WP-3.7b), which reaches
+    /// it through `RenderManager.renderers.living_mut(RendererId::Player)`;
+    /// on any other renderer it does nothing (only `RenderPlayer` has it).
+    // src: RenderPlayer.java:226-230
+    pub fn draw_first_person_hand(&mut self, gl: &mut EntityGl) {
+        if self.class != LivingClass::Player {
+            return;
+        }
+        self.main_model.on_ground = 0.0;
+        self.main_model
+            .set_rotation_angles(0.0, 0.0, 0.0, 0.0, 0.0, 0.0625);
+        let draws = self
+            .main_model
+            .draws(&[(biped::RIGHT_ARM, RenderMode::Render)], 0.0625);
+        gl.model(self.main_model.kind, draws);
+    }
 }
 
 /// `func_22016_b(player, x, y, z)`: a sleeping, living player is drawn at

@@ -12,13 +12,14 @@ use super::living::RenderLiving;
 use crate::model::biped;
 
 /// `entity.getHeldItem()`.
-// src: EntityLiving.java (getHeldItem: null), EntitySkeleton.java:83-89,
-// EntityPigZombie.java:89-95, EntityPlayer.java (inventory.getCurrentItem())
+// src: EntityLiving.java:846-848 (null; EntityPlayer does not override it, so
+// a player gets null here: RenderPlayer reads inventory.getCurrentItem()
+// itself, RenderPlayer.java:179), EntitySkeleton.java:83-89,
+// EntityPigZombie.java:89-95
 pub fn get_held_item(e: &Entity) -> Option<ItemStack> {
     match &e.kind {
         K::Skeleton(..) => Some(skeleton::get_held_item()),
         K::PigZombie(..) => Some(pig_zombie::get_held_item()),
-        K::PlayerSp(_, p, _) => p.inventory.get_current_item().copied(),
         _ => None,
     }
 }

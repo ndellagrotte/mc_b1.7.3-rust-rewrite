@@ -58,7 +58,7 @@ pub fn do_render(cx: &mut Ctx, var1: &Entity, var2: f64, var4: f64, var6: f64, v
         cx.gl.blend_func(gl::SRC_ALPHA, gl::DST_ALPHA);
         cx.gl.color4f(1.0, 1.0, 1.0, var10);
         // vanilla bug: renderBlockOnInventory sets glColor4f(…, 1.0F) itself
-        // (RenderBlocks.java:3176-3181), replacing var10's alpha: the flash
+        // (RenderBlocks.java:3179-3184), replacing var10's alpha: the flash
         // is opaque white.
         cx.render_block_on_inventory(TNT, 0, 1.0);
         cx.gl.color4f(1.0, 1.0, 1.0, 1.0);
