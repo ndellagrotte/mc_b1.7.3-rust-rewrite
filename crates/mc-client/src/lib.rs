@@ -151,6 +151,9 @@ impl Plugin for ClientPlugin {
             .init_resource::<debug::DebugSources>()
             .init_resource::<debug::DebugText>()
             .insert_non_send(game);
+        // Every camera composites in sRGB, as the world camera
+        // (camera::spawn_camera): GL's byte-space blending (WP-3.7b).
+        app.register_required_components::<Camera, bevy::camera::CompositingSpace>();
         for hook in RunTickHook::ALL {
             app.init_schedule(hook);
         }

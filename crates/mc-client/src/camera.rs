@@ -672,10 +672,29 @@ pub struct CameraState {
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct MainCamera;
 
+/// The world camera's order: first of all. The first-person hand
+/// (`item_renderer`, order 0) and the GUI (orders 1 and 2) are drawn after
+/// it into the same main texture.
+pub const WORLD_CAMERA_ORDER: isize = -1;
+
 /// Spawns the world camera.
+///
+/// It composites in sRGB (`CompositingSpace::Srgb`; every other camera
+/// gets it too, as a required component of `Camera` registered by
+/// [`crate::ClientPlugin`], since cameras share one main texture only when
+/// its format matches): the main texture is `Rgba8Unorm` holding
+/// gamma-encoded values, the materials write the Java's colour values
+/// unconverted (`GL_TARGET_UNORM`, `gl_material` module docs) and the
+/// hardware blends them as GL blends its framebuffer bytes; Bevy's upscale
+/// pass decodes them for the window.
 pub fn spawn_camera(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
+        Camera {
+            order: WORLD_CAMERA_ORDER,
+            ..default()
+        },
+        bevy::camera::CompositingSpace::Srgb,
         Projection::custom(McProjection::default()),
         Transform::IDENTITY,
         MainCamera,
