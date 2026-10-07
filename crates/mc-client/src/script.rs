@@ -165,6 +165,22 @@ pub enum Action {
         /// z.
         z: f64,
     },
+    /// Dev (WP-3.8): queues `world.playAuxSFX(kind, x, y, z, data)` as the
+    /// simulation would (e.g. kind 1005 with data 2256 plays record "13" at
+    /// the block; data 0 stops it).
+    AuxSfx {
+        /// The `playAuxSFX` type.
+        kind: i32,
+        /// Block.
+        x: i32,
+        /// Block.
+        y: i32,
+        /// Block.
+        z: i32,
+        /// The data argument.
+        #[serde(default)]
+        data: i32,
+    },
 }
 
 /// One script line: an action and its optional time.
@@ -453,6 +469,17 @@ pub fn run_script(
                     (b.last_tick_pos_x, b.last_tick_pos_y, b.last_tick_pos_z) = (x, y, z);
                     (b.motion_x, b.motion_y, b.motion_z) = (0.0, 0.0, 0.0);
                     b.fall_distance = 0.0;
+                }
+            }
+            Action::AuxSfx {
+                kind,
+                x,
+                y,
+                z,
+                data,
+            } => {
+                if let Some(w) = game.the_world.as_mut() {
+                    w.play_aux_sfx(kind, x, y, z, data);
                 }
             }
         }

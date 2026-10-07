@@ -50,6 +50,7 @@ naming the path.
 | `import` | — (D5) | the import of a vanilla save |
 | `debug` | `GuiIngame`'s F3 block | the F3 text (`DebugText`, `DebugSources`) |
 | `events` | `IWorldAccess`, `SoundManager` call sites, `EntityPlayerSP`'s calls into `Minecraft` | `WorldEventMsg`, `ClientSound`, `ClientEvent` |
+| `sound` (WP-3.8) | `SoundManager`, `SoundPool`, `SoundPoolEntry`, `CodecMus`/`MusInputStream`, `RenderGlobal.playSound`/`playRecord`/`playAuxSFX` (sound half) | the `SoundManager` resource on `bevy_kira_audio` (below) |
 | `script` | — | the scripted-input dev mode |
 | `textures` | `RenderEngine`, `TextureFX` and its subclasses, `ColorizerGrass`/`ColorizerFoliage`/`ColorizerWater` | the texture cache (`Handle<Image>` by jar name, with a CPU copy), the terrain and items atlases, the animated tiles written every tick, the colour maps (WP-3.2) |
 | `jfmt`, `clock`, `paths` | JDK behaviour | `Float/Double.toString`, `parseFloat`/`parseInt`, `String.split`/`hashCode`; the clocks and `new Random()`'s seed; the default paths |
@@ -225,6 +226,40 @@ downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
   `/terrain/moon.png`, `/environment/clouds.png`, `/environment/rain.png`,
   `/environment/snow.png`.
 
+## Audio (WP-3.8)
+
+`sound::SoundPlugin` (added by `ClientPlugin`) owns `bevy_kira_audio`'s
+`AudioPlugin` and the `SoundManager` resource (`Minecraft.sndManager`).
+
+- At start-up it runs `loadSoundSettings` and installs every file under
+  `resources/` (`sound/`, `newsound/` → sounds; `streaming/` → records;
+  `music/`, `newmusic/` → music; names sorted, since Java's `listFiles`
+  order is unspecified). A file becomes a variant of its pool name:
+  `step/grass1.ogg` → `step.grass`.
+- Each frame after `GameFrameSet` it applies the `ClientSound` messages, the
+  `SoundOptionsChanged` settings effect, and the simulation's
+  `WorldEventMsg::{PlaySound, PlayRecord, PlayAuxSfx}` (with `RenderGlobal`'s
+  16-block range check for `PlaySound`).
+- Other parts call it directly: `ResMut<SoundManager>` then
+  `play_sound_fx(name, volume, pitch)` (GUI clicks, WP-3.6),
+  `play_sound(name, x, y, z, volume, pitch)`. Plays are handed to kira in
+  `PostUpdate`.
+- `RecordPlayingMessage("C418 - <name>")` is `ingameGUI.setRecordPlayingMessage`
+  for the HUD (WP-3.6).
+- `sound::library` models the paulscode/OpenAL behaviour vanilla relied on:
+  pitch clamped to 0.5–2, linear distance attenuation (range 16 blocks, `16 ×
+  volume` above 1, 64 for records) recomputed as the listener moves, and
+  left/right panning of mono sounds from the listener's yaw (an approximation
+  of OpenAL's panner; stereo files are not panned).
+- `.mus` records are decoded (`sound::mus`) before kira sees them; music and
+  records decode on the async task pool.
+- `MC_SOUND_LOG=1` logs every decision (`sound: <name> -> <file> vol .. pitch
+  .. range .. at (x, y, z)` or `fx`), misses (`sound: no such sound: ..`),
+  out-of-range skips, music and record starts and stops.
+- Without an audio device kira cannot start; after a few seconds of plays
+  that never leave the queue the plugin logs one warning and keeps deciding
+  (and logging) without output.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -260,6 +295,7 @@ Actions run in order, as many per frame as are due.
 | `set_time` | `world_time` | Dev (WP-3.4): `World.setWorldTime` (0 sunrise, 6000 noon, 12000 sunset, 18000 midnight) |
 | `set_rain` | `strength` (0..1), `thunder` (bool, default false) | Dev (WP-3.4): sets `rainingStrength` (and the previous value), `raining`/`thundering` with long timers, and the thunder strength to 1 or 0; `updateWeather` then moves the strength 0.01 a tick toward 1 or 0 |
 | `set_pos` | `x`, `y`, `z` | Dev (WP-3.4): moves the player (`posY` is the eye, as `dump` prints it), no interpolation, motion and fall distance cleared |
+| `aux_sfx` | `kind`, `x`, `y`, `z`, `data` | Dev (WP-3.8): queues `world.playAuxSFX(kind, x, y, z, data)` as the simulation would (`1005` with `data` 2256 plays record `13` at the block, `data` 0 stops it; `2001` with a block id plays its break sound) |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
