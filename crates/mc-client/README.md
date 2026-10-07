@@ -682,9 +682,9 @@ destination alpha anyway.
   `Textures`; the GUI samples an `Rgba8Unorm` copy that follows the engine
   image (so the animated atlases work for item icons).
 - Keys: Ctrl+letter reaches `keyTyped` as the control character (LWJGL's
-  22 for Ctrl+V). The system clipboard needs Bevy's `system_clipboard`
-  feature (off in the workspace): without it `getClipboardString` reads
-  Bevy's in-process buffer.
+  22 for Ctrl+V). The workspace enables Bevy's `system_clipboard`
+  feature (arboard, WP-3.6b), so `getClipboardString` reads the system
+  clipboard.
 
 ## In-game GUI (WP-3.6b)
 
@@ -732,8 +732,10 @@ destination alpha anyway.
   entity (vanilla would throw); both are logged.
 - **Previews drawn through the batcher:** the inventory's player
   (`container::inventory::render_player_preview`: `RenderPlayer` /
-  `RenderLiving` matrices, `ModelBiped` and the armour passes, lit; no held
-  item, hurt overlay, shadow or fire) and the sign being edited
+  `RenderLiving` matrices, `ModelBiped`, the armour passes and
+  `renderSpecials`' pumpkin helmet and held item through a batcher copy of
+  `ItemRenderer.renderItem`, lit; no hurt overlay, shadow or fire) and the
+  sign being edited
   (`container::edit_sign::render_tile_entity_sign_at`, `SignModel` and the
   text). WP-3.5b's renderers may replace them.
 - **Draw order:** `gui::render` sorts batches by `GuiMaterial::sort_bias`
@@ -741,6 +743,33 @@ destination alpha anyway.
   adds (z −1000..1000); with the plain index the HUD's counts, drawn with
   the depth test off, went under the 3D block icons.
 - **Clipboard:** the workspace enables Bevy's `system_clipboard` (`arboard`).
+- **Known deviations** (each needs a change outside WP-3.6b's files):
+  - *Container close timing.* `EntityPlayer.onUpdate`'s
+    `craftingInventory.isUsableByPlayer` close (EntityPlayer.java:80-84)
+    runs in `GuiContainer::update_screen` at the start of tick N+1, not
+    right after the player's `super.onUpdate()` inside tick N's
+    `updateEntities`. The dropped cursor stack and workbench grid get one
+    `EntityItem` update fewer and their entity ids come after the rest of
+    tick N's spawns. Needs `craftingInventory` in `mc-sim`'s player (then
+    `entity::player::on_update` can call `close_screen`) or a shell hook
+    after the player's update.
+  - *Screens opened by a click.* `ClientEvent::DisplayGui` opens its screen
+    at the next tick hook, so the rest of that tick's input events still
+    reach the game (a number key, Q, a second right-click), where vanilla
+    routes them to the new screen (Minecraft.java:995-1126). Needs
+    `Game::process_input` (WP-3.1's) to open the screen, or at least set
+    `current_screen`, right after each `PlayerController` call that raises
+    it.
+  - *Portal with a workbench open.* `EntityPlayerSP.onLivingUpdate` calls
+    `displayGuiScreen(null)` directly (EntityPlayerSP.java:45-47), skipping
+    `closeScreen`, so vanilla drops the 3×3 grid twice (the second
+    `EntityItem`s share the first ones' `ItemStack` objects and end up
+    empty). The simulation's stacks are values: it drops once.
+  - *Chest minecart.* `PlayerGui::MinecartChest` is logged and not opened:
+    `InventoryRef` has no entity variant in `mc-sim`.
+  - *Inventory preview.* No hurt/death red overlay (needs
+    `glDepthFunc(GL_EQUAL)` in `GuiGl`), no shadow or fire
+    (`Render.doRenderShadowAndFire`, WP-3.5b).
 
 ## Particles (WP-3.7a)
 

@@ -1,6 +1,10 @@
 //! `GuiCrafting` (GuiCrafting.java): the workbench's 3×3 grid,
-//! `/gui/crafting.png`. Its `onGuiClosed` is [`super::GuiContainer`]'s
-//! (the second `onCraftGuiClosed` call is discussed there).
+//! `/gui/crafting.png`. Its `onGuiClosed` is [`super::GuiContainer`]'s:
+//! on every `closeScreen` path vanilla's `GuiContainer.onGuiClosed` runs
+//! `ContainerPlayer.onCraftGuiClosed` (`closeScreen` reset
+//! `craftingInventory` first) and `GuiCrafting`'s own call is the only
+//! `ContainerWorkbench` drop, which the one call there reproduces; the
+//! portal path, where vanilla drops the grid twice, is discussed there.
 
 use super::LABEL_COLOR;
 use crate::gui::batch::GuiGl;

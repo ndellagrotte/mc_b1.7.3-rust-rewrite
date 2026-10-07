@@ -10,7 +10,9 @@
 //!   built with y negated. A scaled pixel is `scaleFactor` window pixels.
 //! - **Order:** each batch is one mesh; batches are drawn in call order
 //!   (the `Transparent3d` phase sorted by [`GuiMaterial::sort_bias`] = the
-//!   batch's index), with GL's depth test (`GL_LEQUAL`) and mask per batch.
+//!   batch's index × 4096, wider than the batches' AABB-centre depth
+//!   spread, z −1000..1000), with GL's depth test (`GL_LEQUAL`) and mask
+//!   per batch.
 //! - **Colours and blending:** [`GuiMaterial`] runs WP-3.4's shader
 //!   (`gl_material.wgsl`: the Java colour values, the alpha test, converted
 //!   to linear for the sRGB target) with any `glBlendFunc` pair. The
@@ -85,7 +87,9 @@ pub struct GuiMaterial {
     pub texture: Option<Handle<Image>>,
     /// Blend and depth.
     pub key: GuiKey,
-    /// The batch's index in its layer (call order).
+    /// The batch's index in its layer × 4096 (call order: wider than the
+    /// batches' AABB-centre depth spread, z −1000..1000, which Bevy adds
+    /// to the bias in its `Transparent3d` sort key).
     pub sort_bias: f32,
 }
 

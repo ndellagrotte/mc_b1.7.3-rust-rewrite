@@ -293,7 +293,7 @@ pub fn is_front_facing(w: &[[f32; 2]; 4]) -> bool {
 
 /// Colour maps for `render_block_as_item` (the inventory faces read none;
 /// one empty set, made once).
-fn empty_colorizers() -> &'static Colorizers {
+pub(crate) fn empty_colorizers() -> &'static Colorizers {
     static C: OnceLock<Colorizers> = OnceLock::new();
     C.get_or_init(Colorizers::default)
 }

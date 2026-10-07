@@ -24,9 +24,13 @@
 //!   screen's container (`GuiContainer.initGui`, GuiContainer.java:16-19):
 //!   [`Container::slot_click`] on it, with the world and the player.
 //! - `EntityPlayer.onUpdate`'s `craftingInventory.isUsableByPlayer` check
-//!   (EntityPlayer.java:81-84: close the screen when the chest is gone or
-//!   the player walked away) runs in the screen's `updateScreen`, once per
-//!   tick before the player's update instead of inside it.
+//!   (EntityPlayer.java:80-84: close the screen when the chest is gone or
+//!   the player walked away) runs in the screen's `updateScreen`
+//!   ([`GuiContainer::update_screen`]), at the start of tick N+1, instead
+//!   of right after the player's `super.onUpdate()` inside tick N's
+//!   `updateEntities` (a known deviation, README "Known deviations"; the
+//!   fix needs the player's `craftingInventory` in `mc-sim` or a hook
+//!   after the player's update, outside this module).
 //!
 //! [`Container::slot_click`]: mc_sim::inventory::container::Container::slot_click
 
@@ -441,22 +445,49 @@ impl Screen for GuiContainer {
         }
     }
     // src: GuiContainer.java:162-166; PlayerController.java:100-103;
-    // GuiCrafting.java:8-11
+    // GuiCrafting.java:10-13; EntityPlayerSP.java:108-111;
+    // EntityPlayer.java:131-133
     fn on_gui_closed(&mut self, ctx: &mut ScreenCtx) {
         let Some(c) = self.inventory_slots.as_mut() else {
             return;
         };
-        // playerController.onCraftGuiClosed(windowId, thePlayer):
-        // craftingInventory.onCraftGuiClosed(player).
-        // GuiCrafting.onGuiClosed then calls inventorySlots.onCraftGuiClosed
-        // a second time (GuiCrafting.java:10), dropping the grid's ItemStack
-        // objects again; in vanilla the second EntityItems share those
-        // objects, which the first pickup empties, so they carry nothing.
-        // The simulation's stacks are values: a second call would duplicate
-        // the items, so it is not made (reported).
+        // Every close through thePlayer.closeScreen() (Escape, the
+        // inventory key, updateScreen, the isUsableByPlayer check) first
+        // resets craftingInventory to inventorySlots (EntityPlayer.java:
+        // 131-133) and only then calls displayGuiScreen(null)
+        // (EntityPlayerSP.java:108-111). This onGuiClosed's
+        // playerController.onCraftGuiClosed therefore runs
+        // ContainerPlayer.onCraftGuiClosed: it drops the cursor stack
+        // (Container.java:152-159) and the 2x2 grid, which is always empty
+        // here (every GuiInventory close emptied it). GuiCrafting's own
+        // inventorySlots.onCraftGuiClosed (GuiCrafting.java:10-13) is then
+        // the only ContainerWorkbench call: the cursor is already null, the
+        // 3x3 grid is dropped. One call on the screen's container gives
+        // the same drops in the same order: the cursor stack, then the
+        // grid.
+        //
+        // Deviation (README, "Known deviations"): a direct
+        // displayGuiScreen(null) that skips closeScreen, the portal entry
+        // with a GuiCrafting open (EntityPlayerSP.java:45-47), leaves
+        // craftingInventory on the ContainerWorkbench, so vanilla drops the
+        // 3x3 grid twice: the second EntityItems hold the same ItemStack
+        // objects as the first, which become empty "ghosts" once one of
+        // them is picked up, and take entity ids and player.rand draws.
+        // The simulation's stacks are values, so a second call would
+        // duplicate the items; it drops once.
         with_player(ctx.game, |w, p| c.on_craft_gui_closed(w, p));
     }
-    // src: GuiContainer.java:172-178; EntityPlayer.java:81-84
+    // src: GuiContainer.java:172-178; EntityPlayer.java:80-84
+    //
+    // Only the isEntityAlive/isDead test is GuiContainer.updateScreen's.
+    // The isUsableByPlayer test is EntityPlayer.onUpdate's, right after
+    // the player's super.onUpdate() inside tick N's updateEntities; here
+    // it runs at the start of tick N+1, so the dropped cursor stack and
+    // workbench grid join the world before tick N+1's updateEntities
+    // (one update fewer for those EntityItems, and their entity ids follow
+    // the spawns of the rest of tick N). Known deviation (module docs):
+    // it moves when mc-sim keeps the player's craftingInventory or the
+    // shell offers a hook after the player's update.
     fn update_screen(&mut self, ctx: &mut ScreenCtx) {
         let close = {
             let game = &mut *ctx.game;

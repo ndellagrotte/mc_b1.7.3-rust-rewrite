@@ -796,7 +796,11 @@ pub fn collect_gui_messages(
             ClientEvent::AchievementHint { stat_id } => {
                 achievement.hint_requested = Some(*stat_id);
             }
-            // src: EntityPlayerSP.java:113-131
+            // src: EntityPlayerSP.java:113-131. Vanilla opens the screen
+            // inside the click, so the rest of the tick's input goes to it
+            // (Minecraft.java:995-1126); here it opens at the next hook, a
+            // known deviation (README, "Known deviations": needs
+            // Game::process_input to open it).
             ClientEvent::DisplayGui(gui) => pending.0.push(gui.clone()),
             _ => {}
         }
