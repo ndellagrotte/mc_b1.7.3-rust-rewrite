@@ -53,6 +53,12 @@ naming the path.
 | `script` | — | the scripted-input dev mode |
 | `textures` | `RenderEngine`, `TextureFX` and its subclasses, `ColorizerGrass`/`ColorizerFoliage`/`ColorizerWater` | the texture cache (`Handle<Image>` by jar name, with a CPU copy), the terrain and items atlases, the animated tiles written every tick, the colour maps (WP-3.2) |
 | `jfmt`, `clock`, `paths` | JDK behaviour | `Float/Double.toString`, `parseFloat`/`parseInt`, `String.split`/`hashCode`; the clocks and `new Random()`'s seed; the default paths |
+| `sky` | `RenderGlobal.renderSky` and its display lists | the sky and void planes, sunrise glow, sun, moon, stars; `SkyPlugin` (all of WP-3.4) and the per-frame world read `compute_render_frame` |
+| `fog` | `EntityRenderer.updateFogColor`, `setupFog` | `FogState` (the fog and clear colour, the world's and the sky's fog), the clear colour, a `DistanceFog` on the world camera |
+| `clouds` | `RenderGlobal.renderClouds`, `renderCloudsFancy`, `updateClouds` | fast and fancy clouds, `RenderGlobalClouds::cloud_offset_x` |
+| `weather` | `EntityRenderer.renderRainSnow` | rain and snow columns |
+| `selection` | `RenderGlobal.drawSelectionBox` | the block outline |
+| `gl_material` | — (GL state) | `GlMaterial`: glColor × vertex colour × texture, alpha test, GL fog, blend/depth/colour masks, draw-order biases; Tessellator helpers |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -169,6 +175,38 @@ nether travel.
 Texture packs (`TexturePackList`, `TexturePackCustom`) and the skin and cloak
 downloads (`getTextureForDownloadableImage`) are deferred (D3, D2).
 
+## Sky, clouds, weather, fog (WP-3.4)
+
+- Every frame after `GameFrameSet`, `sky::compute_render_frame` reads the
+  world in `renderWorld`'s order and publishes `fog::FogState`,
+  `sky::SkyFrame`, `clouds::CloudFrame`, `weather::WeatherFrame`,
+  `selection::SelectionFrame`; `apply_*` systems update the meshes.
+- **Fog for everyone else:** read `FogState` (`color`, `world` =
+  `setupFog(0)`, `sky` = `setupFog(-1)`, `far_plane_distance`) and apply
+  `FogParams::factor(eye distance)` to the colour *in the Java's colour
+  values* (or set `GlParams::fog` from `FogParams::to_vec4` if drawing with
+  `GlMaterial`). The world camera also carries a matching `DistanceFog` for
+  `StandardMaterial` meshes (blended in linear space, and that material
+  applies the camera's tonemapping in the shader on LDR cameras, so its
+  colours are not byte-exact).
+- **Draw order:** everything here is in `Transparent3d`, sorted by
+  `gl_material::order` biases: the sky first (drawn at the far plane, no
+  depth writes, so any opaque world covers it), then (after the opaque pass
+  and your own transparent items near bias 0) the selection box, snow, rain,
+  the fancy clouds' depth pass and the clouds. Keep translucent terrain
+  between −0.9e6 and 0.7e6. Do not draw anything that writes depth with
+  `TransparentSortingInfo3d::AlwaysOnTop` (Bevy gizmos do): it is drawn
+  before the sky and punches the clear colour through it.
+- **Colours:** `GlMaterial` does GL's arithmetic on the Java values and
+  converts to linear at the end, so opaque pixels are the bytes vanilla
+  writes (checked: the sky plane's pixels equal `getSkyColor` fogged by
+  `setupFog(-1)` exactly). Textures it samples are uploaded as `Rgba8Unorm`.
+- `clouds::RenderGlobalClouds::cloud_offset_x` is `RenderGlobal.cloudOffsetX`
+  (WP-3.3's occlusion stagger reads it).
+- Textures held locally (could move to WP-3.2's cache): `/terrain/sun.png`,
+  `/terrain/moon.png`, `/environment/clouds.png`, `/environment/rain.png`,
+  `/environment/snow.png`.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -201,6 +239,9 @@ Actions run in order, as many per frame as are due.
 | `respawn` | — | Dev: `Minecraft.respawn(false, 0)` |
 | `quit` | — | `Minecraft.shutdown()`: leaves the world (saving it and the player) and exits |
 | `dump_texture` | `name`, `path` | Dev (WP-3.2): writes the texture's current pixels (for `"terrain"` / `"items"` the atlas with its animated tiles; else a jar path as `getTexture` takes it) to a PNG |
+| `set_time` | `world_time` | Dev (WP-3.4): `World.setWorldTime` (0 sunrise, 6000 noon, 12000 sunset, 18000 midnight) |
+| `set_rain` | `strength` (0..1), `thunder` (bool, default false) | Dev (WP-3.4): sets `rainingStrength` (and the previous value), `raining`/`thundering` with long timers, and the thunder strength to 1 or 0; `updateWeather` then moves the strength 0.01 a tick toward 1 or 0 |
+| `set_pos` | `x`, `y`, `z` | Dev (WP-3.4): moves the player (`posY` is the eye, as `dump` prints it), no interpolation, motion and fall distance cleared |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

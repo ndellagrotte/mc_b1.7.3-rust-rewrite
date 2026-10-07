@@ -137,6 +137,34 @@ pub enum Action {
         /// The PNG.
         path: PathBuf,
     },
+    /// Dev (WP-3.4): sets `worldInfo.worldTime` (`World.setWorldTime`), so
+    /// the sky can be shown at any hour (0 sunrise, 6000 noon, 12000
+    /// sunset, 18000 midnight).
+    SetTime {
+        /// The new world time in ticks.
+        world_time: i64,
+    },
+    /// Dev (WP-3.4): sets the weather: `rainingStrength` (and its previous
+    /// value) to `strength`, `worldInfo.raining` to `strength > 0` and
+    /// `thundering` (strength 1 or 0) with long timers, so `updateWeather`
+    /// keeps it (it still moves the strength 0.01 a tick toward 1 or 0).
+    SetRain {
+        /// 0..1.
+        strength: f32,
+        /// Thunder as well.
+        #[serde(default)]
+        thunder: bool,
+    },
+    /// Dev (WP-3.4): moves the player to `x, y, z` (`posY` is the eye
+    /// level, as the dump prints it), with no interpolation and no motion.
+    SetPos {
+        /// x.
+        x: f64,
+        /// y (`posY`).
+        y: f64,
+        /// z.
+        z: f64,
+    },
 }
 
 /// One script line: an action and its optional time.
@@ -400,6 +428,33 @@ pub fn run_script(
                     }
                 });
             }
+            Action::SetTime { world_time } => {
+                if let Some(w) = game.the_world.as_mut() {
+                    w.set_world_time(world_time);
+                }
+            }
+            Action::SetRain { strength, thunder } => {
+                if let Some(w) = game.the_world.as_mut() {
+                    w.set_rain_strength(strength);
+                    w.world_info.raining = strength > 0.0;
+                    w.world_info.rain_time = 1_000_000;
+                    let t = if thunder { 1.0 } else { 0.0 };
+                    w.thundering_strength = t;
+                    w.prev_thundering_strength = t;
+                    w.world_info.thundering = thunder;
+                    w.world_info.thunder_time = 1_000_000;
+                }
+            }
+            Action::SetPos { x, y, z } => {
+                if let Some(p) = game.player_in_world_mut() {
+                    let b = &mut p.base;
+                    b.set_position(x, y, z);
+                    (b.prev_pos_x, b.prev_pos_y, b.prev_pos_z) = (x, y, z);
+                    (b.last_tick_pos_x, b.last_tick_pos_y, b.last_tick_pos_z) = (x, y, z);
+                    (b.motion_x, b.motion_y, b.motion_z) = (0.0, 0.0, 0.0);
+                    b.fall_distance = 0.0;
+                }
+            }
         }
     }
 }
@@ -451,6 +506,40 @@ mod tests {
             }
         );
         assert_eq!(s.steps[12].action, Action::Quit);
+    }
+
+    #[test]
+    fn parses_the_wp_3_4_dev_actions() {
+        let s = Script::parse(
+            r#"[{"action": "set_time", "world_time": 18000},
+                {"action": "set_rain", "strength": 1, "thunder": true},
+                {"action": "set_rain", "strength": 0.5},
+                {"action": "set_pos", "x": 0.5, "y": 200, "z": -3}]"#,
+        )
+        .unwrap();
+        assert_eq!(s.steps[0].action, Action::SetTime { world_time: 18000 });
+        assert_eq!(
+            s.steps[1].action,
+            Action::SetRain {
+                strength: 1.0,
+                thunder: true
+            }
+        );
+        assert_eq!(
+            s.steps[2].action,
+            Action::SetRain {
+                strength: 0.5,
+                thunder: false
+            }
+        );
+        assert_eq!(
+            s.steps[3].action,
+            Action::SetPos {
+                x: 0.5,
+                y: 200.0,
+                z: -3.0
+            }
+        );
     }
 
     #[test]
