@@ -372,7 +372,10 @@ policy), `snapshot.rs` (what a mesh job reads).
   `occlusionEnabled` is false as on a GL without `ARB_occlusion_query`, F3
   `O: 0`); `RenderList`'s 1024-block anchoring (Bevy's transforms are
   already camera-relative in f32 at the section). b1.7.3 has no
-  `bytesDrawn` statistic.
+  `bytesDrawn` statistic. Pass 1's sections are sorted by Bevy (back to
+  front by entity); vanilla calls them nearest first (`sortedWorldRenderers`),
+  which shows only with fast graphics, where pass 1 writes depth while
+  blending (overlapping water of two sections; WP-3.3b).
 
 ## Scripted-input dev mode
 

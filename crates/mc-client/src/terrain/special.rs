@@ -15,9 +15,9 @@
 //! the face functions read; stairs and fence call
 //! [`RenderBlocks::set_block_bounds`] and [`RenderBlocks::render_standard_block`]
 //! as the Java does (the bounds live in [`RenderBlocks::statics`]). Door
-//! textures (`BlockDoor.getBlockTexture`, negative for a flipped face) are
-//! not in mc-sim's `block::dispatch::get_block_texture`: WP-3.3d adds them
-//! to [`super::blocks::get_block_texture`] (they read the metadata only).
+//! textures (`BlockDoor.getBlockTextureFromSideAndMetadata`, negative for a
+//! mirrored face, BlockDoor.java:18-36) already come through
+//! [`super::blocks::get_block_texture`] from mc-sim.
 
 use super::render_blocks::{RenderBlocks, stub_drawn};
 
