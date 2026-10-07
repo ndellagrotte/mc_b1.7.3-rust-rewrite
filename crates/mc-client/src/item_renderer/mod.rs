@@ -164,7 +164,9 @@ impl Default for ItemRenderer {
 pub fn same_object(held: &ItemStack, held_slot: i32, stack: &ItemStack, slot: i32) -> bool {
     held_slot == slot
         && held.item_id == stack.item_id
-        && (held.item_damage == stack.item_damage || stack.is_item_stack_damageable())
+        && (held.item_damage == stack.item_damage
+            // isItemStackDamageable(): maxDamage > 0 (ItemStack.java:96-98)
+            || item::item(stack.item_id).is_some_and(|d| d.max_damage > 0))
 }
 
 impl ItemRenderer {
