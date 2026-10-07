@@ -611,7 +611,7 @@ were not loaded yet (population and moving entities may load more).
 | `set_motion` | `id`, `motion:[x,y,z]` | assigns `motionX/Y/Z` | `id` |
 | `set_pos` | `id`, `pos:[x,y,z]` | `Entity.setPosition` (Entity.java:163-170; `prevPos*` untouched) | `id` |
 | `set_rotation` | `id`, `yaw`, `pitch` | assigns `rotationYaw`/`rotationPitch` (no `% 360`) | `id` |
-| `use_item` | `item_id?`, `count?` (1), `meta?` (0), `x,y,z,side` | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-block branch of `Minecraft.clickMouse(1)` (Minecraft.java:819-850) with the op's hit instead of a ray trace: `PlayerController.sendPlaceBlock` (PlayerController.java:75-82: the block's `blockActivated`, else `ItemStack.useItem` → `Item.onItemUse`); on success `swingItem`; a stack left at size 0 is removed; if nothing was placed, `sendUseItem` (`useItemRightClick`, PlayerController.java:47-61) | `placed`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
+| `use_item` | `item_id?`, `count?` (1), `meta?` (0), `x,y,z,side` | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-block branch of `Minecraft.clickMouse(1)` (Minecraft.java:819-850) with the op's hit instead of a ray trace: `PlayerController.sendPlaceBlock` (PlayerController.java:75-82: the block's `blockActivated`, else `ItemStack.useItem` → `Item.onItemUse`); on success `swingItem`; a stack left at size 0 is removed; if nothing was placed, `sendUseItem` (`useItemRightClick`, PlayerController.java:47-61). The op's block only feeds `sendPlaceBlock`: the items that aim (`ItemBucket`, `ItemBoat`) trace their own eye ray from the player's position and angles (`set_rotation` turns it) | `placed`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `interact` | `id`, `item_id?`, `count?` (1), `meta?` (0) | needs a player. The stack (if `item_id` is given) replaces hotbar slot `currentItem`; then the right-click-on-entity branch of `Minecraft.clickMouse(1)` (Minecraft.java:800-817, :846-850) with the op's entity instead of the ray trace: `PlayerController.interactWithEntity` (PlayerController.java:88-90) = `EntityPlayer.useCurrentItemOnEntity` (EntityPlayer.java:457-469), `result = entity.interact(player)` (a boat or an empty minecart takes the player on, or puts it off when it already rides it; a furnace minecart takes a coal; a chest minecart opens its GUI), and when that is false the held stack's `useItemOnEntity` on a living entity (ItemStack.java:170-172) and its removal at size ≤ 0; then, as `clickMouse` leaves `var2` true on this branch, `sendUseItem` with the held stack (PlayerController.java:47-61) | `id`, `result`, `used`, `stack` (`{id,count,damage}` or `null`, the slot afterwards) |
 | `input` | `forward?`, `strafe?` (f32, default 0: the key sums, +1 forward / left), `jump?`, `sneak?` (default false), `hotbar?` (0–8) | needs a player. From now until the next `input` op the player's `MovementInput` is what `MovementInputFromOptions.updatePlayerMoveState` makes of those keys (MovementInputFromOptions.java:50-76): `moveForward = forward`, `moveStrafe = strafe`, both `(float)((double)v * 0.3D)` while `sneak`. `HarnessPlayer` applies it where `EntityPlayerSP` does: after `EntityPlayer.updatePlayerActionState`, `moveStrafing`/`moveForward`/`isJumping` from it (EntityPlayerSP.java:27-32), and `isSneaking() = sneak && !sleeping` (:144-146; `Entity.moveEntity`'s edge guard and the ladder hold read it). Not the `ySize` dip of sneaking (EntityPlayerSP.java:79-81, client part of `onLivingUpdate`). `hotbar` is a number key: `inventory.currentItem = hotbar` (Minecraft.java:1073-1076) | — |
 | `dig` | `x,y,z,side` | needs a player; at most one per tick. The left button held on that block face this tick, with the op's block instead of the ray trace (`Minecraft.runTick`'s mouse handling with `PlayerControllerSP`, Minecraft.java:779-830, :962-964, :1003-1022, :1110-1113): `updateController` (`prevBlockDamage`); then on a press (no `dig` last tick, or another block) or when 5 ticks (`ticksPerSecond / 4`) passed since the last click, `clickMouse(0)`: `swingItem`, `clickBlock` (`World.onBlockHit` puts out fire in front of the face; the block's `onBlockClicked` when `curBlockDamage == 0`; `sendBlockRemoved` at once when `blockStrength(player) >= 1`); then `sendBlockRemoving` (after a break `blockHitWait` 5 ticks; the same block as last time adds `blockStrength` and breaks at 1; another block resets the damage to 0 that tick). `sendBlockRemoved`: aux effect 2001, the block set to air, `onBlockDestroyedByPlayer`, the held stack's `onDestroyBlock` (tool wear), `harvestBlock` (the drops) when the player could harvest it (PlayerControllerSP.java:126-199, PlayerController.java:21-32). A tick without a `dig` op (after one) releases the button: `updateController`, `resetBlockRemoving` | `x`, `y`, `z`, `clicked` (whether `clickMouse(0)` ran), `progress` (`curBlockDamage` afterwards, f32 bits), `broken` (a `sendBlockRemoved` of this tick returned true) |
@@ -665,6 +665,7 @@ rod is not used).
 | `ray_trace` | `from:[x,y,z]`, `to:[x,y,z]` (f64: integer or bit pattern), `stop_on_liquid?` (false) | `{"e":"ray_trace","from","to","stop_on_liquid","hit"}`: `World.rayTraceBlocks_do(Vec3D.createVector(from), Vec3D.createVector(to), stop_on_liquid)` (World.java:708-861). `from`/`to` echo the inputs as f64 bit strings. `hit` is `null` or the `MovingObjectPosition`: `{"type":"TILE","x","y","z","side","hit_vec":[3 f64 bit strings],"entity":null}` (`blockX/Y/Z`, `sideHit`, `hitVec`, `entityHit`; MovingObjectPosition.java:12-19). Every chunk of the block box spanned by `from` and `to` (x and z) must be loaded |
 | `power` | `x,y,z` | `{"e":"power","x","y","z","powered","indirectly_powered"}`: `World.isBlockGettingPowered`, then `World.isBlockIndirectlyGettingPowered` (World.java:2151-2190). They read blocks up to two away horizontally; those chunks must be loaded |
 | `inventory` | — | needs a player. `{"e":"inventory","current_item","main","armor","held","craft_matrix","craft_result"}`: `InventoryPlayer.currentItem`, `mainInventory[0..35]` and `armorInventory[0..3]` as lists of `{id,count,damage}` or `null`, the cursor stack `getItemStack()`, and the player's `ContainerPlayer` 2×2 `craftMatrix` (slots 0–3) and `craftResult` (WP-2.5) |
+| `map_data` | `id` | `{"e":"map_data","id","present"}`, and when present `"colors","scale","xCenter","zCenter","dimension","step"`: the `MapData` `"map_<id>"` as the world's `MapStorage` (`World.field_28108_z`) holds it in `loadedDataMap` (no file is read, nothing is added): BLAKE3 over `colors` (MapData.java:13; 16384 bytes for a map made by the game), `scale`, `xCenter`, `zCenter`, `dimension` (bytes and ints as numbers) and `step` (MapData.java:9-14). WP-2.6 |
 | `player_state` | — | needs a player. `{"e":"player_state","id","sleeping","sleepTimer","bed","spawn","isSwinging","swingProgressInt","swingProgress","width","height","yOffset","ySize","cameraYaw","score","damageRemainder","timeUntilPortal","inPortal","sneaking"}`: the `EntityPlayer` state an `entity` line lacks (EntityPlayer.java:7-38): `isPlayerSleeping()`, `getSleepTimer()`, `bedChunkCoordinates` and `getPlayerSpawnCoordinate()` as `[x,y,z]` or `null`, the arm swing (`swingProgress` f32 bits), the box size, `yOffset`, `ySize`, `cameraYaw` (f32 bits), `score`, the private `damageRemainder` and `inPortal`, `timeUntilPortal`, `isSneaking()` |
 | `weather` | — | `{"e":"weather","rain_time","raining","thunder_time","thundering","prev_rain_strength","rain_strength","prev_thunder_strength","thunder_strength"}`: the `WorldInfo` timers and flags (WorldInfo.java:191-221) and `World`'s `prevRainingStrength`, `rainingStrength`, `prevThunderingStrength`, `thunderingStrength` (World.java:27-30; f32 bits) |
 
@@ -954,8 +955,7 @@ Redstone (WP-1.6 task c), empty world, seed 123, the stone platform at y = 60; e
   t = 20; a redstone torch under a block powering it and an inverter on that block;
   `ray_trace` against the torches (`BlockTorch.collisionRayTrace` bounds).
 - `tick/redstone-item-placement`: torches, levers, buttons, a repeater and redstone placed
-  from items (`onBlockPlaced`, `onBlockPlacedBy`). The port's test is ignored until
-  `Item.onItemUse` lands (WP-2.6).
+  from items (`onBlockPlaced`, `onBlockPlacedBy`). Passes since WP-2.6 (`Item.onItemUse`).
 
 Fire, plants, crops, leaves, snow and ice (WP-1.6 task b), empty world, seed 123,
 `"mob_spawning": "none"`, a standing player for random ticks; `rng_state` every tick in all
@@ -1042,9 +1042,8 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   `tick/door-upper-powered` (lever: the upper half forwarding a power notification to the
   lower half, BlockDoor.java:141-143) and `tick/portal-ignite` (`BlockFire.onBlockAdded` →
   `tryToCreatePortal`) need the redstone and fire tasks, both in.
-- `tick/bed-nether` needs `Explosion` (WP-1.8, in). Ignored on the Rust side until its
-  dependencies land: `tick/block-item-placement` (`ItemBlock` and the other placing items,
-  WP-2.6).
+- `tick/bed-nether` needs `Explosion` (WP-1.8, in). `tick/block-item-placement`
+  (`ItemBlock` and the other placing items) passes since WP-2.6.
 
 Tile entities, container blocks and explosions (WP-1.8), empty world, seed 123, the stone
 platform at y = 60 (none needs a player unless it says so):
@@ -1367,6 +1366,71 @@ WP-2.5b):
   player (`wakeUpPlayer(false, true, true)`, the bed becomes the spawn point); asleep again,
   `World.tick` skips to the next morning after 100 ticks; `world_time` and the bed's
   `block_box` every tick.
+
+Item behaviour (WP-2.6), seed 123, empty world unless noted, a player with a preloaded
+`inventory`, `"mob_spawning": "none"`; `use_item` and `interact` without `item_id` use the
+held stack, so a fixture can use up and break what it holds. Every one dumps `rng_state`
+and, where the stacks matter, `inventory` every tick:
+
+- `tick/place-stairs-slabs-doors-beds-signs`: `ItemBlock.onItemUse` and the placing items on
+  every face: stairs at four yaws (`BlockStairs.onBlockPlacedBy`), on a side face and under a
+  block; slabs (a stone slab on a stone slab merges into a double slab in
+  `BlockStep.onBlockAdded`, other types stack); doors (`ItemDoor`: the second of two side by
+  side gets the mirrored hinge; refused on a side face and under a blocked cell), beds
+  (`ItemBed`, two yaws, refused on a side face and with the head cell taken), signs
+  (`ItemSign`: posts at two yaws, wall signs on four faces, refused on a bottom face, a flower
+  and an occupied cell); planks on all six faces of a floating block; the sub-type items'
+  metadata (wool, log, sapling, leaves with the no-decay bit, the piston's 7 then its
+  facing); a snow layer replaced in place (side becomes 0); y = 127 refusing a solid block but
+  not a torch; a stack of 0 refused; a block into the player's own cell refused (the player
+  is in `World.checkIfAABBIsClear`'s scan; the port's player is out of its slot while the item
+  runs, so `item::behaviour` checks it there).
+- `tick/bucket-fill-empty`, `tick/bucket-nether-fizz` (the nether: water only fizzes, a
+  `World.rand` pitch and eight `Math.random()` smoke offsets): `ItemBucket` through
+  `sendUseItem`, aimed with `set_rotation`: the eye ray stops on liquid sources for the empty
+  bucket (flowing water does not stop it), fill and empty water and lava, a ray crossing a
+  corner into a solid block (nothing placed), milk, no hit.
+- `tick/bow-shoot` (tier C): the bow takes arrows from the inventory until none are left;
+  snowballs. Only the player is dumped: the projectiles' constructors draw their heading
+  jitter from their own `rand` before the join hook seeds it (tools/oracle/census.md §3), so
+  their flight is not reproducible in the oracle; it draws nothing from `World.rand` or
+  `Math.random()`.
+- `tick/flint-steel-tnt-portal`: fire on a block, beside a block, refused into stone (still
+  worn), removed under a floating block (`BlockFire.onBlockAdded`), a portal lit in an
+  obsidian frame, fire beside TNT; the `dig` op with flint and steel held on TNT
+  (`BlockTNT.onBlockClicked` sets metadata 1, the instant break primes it); a worn flint and
+  steel breaks. 200 ticks: the primed TNT explodes, the fires burn out.
+- `tick/hoe-seeds-crops`: `ItemHoe` (grass from any face but the bottom with air above; dirt
+  from any face whatever is above, a vanilla bug), a worn hoe breaking, `ItemSeeds` only on
+  farmland's top face with air above; then 300 ticks of crop growth and farmland drying.
+- `tick/food-eat-heal` (tier C): `ItemFood`, `ItemSoup` (a bowl back), `ItemCookie`, the
+  golden apple capped at 20, eating at full health; the player hurt by direct `attack` ops.
+- `tick/dye-bonemeal-crops` (tier C): bone meal on crops (`fertilize`), on grass (128 walks
+  drawn from `Item.itemRand`), on two saplings (`growTree` with `World.rand`), on dirt
+  (nothing); red dye on grass (nothing); `interact` with dyes on a sheep (`ItemDye.saddleEntity`:
+  one off the stack only when the colour changes).
+- `tick/sword-pickaxe-durability` (tier C): wear from `hitEntity` (sword 1, tools 2, shears
+  0) and `onBlockDestroyed` (tools 1, sword 2, shears 1 on leaves and cobweb); a gold pickaxe
+  breaking on stone.
+- `tick/minecart-boat-painting-place` (tier C): minecarts on rails and a powered rail (refused
+  on stone), boats on water (the ray stops on liquid) and on a snow layer (one block lower),
+  paintings on the four faces of a lone block (only 1x1 motives fit, so the art the oracle
+  draws unseeded does not show in the entity lines; a taken face fails `onValidSurface`).
+- `tick/saddle-pig-ride` (tier C): a saddle used on a pig (`interact`: `EntityPig.interact`
+  false, then `useItemOnEntity`), riding and dismounting, and a pig saddled by hitting it with
+  a saddle (`ItemSaddle.hitEntity`).
+- `tick/record-jukebox` (tier C): `ItemRecord` into an empty jukebox; a full one ejects its
+  record from `blockActivated` before the item is tried.
+- `tick/fishing-rod-reel` (tier C): the harness's `FishingHook` bobbers reeled in by the rod
+  (`catchFish`: 2 from the ground, the rod's wear; then from the water).
+- `tick/map-create-update` (`"world": "generated"`): two maps in the inventory get ids 0 and
+  1 (`getMapData`, `getUniqueDataId`), the selected one is drawn around the player
+  (`ItemMap.updateMapData`), fills change the sampled top blocks, the player walks;
+  `map_data` of maps 0, 1 and 5 (absent).
+
+The map files (`data/map_<id>.dat`, `data/idcounts.dat`) are not in any trace (the Tier S
+lines cover `level.dat` and the regions); `crates/mc-sim/tests/item_behaviour.rs` checks the
+port writes and reads them back.
 
 Gate 2's long run (PLAN_v4 §5): `tick/testworld-6000`, `"world": "load"` of
 `save/testworld/world`, the player at the spawn point (the `EntityPlayer` constructor's

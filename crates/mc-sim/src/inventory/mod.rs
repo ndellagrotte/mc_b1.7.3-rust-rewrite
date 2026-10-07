@@ -104,8 +104,10 @@ pub fn drop_player_item(world: &mut World, player: &mut Entity, stack: Option<It
 
 /// `stack.onCrafting(world, player)`: `player.addStat(objectCraftStats[id],
 /// stackSize)` (WP-2.7, recorded) and `Item.onCreated` (empty in `Item`;
-/// `ItemMap.onCreated` assigns a new map id: item behaviour, WP-2.6,
-/// recorded and not applied).
+/// `ItemMap.onCreated` assigns a new map id: transcribed as
+/// [`ItemStack::on_crafting`] (WP-2.6) but recorded and not applied here,
+/// since it changes the damage of the picked-up stack object, of which
+/// `stack` is a copy; module docs, "Gaps").
 // src: ItemStack.java:220-223, Item.java:270-271, ItemMap.java:228-235
 pub fn item_stack_on_crafting(world: &mut World, player: &mut Entity, stack: &ItemStack) {
     let _ = player;

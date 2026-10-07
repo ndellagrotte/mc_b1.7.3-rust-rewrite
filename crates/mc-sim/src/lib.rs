@@ -10,7 +10,7 @@
 //! | Module | Vanilla | Shape |
 //! |---|---|---|
 //! | [`block`] | `Block`, `Material`, `StepSound` + subclasses | const table [`block::BLOCKS`], `BlockKind` enum, behaviour in [`block::dispatch`] |
-//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | item table done (WP-1.2): const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT; item behaviour is WP-2.6; block texture lookups live in `block::block_texture` |
+//! | [`item`] | `Item` + subclasses, `EnumToolMaterial`, `ItemStack` | item table done (WP-1.2): const table [`item::ITEMS`] / [`item::RECORDS`] of `ItemDef` + `ItemKind` enum, data methods as `impl ItemDef`; `ItemStack` value type with NBT and its behaviour calls; item behaviour (WP-2.6) in [`item::behaviour`], a `match` on the kind per `Item` method; block texture lookups live in `block::block_texture` |
 //! | [`world`] | `World`, `Chunk`, `NibbleArray`, `ChunkProvider`, `WorldInfo`, `WorldProvider`, `TileEntity`, `NextTickListEntry`, `IWorldAccess`, `MovingObjectPosition` | lighting done (WP-1.3); [`world::World`] owns everything; client side effects are [`world::events`] |
 //! | [`tick`] | `World.tick` and its block systems, `World.randomDisplayUpdates` | `impl World` |
 //! | [`tile_entity`] | `TileEntity*` subclasses, `FurnaceRecipes`, `IInventory` | data in `world::tile_entity::TileEntityKindData`, behaviour and NBT as free functions over a `TileEntityRef` (WP-1.8) |

@@ -6,7 +6,7 @@
 //! and the constructors it chains to), then the setter chain in source order.
 //!
 //! Not in this table: `StatList.initStats()` (Item.java:380; WP-2.7).
-//! `Item.itemRand` (Item.java:6) is world state for item behaviour (WP-2.6).
+//! `Item.itemRand` (Item.java:6) is world state: [`crate::world::World::item_rand`].
 
 use super::*;
 use crate::block::BLOCKS;
