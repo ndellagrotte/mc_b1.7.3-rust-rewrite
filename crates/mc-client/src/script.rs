@@ -198,6 +198,10 @@ pub enum Action {
         /// The file.
         path: PathBuf,
     },
+    /// Dev (WP-3.5a): spawns a model ([`crate::model::debug`]) at a fixed
+    /// pose in front of the player with its skin from the jar, and with
+    /// `path` set, takes a screenshot of it a few frames later.
+    DebugModel(crate::model::debug::DebugModelSpec),
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -545,6 +549,40 @@ pub fn run_script(
                     }
                 });
             }
+            Action::DebugModel(spec) => {
+                let path = spec.path.clone();
+                commands.queue(move |w: &mut World| {
+                    w.get_resource_or_init::<crate::model::debug::DebugModelRequest>()
+                        .0
+                        .push(spec);
+                });
+                if let Some(path) = path {
+                    // Give the new meshes, material, skin and pipeline
+                    // (compiled asynchronously) 20 frames to reach the GPU,
+                    // then capture.
+                    let at = r.next;
+                    r.script.steps.insert(
+                        at,
+                        Step {
+                            tick: None,
+                            frame: None,
+                            action: Action::Wait {
+                                ticks: None,
+                                frames: Some(20),
+                                in_game: false,
+                            },
+                        },
+                    );
+                    r.script.steps.insert(
+                        at + 1,
+                        Step {
+                            tick: None,
+                            frame: None,
+                            action: Action::Screenshot { path },
+                        },
+                    );
+                }
+            }
         }
     }
 }
@@ -660,6 +698,25 @@ mod tests {
                 path: "build/screens/d.json".into()
             }
         );
+    }
+
+    #[test]
+    fn parses_the_wp_3_5a_debug_model_action() {
+        let s = Script::parse(
+            r#"[{"action": "debug_model", "model": "pig", "path": "build/screens/pig.png"},
+                {"action": "debug_model", "model": "sheep_fur", "turn": 90, "keep": true}]"#,
+        )
+        .unwrap();
+        let Action::DebugModel(a) = &s.steps[0].action else {
+            panic!("{:?}", s.steps[0].action);
+        };
+        assert_eq!(a.model, "pig");
+        assert_eq!(a.path, Some(PathBuf::from("build/screens/pig.png")));
+        assert_eq!(a.distance, 3.0);
+        let Action::DebugModel(b) = &s.steps[1].action else {
+            panic!("{:?}", s.steps[1].action);
+        };
+        assert_eq!((b.turn, b.keep, b.path.is_none()), (90.0, true, true));
     }
 
     #[test]

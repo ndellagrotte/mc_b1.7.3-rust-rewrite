@@ -22,6 +22,8 @@
 //!
 //! WP-3.3a: [`terrain`] (`RenderBlocks`, `WorldRenderer`, the terrain half
 //! of `RenderGlobal`, the crack overlay).
+//! WP-3.5a: [`model`] (the `Model*` family, `ModelRenderer` as meshes and
+//! transforms, the lit model material).
 
 pub mod app;
 pub mod assets;
@@ -39,6 +41,7 @@ pub mod jfmt;
 pub mod keys;
 pub mod lang;
 pub mod loading;
+pub mod model;
 pub mod paths;
 pub mod screenshot;
 pub mod script;
@@ -174,6 +177,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(sound::SoundPlugin);
         // WP-3.3a: the terrain (RenderBlocks, WorldRenderer, RenderGlobal).
         app.add_plugins(terrain::TerrainPlugin);
+        // WP-3.5a: entity models (material, mesh cache, debug_model).
+        app.add_plugins(model::ModelPlugin);
     }
 }
 
