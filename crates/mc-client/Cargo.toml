@@ -7,13 +7,23 @@ license.workspace = true
 description = "Bevy client for the Beta 1.7.3 rewrite: window, input, rendering, UI, audio, assets"
 
 [dependencies]
+mc-core = { path = "../mc-core" }
 mc-sim = { path = "../mc-sim" }
 bevy.workspace = true
 bevy_kira_audio.workspace = true
 bevy_asset_loader.workspace = true
-image.workspace = true
+# PNG decoding of the jar's textures (D8: read at runtime, never embedded).
+image = { workspace = true, features = ["png"] }
 log.workspace = true
+# The scripted-input dev mode's script and dump files (WP-3.1).
+serde.workspace = true
+serde_json.workspace = true
 zip.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+# `localtime_r` for the screenshot file name (ScreenShotHelper's local-time
+# `SimpleDateFormat`); std has no time-zone access.
+libc = "0.2"
 
 [lints]
 workspace = true

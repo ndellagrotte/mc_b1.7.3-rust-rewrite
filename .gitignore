@@ -10,3 +10,5 @@ dist/
 /build/oracle/
 /build/oracle-src/
 /build/golden-out/
+# client screenshots and smoke-run dumps (WP-3.1 scripted mode)
+/build/screens/

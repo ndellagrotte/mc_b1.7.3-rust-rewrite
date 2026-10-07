@@ -1,0 +1,172 @@
+//! Importing a vanilla save folder (PLAN_v4 D5, §3.5): the folder is read
+//! into memory, checked by the simulation's import validation
+//! ([`mc_sim::save::import::validate`]: the first block or item id Beta
+//! 1.7.3 does not define refuses it, and nothing is copied), then written
+//! into `saves/<name>` of the data directory through the native
+//! [`Storage`], `<name>` being the folder's name made unused the way
+//! `GuiCreateWorld.generateUnusedFolderName` does it (append `-`,
+//! GuiCreateWorld.java:52-58).
+//!
+//! The refusal dialog is WP-3.6's; here a refusal is an [`ImportError`].
+
+#![allow(clippy::disallowed_methods)]
+
+use std::path::Path;
+
+use mc_sim::save::import::{ImportRefusal, validate};
+use mc_sim::save::{MemoryStorage, SaveConverterMcRegion, SaveFormat, SaveStore, Storage};
+
+use crate::paths::SAVES_DIR;
+use crate::storage::{FsStorage, WallClock};
+
+/// Why an import failed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ImportError {
+    /// The folder could not be read.
+    Read(String),
+    /// D5: the save holds an id Beta 1.7.3 does not define (or cannot be
+    /// read).
+    Refused(ImportRefusal),
+    /// Writing into the saves directory failed.
+    Write(String),
+}
+
+impl std::fmt::Display for ImportError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ImportError::Read(m) => write!(f, "cannot read the save folder: {m}"),
+            ImportError::Refused(r) => write!(f, "the world cannot be imported: {r}"),
+            ImportError::Write(m) => write!(f, "cannot write the imported world: {m}"),
+        }
+    }
+}
+
+impl std::error::Error for ImportError {}
+
+/// The files under `root`, as `/`-separated paths relative to it, sorted.
+fn read_tree(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let mut out = Vec::new();
+    let mut stack = vec![(root.to_path_buf(), String::new())];
+    while let Some((dir, rel)) = stack.pop() {
+        let it = std::fs::read_dir(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        for entry in it {
+            let entry = entry.map_err(|e| format!("{}: {e}", dir.display()))?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = entry.path();
+            let r = if rel.is_empty() {
+                name.clone()
+            } else {
+                format!("{rel}/{name}")
+            };
+            let ft = entry
+                .file_type()
+                .map_err(|e| format!("{}: {e}", path.display()))?;
+            if ft.is_dir() {
+                stack.push((path, r));
+            } else if ft.is_file() {
+                let bytes = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                out.push((r, bytes));
+            }
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
+}
+
+/// Imports the save folder `src` into `<data_dir>/saves` (module docs);
+/// returns the world's directory name there.
+pub fn import_world(data_dir: &Path, src: &Path) -> Result<String, ImportError> {
+    let files = read_tree(src).map_err(ImportError::Read)?;
+    if files.is_empty() {
+        return Err(ImportError::Read(format!("{} is empty", src.display())));
+    }
+    // Validate a staged copy: nothing touches the saves directory unless
+    // every id is defined.
+    let mut staged = MemoryStorage::default();
+    for (rel, bytes) in &files {
+        staged
+            .write(&format!("import/{rel}"), bytes)
+            .map_err(|e| ImportError::Read(e.to_string()))?;
+    }
+    validate(&mut staged, "import").map_err(ImportError::Refused)?;
+
+    let fs = FsStorage::new(data_dir).map_err(|e| ImportError::Write(e.to_string()))?;
+    let store = SaveStore::shared(Box::new(fs.clone()), Box::new(WallClock));
+    let mut loader = SaveConverterMcRegion::new(store, SAVES_DIR);
+    let mut name = src
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .filter(|n| !n.is_empty() && n != "." && n != "..")
+        .unwrap_or_else(|| "World".to_string());
+    let mut fs = fs;
+    // generateUnusedFolderName, also skipping folders that exist without a
+    // level.dat (the import must not merge into them).
+    while loader.get_world_info(&name).is_some()
+        || !fs
+            .list(&format!("{SAVES_DIR}/{name}"))
+            .unwrap_or_default()
+            .is_empty()
+    {
+        name.push('-');
+    }
+    for (rel, bytes) in &files {
+        fs.write(&format!("{SAVES_DIR}/{name}/{rel}"), bytes)
+            .map_err(|e| ImportError::Write(e.to_string()))?;
+    }
+    Ok(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::tests::TempDir;
+
+    fn level_dat(level_name: &str) -> Vec<u8> {
+        use mc_sim::save::Tag;
+        let info = mc_sim::world::info::WorldInfo::new(5, level_name);
+        let data = info.get_nbt_tag_compound(0);
+        let mut root = std::collections::BTreeMap::new();
+        root.insert("Data".to_string(), Tag::Compound(data));
+        mc_sim::save::mc_nbt::write_gzip("", &Tag::Compound(root)).unwrap()
+    }
+
+    #[test]
+    fn imports_and_renames_on_collision() {
+        let src = TempDir::new("import_src");
+        let data = TempDir::new("import_data");
+        let world = src.0.join("MyWorld");
+        std::fs::create_dir_all(world.join("region")).unwrap();
+        std::fs::write(world.join("level.dat"), level_dat("My World")).unwrap();
+        let a = import_world(&data.0, &world).unwrap();
+        assert_eq!(a, "MyWorld");
+        assert!(data.0.join("saves/MyWorld/level.dat").exists());
+        let b = import_world(&data.0, &world).unwrap();
+        assert_eq!(b, "MyWorld-");
+    }
+
+    #[test]
+    fn a_folder_without_level_dat_is_refused_and_nothing_is_copied() {
+        let src = TempDir::new("import_bad");
+        let data = TempDir::new("import_bad_data");
+        let world = src.0.join("Bad");
+        std::fs::create_dir_all(&world).unwrap();
+        std::fs::write(world.join("junk.txt"), b"x").unwrap();
+        let e = import_world(&data.0, &world).unwrap_err();
+        assert!(matches!(e, ImportError::Refused(_)), "{e}");
+        assert!(!data.0.join("saves").exists());
+    }
+
+    /// The reference testWorld when present (never committed, D8).
+    #[test]
+    fn the_reference_test_world_when_present() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../.reference/mc_b1.7.3-world/testWorld");
+        if !src.exists() {
+            return;
+        }
+        let data = TempDir::new("import_ref");
+        let name = import_world(&data.0, &src).unwrap();
+        assert_eq!(name, "testWorld");
+        assert!(data.0.join("saves/testWorld/level.dat").exists());
+    }
+}

@@ -3,13 +3,185 @@
 //! Owns the window, input, rendering, UI, audio and asset loading, and drives
 //! the simulation from one system. Reads textures and `lang/` from the user's
 //! own `minecraft.jar` and sounds from a `resources/` directory at runtime
-//! (D8). Empty until Phase 3.
+//! (D8). Module map and the scripted-input format: `crates/mc-client/README.md`.
+//!
+//! WP-3.1 (this shell): [`game`] (`Minecraft.java`'s loop and lifecycle),
+//! [`timer`], [`settings`], [`input`] / [`keys`], [`camera`] (the camera half
+//! of `EntityRenderer`), [`storage`] (native `Storage`), [`assets`] / [`lang`]
+//! (jar and `resources/`), [`screenshot`], [`script`] (the scripted-input dev
+//! mode), [`import`], [`loading`], [`debug`] (F3 text), [`events`] (messages
+//! for the other client parts), [`app`] (states, the screen slot).
+
+pub mod app;
+pub mod assets;
+pub mod camera;
+pub mod clock;
+pub mod debug;
+pub mod events;
+pub mod game;
+pub mod import;
+pub mod input;
+pub mod jfmt;
+pub mod keys;
+pub mod lang;
+pub mod loading;
+pub mod paths;
+pub mod screenshot;
+pub mod script;
+pub mod session;
+pub mod settings;
+pub mod storage;
+pub mod timer;
 
 use bevy::prelude::*;
+use mc_sim::stats::AchievementMap;
 
-/// The client plugin. Adds nothing yet.
-pub struct ClientPlugin;
+pub use app::AppState;
+pub use game::{Game, RunTickHook, StartAction};
+
+/// Everything the client needs to start (built by `mc-app` from the command
+/// line).
+#[derive(Clone, Debug)]
+pub struct ClientConfig {
+    /// The data directory, jar and `resources/`.
+    pub paths: paths::ClientPaths,
+    /// The opened jar (D8: opening it is the start-up check).
+    pub jar: assets::JarAssets,
+    /// The `resources/` directory.
+    pub resources: assets::ResourcesDir,
+    /// The player name; `None` for `Minecraft.main`'s `"Player" + millis %
+    /// 1000`.
+    pub username: Option<String>,
+    /// Title screen, or straight into a world.
+    pub start: StartAction,
+    /// The scripted-input dev mode's script.
+    pub script: Option<script::Script>,
+}
+
+impl ClientConfig {
+    /// Opens the jar and checks `resources/` (D8: a missing one is an error
+    /// naming the path).
+    pub fn open(
+        paths: paths::ClientPaths,
+        username: Option<String>,
+        start: StartAction,
+        script: Option<script::Script>,
+    ) -> Result<Self, assets::AssetError> {
+        let jar = assets::JarAssets::open(&paths.jar)?;
+        let resources = assets::ResourcesDir::open(&paths.resources)?;
+        Ok(ClientConfig {
+            paths,
+            jar,
+            resources,
+            username,
+            start,
+            script,
+        })
+    }
+}
+
+/// The client plugin.
+pub struct ClientPlugin {
+    /// Its configuration.
+    pub config: ClientConfig,
+}
+
+/// The shell's frame, in order: input in, the script, window tracking, the
+/// game frame, then the outputs (cursor, window mode, camera, screenshots,
+/// state, published resources). Later WPs order their systems after it.
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct GameFrameSet;
 
 impl Plugin for ClientPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        let c = &self.config;
+        let achievement_map = AchievementMap::parse(&String::from_utf8_lossy(
+            c.jar.get(assets::ACHIEVEMENT_MAP_TXT).unwrap_or_default(),
+        ));
+        let session = match &c.username {
+            Some(u) => session::Session::new(u, "-"),
+            None => session::Session::offline(clock::current_time_millis()),
+        };
+        let game =
+            Game::new(c.paths.clone(), achievement_map, session).unwrap_or_else(|e| panic!("{e}"));
+        let lang = assets::Lang(c.jar.string_translate());
+        app.init_state::<AppState>()
+            .add_message::<events::WorldEventMsg>()
+            .add_message::<events::ClientSound>()
+            .add_message::<events::ClientEvent>()
+            .insert_resource(c.jar.clone())
+            .insert_resource(c.resources.clone())
+            .insert_resource(lang)
+            .insert_resource(StartupAction(Some(c.start.clone())))
+            .init_resource::<input::DeviceInput>()
+            .init_resource::<camera::CameraState>()
+            .init_resource::<screenshot::PendingScreenshots>()
+            .init_resource::<game::FrameView>()
+            .init_resource::<game::ScreenInputOwner>()
+            .init_resource::<debug::DebugSources>()
+            .init_resource::<debug::DebugText>()
+            .insert_non_send(game);
+        for hook in RunTickHook::ALL {
+            app.init_schedule(hook);
+        }
+        if let Some(s) = &c.script {
+            script::install(app, s.clone());
+        }
+        app.add_systems(Startup, (camera::spawn_camera, run_startup_action))
+            .add_systems(
+                Update,
+                (
+                    input::collect_device_input,
+                    script::run_script,
+                    game::track_window,
+                    game::game_frame,
+                    input::apply_cursor_grab,
+                    game::apply_window_mode,
+                    camera::apply_camera,
+                    game::take_requested_screenshot,
+                    game::sync_app_state,
+                    game::publish_frame_view,
+                    debug::publish_debug_text,
+                )
+                    .chain()
+                    .in_set(GameFrameSet),
+            );
+    }
+}
+
+/// What to do once at start-up ([`StartAction`]).
+#[derive(Resource, Clone, Debug)]
+pub struct StartupAction(pub Option<StartAction>);
+
+/// `startGame`'s last step: the main menu, or the world the command line
+/// names (as the world screens would open it). A failure is logged and
+/// leaves the title screen.
+// src: Minecraft.java:295-300
+fn run_startup_action(mut game: NonSendMut<Game>, mut action: ResMut<StartupAction>) {
+    let Some(a) = action.0.take() else {
+        return;
+    };
+    let r = match a {
+        StartAction::Title => {
+            game.display_gui_screen(Some(app::GuiScreen::new(app::ScreenKind::MainMenu)));
+            Ok(())
+        }
+        StartAction::World { name, seed } => game.open_world(&name, seed.as_deref()),
+        StartAction::Import { path } => {
+            match import::import_world(&game.paths.data_dir.clone(), &path) {
+                Ok(name) => {
+                    info!("imported {} as saves/{name}", path.display());
+                    game.open_world(&name, None)
+                }
+                Err(e) => Err(e.to_string()),
+            }
+        }
+    };
+    if let Err(e) = r {
+        error!("{e}");
+        game.last_error = Some(e);
+        if game.the_world.is_none() && game.current_screen.is_none() {
+            game.display_gui_screen(Some(app::GuiScreen::new(app::ScreenKind::MainMenu)));
+        }
+    }
 }

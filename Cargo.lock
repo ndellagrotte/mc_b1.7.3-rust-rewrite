@@ -3503,8 +3503,12 @@ dependencies = [
  "bevy_asset_loader",
  "bevy_kira_audio",
  "image",
+ "libc",
  "log",
+ "mc-core",
  "mc-sim",
+ "serde",
+ "serde_json",
  "zip",
 ]
 
