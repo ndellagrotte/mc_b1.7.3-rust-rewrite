@@ -37,7 +37,7 @@
 
 use std::collections::BTreeMap;
 
-use mc_core::java_hash::JavaHashMap;
+use mc_core::java_hash::{JavaHash, JavaHashMap};
 use serde_json::Value;
 
 use super::stat_base::StatBase;
@@ -233,6 +233,155 @@ fn json_text_int(v: &Value) -> Option<i32> {
     }
 }
 
+// ---- Argo's object field order --------------------------------------------------------
+
+/// Argo's parse tree with each object's fields in document order,
+/// duplicates included (`J_JsonObjectNodeBuilder.fieldBuilders` is a
+/// `LinkedList`); the other values as `serde_json` reads them.
+#[derive(Clone, Debug, PartialEq)]
+enum ArgoNode {
+    Object(Vec<(String, ArgoNode)>),
+    Array(Vec<ArgoNode>),
+    Leaf(Value),
+}
+
+impl ArgoNode {
+    /// `getNode(key)` on an object: `getFields().get(key)`, so a repeated
+    /// key gives its last value (`HashMap.put` replaces it); null otherwise.
+    // src: J_JsonObject.java:14-16, J_JsonObjectNodeList.java:10-18
+    fn get(&self, key: &str) -> Option<&ArgoNode> {
+        match self {
+            ArgoNode::Object(fields) => fields.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ArgoNode {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        d.deserialize_any(ArgoVisitor)
+    }
+}
+
+struct ArgoVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ArgoVisitor {
+    type Value = ArgoNode;
+
+    fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("a JSON value")
+    }
+    fn visit_bool<E>(self, v: bool) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::Bool(v)))
+    }
+    fn visit_i64<E>(self, v: i64) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::from(v)))
+    }
+    fn visit_u64<E>(self, v: u64) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::from(v)))
+    }
+    fn visit_f64<E>(self, v: f64) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::from(v)))
+    }
+    fn visit_str<E>(self, v: &str) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::String(v.to_string())))
+    }
+    fn visit_string<E>(self, v: String) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::String(v)))
+    }
+    fn visit_unit<E>(self) -> Result<ArgoNode, E> {
+        Ok(ArgoNode::Leaf(Value::Null))
+    }
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut a: A) -> Result<ArgoNode, A::Error> {
+        let mut out = Vec::new();
+        while let Some(v) = a.next_element()? {
+            out.push(v);
+        }
+        Ok(ArgoNode::Array(out))
+    }
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut a: A) -> Result<ArgoNode, A::Error> {
+        let mut out = Vec::new();
+        while let Some((k, v)) = a.next_entry::<String, ArgoNode>()? {
+            out.push((k, v));
+        }
+        Ok(ArgoNode::Object(out))
+    }
+}
+
+/// The first entry of `J_JsonObject.getFields()`. The fields go into a
+/// default `HashMap` in document order (`J_JsonObjectNodeList`, a repeated
+/// key keeping its first place and taking the last value), which
+/// `new J_JsonObject` copies (`new HashMap(map)`) and `getFields()` copies
+/// again: each copy's table is sized for the entry count (below), so for
+/// 1 to 6 fields the order differs from the 16-bucket table's. `None` for
+/// an empty object (`iterator().next()` throws).
+// src: J_JsonObjectNodeList.java:10-18, J_JsonObject.java:10-16, StatFileWriter.java:108-109
+fn argo_first_field(fields: &[(String, ArgoNode)]) -> Option<(&str, &ArgoNode)> {
+    let mut m0: JavaHashMap<&str, usize> = JavaHashMap::new();
+    for (i, (k, _)) in fields.iter().enumerate() {
+        m0.insert(k.as_str(), i);
+    }
+    let order0: Vec<(&str, usize)> = m0.iter().map(|(k, v)| (*k, *v)).collect();
+    let order2 = java_hash_map_copy_order(java_hash_map_copy_order(order0));
+    let (k, i) = *order2.first()?;
+    Some((k, &fields[i].1))
+}
+
+/// The iteration order of `new HashMap(map)` filled from `entries` (the
+/// source's iteration order, distinct keys), as the oracle JDK (OpenJDK
+/// 25) behaves, measured: the table starts at the smallest power of two
+/// `>= ceil(n / 0.75)` buckets (2 for one entry, 4 for two or three, 8 for
+/// four to six, 16 for seven to twelve) instead of 16, and the entries are
+/// inserted in order. In a table of list bins the order is the buckets'
+/// (`spread(hash) & (cap - 1)`, `spread(h) = h ^ (h >>> 16)`), each in
+/// insertion order; a resize keeps that rule at the new capacity. The table
+/// doubles when the size passes `0.75 * cap`, or when a ninth entry is
+/// appended to one bucket while `cap < 64`.
+///
+/// Not modelled: a ninth entry in one bucket of a table of 64 or more
+/// buckets, which the JDK turns into a tree bin with its own order; such an
+/// object (a hand-made stats file with dozens of fields per entry) is
+/// ordered as a list here.
+fn java_hash_map_copy_order<K: JavaHash, V>(entries: Vec<(K, V)>) -> Vec<(K, V)> {
+    let n = entries.len();
+    if n == 0 {
+        return entries;
+    }
+    let spread = |h: i32| h ^ ((h as u32) >> 16) as i32;
+    let bucket = |h: i32, cap: usize| (h as u32 as usize) & (cap - 1);
+    let recount = |hashes: &[i32], cap: usize| {
+        let mut counts = vec![0usize; cap];
+        for &h in hashes {
+            counts[bucket(h, cap)] += 1;
+        }
+        counts
+    };
+    // ceil(n / 0.75) = ceil(4n / 3), then the next power of two.
+    let mut cap = (4 * n).div_ceil(3).next_power_of_two().min(1 << 30);
+    let mut hashes: Vec<i32> = Vec::with_capacity(n);
+    let mut counts = vec![0usize; cap];
+    for (k, _) in &entries {
+        let h = spread(k.java_hash());
+        hashes.push(h);
+        counts[bucket(h, cap)] += 1;
+        if counts[bucket(h, cap)] > 8 && cap < 64 {
+            cap *= 2;
+            counts = recount(&hashes, cap);
+        }
+        if hashes.len() > (cap as f32 * 0.75) as usize {
+            cap *= 2;
+            counts = recount(&hashes, cap);
+        }
+    }
+    let mut keyed: Vec<(usize, (K, V))> = hashes
+        .into_iter()
+        .zip(entries)
+        .map(|(h, e)| (bucket(h, cap), e))
+        .collect();
+    keyed.sort_by_key(|(b, _)| *b); // stable: insertion order within a bucket
+    keyed.into_iter().map(|(_, e)| e).collect()
+}
+
 // ---- StatFileWriter --------------------------------------------------------------------
 
 /// `StatFileWriter`'s maps (keyed by `statId`) and dirty flag, plus the
@@ -350,7 +499,8 @@ impl StatFileWriter {
             if name.starts_with("stats_") && name.ends_with(".dat") {
                 let var8 = join(&var3, &name);
                 if storage.read(&var8)?.is_none() {
-                    storage.rename(&join(mc_data_dir, &name), &var8)?;
+                    // `File.renameTo`'s result is ignored (StatFileWriter.java:31).
+                    let _ = storage.rename(&join(mc_data_dir, &name), &var8);
                 }
             }
         }
@@ -361,7 +511,8 @@ impl StatFileWriter {
             for (suffix, target) in files.all() {
                 let from = join(&var3, &format!("stats_{username}{suffix}"));
                 if storage.read(&from)?.is_some() && storage.read(target)?.is_none() {
-                    storage.rename(&from, target)?;
+                    // `renameTo`'s result is ignored (StatsSyncher.java:54).
+                    let _ = storage.rename(&from, target);
                 }
             }
         }
@@ -396,13 +547,17 @@ impl StatFileWriter {
         let text = func_27185_a(Some(username), Some("local"), &self.func_27176_a(), guids);
         // func_27410_a(map, unsent.dat, unsent.tmp, unsent.old)
         storage.write(&files.unsent_tmp, text.as_bytes())?;
+        // `File.delete` and `File.renameTo` report failure by returning
+        // false, which vanilla ignores: a failed step does not stop the
+        // next one (StatsSyncher.java:108-116).
         if storage.read(&files.unsent_old)?.is_some() {
-            storage.delete(&files.unsent_old)?;
+            let _ = storage.delete(&files.unsent_old);
         }
         if storage.read(&files.unsent_dat)?.is_some() {
-            storage.rename(&files.unsent_dat, &files.unsent_old)?;
+            let _ = storage.rename(&files.unsent_dat, &files.unsent_old);
         }
-        storage.rename(&files.unsent_tmp, &files.unsent_dat)
+        let _ = storage.rename(&files.unsent_tmp, &files.unsent_dat);
+        Ok(())
     }
 }
 
@@ -500,8 +655,8 @@ pub fn func_27408_a(bytes: &[u8], guids: &AchievementMap) -> Option<BTreeMap<i32
 }
 
 /// `StatFileWriter.func_27177_a(text)` (static): parses a stats file. Each
-/// element of `"stats-change"` is an object whose first field (Java
-/// `HashMap` order) is `"statId": value`; ids with no stat are skipped
+/// element of `"stats-change"` is an object whose first field (Argo's
+/// `getFields()` order, [`argo_first_field`]) is `"statId": value`; ids with no stat are skipped
 /// (and left out of the checksum); the MD5 of the `guid,value,` pairs
 /// salted with `"local"` must equal `"checksum"`, else null ("CHECKSUM
 /// MISMATCH"). A syntax error gives an empty map (Argo's
@@ -509,27 +664,28 @@ pub fn func_27408_a(bytes: &[u8], guids: &AchievementMap) -> Option<BTreeMap<i32
 /// missing node, a non-integer value, an empty object) is an exception that
 /// `func_27408_a` turns into null. Argo accepts only an object or array
 /// root.
-// src: StatFileWriter.java:96-133, J_JsonObject.java:10-16
+// src: StatFileWriter.java:96-133
 pub fn func_27177_a(var0: &str, guids: &AchievementMap) -> Option<BTreeMap<i32, i32>> {
     let mut var1 = BTreeMap::new();
     let var2 = "local";
     let mut var3 = String::new();
-    let var4: Value = match serde_json::from_str(var0) {
-        Ok(v @ (Value::Object(_) | Value::Array(_))) => v,
+    let var4: ArgoNode = match serde_json::from_str(var0) {
+        Ok(v @ (ArgoNode::Object(_) | ArgoNode::Array(_))) => v,
         _ => return Some(var1),
     };
-    let var5 = var4.get("stats-change")?.as_array()?;
+    let ArgoNode::Array(var5) = var4.get("stats-change")? else {
+        return None;
+    };
     let list = StatList::get();
     for var7 in var5 {
-        let var8 = var7.as_object()?;
-        // getFields() is a HashMap keyed by the field names (J_JsonStringNode
-        // hashes as its String): its first entry in Java order.
-        let mut fields: JavaHashMap<String, &Value> = JavaHashMap::new();
-        for (k, v) in var8 {
-            fields.insert(k.clone(), v);
-        }
-        let (k, v) = fields.iter().next()?;
+        let ArgoNode::Object(var8) = var7 else {
+            return None;
+        };
+        // getFields()'s first entry in Java order (J_JsonStringNode hashes
+        // as its String).
+        let (k, v) = argo_first_field(var8)?;
         let var10 = java_parse_int(k)?;
+        let ArgoNode::Leaf(v) = v else { return None };
         let var11 = json_text_int(v)?;
         match list.func_27361_a(var10) {
             None => {
@@ -543,8 +699,10 @@ pub fn func_27177_a(var0: &str, guids: &AchievementMap) -> Option<BTreeMap<i32, 
         }
     }
     let var15 = md5_string(Some(var2), &var3);
-    let checksum = var4.get("checksum")?.as_str()?;
-    if var15 != checksum {
+    let ArgoNode::Leaf(Value::String(checksum)) = var4.get("checksum")? else {
+        return None;
+    };
+    if &var15 != checksum {
         // System.out.println("CHECKSUM MISMATCH")
         return None;
     }
@@ -635,5 +793,49 @@ mod tests {
         assert_eq!(m.get_guid(1001), Some("bb"));
         assert_eq!(m.get_guid(1002), None);
         assert_eq!(m.get_guid(1003), None);
+    }
+
+    /// `new HashMap(new HashMap(m0))` with `m0` filled in document order.
+    fn argo_order<'a>(doc: &[&'a str]) -> Vec<&'a str> {
+        let mut m0: JavaHashMap<&str, ()> = JavaHashMap::new();
+        for k in doc {
+            m0.insert(*k, ());
+        }
+        let order0: Vec<(&str, ())> = m0.iter().map(|(k, v)| (*k, *v)).collect();
+        java_hash_map_copy_order(java_hash_map_copy_order(order0))
+            .into_iter()
+            .map(|(k, _)| k)
+            .collect()
+    }
+
+    /// Orders printed by OpenJDK 25 for `new HashMap(new HashMap(m0))`:
+    /// three keys in a 4-bucket table; twenty keys (a 32-bucket table);
+    /// nine keys in one bucket of the 16-bucket copy, which grows to 32
+    /// buckets on the ninth instead of making a tree bin.
+    #[test]
+    fn hash_map_copy_order_matches_the_jdk() {
+        assert_eq!(argo_order(&["x1", "x5", "x2"]), ["x1", "x5", "x2"]);
+        let doc = [
+            "f64236", "f49164", "f29485", "f78044", "f89380", "f66254", "f87968", "f96649",
+            "f98850", "f39534", "f31200", "f13712", "f78708", "f88911", "f74495", "f89662",
+            "f12961", "f50738", "f71307", "f38279",
+        ];
+        assert_eq!(
+            argo_order(&doc),
+            [
+                "f74495", "f49164", "f98850", "f78044", "f13712", "f66254", "f87968", "f29485",
+                "f64236", "f88911", "f96649", "f50738", "f89662", "f12961", "f71307", "f78708",
+                "f89380", "f31200", "f39534", "f38279",
+            ]
+        );
+        let doc = [
+            "k17", "k309", "k28", "k408", "k39", "k419", "k150", "k507", "k161",
+        ];
+        assert_eq!(
+            argo_order(&doc),
+            [
+                "k309", "k408", "k419", "k507", "k17", "k28", "k39", "k150", "k161"
+            ]
+        );
     }
 }

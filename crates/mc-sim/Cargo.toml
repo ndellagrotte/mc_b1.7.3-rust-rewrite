@@ -11,6 +11,9 @@ mc-core = { path = "../mc-core" }
 mc-nbt = { path = "../mc-nbt" }
 # The stats file's JSON (StatFileWriter.func_27177_a; Argo replaced per PLAN_v4 §5).
 serde_json.workspace = true
+# The stats file's parse tree keeps each object's fields in document order
+# (Argo's builder list; serde_json's `Value` sorts them): a `Visitor`.
+serde.workspace = true
 
 [lints]
 workspace = true

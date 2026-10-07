@@ -6,8 +6,12 @@
 //!
 //! `StatList`'s static state is filled by three entry points that the
 //! `Block` and `Item` static initialisers reach in this order (the client's
-//! first class to initialise is `Block`; `Item` first would fail, because
-//! `AchievementList` needs `Item.book` while `Item` is still initialising):
+//! first class to initialise is `Block`: Minecraft.java:154's instance
+//! field initialiser `new TextureWaterFX()` reads `Block.waterMoving`
+//! (TextureWaterFX.java:11) before the constructor body runs, so
+//! `StatList.func_27360_a()` at Minecraft.java:168 finds `StatList` already
+//! initialised; `Item` first would fail, because `AchievementList` needs
+//! `Item.book` while `Item` is still initialising):
 //!
 //! 1. Block.java:689 touches `Item`; Item's static initialiser ends with
 //!    `StatList.initStats()` (Item.java:380), which first runs StatList's

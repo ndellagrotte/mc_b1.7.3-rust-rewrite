@@ -193,18 +193,49 @@ impl StatName {
     /// `statName` as Java builds it, given the lang table (`lookup(key)`:
     /// the `en_US.lang` / `stats_US.lang` entry). A missing key translates
     /// to itself (`Properties.getProperty(key, key)`, StringTranslate.java:24-26).
-    /// `String.format` is applied as far as the vanilla stat texts use it:
-    /// `%1$s` and `%s` take the argument.
+    /// `String.format` is applied as far as the vanilla stat texts use it
+    /// ([`java_format_one`]).
     // src: StatCollector.java:6-12, StringTranslate.java:24-31
     pub fn translate(&self, lookup: &dyn Fn(&str) -> Option<String>) -> String {
         let t = |k: &str| lookup(k).unwrap_or_else(|| k.to_string());
         match &self.arg {
             None => t(&self.key),
-            Some(a) => t(&self.key)
-                .replacen("%1$s", &t(a), 1)
-                .replacen("%s", &t(a), 1),
+            Some(a) => java_format_one(&t(&self.key), &t(a)),
         }
     }
+}
+
+/// `String.format(template, arg)` with one argument, for the conversions
+/// the vanilla stat texts use: `%s` (the first ordinary one takes the
+/// argument), `%1$s` (any number of times) and `%%` (a `%`). The template
+/// is scanned once, so the inserted text is never formatted again. Java
+/// throws on a second `%s` or another conversion; those are copied
+/// unchanged here.
+// src: StringTranslate.java:28-31
+fn java_format_one(template: &str, arg: &str) -> String {
+    let mut out = String::new();
+    let mut ordinary_used = false;
+    let mut rest = template;
+    while let Some(i) = rest.find('%') {
+        out.push_str(&rest[..i]);
+        let tail = &rest[i..];
+        if let Some(r) = tail.strip_prefix("%%") {
+            out.push('%');
+            rest = r;
+        } else if let Some(r) = tail.strip_prefix("%1$s") {
+            out.push_str(arg);
+            rest = r;
+        } else if let (Some(r), false) = (tail.strip_prefix("%s"), ordinary_used) {
+            ordinary_used = true;
+            out.push_str(arg);
+            rest = r;
+        } else {
+            out.push('%');
+            rest = &tail[1..];
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The class-specific part of a stat.
@@ -355,5 +386,16 @@ mod tests {
         assert_eq!(n.translate(&lang), "Stone Mined");
         assert_eq!(n.key_form(), "stat.mineBlock(tile.stone.name)");
         assert_eq!(StatName::plain("stat.jump").translate(&lang), "stat.jump");
+    }
+
+    /// One pass over the template: an argument holding `%s` or `%%` is
+    /// inserted as it is; the template's `%%` becomes `%`.
+    #[test]
+    fn format_scans_the_template_once() {
+        assert_eq!(java_format_one("%s used", "50%s"), "50%s used");
+        assert_eq!(java_format_one("%1$s and %s", "a%%"), "a%% and a%%");
+        assert_eq!(java_format_one("100%% %s", "x"), "100% x");
+        assert_eq!(java_format_one("%s %s", "x"), "x %s");
+        assert_eq!(java_format_one("%1$s%1$s", "y"), "yy");
     }
 }

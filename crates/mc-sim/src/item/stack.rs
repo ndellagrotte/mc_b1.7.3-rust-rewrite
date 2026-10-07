@@ -291,7 +291,7 @@ impl ItemStack {
     ) -> bool {
         let var7 = behaviour::on_item_use(self, player, world, x, y, z, side);
         if var7 {
-            // src: ItemStack.java:61
+            // src: ItemStack.java:60-62 (itemID read after the call)
             crate::entity::player::add_stat(
                 player,
                 StatList::get().object_use_stat(self.item_id),

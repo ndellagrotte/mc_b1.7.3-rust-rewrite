@@ -349,6 +349,53 @@ fn stats_file_parse_failures() {
     assert_eq!(func_27177_a("[]", &g), None);
 }
 
+/// An entry with several fields counts its first in `getFields()` order:
+/// the fields go into a 16-bucket `HashMap` in document order and are
+/// copied twice into tables sized for the count (4 buckets for two or
+/// three). The expected firsts were taken from
+/// `new HashMap(new HashMap(map))` on the oracle JDK (OpenJDK 25). A
+/// repeated key keeps its first place with its last value, at the root as
+/// in an entry.
+#[test]
+fn stats_file_entry_first_field() {
+    let g = guids();
+    let file = |body: &str, sum: &str| {
+        format!(
+            "{{\"stats-change\":[{body}],\"checksum\":\"{}\"}}",
+            md5_string(Some("local"), sum)
+        )
+    };
+    // 16 buckets put "1001" first, 4 buckets "1000".
+    assert_eq!(
+        func_27177_a(&file("{\"1000\":3,\"1001\":4}", "aaaa,3,"), &g),
+        Some(BTreeMap::from([(1000, 3)]))
+    );
+    // "2000" and "16777240" share a bucket: document order decides.
+    assert_eq!(
+        func_27177_a(
+            &file("{\"2000\":1,\"16777240\":2,\"2010\":3}", "null,1,"),
+            &g
+        ),
+        Some(BTreeMap::from([(2000, 1)]))
+    );
+    assert_eq!(
+        func_27177_a(
+            &file("{\"16777240\":2,\"2000\":1,\"2010\":3}", "null,2,"),
+            &g
+        ),
+        Some(BTreeMap::from([(16777240, 2)]))
+    );
+    assert_eq!(
+        func_27177_a(&file("{\"1000\":1,\"1001\":2,\"1000\":5}", "aaaa,5,"), &g),
+        Some(BTreeMap::from([(1000, 5)]))
+    );
+    let twice = format!(
+        "{{\"stats-change\":[{{\"1000\":7}}],\"checksum\":\"x\",\"checksum\":\"{}\"}}",
+        md5_string(Some("local"), "aaaa,7,")
+    );
+    assert_eq!(func_27177_a(&twice, &g), Some(BTreeMap::from([(1000, 7)])));
+}
+
 /// `syncStats` writes `stats/stats_<user>_unsent.dat` (the `.tmp` renamed,
 /// the previous file kept as `.old`); `open` relocates `stats_*.dat` from
 /// the data directory, renames mixed-case files to the lower-case names
@@ -393,4 +440,13 @@ fn unsent_file_save_and_open() {
     // No file: empty.
     let r3 = StatFileWriter::open(&mut MemoryStorage::default(), "", "Player", &g).unwrap();
     assert_eq!(r3, StatFileWriter::default());
+
+    // A failed `renameTo` is ignored (its result is never read): a
+    // directory named like a stats file (which `MemoryStorage` cannot
+    // move) does not stop the unsent file's merge.
+    let mut st4 = MemoryStorage::default();
+    st4.write("mc/stats_dir.dat/inner", b"x").unwrap();
+    st4.write(dat, &st.read(dat).unwrap().unwrap()).unwrap();
+    let r4 = StatFileWriter::open(&mut st4, "mc", "Player", &g).unwrap();
+    assert_eq!(r4.field_25101_b, w.field_25101_b);
 }
