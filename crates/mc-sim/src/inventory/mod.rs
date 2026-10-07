@@ -31,17 +31,16 @@
 //! so no change event. The port copies stacks by value and writes such
 //! in-place changes back through `Container::inv_stack_mut`, which, like
 //! Java's field write, raises no event. Each site says which Java object it
-//! stands for.
+//! stands for. `Slot.onPickupFromSlot(stack)` is handed a copy and returns
+//! it as `ItemStack.onCrafting` left it (`ItemMap.onCreated` sets a crafted
+//! map's damage); `Container.slotClick` stores it back into the cursor,
+//! the object Java passed.
 //!
 //! # Gaps (recorded in [`World::unimplemented_hits`])
 //!
 //! - `EntityPlayer.addStat` (statistics and achievements, WP-2.7): crafting
 //!   and smelting pickups (`ItemStack.onCrafting`, `SlotCrafting`,
 //!   `SlotFurnace`) and armour breaking record it.
-//! - `ItemMap.onCreated` on a crafted map (`ItemStack.onCrafting`): the item
-//!   behaviour is transcribed (WP-2.6, [`ItemStack::on_crafting`]) but not
-//!   called here yet, because it changes the damage of the picked-up stack
-//!   object (the cursor's) and `slot_on_pickup_from_slot` passes a copy.
 //!
 //! The client-side parts of `Container` are left out: `crafters`
 //! (`ICrafting` listeners, which only the GUI and the network code
@@ -102,19 +101,15 @@ pub fn drop_player_item(world: &mut World, player: &mut Entity, stack: Option<It
     drop_player_item_with_random_choice(world, player, stack, false);
 }
 
-/// `stack.onCrafting(world, player)`: `player.addStat(objectCraftStats[id],
-/// stackSize)` (WP-2.7, recorded) and `Item.onCreated` (empty in `Item`;
-/// `ItemMap.onCreated` assigns a new map id: transcribed as
-/// [`ItemStack::on_crafting`] (WP-2.6) but recorded and not applied here,
-/// since it changes the damage of the picked-up stack object, of which
-/// `stack` is a copy; module docs, "Gaps").
-// src: ItemStack.java:220-223, Item.java:270-271, ItemMap.java:228-235
-pub fn item_stack_on_crafting(world: &mut World, player: &mut Entity, stack: &ItemStack) {
-    let _ = player;
+/// `stack.onCrafting(world, player)` ([`ItemStack::on_crafting`]):
+/// `player.addStat(objectCraftStats[id], stackSize)` (WP-2.7, recorded) and
+/// `Item.onCreated` (empty in `Item`; `ItemMap.onCreated` gives a crafted map
+/// a new map id and a `MapData` centred on the player, WP-2.6). `stack` is
+/// the picked-up object's copy; the caller stores it back (module docs).
+// src: ItemStack.java:220-223, Item.java:270-271, ItemMap.java:228-238
+pub fn item_stack_on_crafting(world: &mut World, player: &mut Entity, stack: &mut ItemStack) {
     world.note_unimplemented("EntityPlayer.addStat");
-    if stack.item_id == crate::crafting::ids::MAP_ITEM {
-        world.note_unimplemented("ItemMap.onCreated");
-    }
+    stack.on_crafting(world, player);
 }
 
 /// The player's `InventoryPlayer`; panics where Java's `EntityPlayer`

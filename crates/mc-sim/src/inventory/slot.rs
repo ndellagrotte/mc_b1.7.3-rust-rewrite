@@ -220,6 +220,10 @@ impl Container {
     ///   Not `super`: no `onSlotChanged`.
     /// - `SlotFurnace`: `stack.onCrafting`, the iron and fish achievements
     ///   (recorded), then `super`.
+    ///
+    /// Returns `stack` as `onCrafting` left it (`ItemMap.onCreated` sets a
+    /// crafted map's damage): the caller writes it back where Java's object
+    /// lives (the cursor), since `stack` is a copy.
     // src: Slot.java:17-19, SlotCrafting.java:17-47, SlotFurnace.java:15-26
     pub fn slot_on_pickup_from_slot(
         &mut self,
@@ -227,15 +231,16 @@ impl Container {
         player: &mut Entity,
         slot: usize,
         var1: Option<ItemStack>,
-    ) {
+    ) -> Option<ItemStack> {
         match self.slots[slot].kind {
             SlotKind::Plain | SlotKind::Armor { .. } => {
                 self.slot_on_slot_changed(world, player, slot);
+                var1
             }
             SlotKind::Crafting => {
-                let var1 =
+                let mut var1 =
                     var1.expect("SlotCrafting.onPickupFromSlot(null): Java NullPointerException");
-                item_stack_on_crafting(world, player, &var1);
+                item_stack_on_crafting(world, player, &mut var1);
                 // src: SlotCrafting.java:19-35 (AchievementList.buildWorkBench,
                 // buildPickaxe, buildFurnace, buildHoe, makeBread, bakeCake,
                 // buildBetterPickaxe, buildSword)
@@ -277,11 +282,12 @@ impl Container {
                         }
                     }
                 }
+                Some(var1)
             }
             SlotKind::Furnace => {
-                let var1 =
+                let mut var1 =
                     var1.expect("SlotFurnace.onPickupFromSlot(null): Java NullPointerException");
-                item_stack_on_crafting(world, player, &var1);
+                item_stack_on_crafting(world, player, &mut var1);
                 // src: SlotFurnace.java:17-23 (AchievementList.acquireIron, cookFish)
                 if var1.item_id == ids::INGOT_IRON {
                     world.note_unimplemented("EntityPlayer.addStat");
@@ -290,6 +296,7 @@ impl Container {
                     world.note_unimplemented("EntityPlayer.addStat");
                 }
                 self.slot_on_slot_changed(world, player, slot);
+                Some(var1)
             }
         }
     }

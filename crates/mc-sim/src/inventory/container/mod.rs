@@ -611,8 +611,11 @@ impl Container {
                 if var13_size == 0 {
                     self.slot_put_stack(world, player, idx, None);
                 }
+                // var12.onPickupFromSlot(var6.getItemStack()): the cursor's object,
+                // which onCrafting may change in place (ItemMap.onCreated).
                 let held = inventory_of(player).get_item_stack();
-                self.slot_on_pickup_from_slot(world, player, idx, held);
+                let held = self.slot_on_pickup_from_slot(world, player, idx, held);
+                inventory_of_mut(player).item_stack = held;
             }
             (Some(v13), Some(v14)) => {
                 if self.slots[idx].is_item_valid(&v14) {
@@ -672,7 +675,8 @@ impl Container {
                         // crafting output's onCrafting counts the held items too
                         // (objectCraftStats, WP-2.7).
                         let held = inventory_of(player).get_item_stack();
-                        self.slot_on_pickup_from_slot(world, player, idx, held);
+                        let held = self.slot_on_pickup_from_slot(world, player, idx, held);
+                        inventory_of_mut(player).item_stack = held;
                     }
                 }
             }
@@ -940,6 +944,12 @@ impl Container {
             // the rest stays in the output slot until SlotCrafting.onPickupFromSlot
             // consumes the grid, whose onCraftMatrixChanged then overwrites the output
             // with a fresh result: the untaken part is lost.
+            // vanilla bug: mergeItemStack put a copy into the inventory before
+            // onPickupFromSlot(var4), so a shift-clicked crafted map's onCreated
+            // (ItemMap.java:228-238) sets the damage of the detached var4: the
+            // inventory's map keeps damage 0 while a new map_N is made and
+            // getUniqueDataId advances. var4 is a local here: its changes are
+            // dropped like Java's.
             self.slot_on_pickup_from_slot(world, player, var1, Some(var4));
         }
         var2

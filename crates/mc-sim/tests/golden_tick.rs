@@ -245,6 +245,7 @@ fixtures! {
     tick_record_jukebox => "tick" / "record-jukebox";
     tick_fishing_rod_reel => "tick" / "fishing-rod-reel";
     tick_map_create_update => "tick" / "map-create-update";
+    tick_map_craft => "tick" / "map-craft";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test

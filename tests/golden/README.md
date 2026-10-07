@@ -1427,10 +1427,17 @@ and, where the stacks matter, `inventory` every tick:
   1 (`getMapData`, `getUniqueDataId`), the selected one is drawn around the player
   (`ItemMap.updateMapData`), fills change the sampled top blocks, the player walks;
   `map_data` of maps 0, 1 and 5 (absent).
+- `tick/map-craft` (tier C): maps crafted in a workbench (`ItemStack.onCrafting` →
+  `ItemMap.onCreated`): picked up with a click, the cursor's map gets the next id and a
+  `MapData` centred on the player; shift-clicked out, the inventory gets a copy made before
+  `onCreated` runs on the slot's own object (vanilla bug: the inventory's map keeps damage 0
+  while `map_3` is made). `map_data` of maps 0-4 and the inventory.
 
 The map files (`data/map_<id>.dat`, `data/idcounts.dat`) are not in any trace (the Tier S
 lines cover `level.dat` and the regions); `crates/mc-sim/tests/item_behaviour.rs` checks the
-port writes and reads them back.
+port writes and reads them back. With `"save_format": "mcregion"` and `"world": "load"` the
+harness save handler forwards them to `SaveOldDir` (the oracle's `getMapFile` is never null),
+so a loaded save's `data/idcounts.dat` and `data/map_<id>.dat` are read as in Java.
 
 Gate 2's long run (PLAN_v4 §5): `tick/testworld-6000`, `"world": "load"` of
 `save/testworld/world`, the player at the spawn point (the `EntityPlayer` constructor's

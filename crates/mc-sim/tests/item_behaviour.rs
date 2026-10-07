@@ -1,7 +1,8 @@
 //! Item behaviour (WP-2.6) the golden fixtures do not reach: the map files
 //! through `MapStorage` and a save handler (the oracle's Tier S lines do not
-//! carry `data/`), `ItemMap.onCreated` / `getMPMapData` (not called in a
-//! single-player session by any op), thrown eggs, and the fishing rod whose
+//! carry `data/`), `getMPMapData` (not called in a single-player
+//! session by any op), `ItemMap.onCreated` called directly (the crafted map
+//! is pinned by `tick/map-craft`), thrown eggs, and the fishing rod whose
 //! bobber is gone. The rest is covered by `tests/golden/tick/*` (README
 //! "Committed Tier B/C/S scenarios", WP-2.6).
 

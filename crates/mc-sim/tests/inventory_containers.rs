@@ -323,10 +323,11 @@ fn armor_slots_take_a_pumpkin_as_a_helmet() {
     assert_eq!(c.get_slot(36).slot_index, 0);
 }
 
-/// A map from the workbench: `ItemMap.onCreated` assigns a map id (item
-/// behaviour, WP-2.6): recorded; the crafting stat too (WP-2.7).
+/// A map from the workbench: `ItemMap.onCreated` gives the cursor's map a
+/// fresh id and a `MapData` centred on the player (ItemMap.java:228-238);
+/// the crafting stat is recorded (WP-2.7).
 #[test]
-fn crafting_a_map_records_on_created() {
+fn crafting_a_map_runs_on_created() {
     let mut w = empty_world(5);
     let mut p = new_entity_player_sp(&mut w);
     let mut c = new_container_workbench(0, 0, 0);
@@ -335,9 +336,12 @@ fn crafting_a_map_records_on_created() {
         c.put_stack_in_slot(&mut w, &mut p, k, Some(ItemStack::new(s.0, s.1, 0)));
     }
     assert_eq!(c.craft_result().get_stack_in_slot(0).unwrap().item_id, 358);
+    w.get_unique_data_id("map");
     c.slot_click(&mut w, &mut p, 0, 0, false);
-    assert_eq!(inv(&p).item_stack.unwrap().item_id, 358);
-    assert_eq!(hits(&w, "ItemMap.onCreated"), 1);
+    let held = inv(&p).item_stack.unwrap();
+    assert_eq!((held.item_id, held.item_damage), (358, 1));
+    assert!(w.load_item_data("map_1").is_some());
+    assert_eq!(hits(&w, "ItemMap.onCreated"), 0);
     assert_eq!(hits(&w, "EntityPlayer.addStat"), 1);
     assert!((1..=9).all(|k| c.slot_get_stack(&mut w, &mut p, k).is_none()));
 }
