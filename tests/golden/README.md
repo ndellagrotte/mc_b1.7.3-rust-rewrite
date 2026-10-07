@@ -1637,7 +1637,7 @@ harness code.
 | `soak/seed-8675309` | seed 8675309, generated, no save | 48,000 | (−40, 24) 0; (−40, 524) 12,000; (−640, 24) 24,000; (−40, 24) 36,000 | rain from 6,000 | 4,474 / 2.4 MB | 19–20 s | 42–81 s alone, 99–115 s in the set |
 | `soak/seed--7612233452384654969` | seed −7612233452384654969, generated, `mcregion` | 48,000 | (8, 8) 0; (20008, −15000) 12,000; (−3000, 2504) 24,000; (8, 8) 36,000 | rain from 30,000; `reload` at 37,000 (player 0 → 8166) | 4,196 / 2.1 MB | 28 s | 109–124 s |
 | `soak/testworld` | the owner's testWorld, `"world": "load"` (as `tick/testworld-6000`) | 48,000 | the spawn sand (21.5, 65, −63.5) 0 (garden site (45, −64) built at 0 beside it); (296, −296) 16,000; the spawn sand 32,000 | player id 9; rain from 20,000 | 3,405 / 1.8 MB | 24 s | 105–119 s |
-| `soak/nether-8675309` | seed 8675309, nether, generated, no save | 36,000 | (8, 8) 0; (208, −192) 12,000; (8, 8) 24,000 | no weather in the nether | 1,431 / 0.6 MB | 21 s | 94–104 s |
+| `soak/nether-8675309` | seed 8675309, nether, generated, no save | 36,000 | (8, 8) 0; (208, −192) 12,000; (8, 8) 24,000 | no weather in the nether; a new pig and chicken at 24,000; a minecart for the whole run | 1,560 / 0.7 MB | 21 s | 94–104 s |
 
 Runtimes were measured on the 16-core development machine (OpenJDK 25; Rust `test` profile,
 i.e. `dev`: opt-level 1 for the workspace crates, 3 for dependencies) while other builds ran,
@@ -1668,7 +1668,10 @@ ground) and an eternal fire on netherrack at (X+11, 101, Z−4) burns a plank be
 nether site is a 15 × 9 room at floor y = 64 inside a cobblestone shell (so the terrain's
 lava cannot reach it) with glowstone in the ceiling, two mushrooms (spreading on random ticks),
 an eternal fire, a lava source in a basin with a plank above it, soul sand, falling gravel, a
-pig, an item, the same dig (netherrack, stone pickaxe) and placing. The player moves to the
+fenced pen with a pig and a chicken, an item, the same dig (netherrack, stone pickaxe) and
+placing; the first nether site also has a plain minecart on a rail, which never despawns, and
+a new pig and chicken go into its pen when the player returns (the first pair despawned when
+it left), so the nether run has living and non-living entities updating to the end. The player moves to the
 next site with `set_pos` (y = feet + `(double) 1.62F`, the player's `yOffset`, because
 `set_pos` is `Entity.setPosition` while the `player` op adds it) and `set_motion` 0; a
 revisited site is not rebuilt. At a new site the player's 19 × 19 chunks are generated and
