@@ -403,7 +403,11 @@ pub fn flush_gui(
                 },
                 texture,
                 key: d.key,
-                sort_bias: n as f32,
+                // WP-3.6b: Bevy sorts by the mesh's AABB centre's view depth
+                // plus this bias, and GUI batches lie anywhere in z -1000..1000
+                // (the hotbar at -90, items up to +16): a step wider than that
+                // keeps call order.
+                sort_bias: n as f32 * 4096.0,
             };
             if materials.get(&e.material) != Some(&want)
                 && let Some(mut m) = materials.get_mut(&e.material)

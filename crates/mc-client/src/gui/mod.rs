@@ -14,6 +14,11 @@
 //! | [`error_screen`], [`conflict_warning`], [`unused`] | `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused` |
 //! | [`render`] | the Bevy side: two orthographic cameras, [`render::GuiMaterial`] |
 //! | [`debug_screens`] | dev screens for the `debug_gui` script action |
+//! | [`ingame`] (WP-3.6b) | `GuiIngame` (the HUD, the chat lines), `Minecraft.displayDebugInfo`'s graph |
+//! | [`chat`] (WP-3.6b) | `ChatLine`, `GuiChat` |
+//! | [`achievement`] (WP-3.6b) | `GuiAchievement` |
+//! | [`render_item`] (WP-3.6b) | `RenderItem`'s GUI half, the GUI's item lighting |
+//! | [`container`] (WP-3.6b) | `GuiContainer`, `GuiInventory`, `GuiChest`, `GuiFurnace`, `GuiCrafting`, `GuiDispenser`, `GuiEditSign`, `GuiSleepMP`, `GuiGameOver`; `EntityPlayerSP.displayGUI*` |
 //!
 //! # Frame and tick
 //!
@@ -53,13 +58,18 @@
 //! - The in-game overlay draws in a system in [`GuiSet::Overlay`] after
 //!   `gl.set_layer(GuiLayer::Overlay)` (the default at the frame start).
 
+pub mod achievement;
 pub mod batch;
+pub mod chat;
 pub mod conflict_warning;
+pub mod container;
 pub mod debug_screens;
 pub mod draw;
 pub mod error_screen;
 pub mod font;
+pub mod ingame;
 pub mod render;
+pub mod render_item;
 pub mod scaled;
 pub mod screen;
 pub mod unused;
@@ -134,7 +144,76 @@ impl Plugin for GuiPlugin {
             .add_systems(Update, begin_gui_frame.in_set(GuiSet::Begin))
             .add_systems(Update, draw_current_screen.in_set(GuiSet::Screen))
             .add_systems(Update, render::flush_gui.in_set(GuiSet::Flush));
+        // WP-3.6b: the in-game overlay, the chat, the achievement window,
+        // the screens the player opens.
+        add_ingame_systems(app);
     }
+}
+
+/// WP-3.6b's resources and systems ([`ingame`], [`achievement`],
+/// [`container`]): the messages are collected in every tick hook (before
+/// the screen's input) and after the frame; `updateTick` in its hook; the
+/// overlay in [`GuiSet::Overlay`]; the debug graph and the achievement
+/// window after the screen.
+fn add_ingame_systems(app: &mut App) {
+    use self::achievement::{GuiAchievement, apply_achievement_requests, draw_achievement_window};
+    use self::container::{PendingPlayerGuis, open_pending_player_guis};
+    use self::ingame::{
+        GuiIngame, GuiMessageCursors, collect_gui_messages, draw_debug_graph, draw_game_overlay,
+        ingame_update_tick,
+    };
+    app.init_resource::<GuiIngame>()
+        .init_resource::<GuiAchievement>()
+        .init_resource::<GuiMessageCursors>()
+        .init_resource::<PendingPlayerGuis>();
+    for hook in RunTickHook::ALL {
+        match hook {
+            RunTickHook::IngameGuiUpdateTick => {
+                app.add_systems(
+                    hook,
+                    (
+                        collect_gui_messages,
+                        open_pending_player_guis,
+                        ingame_update_tick,
+                    )
+                        .chain(),
+                );
+            }
+            RunTickHook::ScreenInput => {
+                app.add_systems(
+                    hook,
+                    (collect_gui_messages, open_pending_player_guis)
+                        .chain()
+                        .before(screen_input),
+                );
+            }
+            _ => {
+                app.add_systems(
+                    hook,
+                    (collect_gui_messages, open_pending_player_guis).chain(),
+                );
+            }
+        }
+    }
+    app.add_systems(
+        Update,
+        (
+            collect_gui_messages,
+            open_pending_player_guis,
+            apply_achievement_requests,
+        )
+            .chain()
+            .after(GameFrameSet)
+            .before(GuiSet::Begin),
+    )
+    .add_systems(Update, draw_game_overlay.in_set(GuiSet::Overlay))
+    .add_systems(
+        Update,
+        (draw_debug_graph, draw_achievement_window)
+            .chain()
+            .in_set(GuiSet::Screen)
+            .after(draw_current_screen),
+    );
 }
 
 /// Registers this WP's screens (and the dev screens) by class name.
@@ -147,6 +226,8 @@ pub fn register_screens(registry: &mut ScreenRegistry) {
     });
     registry.register("GuiUnused", || Box::new(unused::GuiUnused::default()));
     debug_screens::register(registry);
+    // WP-3.6b
+    container::register(registry);
 }
 
 /// `new FontRenderer(gameSettings, "/font/default.png", renderEngine)`'s
