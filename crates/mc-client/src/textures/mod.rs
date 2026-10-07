@@ -30,8 +30,6 @@
 //! throw an uncaught `IllegalArgumentException` (`ImageIO.read(null)`); the
 //! port logs an error and uses the missing texture instead.
 
-#![allow(clippy::disallowed_methods)]
-
 pub mod colorizer;
 pub mod compass_fx;
 pub mod flames_fx;
@@ -558,9 +556,19 @@ impl Textures {
 
     /// `func_28150_a(pixels, w, h, name)`: uploads ARGB ints into the
     /// top-left `w × h` of an existing texture (the map item), with the
-    /// current flags and the anaglyph transform.
+    /// current flags and the anaglyph transform. The Bevy image is written
+    /// at once, as the `glTexSubImage2D` at the end puts the pixels on the
+    /// GPU at once: the caller runs at render time (MapItemRenderer.java:57),
+    /// also while the game is paused, when no tick flushes.
     // src: RenderEngine.java:246-295
-    pub fn upload_argb(&mut self, pixels: &[i32], w: u32, h: u32, handle: &Handle<Image>) {
+    pub fn upload_argb(
+        &mut self,
+        pixels: &[i32],
+        w: u32,
+        h: u32,
+        handle: &Handle<Image>,
+        images: &mut Assets<Image>,
+    ) {
         let rgba = argb_to_rgba(pixels, self.anaglyph);
         let (blur, clamp) = (self.blur_texture, self.clamp_texture);
         let id = handle.id();
@@ -575,6 +583,8 @@ impl Textures {
         e.blur = blur;
         e.clamp = clamp;
         write_region(e, 0, 0, w, h, &rgba);
+        // src: RenderEngine.java:294 (glTexSubImage2D: on the GPU now)
+        Self::flush_entry(e, images);
     }
 
     /// `registerTextureFX(fx)`: appends it and runs its first `onTick`
@@ -629,14 +639,19 @@ impl Textures {
             .values_mut()
             .chain(self.allocated.iter_mut())
         {
-            if !e.dirty {
-                continue;
-            }
-            e.dirty = false;
-            if let Some(mut img) = images.get_mut(&e.handle) {
-                img.data = Some(e.rgba.clone());
-                img.sampler = sampler(e.blur, e.clamp);
-            }
+            Self::flush_entry(e, images);
+        }
+    }
+
+    /// Writes one CPU copy into its Bevy image if it changed.
+    fn flush_entry(e: &mut TextureEntry, images: &mut Assets<Image>) {
+        if !e.dirty {
+            return;
+        }
+        e.dirty = false;
+        if let Some(mut img) = images.get_mut(&e.handle) {
+            img.data = Some(e.rgba.clone());
+            img.sampler = sampler(e.blur, e.clamp);
         }
     }
 
@@ -1026,6 +1041,30 @@ pub(crate) mod tests {
     /// terrain.png and the compass and watch tiles of items.png, the Bevy
     /// image follows the CPU copy, and a missing name gives the missing
     /// texture.
+    /// `func_28150_a` puts the pixels on the GPU at once (its
+    /// `glTexSubImage2D`, RenderEngine.java:294): the Bevy image matches the
+    /// CPU copy with no tick (no `update_dynamic_textures`) in between.
+    #[test]
+    fn upload_argb_reaches_the_image_at_once() {
+        let mut images = Assets::<Image>::default();
+        let mut t = Textures::new(false);
+        let h = t.allocate_and_setup_texture(ArgbImage::new(4, 4), &mut images);
+        let px: Vec<i32> = (0..4)
+            .map(|i| (0xff00_0000_u32 as i32) | (i * 0x0010_2030))
+            .collect();
+        t.upload_argb(&px, 2, 2, &h, &mut images);
+        let e = t.entry_by_handle(&h).unwrap();
+        assert_eq!(&e.rgba[0..8], &argb_to_rgba(&px[0..2], false)[..]);
+        assert_eq!(&e.rgba[16..24], &argb_to_rgba(&px[2..4], false)[..]);
+        assert_eq!(images.get(&h).unwrap().data.as_ref().unwrap(), &e.rgba);
+        // Anaglyph: the transform applies on upload too.
+        t.anaglyph = true;
+        t.upload_argb(&px, 2, 2, &h, &mut images);
+        let e = t.entry_by_handle(&h).unwrap();
+        assert_eq!(&e.rgba[0..8], &argb_to_rgba(&px[0..2], true)[..]);
+        assert_eq!(images.get(&h).unwrap().data.as_ref().unwrap(), &e.rgba);
+    }
+
     #[test]
     fn engine_with_the_real_jar() {
         let path = crate::paths::default_jar();
@@ -1085,7 +1124,19 @@ pub(crate) mod tests {
         assert_eq!(ie.handle, items_before);
         assert_ne!(tile(&ie.rgba, 54), tile(&items_rgba, 54));
         // The watch tile without a world: the dial at angle ~0 replaces the
-        // magenta pixels; others are the icon's.
+        // magenta pixels (red == blue, green 0, blue > 0); others are the
+        // icon's (TextureWatchFX.java:65-96).
+        let (watch_now, watch_icon) = (tile(&ie.rgba, 70), tile(&items_rgba, 70));
+        assert_ne!(watch_now, watch_icon, "watch");
+        let mut kept = 0;
+        for (now, icon) in watch_now.chunks(4).zip(watch_icon.chunks(4)) {
+            if !(icon[0] == icon[2] && icon[1] == 0 && icon[2] > 0) {
+                assert_eq!(now, icon, "a non-magenta watch pixel");
+                kept += 1;
+            }
+        }
+        assert!(kept > 0 && kept < 256);
+        // A tile no FX touches is unchanged.
         assert_eq!(tile(&ie.rgba, 1), tile(&items_rgba, 1));
         // Missing: the 64×64 missing texture, cached.
         let m = t.get_texture("/no/such.png", &jar, &mut images);

@@ -147,7 +147,10 @@ nether travel.
   `/ 256`, the far edge `- 0.01`); `tile_uv_f64` keeps the Java doubles.
 - `get_texture_contents(name)` is `func_28149_a` (ARGB ints).
   `allocate_and_setup_texture`, `upload_argb` (`func_28150_a`) and
-  `delete_texture` are there for the font and the map.
+  `delete_texture` are there for the font and the map. `upload_argb` takes
+  `&mut Assets<Image>` and writes the Bevy image at once (vanilla's
+  `glTexSubImage2D` runs at render time, also while paused), so call it from
+  the system that draws.
 - The FX (`texture_list`, registered in `Minecraft.startGame`'s order: lava,
   water, portal, compass, watch, flowing water, flowing lava, fire ×2) tick
   in `RunTickHook::UpdateDynamicTextures` and write their 16×16 tiles into

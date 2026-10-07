@@ -161,9 +161,11 @@ impl TextureFx {
     }
 
     /// `bindImage`'s texture name: `/terrain.png` for `tileImage` 0,
-    /// `/gui/items.png` for 1, none otherwise (Java binds nothing and the
-    /// upload goes to whatever texture is bound, which in `runTick` is
-    /// `/terrain.png`, Minecraft.java:967; no FX has another value).
+    /// `/gui/items.png` for 1, none otherwise. For another value Java binds
+    /// nothing, and the upload goes to the texture the previous FX bound
+    /// (terrain.png for the first FX, Minecraft.java:967). No FX has
+    /// another value, so that branch is unreachable; the caller's
+    /// `continue` (write nothing) differs from vanilla there.
     // src: TextureFX.java:20-27
     pub fn bind_image_path(&self) -> Option<&'static str> {
         match self.tile_image {
