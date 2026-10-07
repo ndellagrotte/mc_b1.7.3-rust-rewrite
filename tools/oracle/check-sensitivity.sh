@@ -8,7 +8,8 @@
 # the scenario and its input files): sine_table, nbt_write, nbt_read,
 # java_hash_order, world_read, block_table, item_table, recipe_table, stat_table. A seedless scenario of any other kind fails. The
 # kind is the first "kind" in scenario.json, so it must precede any op's "kind".
-# Needs a built oracle.
+# Needs a built oracle. SOAK (env.sh) selects the scenarios as for regen.sh
+# (SOAK=only: the soak set tests/golden/soak alone, about 2.5 min).
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -20,10 +21,11 @@ oracle_run "$TMP" -Dharness.perturbSeed=1 > /dev/null
 
 UNSEEDED=" sine_table nbt_write nbt_read java_hash_order world_read block_table item_table recipe_table stat_table "
 
+IDS=$(golden_ids)
 cd "$ROOT/tests/golden"
 status=0
-for scenario in */*/scenario.json; do
-    dir=$(dirname "$scenario")
+for dir in $IDS; do
+    scenario="$dir/scenario.json"
     committed="$dir/expected.jsonl"
     [ -f "$committed" ] || { echo "check-sensitivity: $committed missing; run regen.sh" >&2; exit 1; }
     if grep -q '"seed"' "$scenario"; then

@@ -6,6 +6,11 @@
 #      each scenario directory are replaced; scenario.json is never touched)
 #   4. print `git status --short tests/golden` so drift is visible
 # Nobody edits expected.jsonl by hand; run this instead.
+#
+# SOAK (env.sh): unset or 0 regenerates every fixture except the long-run soak
+# set tests/golden/soak/* (the default, about 10 s); SOAK=only regenerates the
+# soak set alone (about 2.5 min of oracle time); SOAK=1 both. Fixtures outside
+# the selected set are not touched.
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -17,9 +22,9 @@ sh "$ROOT/tools/oracle/build.sh"
 rm -rf "$OUT"
 oracle_run "$OUT"
 
+IDS=$(golden_ids)
 cd "$ROOT/tests/golden"
-for scenario in */*/scenario.json; do
-    dir=$(dirname "$scenario")
+for dir in $IDS; do
     [ -f "$OUT/$dir/expected.jsonl" ] || { echo "regen: no output for $dir" >&2; exit 1; }
     find "$dir" -maxdepth 1 -type f ! -name scenario.json -exec rm -f {} +
     cp "$OUT/$dir"/* "$dir"/
