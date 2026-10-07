@@ -232,6 +232,36 @@ pub enum Action {
         /// The characters.
         text: String,
     },
+    /// Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy,
+    /// dz)` as the simulation would (`RenderGlobal.spawnParticle`'s names:
+    /// `smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`,
+    /// `portal`, …). With `ahead`, `x, y, z` are offsets from the point
+    /// `ahead` blocks along the player's look from the eye.
+    Particle {
+        /// The particle name.
+        name: String,
+        /// x (or the offset with `ahead`).
+        #[serde(default)]
+        x: f64,
+        /// y.
+        #[serde(default)]
+        y: f64,
+        /// z.
+        #[serde(default)]
+        z: f64,
+        /// The motion arguments.
+        #[serde(default)]
+        dx: f64,
+        /// y motion.
+        #[serde(default)]
+        dy: f64,
+        /// z motion.
+        #[serde(default)]
+        dz: f64,
+        /// Blocks ahead of the eye.
+        #[serde(default)]
+        ahead: Option<f64>,
+    },
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -665,6 +695,46 @@ pub fn run_script(
                     game.input.push_key(0, false, ch);
                 }
             }
+            Action::Particle {
+                name,
+                x,
+                y,
+                z,
+                dx,
+                dy,
+                dz,
+                ahead,
+            } => {
+                let base = match ahead {
+                    Some(d) => game.player().map(|p| {
+                        let b = &p.base;
+                        // EntityLiving.getLook(1.0F)'s direction (EntityLiving.java:813-823).
+                        let (yaw, pitch) = (
+                            (b.rotation_yaw as f64).to_radians(),
+                            (b.rotation_pitch as f64).to_radians(),
+                        );
+                        let (lx, ly, lz) = (
+                            -yaw.sin() * pitch.cos(),
+                            -pitch.sin(),
+                            yaw.cos() * pitch.cos(),
+                        );
+                        (b.pos_x + lx * d, b.pos_y + ly * d, b.pos_z + lz * d)
+                    }),
+                    None => Some((0.0, 0.0, 0.0)),
+                };
+                if let (Some((bx, by, bz)), Some(w)) = (base, game.the_world.as_mut()) {
+                    w.events
+                        .push(mc_sim::world::events::WorldEvent::SpawnParticle {
+                            name: name.into(),
+                            x: bx + x,
+                            y: by + y,
+                            z: bz + z,
+                            vx: dx,
+                            vy: dy,
+                            vz: dz,
+                        });
+                }
+            }
         }
     }
 }
@@ -827,6 +897,41 @@ mod tests {
             panic!("{:?}", s.steps[1].action);
         };
         assert_eq!((b.turn, b.keep, b.path.is_none()), (90.0, true, true));
+    }
+
+    #[test]
+    fn parses_the_wp_3_7a_particle_action() {
+        let s = Script::parse(
+            r#"[{"action": "particle", "name": "smoke", "x": 1, "y": 64.5, "z": -2},
+                {"action": "particle", "name": "reddust", "ahead": 2, "dx": 0.5}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::Particle {
+                name: "smoke".into(),
+                x: 1.0,
+                y: 64.5,
+                z: -2.0,
+                dx: 0.0,
+                dy: 0.0,
+                dz: 0.0,
+                ahead: None
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::Particle {
+                name: "reddust".into(),
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                dx: 0.5,
+                dy: 0.0,
+                dz: 0.0,
+                ahead: Some(2.0)
+            }
+        );
     }
 
     #[test]

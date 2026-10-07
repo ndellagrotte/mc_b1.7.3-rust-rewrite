@@ -63,6 +63,7 @@ naming the path.
 | `terrain` (WP-3.3a) | `RenderBlocks`, `WorldRenderer`, `RenderGlobal` (terrain half: `loadRenderers`, `updateRenderers`, `sortAndRender`, `clipRenderersByFrustrum`, `markBlock*NeedsUpdate`, `drawBlockBreaking`), `RenderSorter`, `EntitySorter`, `ChunkCache`, `Tessellator`, `Frustrum`, `ClippingHelper(Impl)` | the terrain meshes, two passes, the crack overlay, `renderBlockOnInventory` (below) |
 | `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
 | `gui` (WP-3.6a) | `Gui`, `GuiScreen`, `GuiButton`, `GuiSmallButton`, `GuiSlider`, `GuiTextField`, `GuiSlot`, `GuiYesNo`, `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused`, `FontRenderer`, `ChatAllowedCharacters`, `ScaledResolution` (arithmetic) | the screen objects bound to `currentScreen`, their input and drawing; `GuiGl` (the GL state and Tessellator as data) and the two GUI cameras (below) |
+| `particles` (WP-3.7a) | `EffectRenderer`, `EntityFX` and every `Entity*FX`, `RenderGlobal.spawnParticle`, `playAuxSFX` (particle half), `EntityRenderer.addRainParticles` | the `EffectRenderer` resource, the particle updates in `RunTickHook::UpdateEffects`, the rain splashes in `UpdateRenderer`, the particle meshes (below) |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -633,6 +634,46 @@ GL's.
   feature (off in the workspace): without it `getClipboardString` reads
   Bevy's in-process buffer.
 
+## Particles (WP-3.7a)
+
+`particles::ParticlesPlugin` (added by `ClientPlugin`) owns
+`particles::EffectRenderer` (`Minecraft.effectRenderer`, a `Resource`).
+
+- Requests arrive as messages and are queued in `EffectRenderer::pending`:
+  `WorldEventMsg::SpawnParticle` (`RenderGlobal.spawnParticle`, with its
+  16-block range), `WorldEventMsg::PlayAuxSfx` 2000 (dispenser smoke) and
+  2001 (block-break debris), `ClientEvent::BlockHitEffects`,
+  `ClientEvent::PickupFx`, `ClientEvent::WorldChanged` (`clearEffects`).
+  They are applied at the next `RunTickHook::UpdateRenderer` /
+  `UpdateEffects`, so every particle of a tick exists before that tick's
+  `updateEffects` (a world change clears at once). Other parts may also
+  call `EffectRenderer::add_effect`, `spawn_particle`,
+  `add_block_hit_effects`, `add_block_destroy_effects` directly.
+- `RunTickHook::UpdateRenderer`: `addRainParticles` (splashes and smoke on
+  lava around the viewer while it rains; the rain sound is queued on the
+  world as `World.playSoundEffect`, WP-3.8 plays it). It reseeds WP-3.4's
+  `weather::WeatherRandom` (`EntityRenderer.random`).
+- `RunTickHook::UpdateEffects`: `updateEffects` (each particle's
+  `onUpdate`; physics through the simulation's collision boxes, read-only
+  apart from the `random.fizz` sound event a burning, rained-on particle
+  queues).
+- Drawing (after `GameFrameSet`): one `GlMaterial` mesh per layer (0
+  `/particles.png`, 1 `/terrain.png`, 2 `/gui/items.png`; alpha test 0.1,
+  no blending, depth writes, `setupFog(0)`), plus the footsteps (layer 3,
+  `/misc/footprint.png`, blended). Sort biases `particles::render::order`
+  (between the entities and the translucent terrain). The layers sample
+  `Rgba8Unorm` mirrors of the `Textures` CPU copies (`GlMaterial` wants
+  Unorm, `Textures` uploads sRGB).
+- For WP-3.5b: `particles::PickupFxFrame` lists the `EntityPickupFX`s of the
+  frame (position relative to `ParticlesFrame::anchor`, yaw, partial tick,
+  light) for `RenderManager.renderEntityWithPosYaw`; the particle module
+  draws no entity.
+- F3's `P:` count is written into `DebugSources::particles` every frame.
+- No simulation `Random` is drawn: the particles' `rand` (one clock-seeded
+  `JavaRandom` per particle, as `new Random()`), `Math.random()` (a client
+  stream) and `playAuxSFX` 2000's `worldObj.rand` (a stand-in, as in the
+  sound half) are the client's own; particles take no entity id.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -676,6 +717,7 @@ Actions run in order, as many per frame as are due.
 | `open_screen` | `name` | Dev (WP-3.6a): `displayGuiScreen(new X())` for a screen class name (`"GuiConflictWarning"`, `"GuiErrorScreen"`, `"GuiIngameMenu"`, …; an unregistered one is a placeholder) |
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
+| `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

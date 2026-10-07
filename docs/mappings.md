@@ -130,6 +130,7 @@ mixed-case originals).
 | `GuiSlot.func_27255_a(int, int)` | `SlotList::header_clicked` | Called for a click inside the list's columns above the first row, with coordinates relative to the header (GuiSlot.java:142-145); the statistics lists pick the sort column from x (GuiSlotStats.java:79-90) |
 | `GuiSlot.func_27257_b(int, int)` | `SlotList::post_draw` | Called with the pointer at the end of `drawScreen`, after the bands and the scroll bar (GuiSlot.java:297); the statistics lists draw their tooltips there (GuiSlotStats.java:117-130) |
 | `GuiErrorScreen.field_28098_a` | `mc-client` `gui::error_screen::GuiErrorScreen::update_counter` | `++` in `updateScreen` (GuiErrorScreen.java:6-8), never read: the same tick counter `GuiConflictWarning` names `updateCounter` (GuiConflictWarning.java:4-8) |
+| `EntityDiggingFX.field_32001_o` | `particles::FxKind::Digging::side` | Set from the constructor's `var15` and never read (EntityDiggingFX.java:5, :14); `addBlockHitEffects` passes the side hit (`var4`, EffectRenderer.java:163) and `addBlockDestroyEffects` a `rand.nextInt(6)` side (:122-123) |
 
 ## Kept (meaning documented)
 
