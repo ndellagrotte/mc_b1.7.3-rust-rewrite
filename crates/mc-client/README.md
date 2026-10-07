@@ -64,6 +64,7 @@ naming the path.
 | `model` (WP-3.5a) | `ModelBase` and every `Model*`, `ModelRenderer`, `TexturedQuad`, `PositionTextureVertex`, `RenderHelper.enableStandardItemLighting` (the lights) | the models as part tables with their pose functions, part meshes and transforms, `ModelMaterial` (GL state with GL lighting), the `debug_model` dev action |
 | `gui` (WP-3.6a) | `Gui`, `GuiScreen`, `GuiButton`, `GuiSmallButton`, `GuiSlider`, `GuiTextField`, `GuiSlot`, `GuiYesNo`, `GuiErrorScreen`, `GuiConflictWarning`, `GuiUnused`, `FontRenderer`, `ChatAllowedCharacters`, `ScaledResolution` (arithmetic) | the screen objects bound to `currentScreen`, their input and drawing; `GuiGl` (the GL state and Tessellator as data) and the two GUI cameras (below) |
 | `particles` (WP-3.7a) | `EffectRenderer`, `EntityFX` and every `Entity*FX`, `RenderGlobal.spawnParticle`, `playAuxSFX` (particle half), `EntityRenderer.addRainParticles` | the `EffectRenderer` resource, the particle updates in `RunTickHook::UpdateEffects`, the rain splashes in `UpdateRenderer`, the particle meshes (below) |
+| `item_renderer` (WP-3.7b) | `ItemRenderer`, `MapItemRenderer`, `EntityRenderer.renderHand`, `RenderPlayer.drawFirstPersonHand` (the call) | the first-person hand and held item, the fire / inside-a-block / water overlays, `updateEquippedItem`, `renderItem` for the entity renderers (`HeldItemHook`), the hand camera (below) |
 
 `mc-sim/src/world/teleporter.rs` (`Teleporter.java`) is the simulation half of
 nether travel.
@@ -729,6 +730,92 @@ GL's.
   stream) and `playAuxSFX` 2000's `worldObj.rand` (a stand-in, as in the
   sound half) are the client's own; particles take no entity id.
 
+## Item renderer and the hand (WP-3.7b)
+
+`item_renderer::ItemRendererPlugin` (added by `ClientPlugin`) owns
+`item_renderer::ItemRenderer` (`entityRenderer.itemRenderer`'s fields).
+
+- **Tick:** `updateEquippedItem` runs in `RunTickHook::UpdateRenderer`,
+  after the `ClientEvent::ResetEquippedProgress` events flushed before it
+  (`resetEquippedProgress(2)` from `clickMouse`). The equip animation is
+  `equippedProgress` moving 0.4 a tick toward 1 (same item) or 0 (a new
+  one; the new stack is taken once it is under 0.1).
+- **`itemToRender` identity:** vanilla compares the hotbar's `ItemStack`
+  object by identity; stacks are values here, so it is approximated
+  (`item_renderer::same_object`: same slot as when taken, same id, same
+  damage unless the item is damageable). A stack moved between slots by
+  the inventory screen counts as a new object.
+- **The hand pass:** `renderWorld` clears the depth buffer and calls
+  `renderHand` last. Here that is a second `Camera3d`
+  (`item_renderer::HandCamera`, order 0; the world camera is order −1
+  (`camera::WORLD_CAMERA_ORDER`), the GUI cameras 1 and 2), depth cleared,
+  colour loaded, output written with `BlendState::REPLACE` like the GUI
+  cameras, render layer `item_renderer::HAND_RENDER_LAYER` (29). Its view is
+  the identity and its projection the world's `McProjection` (FOV modifier
+  included: 60° under water) without the portal distortion, which vanilla
+  applies to the world's modelview only. Mesh transforms are the Java's
+  eye-space matrices: `identity · hurtCameraEffect · setupViewBobbing`
+  (`camera::hurt_camera_effect`, `camera::setup_view_bobbing`) then
+  `renderItemInFirstPerson`'s calls.
+- **What is drawn:** the empty hand (the right arm of `ModelKind::Biped`,
+  `/mob/char.png`, posed by `setRotationAngles(0, …)` with `onGround` 0),
+  an item (`renderItem`: 3D blocks via `render_block_as_item`, anything else
+  the extruded icon), or a map (both arms, `/misc/mapbg.png`, the map's
+  pixels, the markers from `/misc/mapicons.png`, the name in the font).
+  Lit with `ModelMaterial` (the standard item lights placed under the hand's
+  modelview turned by the player's pitch and yaw), back faces culled
+  (`GL_CULL_FACE` is on at `renderHand`), alpha test 0.1, no fog. Hidden in
+  third person, while sleeping and with F1 (`hideGUI` hides the hand too,
+  EntityRenderer.java:313).
+- **Overlays** (`renderOverlays`, unless third person or sleeping, also
+  with F1): fire (`isBurning`), inside a block (`isEntityInsideOpaqueBlock`;
+  vanilla's texture rectangle misses the tile size, so it shows a dark
+  window near the atlas corner, transcribed), water (`/misc/water.png`
+  scrolled by the rotation). `GlMaterial` quads at z −0.5 in eye space,
+  in that order (`item_renderer::order`), on an `Rgba8Unorm` mirror of the
+  live terrain atlas (`particles::render::sync_mirror`). The portal overlay
+  is `GuiIngame`'s (WP-3.6b).
+- **For WP-3.5b (held items in third person):** `RenderPlayer.renderSpecials`
+  and `RenderBiped.renderEquippedItems` call `itemRenderer.renderItem(entity,
+  stack)`. Use the resource `item_renderer::render_item::HeldItemHook`:
+  `(hook.render_item)(&mut ItemMeshCache, &mut Assets<Mesh>, &RenderItemArgs
+  { item_id, damage, icon: render_item::get_item_icon(entity, stack),
+  brightness: getEntityBrightness(1.0), statics, colorizers })` returns an
+  `ItemDraw { mesh, atlas, matrix, gl_color }`: draw `mesh` at `your matrix ·
+  draw.matrix` with `ModelMaterial` on `atlas.path()`'s texture
+  (`texture_srgb` 1, lighting on, alpha test 0.1, cull off), `glColor` =
+  `gl_color` or the entity's brightness. `render_item::is_full_3d`,
+  `should_rotate_around_when_rendering`, `is_block_3d` give the branches of
+  those methods. The hook is defined here because WP-3.5b's
+  `render::HeldItemHook` was not in this tree; the integrator may move it.
+- **Not done:** the skin download (`getTextureForDownloadableImage`,
+  deferred, D2: always `/mob/char.png`); anaglyph's second pass (the shell
+  draws one eye); `cameraZoom` (only the unused high-resolution screenshot
+  changes it, so `renderHand` always runs).
+
+## Compositing in sRGB (WP-3.7b)
+
+Every camera now carries `bevy::camera::CompositingSpace::Srgb` (the
+world camera explicitly, the others as a required component of `Camera`
+registered by `ClientPlugin`; cameras share one main texture only when its
+format matches). The main texture is `Rgba8Unorm` holding gamma-encoded
+values, so the `GL_TARGET_UNORM` path of `gl_material.wgsl`,
+`model_material.wgsl`, `terrain.wgsl` and the GUI material writes the
+Java's colour values unconverted and the hardware blends them as GL blends
+its framebuffer bytes; Bevy's upscale pass decodes them for the window.
+The caveats in the Sky/GUI sections and the `gl_material` module docs about
+linear blending no longer apply. Measured (same world, before → after):
+`drawDefaultBackground` over the noon sky `(145, 163, 255)` →
+`(77, 87, 137)` before, `(48, 52, 75)` after, which is GL's
+`16·a + d·(1 − a)` with `a = 0xc0/255` exactly; over grass `(51, 74, 28)`:
+`(27, 37, 19)` → `(23, 28, 18)` (GL: `(23, 28, 18)`); the selection outline
+(black at 0.4) over sand `(218, 212, 156)`: `(175, 171, 125)` →
+`(132, 128, 95)` (GL: `(131, 127, 94)`); the sun's halo now brightens the
+sky around it; opaque pixels are unchanged (at most 1 byte, now GL's
+rounding). Bevy's own `StandardMaterial`/gizmo shaders do not support an
+sRGB-compositing target (they would write linear values); nothing in the
+client uses them.
+
 ## Scripted-input dev mode
 
 `--script file.json` runs a list of actions against the game instead of the
@@ -773,7 +860,9 @@ Actions run in order, as many per frame as are due.
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
 | `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
-| `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0), `raw` (default false) | Dev (WP-3.3b, WP-3.3d): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (`onBlockAdded` and the neighbours' updates run, as for a placed block: a redstone torch powers its wire, a piston beside a torch extends, a placed flowing source, id 8 or 10, then flows); with `raw`, `setBlockAndMetadata` without neighbour updates, the metadata forced again (`onBlockAdded`, e.g. a rail's, may change it) and the block marked for re-render: shapes the game would not keep (a lone curved rail, a powered wire with no source). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks) |
+| `give_item` | `id`, `count` (1), `damage` (0), `slot` (optional) | Dev (WP-3.7b): puts the stack into main-inventory slot `slot` (0-8: the hotbar; replacing what is there), or without `slot` as a pickup does (`addItemStackToInventory`). Select it with the number keys (`key_down` `"1"`…`"9"`) or `wheel` |
+| `set_fire` | `ticks` | Dev (WP-3.7b): sets the player's `fire` (`isBurning()`, the fire overlay; the simulation counts it down, burns the player every 20 ticks, and water puts it out) |
+| `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0), `raw` (default false), `rel` (default false) | Dev (WP-3.3b, WP-3.3d, WP-3.7b): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (`onBlockAdded` and the neighbours' updates run, as for a placed block: a redstone torch powers its wire, a piston beside a torch extends, a placed flowing source, id 8 or 10, then flows); with `raw`, `setBlockAndMetadata` without neighbour updates, the metadata forced again (`onBlockAdded`, e.g. a rail's, may change it) and the block marked for re-render: shapes the game would not keep (a lone curved rail, a powered wire with no source). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks). With `rel` (WP-3.7b), the coordinates are offsets from the player's block (`floor(posX)`, `floor(posY)`, `floor(posZ)`; `posY` is the eye): `{"id": 9, "rel": true}` puts water at the eye (the water overlay), `1` stone (the inside-of-block overlay) |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 
