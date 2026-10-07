@@ -7,7 +7,7 @@
 //!
 //! Transcribed: the `(World)`, `(World, EntityLiving)` and `(World, x, y,
 //! z)` constructors, `setSnowballHeading`, `onUpdate`, the NBT bodies,
-//! `onCollideWithPlayer` up to the inventory. Not ported: `setVelocity`
+//! `onCollideWithPlayer` (the pickup, WP-2.H). Not ported: `setVelocity`
 //! (`NetClientHandler` only, multiplayer, D3), `isInRangeToRenderDist`,
 //! `getShadowSize` (render).
 //!
@@ -319,19 +319,33 @@ pub(super) fn throwable_on_update(
 }
 
 /// `EntitySnowball.onCollideWithPlayer(player)` / `EntityEgg`'s: the
-/// thrower picks up a stuck projectile as an arrow (module docs). The
-/// inventory call is WP-2.5: when every other condition holds it is
-/// recorded and the pickup fails.
+/// thrower picks up a stuck, still projectile as an arrow (module docs);
+/// then `random.pop` with two `rand` draws, `onItemPickup(this, 1)` and
+/// death. Unlike `EntityArrow`'s there is no `multiplayerWorld` test, and
+/// `thrower == player` is an identity test (here: the entity id). The `&&`
+/// chain tries the inventory only when the other three conditions hold.
 // src: EntitySnowball.java:222-229, EntityEgg.java:235-242
 pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut Entity) {
     let pid = player.base.entity_id;
     let d = thrown(e);
     if d.in_ground && d.thrower == Some(pid) && d.shake <= 0 {
         // vanilla bug: an arrow, not a snowball or an egg (copied from EntityArrow).
-        let _stack = crate::item::ItemStack::new(ARROW_ITEM_ID, 1, 0);
-        world.note_unimplemented(
-            "InventoryPlayer.addItemStackToInventory (EntitySnowball/EntityEgg.onCollideWithPlayer)",
-        );
+        // src: EntitySnowball.java:223, EntityEgg.java:236
+        let mut stack = crate::item::ItemStack::new(ARROW_ITEM_ID, 1, 0);
+        let taken = player
+            .kind
+            .player_mut()
+            .expect("EntityPlayer.inventory on a non-player (Java ClassCastException)")
+            .inventory
+            .add_item_stack_to_inventory(&mut stack);
+        if taken {
+            // src: EntitySnowball.java:224, EntityEgg.java:237 (left operand drawn first)
+            let pitch = ((e.base.rand.next_float() - e.base.rand.next_float()) * 0.7 + 1.0) * 2.0;
+            world.play_sound_at_entity(&e.base, "random.pop", 0.2, pitch);
+            // src: EntitySnowball.java:225-226, EntityEgg.java:238-239
+            super::player::on_item_pickup(player, world, e, 1);
+            e.base.set_entity_dead();
+        }
     }
 }
 
@@ -356,4 +370,66 @@ pub fn read_entity_from_nbt(d: &mut ThrowableData, c: &Compound) -> Result<(), S
     d.shake = n::get_byte(c, "shake")? as i32 & 255;
     d.in_ground = n::get_byte(c, "inGround")? == 1;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::player::new_entity_player_sp;
+    use crate::item::ItemStack;
+    use crate::save::NoSave;
+    use crate::world::WorldEnvironment;
+    use crate::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use crate::world::provider::{Dimension, WorldProvider};
+
+    fn world() -> World {
+        let mut w = World::new(
+            Box::new(NoSave),
+            "harness",
+            WorldProvider::new(Dimension::Surface),
+            123,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.make_deterministic(123);
+        w
+    }
+
+    /// The thrower picks a stuck snowball or egg up as an arrow (vanilla
+    /// bug); another player, or a projectile still shaking, is ignored.
+    #[test]
+    fn the_thrower_picks_up_an_arrow() {
+        for egg in [false, true] {
+            let mut w = world();
+            let mut p = new_entity_player_sp(&mut w);
+            let mut s = new_thrown_at(&mut w, 0.5, 61.0, 0.5, egg);
+            {
+                let d = thrown(&mut s);
+                d.in_ground = true;
+                d.shake = 0;
+                d.thrower = Some(p.base.entity_id + 1);
+            }
+            on_collide_with_player(&mut s, &mut w, &mut p);
+            assert!(!s.base.is_dead, "not the thrower");
+            {
+                let d = thrown(&mut s);
+                d.thrower = Some(p.base.entity_id);
+                d.shake = 1;
+            }
+            on_collide_with_player(&mut s, &mut w, &mut p);
+            assert!(!s.base.is_dead, "shaking");
+            thrown(&mut s).shake = 0;
+            on_collide_with_player(&mut s, &mut w, &mut p);
+            assert!(s.base.is_dead);
+            let got = p.kind.player().unwrap().inventory.main_inventory[0];
+            assert_eq!(
+                got.map(|s: ItemStack| (s.item_id, s.stack_size)),
+                Some((ARROW_ITEM_ID, 1))
+            );
+        }
+    }
 }

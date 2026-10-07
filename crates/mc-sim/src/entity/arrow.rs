@@ -1,7 +1,7 @@
 //! `EntityArrow` (EntityArrow.java): an arrow in flight or stuck in a block.
 //! Transcribed: the `(World)`, `(World, x, y, z)` and `(World, EntityLiving)`
 //! constructors, `setArrowHeading`, `onUpdate`, the NBT bodies and
-//! `onCollideWithPlayer` up to the inventory (below). Not ported:
+//! `onCollideWithPlayer` (the pickup, WP-2.H). Not ported:
 //! `setVelocity` (only `NetClientHandler` calls it, multiplayer, D3) and
 //! `getShadowSize` (render).
 //!
@@ -10,11 +10,6 @@
 //! [`set_heading`], [`attack_entity_by_id`]): `EntitySnowball`, `EntityEgg`,
 //! `EntityFireball` and `EntityFish` repeat the same code with renamed
 //! fields.
-//!
-//! # Gaps
-//!
-//! `onCollideWithPlayer` needs `InventoryPlayer.addItemStackToInventory`
-//! (WP-2.5): reaching it is recorded and counts as a failed pickup.
 //!
 //! # References to other entities
 //!
@@ -507,22 +502,33 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
     b.set_position(b.pos_x, b.pos_y, b.pos_z);
 }
 
-/// `EntityArrow.onCollideWithPlayer(player)`: a player's own arrow, stuck
-/// and still, goes into the player's inventory. The inventory call is WP-2.5
-/// (module docs): when every other condition holds it is recorded and the
-/// pickup fails.
+/// `EntityArrow.onCollideWithPlayer(player)`: an arrow a player shot
+/// (`doesArrowBelongToPlayer`: any player, not only the shooter), stuck and
+/// still, goes into the player's inventory as one arrow; then `random.pop`
+/// with two `rand` draws, `onItemPickup(this, 1)` and death. The `&&` chain
+/// tries the inventory only when the other three conditions hold.
 // src: EntityArrow.java:257-266
 pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut Entity) {
-    let _ = player;
     if !world.multiplayer_world {
         let d = data(e);
         if d.in_ground && d.does_arrow_belong_to_player && d.arrow_shake <= 0 {
-            // src: EntityArrow.java:259: player.inventory.addItemStackToInventory(
-            // new ItemStack(Item.arrow, 1)); then random.pop, onItemPickup, setEntityDead.
-            let _stack = crate::item::ItemStack::new(ARROW_ITEM_ID, 1, 0);
-            world.note_unimplemented(
-                "InventoryPlayer.addItemStackToInventory (EntityArrow.onCollideWithPlayer)",
-            );
+            // src: EntityArrow.java:259 (new ItemStack(Item.arrow, 1))
+            let mut stack = crate::item::ItemStack::new(ARROW_ITEM_ID, 1, 0);
+            let taken = player
+                .kind
+                .player_mut()
+                .expect("EntityPlayer.inventory on a non-player (Java ClassCastException)")
+                .inventory
+                .add_item_stack_to_inventory(&mut stack);
+            if taken {
+                // src: EntityArrow.java:260 (left operand drawn first)
+                let pitch =
+                    ((e.base.rand.next_float() - e.base.rand.next_float()) * 0.7 + 1.0) * 2.0;
+                world.play_sound_at_entity(&e.base, "random.pop", 0.2, pitch);
+                // src: EntityArrow.java:261-262
+                super::player::on_item_pickup(player, world, e, 1);
+                e.base.set_entity_dead();
+            }
         }
     }
 }
@@ -552,4 +558,114 @@ pub fn read_entity_from_nbt(d: &mut ArrowData, c: &Compound) -> Result<(), SaveE
     d.in_ground = n::get_byte(c, "inGround")? == 1;
     d.does_arrow_belong_to_player = n::get_boolean(c, "player")?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::player::new_entity_player_sp;
+    use crate::item::ItemStack;
+    use crate::save::NoSave;
+    use crate::world::WorldEnvironment;
+    use crate::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use crate::world::events::WorldEvent;
+    use crate::world::provider::{Dimension, WorldProvider};
+
+    fn world() -> World {
+        let mut w = World::new(
+            Box::new(NoSave),
+            "harness",
+            WorldProvider::new(Dimension::Surface),
+            123,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.make_deterministic(123);
+        w
+    }
+
+    fn stuck_arrow(w: &mut World, belongs: bool, shake: i32) -> Entity {
+        let mut a = new_entity_arrow_at(w, 0.5, 61.0, 0.5);
+        let d = data(&mut a);
+        d.in_ground = true;
+        d.does_arrow_belong_to_player = belongs;
+        d.arrow_shake = shake;
+        a
+    }
+
+    fn pops(w: &mut World) -> Vec<f32> {
+        w.events
+            .drain()
+            .into_iter()
+            .filter_map(|e| match e {
+                WorldEvent::PlaySound { name, pitch, .. } if name == "random.pop" => Some(pitch),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_players_still_arrow_is_picked_up() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        let mut a = stuck_arrow(&mut w, true, 0);
+        w.events.drain();
+        let mut r = a.base.rand.clone();
+        on_collide_with_player(&mut a, &mut w, &mut p);
+        let inv = &p.kind.player().unwrap().inventory;
+        let got = inv.main_inventory[0].unwrap();
+        assert_eq!((got.item_id, got.stack_size), (ARROW_ITEM_ID, 1));
+        // src: InventoryPlayer.java:104 (the new slot's pick-up bob)
+        assert_eq!(got.animations_to_go, 5);
+        assert!(a.base.is_dead);
+        let expected = ((r.next_float() - r.next_float()) * 0.7 + 1.0) * 2.0;
+        assert_eq!(pops(&mut w), vec![expected]);
+    }
+
+    #[test]
+    fn no_pickup_while_shaking_or_not_a_players_or_full() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        for (belongs, shake) in [(true, 1), (false, 0)] {
+            let mut a = stuck_arrow(&mut w, belongs, shake);
+            w.events.drain();
+            on_collide_with_player(&mut a, &mut w, &mut p);
+            assert!(!a.base.is_dead);
+            assert!(pops(&mut w).is_empty());
+        }
+        let mut a = new_entity_arrow_at(&mut w, 0.5, 61.0, 0.5);
+        data(&mut a).does_arrow_belong_to_player = true;
+        on_collide_with_player(&mut a, &mut w, &mut p);
+        assert!(!a.base.is_dead, "in flight");
+        assert!(
+            p.kind
+                .player()
+                .unwrap()
+                .inventory
+                .main_inventory
+                .iter()
+                .all(Option::is_none)
+        );
+        for s in p
+            .kind
+            .player_mut()
+            .unwrap()
+            .inventory
+            .main_inventory
+            .iter_mut()
+        {
+            *s = Some(ItemStack::new(1, 64, 0));
+        }
+        let mut a = stuck_arrow(&mut w, true, 0);
+        let rand = a.base.rand.clone();
+        w.events.drain();
+        on_collide_with_player(&mut a, &mut w, &mut p);
+        assert!(!a.base.is_dead, "inventory full");
+        assert_eq!(a.base.rand, rand);
+        assert!(pops(&mut w).is_empty());
+    }
 }

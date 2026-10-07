@@ -41,7 +41,7 @@
 //! | 249-289 | `dropCurrentItem`, `dropPlayerItem`, `dropPlayerItemWithRandomChoice`, `joinEntityItemWithWorld` | [`drop_current_item`], [`drop_player_item`], [`drop_player_item_with_random_choice`], [`join_entity_item_with_world`] |
 //! | 291-306 | `getCurrentPlayerStrVsBlock`, `canHarvestBlock` | [`get_current_player_str_vs_block`], [`can_harvest_block`] |
 //! | 308-338 | NBT | [`super::nbt`] (the sleeping player's wake-up: [`read_entity_from_nbt_tail`]) |
-//! | 340-355 | `displayGUIChest`, `displayWorkbenchGUI`, `onItemPickup` (empty), `getEyeHeight`, `resetHeight` | GUI: client; [`EYE_HEIGHT`], [`reset_height`] |
+//! | 340-355 | `displayGUIChest`, `displayWorkbenchGUI`, `onItemPickup` (empty), `getEyeHeight`, `resetHeight` | GUI: client; [`on_item_pickup`]; [`EYE_HEIGHT`], [`reset_height`] |
 //! | 357-437 | `attackEntityFrom`, `isPVPEnabled`, `alertWolves` | [`attack_entity_from`], [`alert_wolves`] |
 //! | 439-446 | `damageEntity` | [`damage_entity`] |
 //! | 448-486 | `displayGUI*` (empty), `useCurrentItemOnEntity`, `getCurrentEquippedItem`, `destroyCurrentEquippedItem`, `getYOffset`, `swingItem` | [`use_current_item_on_entity`]; [`get_current_equipped_item`]; [`destroy_current_equipped_item`]; [`get_y_offset`]; [`swing_item`] |
@@ -628,6 +628,16 @@ pub fn read_entity_from_nbt_tail(e: &mut Entity, world: &mut World) {
 }
 
 // ---- size, damage --------------------------------------------------------------------
+
+/// `onItemPickup(entity, count)`: called by the three pickups
+/// (`EntityItem`, `EntityArrow`, `EntitySnowball`/`EntityEgg`
+/// `.onCollideWithPlayer`) after the stack went into the inventory.
+/// `EntityPlayer`'s body is empty, and so is the oracle's `HarnessPlayer`'s.
+/// `EntityPlayerSP`'s override only adds an `EntityPickupFX` (the item flying
+/// to the player) to the client's effect renderer (EntityPlayerSP.java:133-135):
+/// client, no simulation state, not ported here.
+// src: EntityPlayer.java:346-347
+pub fn on_item_pickup(_e: &mut Entity, _world: &mut World, _picked: &Entity, _count: i32) {}
 
 /// `resetHeight()`: `yOffset = 1.62F`.
 // src: EntityPlayer.java:353-355

@@ -1,15 +1,15 @@
 //! `EntityItem` (EntityItem.java): a dropped item stack. Fully transcribed
-//! (audited line by line in WP-2.4) except the inside of
-//! `onCollideWithPlayer`, which needs `InventoryPlayer.addItemStackToInventory`
-//! (WP-2.5): reaching it is recorded and counts as a failed pickup. The NBT
-//! bodies are in [`super::nbt`]. `canTriggerWalking` is in
-//! [`super::dispatch::can_trigger_walking`].
+//! (audited line by line in WP-2.4; the pickup in `onCollideWithPlayer`
+//! completed in WP-2.H). The NBT bodies are in [`super::nbt`].
+//! `canTriggerWalking` is in [`super::dispatch::can_trigger_walking`].
 
 use mc_core::math::floor_double;
 
 use super::{Entity, EntityKindData, base};
 use crate::block::{self, Material};
 use crate::item::ItemStack;
+use crate::stats::achievement_list as al;
+use crate::stats::stat;
 use crate::world::World;
 
 /// The fields `EntityItem` declares (EntityItem.java:4-9).
@@ -193,23 +193,217 @@ pub fn attack_entity_from(
     false
 }
 
+/// `Block.wood.blockID` (the log).
+// src: Block.java:609
+const WOOD: i32 = 17;
+/// `Item.leather.shiftedIndex`.
+// src: Item.java:352 (new Item(78): 256 + 78)
+const LEATHER: i32 = 334;
+
 /// `EntityItem.onCollideWithPlayer(player)`: a player touching the item
-/// picks it up once `delayBeforeCanPickup` is 0. The pickup itself
-/// (`player.inventory.addItemStackToInventory(item)`, then the achievements
-/// for wood and leather, `random.pop` with two `rand` draws, `onItemPickup`
-/// and death when the stack is used up) needs the inventory (WP-2.5): it is
-/// recorded and counts as a failed pickup, so nothing is drawn.
+/// picks it up once `delayBeforeCanPickup` is 0. The stack goes into
+/// `player.inventory` (`addItemStackToInventory`, which lowers
+/// `item.stackSize` in place); if anything was taken: the `mineWood` /
+/// `killCow` achievements for a log / leather, `random.pop` with two `rand`
+/// draws, `onItemPickup` (empty for `EntityPlayer`, [`super::player::on_item_pickup`])
+/// with the size read *before* the call, and death once the stack is used up.
+///
+/// `item.stackSize` is read first (:112), so a null `item` (an
+/// `EntityItem(World)` never read from NBT) throws there in Java; recorded
+/// here and taken as no pickup.
 // src: EntityItem.java:110-130
 pub fn on_collide_with_player(e: &mut Entity, world: &mut World, player: &mut Entity) {
-    let _ = player;
-    if !world.multiplayer_world {
-        let d = data(e);
-        // src: EntityItem.java:112 (`var2 = item.stackSize`, read before the call)
-        let _var2 = d.item.map(|s| s.stack_size);
-        if d.delay_before_can_pickup == 0 {
-            world.note_unimplemented(
-                "InventoryPlayer.addItemStackToInventory (EntityItem.onCollideWithPlayer)",
-            );
+    if world.multiplayer_world {
+        return;
+    }
+    let Some(mut stack) = data(e).item else {
+        world.note_unimplemented(
+            "EntityItem.onCollideWithPlayer with a null item (Java NullPointerException)",
+        );
+        return;
+    };
+    // src: EntityItem.java:112 (`var2 = item.stackSize`, read before the call)
+    let var2 = stack.stack_size;
+    if data(e).delay_before_can_pickup != 0 {
+        return;
+    }
+    // src: EntityItem.java:113 (`&&`: the inventory is only tried at delay 0)
+    let taken = player
+        .kind
+        .player_mut()
+        .expect("EntityPlayer.inventory on a non-player (Java ClassCastException)")
+        .inventory
+        .add_item_stack_to_inventory(&mut stack);
+    // `item` is the object the inventory call changed in place.
+    data(e).item = Some(stack);
+    if taken {
+        // src: EntityItem.java:114-120
+        if stack.item_id == WOOD {
+            super::player::trigger_achievement(player, stat(al::MINE_WOOD));
         }
+        if stack.item_id == LEATHER {
+            super::player::trigger_achievement(player, stat(al::KILL_COW));
+        }
+        // src: EntityItem.java:122 (left operand drawn first)
+        let pitch = ((e.base.rand.next_float() - e.base.rand.next_float()) * 0.7 + 1.0) * 2.0;
+        world.play_sound_at_entity(&e.base, "random.pop", 0.2, pitch);
+        // src: EntityItem.java:123
+        super::player::on_item_pickup(player, world, e, var2);
+        // src: EntityItem.java:124-126 (`setEntityDead` is not overridden on this path)
+        if stack.stack_size <= 0 {
+            e.base.set_entity_dead();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entity::player::new_entity_player_sp;
+    use crate::save::NoSave;
+    use crate::world::WorldEnvironment;
+    use crate::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use crate::world::events::WorldEvent;
+    use crate::world::provider::{Dimension, WorldProvider};
+
+    const DIRT: i32 = 3;
+    const STONE: i32 = 1;
+
+    fn world() -> World {
+        let mut w = World::new(
+            Box::new(NoSave),
+            "harness",
+            WorldProvider::new(Dimension::Surface),
+            123,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        w.make_deterministic(123);
+        w
+    }
+
+    fn main(p: &Entity) -> &[Option<ItemStack>; 36] {
+        &p.kind.player().unwrap().inventory.main_inventory
+    }
+
+    fn pops(w: &mut World) -> Vec<f32> {
+        w.events
+            .drain()
+            .into_iter()
+            .filter_map(|e| match e {
+                WorldEvent::PlaySound {
+                    name,
+                    volume,
+                    pitch,
+                    ..
+                } if name == "random.pop" => {
+                    assert_eq!(volume, 0.2);
+                    Some(pitch)
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn pickup_waits_for_the_delay() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        let mut it = new_entity_item(&mut w, 0.5, 61.0, 0.5, ItemStack::new(DIRT, 3, 0));
+        data(&mut it).delay_before_can_pickup = 1;
+        w.events.drain();
+        let rand = it.base.rand.clone();
+        on_collide_with_player(&mut it, &mut w, &mut p);
+        assert!(main(&p).iter().all(Option::is_none));
+        assert!(!it.base.is_dead);
+        assert_eq!(it.base.rand, rand);
+        assert!(pops(&mut w).is_empty());
+    }
+
+    #[test]
+    fn whole_stack_is_taken_and_the_item_dies() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        let mut it = new_entity_item(&mut w, 0.5, 61.0, 0.5, ItemStack::new(DIRT, 3, 0));
+        w.events.drain();
+        let mut r = it.base.rand.clone();
+        on_collide_with_player(&mut it, &mut w, &mut p);
+        assert_eq!(
+            main(&p)[0].map(|s| (s.item_id, s.stack_size)),
+            Some((DIRT, 3))
+        );
+        assert_eq!(data(&mut it).item.map(|s| s.stack_size), Some(0));
+        assert!(it.base.is_dead);
+        let expected = ((r.next_float() - r.next_float()) * 0.7 + 1.0) * 2.0;
+        assert_eq!(pops(&mut w), vec![expected]);
+        assert!(w.unimplemented_hits.borrow().is_empty());
+    }
+
+    /// `addItemStackToInventory` loops while a round moves something and
+    /// returns `stackSize < var2` of the *last* round (InventoryPlayer.java:144-150),
+    /// so it is true only when the whole stack went in: a pickup that leaves
+    /// a rest moves items but returns false (no sound, no draw, no
+    /// `onItemPickup`), and the rest stays on the ground.
+    #[test]
+    fn partial_pickup_keeps_the_rest_silently() {
+        for extra_slot in [false, true] {
+            let mut w = world();
+            let mut p = new_entity_player_sp(&mut w);
+            {
+                let inv = &mut p.kind.player_mut().unwrap().inventory;
+                for s in inv.main_inventory.iter_mut() {
+                    *s = Some(ItemStack::new(STONE, 64, 0));
+                }
+                inv.main_inventory[7] = Some(ItemStack::new(DIRT, 63, 0));
+                if extra_slot {
+                    inv.main_inventory[9] = Some(ItemStack::new(DIRT, 63, 0));
+                }
+            }
+            let mut it = new_entity_item(&mut w, 0.5, 61.0, 0.5, ItemStack::new(DIRT, 3, 0));
+            w.events.drain();
+            let rand = it.base.rand.clone();
+            on_collide_with_player(&mut it, &mut w, &mut p);
+            assert_eq!(main(&p)[7].map(|s| s.stack_size), Some(64));
+            let rest = if extra_slot { 1 } else { 2 };
+            assert_eq!(data(&mut it).item.map(|s| s.stack_size), Some(rest));
+            assert!(!it.base.is_dead);
+            assert_eq!(it.base.rand, rand);
+            assert!(pops(&mut w).is_empty());
+        }
+    }
+
+    #[test]
+    fn a_log_triggers_mine_wood_once_its_parent_is_unlocked() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        let mine_wood = stat(al::MINE_WOOD).unwrap();
+        let mut it = new_entity_item(&mut w, 0.5, 61.0, 0.5, ItemStack::new(WOOD, 1, 0));
+        on_collide_with_player(&mut it, &mut w, &mut p);
+        assert!(it.base.is_dead);
+        // EntityPlayerSP.addStat: openInventory (the parent) is not unlocked.
+        let sfw = &p.kind.player().unwrap().stat_file_writer;
+        assert!(!sfw.has_achievement_unlocked(mine_wood));
+        super::super::player::trigger_achievement(&mut p, stat(al::OPEN_INVENTORY));
+        let mut it = new_entity_item(&mut w, 0.5, 61.0, 0.5, ItemStack::new(WOOD, 1, 0));
+        on_collide_with_player(&mut it, &mut w, &mut p);
+        let sfw = &p.kind.player().unwrap().stat_file_writer;
+        assert!(sfw.has_achievement_unlocked(mine_wood));
+        assert!(!sfw.has_achievement_unlocked(stat(al::KILL_COW).unwrap()));
+    }
+
+    #[test]
+    fn a_null_item_is_recorded() {
+        let mut w = world();
+        let mut p = new_entity_player_sp(&mut w);
+        let mut it = new_entity_item_empty(&mut w);
+        on_collide_with_player(&mut it, &mut w, &mut p);
+        assert!(w.unimplemented_hits.borrow().contains_key(
+            "EntityItem.onCollideWithPlayer with a null item (Java NullPointerException)"
+        ));
+        assert!(main(&p).iter().all(Option::is_none));
     }
 }

@@ -44,8 +44,8 @@ use crate::world::World;
 /// transcriber adds to its class's row (or adds the row) in the same change
 /// that replaces the recorded arm.
 pub const TRANSCRIBED: &[(&str, &[&str])] = &[
-    // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup's
-    // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
+    // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup
+    // completed in WP-2.H)
     ("EntityArrow", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityBoat.java:29-31, :36-46, :59-61, :63-316, :318-324, :332-346
     // (super::boat)
@@ -74,7 +74,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("EntityCow", &["interact"]),
     // src: EntityCreeper.java:44-71, :141-144 (super::creeper, WP-2.3)
     ("EntityCreeper", &["onStruckByLightning", "onUpdate"]),
-    // src: EntityEgg.java:87-215, :235-242 (super::egg, super::snowball)
+    // src: EntityEgg.java:87-215, :235-242 (super::egg, super::snowball; the
+    // pickup completed in WP-2.H)
     ("EntityEgg", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntityFallingSand.java:26-28, :33-71 (super::falling_sand)
     (
@@ -92,8 +93,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     ("EntityFlying", &["fall"]),
     // src: EntityGhast.java:25-29 (super::ghast, WP-2.3)
     ("EntityGhast", &["onUpdate"]),
-    // src: EntityItem.java:23-25, :36-95, :110-130 (super::item; the pickup's
-    // inventory half records InventoryPlayer.addItemStackToInventory, WP-2.5)
+    // src: EntityItem.java:23-25, :36-95, :110-130 (super::item; the pickup
+    // completed in WP-2.H)
     (
         "EntityItem",
         &[
@@ -200,7 +201,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
         "EntitySlime",
         &["onCollideWithPlayer", "onUpdate", "setEntityDead"],
     ),
-    // src: EntitySnowball.java:87-202, :222-229 (super::snowball)
+    // src: EntitySnowball.java:87-202, :222-229 (super::snowball; the pickup
+    // completed in WP-2.H)
     ("EntitySnowball", &["onCollideWithPlayer", "onUpdate"]),
     // src: EntitySpider.java:11-17 (super::spider)
     ("EntitySpider", &["canTriggerWalking", "getMountedYOffset"]),
