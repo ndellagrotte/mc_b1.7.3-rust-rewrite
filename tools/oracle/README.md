@@ -12,7 +12,7 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `regen.sh` | `build.sh`, runs the harness into `build/golden-out`, copies the results into `tests/golden`, prints `git status --short tests/golden` |
 | `check-reproducible.sh` | Three harness runs, byte-compared (§4.4 item 1) |
 | `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table`, `stat_table` may lack a seed (§4.4 item 2) |
-| `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
+| `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5), `golden_ids` (the scenario set, chosen by `SOAK`) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
 | `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `StatTable` (`stat_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power`, `inventory` and `map_data`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets, the `reload` op), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
@@ -29,7 +29,20 @@ tools/oracle/check-reproducible.sh  # needs a built oracle
 tools/oracle/check-sensitivity.sh   # compares against the committed fixtures
 ```
 
-Scripts are POSIX `sh` and work from any directory. Direct use:
+Scripts are POSIX `sh` and work from any directory. Every script runs the scenarios
+`golden_ids` (env.sh) selects: by default all except the long-run soak set
+`tests/golden/soak/*` (WP-4.2, tests/golden/README.md "Soak"); `SOAK=only` selects the soak
+set alone (about 2 min of oracle time per run; `check-reproducible.sh` then compares two runs
+instead of three), `SOAK=1` everything:
+
+```sh
+SOAK=only tools/oracle/regen.sh
+SOAK=only tools/oracle/check-reproducible.sh
+SOAK=only tools/oracle/check-sensitivity.sh
+```
+
+Direct use (without trailing ids `harness.Main` runs every scenario under the directory,
+the soak set included):
 
 ```sh
 java $JAVA_MATH_FLAGS -cp "build/oracle:$CP" harness.Main tests/golden build/golden-out [area/name ...]

@@ -4,6 +4,11 @@ on:
   pull_request:
   push:
   workflow_dispatch:
+    inputs:
+      soak:
+        description: "Also run the long-run soak (tests/golden/soak, WP-4.2; several minutes)"
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -117,3 +122,23 @@ jobs:
       - name: Regenerate golden fixtures
         if: steps.reference.outputs.present == 'true'
         run: tools/oracle/regen.sh
+  soak:
+    # WP-4.2 long-run soak: the Rust side of tests/golden/soak against the committed
+    # oracle output (no reference tree needed). Manual only, opt-in: run the workflow by
+    # hand with "soak" ticked. About 2.5 min on 16 cores, longer on a hosted runner.
+    if: github.event_name == 'workflow_dispatch' && inputs.soak
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ubuntu-latest-cargo-soak-${{ hashFiles('**/Cargo.toml') }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run the soak fixtures
+        run: cargo test -p mc-golden --test golden_soak -- --ignored --nocapture

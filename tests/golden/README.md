@@ -6,7 +6,9 @@ scenario and compares. Nobody edits an `expected.jsonl` by hand; regenerate it
 with `tools/oracle/regen.sh`.
 
 Layout: `tests/golden/<area>/<name>/scenario.json` + `expected.jsonl`
-(+ optional sidecar binaries named in the trace).
+(+ optional sidecar binaries named in the trace). The long-run fixtures under
+`tests/golden/soak/` are left out of the default `regen.sh` and check-script runs and of
+`cargo test`; see "Soak" at the end.
 
 ## Encoding rules (both sides, non-negotiable)
 
@@ -1620,3 +1622,104 @@ Vanilla behaviour these fixtures pin down:
   spreads over several ticks after large edits (`light/skylight-column` shows the queue
   outliving one tick; `light/blocklight-glowstone` pins the exact budget, failing at 498 and
   at 500 updates per call).
+
+## Soak (WP-4.2)
+
+`tests/golden/soak/<name>`: long-run `tick` scenarios (PLAN_v4 §5 Phase 4 row 4.2), tens of
+thousands of ticks each, with periodic world digests compared against the oracle, as a
+repeatable check that the port does not drift from the Java over long runs. They are
+ordinary `kind: "tick"` scenarios: only the ops and dumps documented above, no soak-only
+harness code.
+
+| Fixture | World | Ticks | Sites (X, Z), from tick | Also | Lines / size | Oracle | Rust |
+|---|---|---|---|---|---|---|---|
+| `soak/seed-123` | seed 123, generated, `"save_format": "mcregion"` | 72,000 | (8, 8) 0; (408, 8) 18,000; (−92, −442) 36,000; (8, 8) 54,000 | rain from 24,000; `reload` at 55,000 (player id 0 → 7848) | 6,156 / 3.1 MB | 31 s | 136–155 s |
+| `soak/seed-8675309` | seed 8675309, generated, no save | 48,000 | (−40, 24) 0; (−40, 524) 12,000; (−640, 24) 24,000; (−40, 24) 36,000 | rain from 6,000 | 4,474 / 2.4 MB | 19–20 s | 42–81 s alone, 99–115 s in the set |
+| `soak/seed--7612233452384654969` | seed −7612233452384654969, generated, `mcregion` | 48,000 | (8, 8) 0; (20008, −15000) 12,000; (−3000, 2504) 24,000; (8, 8) 36,000 | rain from 30,000; `reload` at 37,000 (player 0 → 8166) | 4,196 / 2.1 MB | 28 s | 109–124 s |
+| `soak/testworld` | the owner's testWorld, `"world": "load"` (as `tick/testworld-6000`) | 48,000 | the spawn sand (21.5, 65, −63.5) 0 (garden site (45, −64) built at 0 beside it); (296, −296) 16,000; the spawn sand 32,000 | player id 9; rain from 20,000 | 3,405 / 1.8 MB | 24 s | 105–119 s |
+| `soak/nether-8675309` | seed 8675309, nether, generated, no save | 36,000 | (8, 8) 0; (208, −192) 12,000; (8, 8) 24,000 | no weather in the nether | 1,431 / 0.6 MB | 21 s | 94–104 s |
+
+Runtimes were measured on the 16-core development machine (OpenJDK 25; Rust `test` profile,
+i.e. `dev`: opt-level 1 for the workspace crates, 3 for dependencies) while other builds ran,
+so they vary by up to 2x between runs. Oracle: one JVM per fixture, start-up included
+(~2,300 ticks/s for `seed-123`); all five in one `SOAK=only regen.sh` run take about 2 min.
+Rust: the five tests run in parallel, so the set takes as long as `seed-123`, 2.5 min; the
+ranges are over two runs of the set (each fixture runs at 350–530 ticks/s while the set runs in
+parallel). `seed-8675309` alone, four runs each: 67–81 s in the test profile (about 700 ticks/s;
+one run took 42 s) and 39–41 s with opt-level 3 for the workspace crates too
+(`CARGO_PROFILE_DEV_OPT_LEVEL=3`, about 1,180 ticks/s; one run took 68 s), against 19–20 s
+for the oracle (about 2,400 ticks/s including the JVM start-up): the port runs at roughly a
+third (opt-level 1) to a half (opt-level 3) of the oracle's speed, a data point for WP-4.3.
+
+**What a site is.** Each overworld site is a 15 × 9 stone platform at y = 100
+(x = X−7…X+7, z = Z−4…Z+4; the 15 × 12 × 9 box above it is first filled with air), built with
+`fill`/`set_block` ops in the tick the player arrives, so the site does not depend on the
+terrain and the scenarios run under `check-sensitivity.sh`'s flipped seed. On it: the player
+at (X−5.5, 101, Z+0.5); a dirt block beside it dug with a stone shovel from t+2 (the drop is
+picked up), dirt placed back with `use_item` at t+20 and a torch at t+21; birch, spruce and
+oak saplings on dirt (random-tick growth into `WorldGenForest`, `WorldGenTaiga2`,
+`WorldGenTrees` or `WorldGenBigTree`); a farm row (crops on two farmland blocks around a
+still-water block, a cactus on sand and reeds on dirt beside the water); two leaves blocks with
+the check-decay bit and no log in range; sand and gravel in the air; a fenced 2 × 2 pen with
+a pig and a chicken; a cobblestone item out of the player's reach (it despawns at age 6000).
+Outside the platform, three one-block pillars: flowing water at (X+11, 101, Z) and flowing
+lava at (X, 101, Z−9) pour down to the terrain (long fluid cascades; lava fires on the
+ground) and an eternal fire on netherrack at (X+11, 101, Z−4) burns a plank beside it. A
+nether site is a 15 × 9 room at floor y = 64 inside a cobblestone shell (so the terrain's
+lava cannot reach it) with glowstone in the ceiling, two mushrooms (spreading on random ticks),
+an eternal fire, a lava source in a basin with a plank above it, soul sand, falling gravel, a
+pig, an item, the same dig (netherrack, stone pickaxe) and placing. The player moves to the
+next site with `set_pos` (y = feet + `(double) 1.62F`, the player's `yOffset`, because
+`set_pos` is `Entity.setPosition` while the `player` op adds it) and `set_motion` 0; a
+revisited site is not rebuilt. At a new site the player's 19 × 19 chunks are generated and
+populated; nothing unloads (b1.7.3 single player never drops chunks); animals left more than
+128 blocks behind despawn (`EntityLiving.despawnEntity`). Each `scenario.json`'s `comment`
+lists its sites and ops.
+
+**Reproducible settings.** Difficulty 0 with natural spawning on (`mob_spawning` default):
+animals and squid spawn, hostile spawning stays off (census §3: hostile spawn checks draw
+from an unseeded `Entity.rand`). Every overworld scenario sets `thunder_time` to 100000000
+with `set_weather` at t = 0, so no thunderstorm starts: lightning bolts draw their lifetime
+from a never-seeded `Entity.rand` (EntityLightningBolt.java:14-15, census §3) and a bolt near
+an entity would make the oracle irreproducible. Rain is natural (a `rain_time` makes the
+first rain start inside the run). `reload` comes after the last `set_pos`: the reloaded
+player's id (from the oracle's `reload` line) depends on how many entities spawned, so under
+the flipped seed it differs, and the every-500 `entity_state` of that id then gives
+`entity_absent` instead of failing an op.
+
+**Dumps.** `rng_state` every 100 ticks (the first-divergence signal: random block ticks,
+spawning and `randomDisplayUpdates` all draw `World.rand`); the player's `entity` line every
+500; `world_time`, `weather`, `scheduled_ticks`, `player_state`, `inventory`, `entity_state`
+`"all"` and the `chunk_digest` of the 3 × 3 chunks around every site every 1,000; at the last
+tick also the rest of each site's 5 × 5 chunks, a `block_box` over each site (for the
+testWorld spawn: y = 58…71, with the chest at (9, 64, −61)) and `scheduled_ticks` with
+`full`. Chunk digests cover these fixed chunks, not every loaded chunk (no dump lists the
+loaded set); a difference elsewhere in the player's 19 × 19 shows up in `rng_state` or the
+entity lines. No `save` op: `crates/mc-sim/tests/golden_save.rs` requires every fixture with
+one to be registered there, so the two `mcregion` scenarios (and `testworld`'s copy) exercise
+saving through the autosave every 40 ticks and the `reload` op instead.
+
+**Selected by `SOAK`.** `tools/oracle/env.sh`'s `golden_ids` picks the scenarios every
+oracle script runs: `SOAK` unset or `0` (the default) leaves `tests/golden/soak` out, so the
+default runs are unchanged; `SOAK=only` selects the soak set alone, `SOAK=1` everything.
+
+```sh
+SOAK=only sh tools/oracle/regen.sh               # regenerate tests/golden/soak (~2 min)
+SOAK=only sh tools/oracle/check-reproducible.sh  # two oracle runs byte-identical (~4 min)
+SOAK=only sh tools/oracle/check-sensitivity.sh   # every soak fixture changes under seed ^ 1 (~2 min)
+cargo test -p mc-golden --test golden_soak -- --ignored --nocapture   # the Rust side (~2.5 min)
+```
+
+`crates/mc-golden/tests/golden_soak.rs` has one `#[ignore]`d test per fixture (`--nocapture`
+prints its ticks per second) and a non-ignored check that every `tests/golden/soak/*`
+directory has one. The ordinary `cargo test` therefore runs no soak scenario, but it still
+reads the soak `expected.jsonl` files where a test reads every fixture
+(`fixtures_parse.rs`, `constructors_match_oracle.rs`), which adds about 0.5 s to
+`cargo test -p mc-golden` (0.9 s → 1.4 s here). The CI workflow's `soak` job runs the
+Rust side on a manual run with the `soak` input ticked. A failing soak test names the first
+differing line; the Rust trace is in `target/golden/soak/<name>/actual.jsonl`, and the
+`rng_state` lines bound the first divergence to 100 ticks, from where a short scenario cut at
+that tick reproduces it.
+
+Status (WP-4.2): all five pass on every line.
+
