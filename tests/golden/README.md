@@ -33,7 +33,8 @@ depends on another: the oracle reseeds its `Math.random()` replacement stream
 (`HarnessMath`, see `tools/oracle/README.md`) from the scenario `seed` (0 when there
 is none) at the start of every scenario. A scenario without a `seed` is allowed only
 for the kinds whose output is a pure function of the scenario file: `sine_table`,
-`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`, `item_table`, `recipe_table`
+`nbt_write`, `nbt_read`, `java_hash_order`, `block_table`, `item_table`, `recipe_table`,
+`stat_table`
 (`tools/oracle/check-sensitivity.sh` enforces this).
 
 ### `kind: "java_random"` — `java.util.Random` sequences
@@ -505,6 +506,48 @@ registration order (CraftingManager.java:16-80) after `Collections.sort` with
      pattern in a 2×2 grid (slot `col + 2·row`; shapeless: slot `k`).
 
 Scenario: `recipe/recipe-table`.
+
+### `kind: "stat_table"` — `StatList` and `AchievementList` (WP-2.7)
+
+```json
+{"name":"stat-table","tier":"A","kind":"stat_table","format_values":[0,1,50,51,1000,62500,-1]}
+```
+No seed. The registries after vanilla's static initialisers (`Block` first: Block.java:689
+starts `Item`, whose last line starts `StatList`, which registers the achievements; then
+Block.java:705), run by the oracle in a fresh class loader whose `StringTranslate` table
+is an identity table (`tools/oracle/README.md`, "`stat_table`"). So a stat's `name` is its
+translation key, and a formatted name (`stat.mineBlock`, `stat.useItem`, `stat.breakItem`,
+`stat.craftItem`) is `key(argument key)`, the argument being the block's or item's
+`getBlockName()` / `getItemName()` + `".name"`: `"stat.mineBlock(tile.stone.name)"`.
+`mc-golden` models the kind as a unit variant; `format_values` (optional, ints) is read
+by the Rust side, `crates/mc-sim/tests/golden_stat_table.rs`. Trace, in this order:
+
+1. `{"e":"stat_count","listed","oneShot","generalStats","itemStats","objectMineStats",
+   "achievements"}`: the sizes of `StatList.field_25188_a`, `oneShotStats`,
+   `generalStats`, `itemStats`, `objectMineStats` and `AchievementList.achievementList`.
+2. One `{"e":"stat","i","statId","name","class","type","isIndependent","itemId"?}` per
+   entry of `field_25188_a`, `i` its index: `class` is the stat's class simple name
+   (`StatBasic`, `StatCrafting`, `Achievement`), `type` its `IStatType`'s
+   (`StatTypeSimple`, `StatTypeTime`, `StatTypeDistance`), `itemId` the
+   `StatCrafting`'s block or item id.
+3. One `{"e":"unlisted_stat",...}` (the same fields, no `i`) per stat of `oneShotStats`
+   missing from `field_25188_a` (removed by `replaceSimilarBlocks`), by `statId`.
+4. `{"e":"stat_list","list","ids"}` for `generalStats`, `itemStats`, `objectMineStats`
+   in that order: the `statId`s in list order.
+5. `{"e":"stat_array","array","length","entries"}` for `mineBlockStatArray`,
+   `objectUseStats`, `objectBreakStats`, `objectCraftStats` in that order: `entries`
+   are the non-null slots as `[index, statId]`, by index (aliases from
+   `replaceSimilarBlocks` show as two indices with one `statId`).
+6. One `{"e":"achievement","i","statId","name","column","row","parent","icon","isSpecial",
+   "isIndependent"}` per `achievementList` entry: `parent` the parent's `statId` or
+   `null`, `icon` `{"id","damage"}` of `theItemStack`.
+7. `{"e":"achievement_bounds","minDisplayColumn","minDisplayRow","maxDisplayColumn",
+   "maxDisplayRow"}`.
+8. For `StatTypeSimple`, `StatTypeTime`, `StatTypeDistance` in that order, one
+   `{"e":"stat_format","type","v","s"}` per `format_values` entry: `s` is
+   `format(v)`, with `StatBase`'s `DecimalFormat` created under `Locale.US`.
+
+Scenario: `stat/stat-table`.
 
 ## Tier B/C/S scenarios (WP-0.4)
 

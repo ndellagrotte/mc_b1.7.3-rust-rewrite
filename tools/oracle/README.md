@@ -11,14 +11,14 @@ Needs a JDK ≥ 17 (`javac`/`java` on `PATH`); the harness sources are Java 17.
 | `rewrite-math-random.sh` | Copies `src/minecraft` to `build/oracle-src`, rewrites `Math.random()` |
 | `regen.sh` | `build.sh`, runs the harness into `build/golden-out`, copies the results into `tests/golden`, prints `git status --short tests/golden` |
 | `check-reproducible.sh` | Three harness runs, byte-compared (§4.4 item 1) |
-| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table` may lack a seed (§4.4 item 2) |
+| `check-sensitivity.sh` | One run with every seed XOR 1; every seeded fixture must change, every unseeded one must not; only `sine_table`, `nbt_write`, `nbt_read`, `java_hash_order`, `world_read`, `block_table`, `item_table`, `recipe_table`, `stat_table` may lack a seed (§4.4 item 2) |
 | `env.sh` | Shared classpath (`minecraft.jar` last), the JVM math flags (§3.4 rule 5) and the `oracle_run` helper, sourced by the scripts |
 | `census.md` | Every `Math.random()` and `new Random(` site in the vanilla tree, entity-constructor draws, clock reads, static state: what the harness does about each (WP-0.4) |
-| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power`, `inventory` and `map_data`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
+| `java/harness/` | `Main` (driver, tier dispatch), `TierA` (`java_random`, `sine_table`, `math_sweep`, `terrain`), `BlockTable` (`block_table`), `ItemTable` (`item_table`), `RecipeTable` (`recipe_table`), `StatTable` (`stat_table`), `Nbt` (`nbt_write`, `nbt_read`), `HashOrder` (`java_hash_order`), `TickScenario` (kind `tick`: ops, tick loop), `Dumps` (Tier B/C dumps, incl. `ray_trace`, `power`, `inventory` and `map_data`), `TierS` (`save` op, `world_read`), `HarnessWorld` (world construction, seeding protocol, static resets), `HarnessWorldAccess` (the `IWorldAccess` with the entity seeding hook), `HarnessPlayer`, `EmptyChunkProvider` (`"world": "empty"`), `Rng` (reads `java.util.Random` state), `Reflect`, `Num`, `Blake3`, `Json`, `Hex`, `Trace`, `HarnessMath` |
 
 Tier A kinds (specified in `tests/golden/README.md`): `java_random`, `sine_table`,
 `math_sweep` (optional `"strict": true` for `StrictMath`), `terrain` (WP-0.2);
-`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1), `item_table` (WP-1.2), `recipe_table` (WP-2.5). Tier B/C/S kinds (WP-0.4):
+`nbt_write`, `nbt_read`, `java_hash_order` (WP-0.3); `block_table` (WP-1.1), `item_table` (WP-1.2), `recipe_table` (WP-2.5), `stat_table` (WP-2.7). Tier B/C/S kinds (WP-0.4):
 `tick` (a world ticked under ops and dumps; tiers B, C, S) and `world_read` (S).
 
 ## Use
@@ -178,7 +178,9 @@ dereferences it, EntityPlayer.java:223). It keeps the last `sleepInBedAt` result
 `Minecraft.usePortal`, the sneak `ySize` dip, `pushOutOfBlocks`), statistics/achievements
 (EntityPlayer's `addStat` is a no-op), the pickup animation. The port has those
 `EntityPlayerSP` parts behind `PlayerSpData::client_additions`, which the golden driver
-leaves off. Vanilla paths that only run with a player in
+leaves off, except the statistics: the port always counts them into the player's
+`stat_file_writer` (WP-2.7), which no dump reads; `crates/mc-sim/tests/stats.rs` covers
+them and `stat/stat-table` the registries. Vanilla paths that only run with a player in
 `World.playerEntities`: random block ticks, snow/ice, lightning and cave sounds
 (World.updateBlocksAndPlayCaveSounds, chunks within 9 of a player), mob spawning
 (SpawnerAnimals.performSpawning, chunks within 8), sleeping, despawning and AI target
@@ -299,3 +301,21 @@ through a player's `ContainerPlayer`, changes nothing). The private fields of
 `InventoryCrafting` whose event handler is an anonymous `Container` with an empty slot
 list (its `onCraftMatrixChanged` → `updateCraftingResults` does nothing); the tick
 harness's `craft` op builds its grid the same way.
+
+## `stat_table` (WP-2.7)
+
+`StatTable` dumps `StatList` and `AchievementList` by reflection. Two things would make
+the JVM's own copies unusable: their stat names are translated from the jar's `lang/`
+files (which no fixture may hold, PLAN_v4 D8), and they are initialised by whichever
+scenario first touched `Block`. So `StatTable` builds a new `URLClassLoader` over the
+oracle's class path (parent: the platform loader, so nothing is shared), initialises
+`StringTranslate` there, replaces its private `translateTable` with `KeyTable` (every key
+translates to itself; a key whose en_US text contains `%` translates to `key(%1$s)`, so
+`translateToLocalFormatted("stat.mineBlock", "tile.stone.name")` gives
+`stat.mineBlock(tile.stone.name)`), and only then initialises `Block`, which runs
+vanilla's static-initialiser chain (Block.java:689 → Item → Item.java:380 → StatList →
+AchievementList; Block.java:705). `Locale.US` is the default locale while `Block`
+initialises (restored after), so `StatBase`'s `DecimalFormat` uses `.` whatever the
+machine's locale. The `IStatType` formats are called on the fresh loader's instances.
+The `"16 achievements"` line `AchievementList` prints goes to stdout as on every first
+initialisation.
