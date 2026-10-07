@@ -1107,7 +1107,6 @@ impl RenderBlocks<'_> {
     /// `func_31081_b` (along z), `func_31077_c` (along x) differ in which
     /// arguments make the four corners.
     // src: RenderBlocks.java:483-541
-    #[allow(clippy::too_many_arguments)]
     fn piston_rod(&mut self, kind: u8, a: [f64; 6], var13: f32, var14: f64) {
         let [var1, var3, var5, var7, var9, var11] = a;
         let mut var16 = PISTON_ROD_TEXTURE;
