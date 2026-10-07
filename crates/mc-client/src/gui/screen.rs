@@ -422,8 +422,9 @@ impl Screen for ShellScreen {
 pub struct Binder {
     /// The object bound to the slot (out while it runs a method).
     screen: Option<Box<dyn Screen>>,
-    /// `(screen_serial, width, height)` of the bound object.
-    bound: Option<(u64, i32, i32)>,
+    /// `(screen_serial, screen_resize_serial, width, height)` of the bound
+    /// object (the [`Game`] counters it was last initialised at).
+    bound: Option<(u64, u64, i32, i32)>,
     /// An object handed to `displayGuiScreen`, for the serial it gets.
     pending: Option<(u64, Box<dyn Screen>)>,
     /// The bound object that is running a method (taken out).
@@ -526,6 +527,15 @@ impl<'a> ScreenCtx<'a> {
         self.clipboard.as_mut().and_then(|f| f())
     }
 
+    /// `Keyboard.enableRepeatEvents(on)`: held keys repeat into `keyTyped`
+    /// while on (GuiChat, GuiCreateWorld, GuiRenameWorld and GuiEditSign
+    /// turn it on in `initGui` and off in `onGuiClosed`; LWJGL's default
+    /// is off). Sets [`crate::input::InputQueue::repeat_events`].
+    // src: GuiChat.java:11, :15
+    pub fn enable_repeat_events(&mut self, on: bool) {
+        self.game.input.repeat_events = on;
+    }
+
     /// A new object of the class `kind` from the registry (`new X()`).
     pub fn create_screen(&self, kind: &ScreenKind) -> Box<dyn Screen> {
         self.registry.create(kind)
@@ -588,6 +598,7 @@ impl<'a> ScreenCtx<'a> {
     pub fn sync(&mut self) {
         let slot = self.game.current_screen.clone();
         let serial = self.game.screen_serial;
+        let resized = self.game.screen_resize_serial;
         match slot {
             None => {
                 if self.binder.bound.is_some() {
@@ -604,15 +615,19 @@ impl<'a> ScreenCtx<'a> {
                         Some((p, obj)) if p == serial => obj,
                         _ => self.registry.create(&s.kind),
                     };
-                    self.binder.bound = Some((serial, s.width, s.height));
+                    self.binder.bound = Some((serial, resized, s.width, s.height));
                     let after = self.run_bound(obj, serial, |o, ctx| {
                         set_world_and_resolution(o, ctx, s.width, s.height);
                     });
                     drop_detached(after);
-                } else if let Some((_, w, h)) = self.binder.bound
-                    && (w, h) != (s.width, s.height)
+                } else if let Some((_, r, w, h)) = self.binder.bound
+                    && (r != resized || (w, h) != (s.width, s.height))
                 {
-                    self.binder.bound = Some((serial, s.width, s.height));
+                    // Every `resize` with a screen open is a
+                    // setWorldAndResolution, whether or not the scaled size
+                    // changed (Game::screen_resize_serial).
+                    // src: Minecraft.java:900-918
+                    self.binder.bound = Some((serial, resized, s.width, s.height));
                     match self.binder.running.as_mut() {
                         Some(r) if r.serial == serial => r.reinit = true,
                         _ => {
@@ -679,7 +694,7 @@ impl<'a> ScreenCtx<'a> {
         if st.closed {
             obj.on_gui_closed(self);
         } else if still_bound && st.reinit {
-            let (_, w, h) = self.binder.bound.expect("bound");
+            let (_, _, w, h) = self.binder.bound.expect("bound");
             let after = self.run_bound_dyn(obj, serial, &mut |o, ctx| {
                 set_world_and_resolution(o, ctx, w, h);
             });

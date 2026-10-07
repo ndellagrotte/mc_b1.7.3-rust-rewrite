@@ -607,6 +607,63 @@ mod tests {
         assert!(e.game.input.keyboard.is_empty());
     }
 
+    /// Counts its `initGui` calls.
+    struct Inits {
+        base: ScreenBase,
+        inits: Arc<AtomicUsize>,
+    }
+
+    impl Screen for Inits {
+        fn base(&self) -> &ScreenBase {
+            &self.base
+        }
+        fn base_mut(&mut self) -> &mut ScreenBase {
+            &mut self.base
+        }
+        fn kind(&self) -> ScreenKind {
+            ScreenKind::Other("Inits".into())
+        }
+        fn init_gui(&mut self, _ctx: &mut ScreenCtx) {
+            self.inits.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn every_resize_reinits_even_at_the_same_scaled_size() {
+        // src: Minecraft.java:900-918: resize always calls
+        // setWorldAndResolution with a screen open.
+        let mut e = env();
+        let inits = Arc::new(AtomicUsize::new(0));
+        e.ctx().display_gui_screen(Some(Box::new(Inits {
+            base: ScreenBase::default(),
+            inits: inits.clone(),
+        })));
+        assert_eq!(inits.load(Ordering::SeqCst), 1);
+        // 854 -> 853 wide: scale factor 2 both times, scaled width
+        // ceil(426.5) = 427 = 854 / 2 (ScaledResolution.java).
+        e.game.resize(853, 480);
+        e.ctx().sync();
+        assert_eq!(inits.load(Ordering::SeqCst), 2);
+        let s = e.binder.screen().unwrap();
+        assert_eq!((s.base().width, s.base().height), (427, 240));
+        // No resize: no init.
+        e.ctx().sync();
+        assert_eq!(inits.load(Ordering::SeqCst), 2);
+        // toggleFullscreen resizes with a screen open, same size included.
+        e.ctx().toggle_fullscreen();
+        assert_eq!(inits.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn enable_repeat_events_sets_the_input_flag() {
+        let mut e = env();
+        assert!(!e.game.input.repeat_events);
+        e.ctx().enable_repeat_events(true);
+        assert!(e.game.input.repeat_events);
+        e.ctx().enable_repeat_events(false);
+        assert!(!e.game.input.repeat_events);
+    }
+
     #[test]
     fn font_from_a_missing_jar_is_empty() {
         let f = build_font(None, false);

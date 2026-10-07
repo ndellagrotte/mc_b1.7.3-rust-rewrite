@@ -19,8 +19,20 @@
 //!   `drawRect` with alpha, the list shadows) happen in linear space, so a
 //!   dimmed world is lighter than vanilla's; GuiIngame's crosshair
 //!   inversion (`glBlendFunc(775, 769)`) inverts linear values. The
-//!   framebuffer's alpha is never changed ([`blend_state`]): Bevy
-//!   composites by it, GL's was never seen.
+//!   framebuffer's alpha is never changed by a GUI draw ([`blend_state`]).
+//! - **Output:** all three cameras draw into one shared main texture (same
+//!   target, usages, format and MSAA), as vanilla draws the world and the
+//!   screen into its one framebuffer (EntityRenderer.java:420-424). Each
+//!   camera's upscale pass then copies that texture to the window; Bevy's
+//!   default for every camera after the first is to alpha-blend that copy
+//!   over the window by the texture's alpha (bevy_core_pipeline 0.19.1
+//!   `upscaling/mod.rs:66-75`), and the world's translucent draws (clouds,
+//!   the sunrise band) leave that alpha below 1, so the world-only frame
+//!   written by camera 0 showed through every GUI pixel there, opaque ones
+//!   included (measured: `GuiTextField`'s black fill `(67, 73, 90)` under a
+//!   cloud). The GUI cameras write their copy with
+//!   `BlendState::REPLACE` instead ([`spawn_gui_cameras`]): the window gets
+//!   world plus GUI, as GL's.
 //! - **Textures:** a batch names a texture through
 //!   [`crate::textures::Textures`] (`getTexture` by name, or a handle such as
 //!   the font's); the GUI samples an `Rgba8Unorm` copy of that image
@@ -34,7 +46,7 @@ use std::collections::BTreeMap;
 
 use bevy::asset::AssetEvent;
 use bevy::camera::visibility::{NoFrustumCulling, RenderLayers};
-use bevy::camera::{ClearColorConfig, ScalingMode};
+use bevy::camera::{CameraOutputMode, ClearColorConfig, ScalingMode};
 use bevy::mesh::MeshVertexBufferLayoutRef;
 use bevy::pbr::{MaterialPipeline, MaterialPipelineKey};
 use bevy::prelude::*;
@@ -99,9 +111,11 @@ fn blend_factor(f: u32) -> BlendFactor {
 }
 
 /// The destination's alpha, kept: vanilla's framebuffer alpha is never
-/// seen, but Bevy composites a camera's output by it, so a GUI draw with
-/// `0 < alpha < 1` would let the window behind show through (measured:
-/// `GuiSlot`'s shadows turned sky-blue).
+/// seen, so a GUI draw leaves it as the world left it. (Before the GUI
+/// cameras' output was set to replace, [`spawn_gui_cameras`], Bevy's
+/// upscale composite blended by it and a GUI draw with `0 < alpha < 1`
+/// let camera 0's world-only frame show through: `GuiSlot`'s shadows
+/// turned sky-blue.)
 const KEEP_ALPHA: BlendComponent = BlendComponent {
     src_factor: BlendFactor::Zero,
     dst_factor: BlendFactor::One,
@@ -266,6 +280,13 @@ pub fn spawn_gui_cameras(mut commands: Commands) {
             Camera {
                 order: GUI_CAMERA_ORDER + i as isize,
                 clear_color: ClearColorConfig::None,
+                // The shared main texture (world + GUI so far) replaces the
+                // window instead of being alpha-blended over camera 0's
+                // copy (module docs, "Output").
+                output_mode: CameraOutputMode::Write {
+                    blend_state: Some(BlendState::REPLACE),
+                    clear_color: ClearColorConfig::None,
+                },
                 ..default()
             },
             Projection::Orthographic(OrthographicProjection {

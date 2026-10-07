@@ -324,6 +324,12 @@ pub struct Game {
     /// ([`crate::gui`]) can tell a new screen of the same kind from the one
     /// it already holds and bind its own object to the slot.
     pub screen_serial: u64,
+    /// Counts the `resize` calls made with a screen open (WP-3.6a): each
+    /// one is a `currentScreen.setWorldAndResolution`, even when the scaled
+    /// size stays the same, so the GUI ([`crate::gui`]) re-runs it on its
+    /// object.
+    // src: Minecraft.java:911-916
+    pub screen_resize_serial: u64,
     /// `loadingScreen`.
     // src: Minecraft.java:128
     pub loading_screen: LoadingScreenRenderer,
@@ -470,6 +476,7 @@ impl Game {
             is_game_paused: false,
             current_screen: None,
             screen_serial: 0,
+            screen_resize_serial: 0,
             loading_screen: LoadingScreenRenderer::default(),
             entity_renderer: EntityRendererCam::new(now),
             ticks_ran: 0,
@@ -825,6 +832,8 @@ impl Game {
             let r = ScaledResolution::new(self.game_settings.gui_scale, var1, var2);
             s.width = r.scaled_width;
             s.height = r.scaled_height;
+            // WP-3.6a: setWorldAndResolution again (field docs).
+            self.screen_resize_serial = self.screen_resize_serial.wrapping_add(1);
             self.outbox
                 .events
                 .push(ClientEvent::ScreenResized(s.clone()));

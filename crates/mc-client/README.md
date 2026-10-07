@@ -585,9 +585,14 @@ opaque pixels are vanilla's bytes; blends with `0 < alpha < 1` happen in
 linear space, so `drawDefaultBackground`'s dark gradient dims the world
 less than vanilla (sky `(42, 61, 183)` becomes `(25, 33, 97)` where GL
 writes `(22, 27, 57)`) and `drawRect` translucency and the list shadows
-are lighter. Bevy composites cameras by the framebuffer alpha, which GL
-never showed: the GUI never changes it (a translucent draw that did let
-the window behind show through). Switching the client to
+are lighter. The three cameras share one main texture, but Bevy's
+upscale pass by default alpha-blends each later camera's copy of it over
+the window by that texture's alpha, which the world's clouds and sunrise
+band leave below 1: camera 0's world-only frame then showed through every
+GUI pixel there (the text field's black came out `(67, 73, 90)` under a
+cloud). The GUI cameras therefore write with `CameraOutputMode::Write {
+blend_state: Some(BlendState::REPLACE), .. }`, and GUI draws keep the
+destination alpha anyway. Switching the client to
 `CompositingSpace::Srgb` (WP-3.1's camera) would make every GUI blend
 GL's.
 
@@ -605,7 +610,9 @@ GL's.
   `ctx.display_wrapping_this(|this| Box::new(GuiYesNo::new(this, ..)))`
   (`new GuiYesNo(this, ..)`), `ctx.play_sound_fx`, `ctx.create_screen(kind)`
   (`new GuiMainMenu()` and other registered classes),
-  `ctx.get_clipboard_string()`.
+  `ctx.get_clipboard_string()`, `ctx.enable_repeat_events(on)`
+  (`Keyboard.enableRepeatEvents`, for GuiChat, GuiCreateWorld,
+  GuiRenameWorld, GuiEditSign: on in `initGui`, off in `onGuiClosed`).
 - The shell opens some screens by kind (`GuiMainMenu`, `GuiIngameMenu`,
   `GuiGameOver`, `GuiInventory`, `GuiConflictWarning`); register a factory
   for the class name with `ScreenRegistry::register` (a resource) and the
