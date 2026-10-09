@@ -13,7 +13,7 @@ bevy = { version = "0.19.0", default-features = false, features = ["2d", "3d", "
 bevy_kira_audio = "0.26"
 bevy_asset_loader = "0.27.0"
 blake3 = "1" # mc-golden digests (ADR-007 §5.2)
-flate2 = "1"
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] } # WP-4.3: zlib-rs backend (pure Rust, wasm-safe), ~1.5x faster deflate than miniz_oxide
 libm = "0.2" # fdlibm-derived pure-Rust libm; candidate in the mc-core §3.4 rule 5 sweep
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
