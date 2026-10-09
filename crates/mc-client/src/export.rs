@@ -5,7 +5,8 @@
 //! The native save format already is vanilla McRegion (D5), so an export is
 //! a verified copy, nothing is converted or stripped (`session.lock` is
 //! copied too; vanilla rewrites it when it opens the world,
-//! SaveHandler.java:41-51). [`export_world`] does, in order:
+//! SaveHandler.java:19-47, the constructor and `func_22154_d`).
+//! [`export_world`] does, in order:
 //!
 //! 1. **Target.** `<target>/<world folder>` must not exist, or be an empty
 //!    directory ([`ExportError::TargetNotEmpty`]): nothing is ever
@@ -36,12 +37,18 @@
 //!    same loaders, step 3) equal to the source's, chunk by chunk
 //!    ([`ExportError::Mismatch`]).
 //! 6. **Publish**: the staging folder is renamed to `<target>/<world>`. On
-//!    any failure after step 4 the staging folder is removed, so a refused or
+//!    any failure after step 4 the staging folder is removed, and so are the
+//!    folders step 4 created for `<target>` (while empty), so a refused or
 //!    failed export leaves nothing behind.
 //!
 //! An open world is saved first (`World.saveWorld(true)`, by
 //! [`export_from_game`]); from the world list the world is closed and its
-//! files are complete. The screens are
+//! files are complete. Vanilla runs `saveWorld(true)` only on quit or a
+//! world change: a full save writes every modified chunk and resets its
+//! `isModified` and `lastSaveTime`, so after an in-game export (the dev
+//! action) the later autosaves of that run write other chunks than an
+//! unexported run would (a dev-run divergence; the UI exports a closed
+//! world). The screens are
 //! [`crate::gui::menu::export_world`]; the dev action is `export_world`
 //! (crates/mc-client/README.md).
 
@@ -104,7 +111,8 @@ pub enum ExportError {
     Refused(ImportRefusal),
     /// A part of the save the simulation's loaders cannot load.
     Corrupt {
-        /// The file, relative to the world folder.
+        /// The file as staged (`world/…`); `rel` gives the path inside
+        /// the world folder, which the messages show.
         path: String,
         /// Why.
         reason: String,
@@ -116,8 +124,10 @@ pub enum ExportError {
 }
 
 /// A storage path under [`STAGE`] → the path inside the world folder.
-fn rel(path: &str) -> &str {
-    path.strip_prefix("world/").unwrap_or(path)
+pub(crate) fn rel(path: &str) -> &str {
+    path.strip_prefix(STAGE)
+        .and_then(|p| p.strip_prefix('/'))
+        .unwrap_or(path)
 }
 
 impl std::fmt::Display for ExportError {
@@ -183,8 +193,11 @@ impl ChunkDigest {
     }
 }
 
-/// A world's digest (module docs, step 3).
-#[derive(Clone, Debug, PartialEq)]
+/// A world's digest (module docs, step 3). Equality compares `player_pos`
+/// by its bits (`f64::to_bits`), so a `level.dat` whose player `Pos` holds
+/// a NaN (Beta 1.7.3 writes and reads one without a check) still equals its
+/// byte-identical copy.
+#[derive(Clone, Debug)]
 pub struct WorldDigest {
     /// `LevelName`.
     pub level_name: String,
@@ -204,6 +217,21 @@ pub struct WorldDigest {
     pub regions: Vec<String>,
     /// Every chunk, by dimension (0 then -1), region file name and index.
     pub chunks: Vec<ChunkDigest>,
+}
+
+impl PartialEq for WorldDigest {
+    fn eq(&self, o: &Self) -> bool {
+        let bits = |p: &Option<[f64; 3]>| p.map(|v| v.map(f64::to_bits));
+        self.level_name == o.level_name
+            && self.seed == o.seed
+            && self.time == o.time
+            && bits(&self.player_pos) == bits(&o.player_pos)
+            && self.player_dimension == o.player_dimension
+            && self.level_dat == o.level_dat
+            && self.files == o.files
+            && self.regions == o.regions
+            && self.chunks == o.chunks
+    }
 }
 
 impl WorldDigest {
@@ -362,21 +390,24 @@ pub fn world_digest(files: &[(String, Vec<u8>)]) -> Result<WorldDigest, ExportEr
             other => other,
         })
     })?;
-    let (root_name, root) =
-        level_dat_tree(&mut st).ok_or_else(|| corrupt("world/level.dat", "does not decode"))?;
+    let (root_name, root) = level_dat_tree(&mut st)
+        .ok_or_else(|| corrupt(path_join(STAGE, "level.dat"), "does not decode"))?;
     let level_dat = hex(&mc_sim::save::mc_nbt::write_named(&root_name, &root)
-        .map_err(|e| corrupt("world/level.dat", format!("{e:?}")))?);
+        .map_err(|e| corrupt(path_join(STAGE, "level.dat"), format!("{e:?}")))?);
 
     let store: SharedSaveStore = SaveStore::shared(Box::new(st), Box::new(FixedClock(0)));
     // SaveOldDir writes session.lock: into the in-memory copy only.
-    let mut handler =
-        SaveOldDir::new(store.clone(), "", STAGE).map_err(|e| corrupt("world/session.lock", e))?;
-    let info = handler
-        .load_world_info()
-        .ok_or_else(|| corrupt("world/level.dat", "SaveOldDir.loadWorldInfo returns null"))?;
+    let mut handler = SaveOldDir::new(store.clone(), "", STAGE)
+        .map_err(|e| corrupt(path_join(STAGE, "session.lock"), e))?;
+    let info = handler.load_world_info().ok_or_else(|| {
+        corrupt(
+            path_join(STAGE, "level.dat"),
+            "SaveOldDir.loadWorldInfo returns null",
+        )
+    })?;
     if info.save_version != MCREGION_VERSION {
         return Err(corrupt(
-            "world/level.dat",
+            path_join(STAGE, "level.dat"),
             format!(
                 "save version {} is not McRegion ({MCREGION_VERSION}); pre-McRegion worlds are not supported (deferred)",
                 info.save_version
@@ -610,9 +641,13 @@ pub fn export_world(
         return Err(ExportError::Read(format!("{} is empty", src.display())));
     }
     let source = world_digest(&files)?;
-    // 4. copy into the staging folder
-    fs::create_dir_all(target)
-        .map_err(|e| ExportError::Write(format!("{}: {e}", target.display())))?;
+    // 4. copy into the staging folder; the folders created for the target
+    // are removed again if the export fails (nothing is left behind)
+    let created = missing_dirs(target);
+    if let Err(e) = fs::create_dir_all(target) {
+        remove_created(&created);
+        return Err(ExportError::Write(format!("{}: {e}", target.display())));
+    }
     let staging = target.join(format!("{STAGING_PREFIX}{name}-{}", std::process::id()));
     let _ = fs::remove_dir_all(&staging);
     let checked = (|| {
@@ -644,7 +679,33 @@ pub fn export_world(
         }),
         Err(e) => {
             let _ = fs::remove_dir_all(&staging);
+            remove_created(&created);
             Err(e)
+        }
+    }
+}
+
+/// `dir` and those of its ancestors that do not exist yet, deepest first:
+/// the folders `fs::create_dir_all(dir)` would create.
+fn missing_dirs(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut cur = Some(dir);
+    while let Some(d) = cur {
+        if d.as_os_str().is_empty() || fs::symlink_metadata(d).is_ok() {
+            break;
+        }
+        out.push(d.to_path_buf());
+        cur = d.parent();
+    }
+    out
+}
+
+/// Removes the folders [`missing_dirs`] listed, deepest first, while they are
+/// empty (`fs::remove_dir` refuses a folder that is not).
+fn remove_created(created: &[PathBuf]) {
+    for d in created {
+        if fs::remove_dir(d).is_err() {
+            break;
         }
     }
 }
@@ -680,7 +741,7 @@ fn absolute_existing_prefix(p: &Path) -> std::io::Result<PathBuf> {
 }
 
 /// The export as the game runs it: the open world is saved first when it is
-/// the one exported (`World.saveWorld(true, null)`, World.java:277-290), the
+/// the one exported (`World.saveWorld(true, null)`, World.java:278-291), the
 /// region-file cache is flushed (`SaveConverterMcRegion.flushCache`,
 /// SaveConverterMcRegion.java:49-51), then [`export_world`] from the data
 /// directory's `saves/`.
@@ -760,12 +821,14 @@ mod tests {
     /// (1, 0) in `r.0.0.mcr`, (−1, −1) of the nether in `DIM-1`; `bad` is
     /// the block id at (1, 64, 1) of chunk (1, 0).
     fn make_world(data: &Path, name: &str, bad: u8) -> PathBuf {
+        make_world_at(data, name, bad, [8.5, 66.62, -3.5])
+    }
+
+    /// [`make_world`] with the player at `pos`.
+    fn make_world_at(data: &Path, name: &str, bad: u8, pos: [f64; 3]) -> PathBuf {
         let mut st = MemoryStorage::default();
-        st.write(
-            &format!("{name}/level.dat"),
-            &level_dat(name, [8.5, 66.62, -3.5]),
-        )
-        .unwrap();
+        st.write(&format!("{name}/level.dat"), &level_dat(name, pos))
+            .unwrap();
         st.write(&format!("{name}/session.lock"), &[0, 0, 0, 0, 0, 0, 0, 1])
             .unwrap();
         let mut cache = RegionFileCache::new();
@@ -827,6 +890,62 @@ mod tests {
     }
 
     #[test]
+    fn a_nan_player_position_still_compares_equal() {
+        // Beta 1.7.3 writes and reads a NaN Pos without a check; the copy of
+        // such a world is byte-identical and must not be reported as a
+        // mismatch.
+        let d = TempDir::new("export_nan");
+        make_world_at(&d.0, "Nan", 4, [f64::NAN, 66.62, -3.5]);
+        let out = d.0.join("out");
+        let r = export_world(&d.0.join("saves"), "Nan", &out).unwrap();
+        let [x, y, _] = r.digest.player_pos.unwrap();
+        assert!(x.is_nan());
+        assert_eq!(y, 66.62);
+        let again = world_digest(&read_tree(&r.path).unwrap()).unwrap();
+        assert_eq!(again, r.digest);
+        assert_eq!(compare(&r.digest, &again), Ok(()));
+        // A different NaN payload or position is still a difference.
+        let mut other = again.clone();
+        other.player_pos = Some([f64::from_bits(f64::NAN.to_bits() ^ 1), 66.62, -3.5]);
+        assert_ne!(other, r.digest);
+    }
+
+    #[test]
+    fn a_failed_export_removes_the_folders_it_created() {
+        let d = TempDir::new("export_created");
+        let target = d.0.join("a/b/c");
+        let created = missing_dirs(&target);
+        assert_eq!(
+            created,
+            vec![d.0.join("a/b/c"), d.0.join("a/b"), d.0.join("a")]
+        );
+        fs::create_dir_all(&target).unwrap();
+        remove_created(&created);
+        assert!(!d.0.join("a").exists());
+        assert!(d.0.exists());
+        // A created folder that is no longer empty stops the removal there.
+        fs::create_dir_all(&target).unwrap();
+        fs::write(d.0.join("a/keep"), b"x").unwrap();
+        remove_created(&created);
+        assert!(!d.0.join("a/b").exists());
+        assert!(d.0.join("a/keep").exists());
+        // An existing target creates nothing, so nothing is removed.
+        assert_eq!(missing_dirs(&d.0), Vec::<PathBuf>::new());
+    }
+
+    #[test]
+    fn rel_strips_the_staging_folder() {
+        assert_eq!(
+            rel(&path_join(STAGE, "region/r.0.0.mcr")),
+            "region/r.0.0.mcr"
+        );
+        assert_eq!(rel("region/r.0.0.mcr"), "region/r.0.0.mcr");
+        // Only a whole leading component.
+        let longer = format!("{STAGE}x/level.dat");
+        assert_eq!(rel(&longer), longer);
+    }
+
+    #[test]
     fn refuses_an_unknown_block_id_and_copies_nothing() {
         let d = TempDir::new("export_bad_id");
         make_world(&d.0, "Modded", 200);
@@ -861,7 +980,7 @@ mod tests {
         let ExportError::Corrupt { path, reason } = &e else {
             panic!("{e}");
         };
-        assert_eq!(path, "world/region/r.0.0.mcr");
+        assert_eq!(path, &path_join(STAGE, "region/r.0.0.mcr"));
         assert!(
             reason.starts_with("chunk (1, 0): listed in the header"),
             "{reason}"

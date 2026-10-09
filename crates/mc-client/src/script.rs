@@ -352,7 +352,11 @@ pub enum Action {
     /// Dev (WP-4.5): exports the world `saves/<name>` into the folder
     /// `path` (as `<path>/<name>`) through [`crate::export::export_from_game`]:
     /// the open world is saved first when it is that world; the world is
-    /// validated, copied and read back. With `report`, the result (the
+    /// validated, copied and read back. In game this is a full
+    /// `saveWorld(true)` (World.java:278-291), which vanilla runs only on
+    /// quit or a world change: it resets every modified chunk's
+    /// `isModified`/`lastSaveTime`, so the run's later autosaves differ
+    /// from an unexported run's. With `report`, the result (the
     /// report with every file's and chunk's digest, or the error) is written
     /// there as JSON.
     ExportWorld {

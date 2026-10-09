@@ -9,8 +9,9 @@
 //!   inside the click (a large world stalls that frame): the world is
 //!   checked, copied to `<folder>/<world folder>` and read back.
 //! - [`GuiExportResult`]: drawn as the import refusal dialog (after
-//!   `GuiErrorScreen`): on success "World exported" with the path and what
-//!   was checked, Done back to the world list; on a refusal or failure the
+//!   `GuiErrorScreen`): on success "World exported" with the path (wrapped
+//!   at `/`, shortened by [`elide_path`] to the room above the button) and
+//!   what was checked, Done back to the world list; on a refusal or failure the
 //!   problem (the first offending id and its chunk, the unreadable chunk,
 //!   the folder in the way, …) and "Nothing was exported.", Back to the
 //!   export screen.
@@ -290,6 +291,24 @@ pub fn wrap_path(text: &str, width: i32, w: impl Fn(&str) -> i32) -> Vec<String>
     out
 }
 
+/// The text's room in the result dialog (scaled pixels): from its first line
+/// at `height / 4 - 10` to 4 pixels above the button at `height / 4 + 132`.
+pub const TEXT_ROOM: i32 = (120 + 12 - 4) - (-60 + 50);
+
+/// The pieces of a wrapped path cut to at most `max` lines (at least 3):
+/// the first piece, `.../` (the font has no ellipsis), then the last
+/// `max - 2` pieces, so a long path keeps its start and the world folder and
+/// the text stays above the button.
+pub fn elide_path(pieces: Vec<String>, max: usize) -> Vec<String> {
+    let max = max.max(3);
+    if pieces.len() <= max {
+        return pieces;
+    }
+    let mut out = vec![pieces[0].clone(), ".../".to_string()];
+    out.extend_from_slice(&pieces[pieces.len() - (max - 2)..]);
+    out
+}
+
 /// The dialog's title and lines for a successful export.
 pub fn success_text(name: &str, r: &ExportReport) -> (String, Vec<DialogLine>) {
     let mut lines = vec![
@@ -317,7 +336,6 @@ pub fn success_text(name: &str, r: &ExportReport) -> (String, Vec<DialogLine>) {
 
 /// The dialog's title and lines for a refused or failed export.
 pub fn failure_text(e: &ExportError) -> (String, Vec<DialogLine>) {
-    let strip = |p: &str| p.strip_prefix("world/").unwrap_or(p).to_string();
     let (title, mut lines) = match e {
         ExportError::Refused(r) => (
             "Export refused",
@@ -340,7 +358,7 @@ pub fn failure_text(e: &ExportError) -> (String, Vec<DialogLine>) {
                 ],
                 ImportRefusal::Unreadable { path, reason } => vec![DialogLine::Text(format!(
                     "Cannot read {}: {reason}",
-                    strip(path)
+                    crate::export::rel(path)
                 ))],
             },
         ),
@@ -348,7 +366,7 @@ pub fn failure_text(e: &ExportError) -> (String, Vec<DialogLine>) {
             "Export refused",
             vec![DialogLine::Text(format!(
                 "Cannot read {}: {reason}",
-                strip(path)
+                crate::export::rel(path)
             ))],
         ),
         ExportError::TargetNotEmpty(p) => (
@@ -477,6 +495,17 @@ impl Screen for GuiExportResult {
         draw::draw_centered_string(g, f, &self.title, w / 2, h / 4 - 60 + 20, 16777215);
         let x = w / 2 - WRAP / 2;
         let mut y = h / 4 - 60 + 50;
+        // The path gets the lines the other text leaves above the button.
+        let other: i32 = self
+            .lines
+            .iter()
+            .map(|l| match l {
+                DialogLine::Gap => 9,
+                DialogLine::Text(t) => f.split_string_width(t, WRAP) + 1,
+                DialogLine::Path(_) => 0,
+            })
+            .sum();
+        let path_lines = ((TEXT_ROOM - other) / 9).max(0) as usize;
         for l in &self.lines {
             match l {
                 DialogLine::Gap => y += 9,
@@ -485,7 +514,8 @@ impl Screen for GuiExportResult {
                     y += f.split_string_width(t, WRAP) + 1;
                 }
                 DialogLine::Path(p) => {
-                    for piece in wrap_path(p, WRAP, |s| f.get_string_width(s)) {
+                    let pieces = wrap_path(p, WRAP, |s| f.get_string_width(s));
+                    for piece in elide_path(pieces, path_lines) {
                         draw::draw_string(g, f, &piece, x, y, 16777215);
                         y += 9;
                     }
@@ -518,6 +548,16 @@ mod tests {
         assert_eq!(wrap_path("", 30, w), Vec::<String>::new());
         // A character wider than the box still makes progress.
         assert_eq!(wrap_path("ab", 3, w), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn long_paths_keep_their_start_and_end() {
+        let p = |n: usize| (0..n).map(|i| format!("p{i}/")).collect::<Vec<_>>();
+        assert_eq!(elide_path(p(4), 4), p(4));
+        assert_eq!(elide_path(p(6), 4), vec!["p0/", ".../", "p4/", "p5/"]);
+        // Never fewer than three lines: the start, the ellipsis, the end.
+        assert_eq!(elide_path(p(6), 0), vec!["p0/", ".../", "p5/"]);
+        assert_eq!(TEXT_ROOM, 138);
     }
 
     fn report() -> ExportReport {

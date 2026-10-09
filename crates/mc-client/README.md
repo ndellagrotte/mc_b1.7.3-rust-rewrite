@@ -817,8 +817,9 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   while a world is selected) opens `export_world::GuiExportWorld` for the
   selected world: a folder box (default `<data-dir>/exports`), Export and
   Cancel. Export runs `export::export_from_game` inside the click; the
-  result dialog (`GuiExportResult`) says "World exported" with the path,
-  the files, region files and chunks checked and the player position (Done:
+  result dialog (`GuiExportResult`) says "World exported" with the path
+  (wrapped at `/`; a path too long for the room above the button keeps its
+  first piece, `.../` and its last pieces), the files, region files and chunks checked and the player position (Done:
   the world list), or "Export refused" / "Export failed" with the problem
   and "Nothing was exported." (Back: the export screen). See "Export" below.
 - **Pause menu**: Back to game, Achievements, Statistics, Options..., Save
@@ -882,7 +883,8 @@ arrays, the Tier S `chunk_digest` `"loaded"`, of its NBT tree, of the
 `std::fs` into a hidden staging folder `<target>/.mc_export-<name>-<pid>`,
 read back from disk, digested again and compared (`export::compare`, the
 first differing file or chunk); then the staging folder is renamed to
-`<target>/<name>`. Any failure removes the staging folder.
+`<target>/<name>`. Any failure removes the staging folder and the folders
+created for `<target>` (while empty).
 `export::export_from_game` saves the open world first
 (`World.try_save_world(true)`) when it is the one exported and flushes the
 region cache. How it was checked against the vanilla client:
@@ -1189,7 +1191,7 @@ Actions run in order, as many per frame as are due.
 | `equip` | `slot` (0-35 inventory, 100-103 armour: boots … helmet), `item` (`[id, count, damage]`, absent: empty) | Dev (WP-3.5b): puts a stack into one of the player's slots (armour on the third-person player) |
 | `chat` | `text` | Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` |
 | `dump_inventory` | `path` | Dev (WP-3.6b): the player's 36 main and 4 armour slots and the cursor stack, each `[id, count, damage]` or null, as JSON |
-| `export_world` | `name`, `path`, `report` (optional) | Dev (WP-4.5): exports `saves/<name>` to `<path>/<name>` (`export::export_from_game`: the open world is saved first when it is that world; then validated, copied and read back). With `report`, writes `{"ok": true, "report": {path, files, bytes, regions, chunks, digest}}` (the digest lists every file's and every chunk's blake3) or `{"ok": false, "error": …}` |
+| `export_world` | `name`, `path`, `report` (optional) | Dev (WP-4.5): exports `saves/<name>` to `<path>/<name>` (`export::export_from_game`: the open world is saved first when it is that world; then validated, copied and read back). In game the save is a full `saveWorld(true)`, which vanilla runs only on quit or a world change, so the run's later autosaves write other chunks than an unexported run would. With `report`, writes `{"ok": true, "report": {path, files, bytes, regions, chunks, digest}}` (the digest lists every file's and every chunk's blake3) or `{"ok": false, "error": …}` |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

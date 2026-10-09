@@ -36,7 +36,8 @@ home. None of them is committed (D8).
 The native save format already is vanilla McRegion (D5). The export is
 therefore a checked copy: nothing is converted or stripped. `session.lock` is
 copied too, and vanilla rewrites it when it opens the world
-(SaveHandler.java:41-51).
+(SaveHandler.java:19-47: the constructor calls `func_22154_d`, which
+writes the session time into `session.lock`).
 
 `export::export_world(saves_dir, name, target)`:
 
@@ -74,13 +75,21 @@ copied too, and vanilla rewrites it when it opens the world
    digest from the same loaders, chunk by chunk. A failure names the first
    differing file or chunk and array.
 6. **Publish**: the staging folder is renamed to `<target>/<world>`. Any
-   failure after step 4 removes the staging folder. A refused or failed
-   export leaves nothing behind (E9, and the unit tests).
+   failure after step 4 removes the staging folder, and also the folders
+   step 4 created for `<target>` (deepest first, while they are empty; an
+   existing target folder is kept). A refused or failed export leaves
+   nothing behind (E9, and the unit tests).
 
 `export::export_from_game` is what the screen and the dev action call. When
 the world being exported is the one open, it first saves that world
-(`World.try_save_world(true)`, `saveWorld(true, null)`: `level.dat` with the
-player, then every chunk). It then flushes the region-file cache
+(`World.try_save_world(true)`, `saveWorld(true, null)`, World.java:278-291:
+`level.dat` with the player, then every chunk). Vanilla runs
+`saveWorld(true)` only on quit or a world change. A full save writes every
+modified chunk and resets its `isModified` and `lastSaveTime`, so after an
+in-game export (only the dev action can do that) the run's later autosaves
+write other chunks than an unexported run would. This is a dev-run
+divergence with no vanilla counterpart; the UI exports from the world list,
+where the world is closed. It then flushes the region-file cache
 (`SaveConverterMcRegion.flushCache`) and runs `export_world` on
 `<data-dir>/saves`. From the world list, the world is closed and its files
 are complete.
@@ -91,7 +100,8 @@ top right, and it is enabled while a world is selected. It opens **Export
 world**, which has the world's name, a folder box defaulting to
 `<data-dir>/exports` (typed or pasted; `~/` is the home directory; a long
 path shows its end), Export and Cancel. Success opens **World exported**:
-the path (wrapped at `/`), the number of files, region files and chunks read
+the path (wrapped at `/`; a path too long for the room above the button
+keeps its first piece, `.../` and its last pieces), the number of files, region files and chunks read
 back, the player's position, and a hint to copy the folder into
 `.minecraft/saves`. Done returns to the world list. A refusal or failure
 opens **Export refused** or **Export failed**, which names the problem (the
@@ -258,9 +268,42 @@ warning or error other than the expected refusals.
 - **N** (`scripts/n.json`, `n/`): `--world netherworld --seed 123`, dev
   `use_portal`, export five ticks after arrival.
 
+- **F** (the review fixes, `scripts/f_*.json`, `f/`), on a fresh data
+  folder:
+  - `f_a1.json` = A1 (seed 123, dig, place, `set_block` structure, tick
+    480, dev `export_world`): 7 files, 743 chunks checked. The spawn search
+    put the player at (67.5, 67.62, 37.5) this time (`World.rand` is not
+    seeded from the world seed, as in vanilla), so the chunk count differs
+    from A1's 733. `f/a1/03_before_export.png` shows the gold wall with the
+    glowstone, the chest and workbench with their torches, the sign post,
+    the placed cobblestone and the hotbar (15 cobblestone, the diamond
+    sword, 12 torches).
+  - `f_b.json` = B (`--import testWorld`, walk, diamond block, torch, sign,
+    3 diamonds, tick 300, dev `export_world`): 7 files, 784 chunks checked;
+    `f/b/02_before_export.png` shows the chest with the diamond block and
+    torch on top and the sign "testWorld / exported / from Rust".
+  - The vanilla loaders' cross-read (`xread.sh`, `compare_xread.py`) of both
+    exports: dimension 0 has 743 / 743 and 784 / 784 chunks with 0
+    differing; seed, time (482, 2052), name, version 19132 and the player
+    match; vanilla read 44 and 54 tile entities.
+  - `f_e1.json` (the UI on the F data folder): `01` the export screen;
+    `02` Escape on it returns to the world list; `03` six 46-character
+    folders typed after the default path (the box shows the end); `04`
+    "World exported" with that path. Wrapped, the path takes 13 lines and
+    would run into the Done button, so the dialog now shortens it to the
+    lines left above the button: `/tmp/claude-1000/`, `.../`, the last four
+    folders and `rustworld`, with the counts, the position and the hint
+    above Done. Before the fix the hint was drawn under the button (seen,
+    then fixed). `05` Escape on the dialog returns to the world list.
+  - `f_e2.json` with `saves/rustworld/session.lock` made unreadable
+    (`chmod 000`): `06` "Export failed: Cannot read the world: …/session.lock:
+    Permission denied (os error 13)  Nothing was exported." and no
+    `exports/new` folder; `07` Back returns to the export screen with the
+    typed path.
+
 ## 4. Unit tests
 
-13 new tests in `mc-client` (`export::tests`, `gui::menu::export_world::tests`,
+17 new tests in `mc-client` (`export::tests`, `gui::menu::export_world::tests`,
 `script::tests::parses_the_wp_4_5_export_action`), all in temporary folders:
 
 - a good world (two overworld chunks, one nether chunk) exports. The copy
@@ -283,8 +326,18 @@ warning or error other than the expected refusals.
   its `nbt`, a missing chunk;
 - the reference `testWorld` when present (it is never committed): 100+
   chunks, byte-identical copy;
+- a player `Pos` holding a NaN double (Beta 1.7.3 writes and reads one
+  without a check) exports, and the copy's digest equals the source's
+  (`WorldDigest` compares the position by its bits); a NaN with another
+  payload still differs;
+- the folders created for a missing target (`a/b/c`) are listed deepest
+  first and removed again while empty; a folder that gained a file stops
+  the removal there;
+- `export::rel` strips only the whole staging component;
 - the dialog texts (success with the wrapped path and the player position,
-  each refusal kind), `wrap_path`, and the parsing of `export_world`.
+  each refusal kind), `wrap_path`, `elide_path` (a path longer than the
+  room above the button keeps its first piece, `.../` and its last
+  pieces), and the parsing of `export_world`.
 
 ## 5. Workspace checks
 
@@ -293,7 +346,7 @@ Run in the worktree after the last code change:
 | Check | Result |
 |---|---|
 | `cargo build -p mc-app` | pass |
-| `cargo test --workspace` | pass: 1,126 tests (1,113 at Gate 3 plus the 13 new ones in `mc-client`), 0 failed |
+| `cargo test --workspace` | pass: 1,130 tests (1,113 at Gate 3 plus the 17 new ones in `mc-client`), 0 failed |
 | `cargo clippy --workspace --all-targets --all-features -- -Dwarnings` | clean |
 | `cargo fmt --all --check` | clean |
 | wasm32 check | not needed: `mc-core`, `mc-nbt` and `mc-sim` are untouched |
@@ -340,3 +393,16 @@ No `field_NNN`/`func_NNN` was touched, so `docs/mappings.md` is unchanged.
 6. **Walking through a portal in vanilla** with the exported nether was not
    shown (§2.2, E5): this desktop's focus changes paused the game. The
    nether chunks were checked by the cross-read instead.
+7. **An in-game export changes the run's later autosaves.** The dev action
+   can export the open world. That saves it with `saveWorld(true)`
+   (World.java:278-291), which vanilla only does on quit or a world change.
+   The full save resets every modified chunk's `isModified` and
+   `lastSaveTime`, so later autosaves in that run write other chunks than
+   an unexported run would. The UI exports from the world list, where the
+   world is closed, so only dev runs are affected.
+8. **Not shown on screen:** the "Export failed" dialog for a save, write or
+   mismatch failure (only the read failure was seen, F `06`). Their texts are
+   unit-tested, and they are drawn by the same code as the read failure.
+   Removing the target folders a failed export created is unit-tested on
+   the helpers; no failure after the target is created could be provoked
+   from the UI.
