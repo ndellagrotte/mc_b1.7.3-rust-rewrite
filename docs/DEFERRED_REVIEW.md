@@ -28,8 +28,11 @@ tree was read.
     ThreadStatSyncherSend.java). The port writes stats only on a world change
     and at shutdown, so a crash loses the whole session's stats. This should
     be scheduled (§2.3, proposed WP-4.7). PLAN_v4's own WP-2.7 row repeats
-    the mislabel ("`StatsSyncher` deferred per D2").
-- **One tag text was wrong and is fixed.** `crates/mc-client/src/game.rs:88`
+    the mislabel ("`StatsSyncher` deferred per D2"), and so does **D2
+    itself**: PLAN_v4.md:100 lists "stats sync" among the defunct online
+    services. Scheduling it therefore amends the text of an owner decision,
+    not only a WP row (Q34).
+- **One tag text was wrong and is fixed.** `crates/mc-client/src/game.rs:88` (89 after the fix)
   named "the snooper", which b1.7.3 does not have. It now names the systems
   in its own parenthesis (§7).
 - **The sky dimension costs no singleplayer parity.** Vanilla never opens
@@ -41,11 +44,11 @@ tree was read.
 
   | Kind | Sites | Notes |
   |---|---|---|
-  | Parity gaps reachable in singleplayer | 7 | Six are WP-4.6's brief. The seventh is **new**: `EntityFireball.getCollisionBorderSize`, reached through the client's picking (camera.rs:567). A ghast fireball's pick box grows by 0.1 instead of 1.0, so it is much harder to hit back |
+  | Parity gaps reachable in singleplayer | 10 | Six are WP-4.6's brief. Four are **new**: (1) `EntityFireball.getCollisionBorderSize`, reached through the client's picking (camera.rs:567): a ghast fireball's pick box grows by 0.1 instead of 1.0, so it is much harder to hit back. (2) A projectile whose shooter has left the world (arrow.rs:312): switch to Peaceful while a skeleton's arrow is in flight, and the port deals 4 damage where vanilla deals none and the arrow bounces. (3) A mob's look target that has left the world (living.rs:324). (4) A container over a removed tile entity (inventory/container/mod.rs:115): an explosion destroys an open chest |
   | Client-only, dead in the shipping game | 14 | The client has its own implementations |
   | Multiplayer-only | 5 | |
   | Dead code | 6 | |
-  | Defensive guards | 65 | One family of them is reachable in rare play: an entity that refers to an entity already removed from the list (§3.1) |
+  | Defensive guards | 62 | One family can be reached in rare play: a reference to an entity already removed from the list (the fishing bobber, a mount; §3.1 E family 3) |
 
   Two of WP-4.6's sites matter more than the gate documents say:
   - **Cake.** Eating cake within about 10 ticks of a hit is observable, in
@@ -112,7 +115,7 @@ edited.
 | 3 | session.rs:3 | login, session id | D2 | ok (field cites one line early, §2.4) | stays |
 | 4 | settings.rs:236 | `skin` = texture pack name, kept for `options.txt` | D3-TP | ok (GameSettings.java:27) | stays |
 | 5 | game.rs:16 | `func_28001_B` (`ThreadCheckHasPaid` at `ticksRan == 6000`) and `statFileWriter.func_27178_d` | D2 + **SCHED** | ok (Minecraft.java:940-949) | has-paid: stays. `ThreadCheckHasPaid.java:17-21` sets `hasPaidCheckTime` only on an HTTP 400 from `login.minecraft.net`, so vanilla today never shows the "Unlicensed Copy" lines either. `func_27178_d`: **not out of scope**, §2.3 |
-| 6 | game.rs:88 | applet, multiplayer, has-paid check, resource downloads, stats sync | PLAT/D3-MP/D2 + **SCHED** | text was wrong ("the snooper", which b1.7.3 lacks): **fixed** (§7) | stays, except stats (§2.3) |
+| 6 | game.rs:88 (89 after §7) | applet, multiplayer, has-paid check, resource downloads, stats sync | PLAT/D3-MP/D2 + **SCHED** | text was wrong ("the snooper", which b1.7.3 lacks): **fixed** (§7) | stays, except stats (§2.3) |
 | 7 | game.rs:521 | `isMultiplayerWorld()` always false | D3-MP | ok (Minecraft.java:1187-1189) | stays |
 | 8 | game.rs:1021 | :945-947 has-paid, :949 `func_27178_d` | D2 + **SCHED** | ok | as #5 |
 | 9 | game.rs:1022 | continuation of #8 ("stats sync, deferred D2") | **SCHED** | label wrong (not online) | §2.3 |
@@ -158,11 +161,11 @@ edited.
 |---|---|---|---|---|---|
 | 40 | inventory/mod.rs:11 | `InventoryBasic` built only by `NetClientHandler` | D3-MP | ok (NetClientHandler.java:488 is the only `new InventoryBasic`) | stays (the class is transcribed anyway) |
 | 41 | inventory/basic.rs:5 | same | D3-MP | ok | stays |
-| 42 | stats/mod.rs:18 | `StatsSyncher`: "threads and the received copy deferred (D2)" | **SCHED** / dead | label wrong | send path: §2.3. Received copy: dead in b1.7.3 singleplayer (nothing writes `stats_<user>.dat`) |
+| 42 | stats/mod.rs:18 | `StatsSyncher`: "threads and the received copy deferred (D2)" | **SCHED** / dead | label wrong | send path: §2.3. Received copy: dead unless a `stats_<user>.dat` already exists; local file I/O, not D2 (§2.3) |
 | 43 | stats/mod.rs:19 | `ThreadStatSyncherReceive`, `ThreadStatSyncherSend` "deferred (D2)" | **SCHED** / dead | label wrong | as #42 |
 | 44 | stats/file_writer.rs:29 | the threads, `func_27418_a`, `func_27424_a`, the received copy, the per-tick `func_27178_d` | **SCHED** / dead | Java cites ok; label wrong | as #42 |
 | 45 | stats/file_writer.rs:398 | `field_27189_c` read only by the deferred `func_27178_d` | **SCHED** | ok | §2.3 |
-| 46 | stats/file_writer.rs:486 | the receive thread | dead | ok (StatsSyncher.java:26-49) | stays out: it reads a file no b1.7.3 client writes |
+| 46 | stats/file_writer.rs:486 | the receive thread | dead unless the file exists | ok (StatsSyncher.java:26-49) | local file I/O, not D2: dead unless a `stats_<user>.dat` already exists; optional WP-4.7 item (6) or an accepted divergence (§2.3, Q34) |
 | 47 | stats/file_writer.rs:534 | `syncStatsFileWithMap`'s busy-wait for the threads | n/a | ok (StatsSyncher.java:139-165) | nothing to do once the send runs synchronously |
 | 48 | stats/file_writer.rs:588 | `field_27433_f` = `stats_<user>.dat` | dead | ok | as #46 |
 | 49 | world/sky.rs:18 | `WorldProviderSky` overrides | D3-SKY | ok | stays; unreachable in singleplayer (§2.3) |
@@ -193,7 +196,7 @@ edited.
 | 69 | PLAN_v4.md:106 | D3 defines the `deferred` tag | — |
 | 70 | PLAN_v4.md:142 | D5: pre-McRegion worlds deferred | D3-CONV, Phase 6 |
 | 71 | PLAN_v4.md:400 | networking 72 files / 4.6k LOC deferred | D3-MP, Phase 6 |
-| 72 | PLAN_v4.md:476 | WP-2.7: "`StatsSyncher` deferred per D2" | **wrong**, §2.3; fix in PLAN_v5 |
+| 72 | PLAN_v4.md:476 | WP-2.7: "`StatsSyncher` deferred per D2" | **wrong**, §2.3; fix in PLAN_v5, together with D2's own "stats sync" (PLAN_v4.md:100, a line without the word `deferred`) |
 | 73 | PLAN_v4.md:505 | this WP | — |
 | 74 | PLAN_v4.md:546 | brief template "Out of scope: deferred code it will meet" | — |
 | 75 | PLAN_v4.md:563 | DoD 7 "deferred code skipped" | — |
@@ -250,14 +253,32 @@ accurate.
      from the shell's tick, before `IngameGuiUpdateTick`.
    - **Proposed:** WP-4.7 (§3.6). Mc-sim's stats module is fixture-neutral:
      the oracle's `HarnessPlayer` counts no stats.
-   - The receive half (`ThreadStatSyncherReceive`, `stats_<user>.dat`,
-     `func_27180_b`) stays out. It reads a file that nothing in b1.7.3
-     singleplayer writes: the receive thread's write branch needs a map
-     that only the receive thread itself sets, and it runs once, at
-     construction.
+   - **The label comes from D2 itself.** PLAN_v4.md:100 names "stats sync"
+     among the defunct online services that are out of scope. In b1.7.3
+     there is no server side to it: every "sync" is a local file. So D2's
+     list should drop "stats sync" (or narrow it to a server upload, which
+     b1.7.3 never had). That is an amendment of an owner decision, which
+     Q34 asks for.
+   - **The receive half** (`ThreadStatSyncherReceive`, `stats_<user>.dat`,
+     `func_27180_b`) is local file I/O too, not D2. It is dead unless a
+     `stats_<user>.dat` already exists. Nothing in b1.7.3 singleplayer
+     writes that file: the receive thread's write branch needs a map that
+     only the receive thread itself sets, and it runs once, at
+     construction. But a file can exist: `StatFileWriter`'s constructor
+     relocates any `stats_*.dat` from the data directory's root
+     (StatFileWriter.java:22-34), or the owner may copy one in from a
+     `.minecraft`. Vanilla then reads it at start-up
+     (ThreadStatSyncherReceive.java:15-16, StatsSyncher.java:26-49), and the
+     per-tick `func_27425_c` folds it through `func_27180_b`
+     (StatsSyncher.java:185-187, StatFileWriter.java:69-80) into the totals
+     map that `hasAchievementUnlocked`, `writeStat` and the statistics
+     screen read (StatFileWriter.java:174-185). The port relocates the file
+     (stats/file_writer.rs:486-500) but does not merge it. Either add the
+     merge as optional WP-4.7 item (6) or record it as an accepted
+     divergence (Q34).
    - Relabel when that WP lands: game.rs:16, :1021-1022, gui/menu/mod.rs:42,
-     stats/mod.rs:18-19, stats/file_writer.rs:29, :398, and PLAN_v5's WP-2.7
-     row.
+     stats/mod.rs:18-19, stats/file_writer.rs:29, :398, PLAN_v5's WP-2.7
+     row, and PLAN_v5's D2 text (PLAN_v4.md:100).
 2. **The sky dimension is unreachable in vanilla singleplayer.** The
    loading constructor picks `getProviderForDimension(-1)` for a saved
    dimension of −1 and the surface for anything else (World.java:184-190).
@@ -287,6 +308,10 @@ They are outside this WP's files; a cleanup pass can take them.
 
 - assets.rs:9 `TexturePackBase.java:27-29` → 28-29. assets.rs:12
   `TexturePackDefault.java:7-13` → the constructor is 13-18.
+- assets.rs:36 `TexturePackDefault.java:11` → 18 (line 11 is the field
+  declaration; the `/pack.png` read is :18). assets.rs:38
+  `LoadingScreenRenderer.java:145` → 80 (the file has 123 lines).
+  assets.rs:41 `TexturePackDefault.java:28` → 40 (`/gui/unknown_pack.png`).
 - session.rs:13/:16/:19 `Session.java:7/:8/:9` → 8/9/10; :25
   `Session.java:11-14` → 12-15.
 - sleep.rs:3 `Minecraft.java:978-983` → 975-979.
@@ -303,7 +328,7 @@ They are outside this WP's files; a cleanup pass can take them.
 drains no `unimplemented_hits`, so a reached gap is silent there (§3.6,
 WP-4.8 item 1).
 
-**A. Parity gaps (7 sites).** All are reachable, and none changes a
+**A. Parity gaps (10 sites).** All are reachable, and none changes a
 current fixture.
 
 | Java | Site | Effect in play | Owner |
@@ -314,6 +339,9 @@ current fixture.
 | `EntityPig.onStruckByLightning` | entity/pig.rs:102 | A struck pig dies; no zombie pigman joins, so the entity id stream shifts | WP-4.6 (R2) |
 | `EntityPlayer.alertWolves`: the tamed branch | entity/player.rs:836, :853 | Tamed wolves never defend their owner (EntityPlayer.java:402-437) | WP-4.6 |
 | `EntityFireball.getCollisionBorderSize` (1.0F, EntityFireball.java:198-200) | entity/dispatch.rs:795 | **New.** The client's `getMouseOver` calls the sim dispatch (camera.rs:567), which records the gap and returns the base 0.1. A ghast fireball is therefore picked through a box expanded by 0.1 instead of 1.0, so punching it back (`attackEntityFrom` sends it along the look) is much harder than in vanilla. Gate 2 gave this method to WP-3.1; it was not done there, and fireball.rs:10-12 still calls it "client". One match arm | **add to WP-4.6** |
+| A projectile's shooter that has left `loadedEntityList`: `attackEntityFrom(this.owner, 4)` (EntityArrow.java:163; the fireball's `shootingEntity` likewise, EntityFireball.java:124) | entity/arrow.rs:312 (`attack_entity_by_id`, shared by all five projectiles) | **New; moved here from the defensive guards.** Java still holds the shooter object; the port passes no attacker. **Repro:** switch to Peaceful while a skeleton's arrow is in flight. Vanilla removes the skeleton (EntityMob.java:20-24), the arrow still passes it, `EntityPlayer.attackEntityFrom` sees an `EntityMob`, scales the damage to 0 and returns false (EntityPlayer.java:366-381), and the arrow bounces back (EntityArrow.java:166-173). The port skips the scaling (player.rs:767-778), deals 4 damage and kills the arrow with `random.drr`. On Easy the port deals 4 where vanilla deals 2; on Hard, 4 where vanilla deals 6 (Normal agrees). With no attacker, `EntityLiving.attackEntityFrom` also skips the knockback and draws `Math.random` once for `attackedAtYaw` instead of the `atan2` path (EntityLiving.java:337-349, `knockBack` at :346), which shifts the shared `Math.random` stream, and `alertWolves` is not called. The same happens when the skeleton is killed (removed at `deathTime > 20`, EntityLiving.java:157-159) or despawns while the arrow flies, and when a ghast is removed under its fireball (EntityGhast.java:32, damage 0: only knockback and the `Math.random` draw differ) | **proposed WP-4.7** item (5) (mc-sim behaviour; the snapshot of WP-4.8 item 2 is the general remedy) |
+| `EntityLiving.updatePlayerActionState`: `faceEntity(currentTarget)` before the `isDead` check (EntityLiving.java:706-710) | entity/living.rs:324 (`EntityView::of`, via living.rs:1096) | **New; moved here from the defensive guards.** An idle mob looking at the player (`currentTarget`, set at EntityLiving.java:697-700) when the dead player leaves the list 20 ticks after death (EntityLiving.java:157-159): vanilla turns the mob toward the removed player's last position once more, then drops it as `isDead`; the port finds no view, skips the turn and drops it. One tick of the mob's yaw and pitch differs, and its walk direction follows from them. Rare and invisible behind the death screen, but a simulation divergence | **proposed WP-4.7** item (5), with the projectile shooter |
+| `Container.slotClick` over a tile entity that has left the world (TileEntityChest/Furnace/Dispenser) | inventory/container/mod.rs:115 (`te_gone`, called from :144, :170, :211, :253, :366) | **New; moved here from the defensive guards.** **Repro:** an explosion destroys a chest, furnace or dispenser whose window is open. The port closes the window in tick N+1's screen hook, *after* `handle_input` (gui/mod.rs:344-351; the README's close-timing deviation, §3.2), so clicks queued since tick N still reach `slot_click`, which records `te_gone` and does nothing. Vanilla depends on the order within tick N's `updateEntities`: if the explosion came before the player's update, `isUsableByPlayer` failed and the window closed in tick N (EntityPlayer.java:80-84), so tick N+1's input goes to the game; if it came after, tick N+1's `handleInput` (Minecraft.java:987-991, before `updateEntities` at :1160) clicks the orphaned `TileEntityChest`, whose stacks `onBlockRemoval` left at `stackSize` 0 (BlockChest.java:155-182), before the player's update closes the window. The site's own comment (container/mod.rs:111-113, "unreachable from the client, which closes the window") is wrong | **proposed WP-4.7** item (2) (fixing the close timing removes the first case); the comment is WP-4.6's (§3.4) |
 
 **B. Client-only, dead in the shipping game (14 sites).** The client
 implements these itself and never calls the sim's versions.
@@ -342,8 +370,10 @@ Snowball; entity/dispatch.rs:825, :828, :829, :832) and
 - block/dispatch.rs:680: `untranscribed()`, reached only through the five
   all-`None` tails (§1).
 
-**E. Defensive guards (65 sites)**: the take-out/put-back pattern and Java
-exception paths. None is a work item on its own.
+**E. Defensive guards (62 sites)**: the take-out/put-back pattern and Java
+exception paths. None is a work item on its own. (The first version of this
+document counted 65; arrow.rs:312, living.rs:324 and
+inventory/container/mod.rs:115 moved to A after its review.)
 
 | File | Sites |
 |---|---|
@@ -355,8 +385,8 @@ exception paths. None is a work item on its own.
 | spawner.rs | 127, 383, 399, 424 |
 | entity/boat.rs | 168, 322, 474 |
 | entity/painting.rs | 306, 407, 497 |
-| entity/arrow.rs, minecart.rs, pressure_plate.rs, tile_entity/mob_spawner.rs | 312, 324; 303, 1065; 189, 193; 166, 216 |
-| one each | creature.rs:110, ghast.rs:202, item.rs:222, lightning_bolt.rs:160, living.rs:324, mob.rs:182, nbt.rs:129, pig.rs:122, skeleton.rs:87, spider.rs:76, inventory/container/mod.rs:115, item/behaviour/projectiles.rs:110, save/chunk_loader.rs:118, save/entity_list.rs:301, tick.rs:98, world/explosion.rs:345, world/mod.rs:2023 |
+| entity/arrow.rs, minecart.rs, pressure_plate.rs, tile_entity/mob_spawner.rs | 324; 303, 1065; 189, 193; 166, 216 |
+| one each | creature.rs:110, ghast.rs:202, item.rs:222, lightning_bolt.rs:160, mob.rs:182, nbt.rs:129, pig.rs:122, skeleton.rs:87, spider.rs:76, item/behaviour/projectiles.rs:110, save/chunk_loader.rs:118, save/entity_list.rs:301, tick.rs:98, world/explosion.rs:345, world/mod.rs:2023 |
 
 Three families:
 
@@ -364,28 +394,85 @@ Three families:
    `ClassCastException` paths in item.rs, player.rs:537, nbt.rs:129,
    fish.rs:260, painting.rs and mob_spawner.rs. Vanilla would crash or log
    here; the port skips. This is not a parity concern.
-2. **Taken-out entity** (Gate 2 R5): a query meets an entity that is out
-   of its slot, so the port leaves it out where Java would test it.
+2. **Taken-out entity** (Gate 2 R5), 46 sites: a query meets an entity
+   that is out of its slot, so the port leaves it out where Java would test
+   it.
    - 11 passing fixtures reach it, and none changes a value.
    - The risk is a case where the skipped entity would have matched.
    - Unscheduled: §3.6, WP-4.8 item 2.
-3. **Removed-entity references.** These are reachable, if rarely. Java
-   keeps an object after it leaves `loadedEntityList`; the port keeps an
-   id. The sites:
-   - player.rs:798 and wolf.rs:662: the arrow's owner;
-   - arrow.rs:312: the projectile's attacker;
-   - living.rs:324: the target or attacker view;
-   - fish.rs:503 and projectiles.rs:110: the bobber;
-   - world/entities.rs:52/282/507.
 
-   Example: a skeleton's arrow lands more than 21 ticks after the skeleton
-   died (death animation, EntityLiving's `deathTime > 20`). Vanilla still
-   calls `attackEntityFrom(deadSkeleton, 4)`, which gives knockback
-   (EntityLiving.java:337) and calls `alertWolves`. The port passes no
-   attacker: no knockback, no wolves alerted. Gate 2 R5 suggests one
-   remedy for this family and family 2: keep a snapshot (class, position,
-   box) of entities that are taken out or removed while something still
-   refers to them. WP-4.8 item 2.
+   The one-each members were traced site by site (the first version of this
+   document classified the family as a block, and
+   inventory/container/mod.rs:115 turned out to be reachable; it is now in
+   A):
+   - **creature.rs:110**: unreachable. The target is the player
+     `findPlayerToAttack` has just returned from `playerEntities`, and no
+     mob updates nested inside a player's update: the port puts a mount back
+     in its slot before it updates the rider (world/entities.rs:470-471).
+   - **ghast.rs:202**: unreachable. A removed target is `isDead`, and the
+     ghast drops a dead target before reading it (EntityGhast.java:61-63,
+     ghast.rs:176-180); its target is always a player (EntityGhast.java:66).
+   - **mob.rs:182, skeleton.rs:87, spider.rs:76**: unreachable.
+     `attackEntity` runs only after `EntityView::of` found the target in its
+     slot (creature.rs:142-148).
+   - **pressure_plate.rs:189**: believed unreachable. During a plate's
+     query the only entities out of their slots are the colliding entity
+     (passed in as `in_hand`) and an attack target inside
+     `attackEntityFrom`, which neither moves nor ticks a plate. The first
+     message (a chunk list holding an entity not in `loadedEntityList`)
+     cannot happen: dead and unloaded entities leave both lists together
+     (World.java:1189-1231).
+   - **save/chunk_loader.rs:118**: unreachable. Singleplayer's
+     `ChunkProvider` (World.java:212) saves only from `saveChunks` and
+     `unload100OldestChunks` (ChunkProvider.java:130-167), which run from
+     `World.tick` and `saveWorld` (World.java:1762, :1774), never inside an
+     entity's update.
+   - **world/entities.rs:771**: reachable, with no effect. On the death
+     screen, more than 20 ticks after death, the dead player has left the
+     list (EntityLiving.java:157-159), and `joinEntityInSurroundings` runs
+     every 30 ticks (Minecraft.java:1134-1139). Vanilla appends the dead
+     player again (World.java:2305-2307), and the same tick's
+     `updateEntities` drops it, since it is `isDead`, after every other
+     entity has updated and before `World.tick`; the 5 × 5 chunks it loads
+     are already loaded. The port records the gap and returns.
+   - **tick.rs:98, world/mod.rs:2023, lightning_bolt.rs:160, pig.rs:122**:
+     unreachable. The sleep check (World.java:1748) and the level save run
+     outside entity updates; the bolt strikes entities its own query found
+     in their slots; a pig's `fall` runs in the pig's own update, with its
+     rider in its slot.
+   - **world/explosion.rs:345**: believed unreachable, as the plate. The
+     entity whose update set off the explosion is passed in (`hid`), and
+     no other entity is out of its slot when an explosion runs.
+   - **save/entity_list.rs:301**: not a taken-out entity. A saved entity
+     whose id is outside `EntityList`'s table; vanilla skips it too
+     (`createEntityFromNBT` returns null), so nothing differs but the
+     record.
+
+   The multi-site files (world/entities.rs, wolf.rs, base.rs, fish.rs,
+   player.rs, spawner.rs, boat.rs, painting.rs, minecart.rs,
+   mob_spawner.rs, arrow.rs:324, pressure_plate.rs:193) were not traced
+   site by site. WP-4.8 item 2 should trace them before it picks a remedy.
+3. **Removed-entity references**, 7 sites. Java keeps an object after it
+   leaves `loadedEntityList`; the port keeps an id. The sites:
+   - player.rs:798 and wolf.rs:662: the owner of an arrow passed *as* the
+     attacker. **Unreachable in b1.7.3:** no caller passes an arrow entity
+     to `attackEntityFrom`. All five projectiles pass their shooter
+     (EntityArrow.java:163, EntitySnowball.java:153, EntityEgg.java:153,
+     EntityFireball.java:124, EntityFish.java:225), so the
+     `instanceof EntityArrow` branches of EntityPlayer.java:384 and
+     EntityWolf.java:269 never run. The reachable form of this gap, the
+     shooter passed directly, is arrow.rs:312 in A;
+   - fish.rs:503 and projectiles.rs:110: the bobber;
+   - world/entities.rs:52/282/507: the dead-or-gone check and a rider's
+     mount.
+
+   The projectile shooter (arrow.rs:312) and the look target
+   (living.rs:324) were in this family in the first version of this
+   document; both are parity gaps reachable in singleplayer and are now in
+   A. Gate 2 R5 suggests one remedy for the rest of this family and for
+   family 2: keep a snapshot (class, position, box) of entities that are
+   taken out or removed while something still refers to them. WP-4.8 item
+   2.
 
 The two `SpawnerAnimals.performSleepSpawning` "Pathfinder read of an
 unloaded chunk" records (spawner.rs:383, :399) are believed unreachable.
@@ -403,7 +490,7 @@ The random-tick pass keeps the 19 × 19 chunks around each player loaded
 |---|---|---|---|
 | D1 third-person held items not drawn (`render::held_item::HeldItemHook` never inserted; `ItemRenderer::player_model_drawn` not called from the third-person draw) | Gate 3 §3; README "Integration status" | yes | scheduled **WP-3.9** |
 | D2 achievement/statistics block icons drawn flat | Gate 3 §3; README "Item icons" | yes | scheduled **WP-3.9** |
-| Container close timing: `isUsableByPlayer` close runs at the start of tick N+1 (EntityPlayer.java:80-84) | README "Known deviations" | yes (walk away from an open chest: the dropped cursor stack gets one `EntityItem` update fewer, and its id comes after tick N's spawns) | **unowned**. Needs `craftingInventory` in mc-sim's player or a shell hook after the player's update; proposed **WP-4.7** with WP-4.6 for the mc-sim side |
+| Container close timing: `isUsableByPlayer` close runs at the start of tick N+1 (EntityPlayer.java:80-84) | README "Known deviations" | yes. (a) Walk away from an open chest: the dropped cursor stack gets one `EntityItem` update fewer, and its id comes after tick N's spawns. (b) **A whole tick of input still reaches a container vanilla has already closed.** The port closes in `update_screen`, which runs after `handle_input` in tick N+1's screen hook (gui/mod.rs:344-351). Vanilla closed the window inside tick N's `updateEntities` and routes tick N+1's `handleInput` (Minecraft.java:987-991) to the game. So chest clicks in the tick after walking out of range still move items between the chest and the inventory, which vanilla never allows, and that tick's key and mouse events (a number key, Q, a click) miss the game. (c) A container whose tile entity an explosion removed (§3.1 A, container/mod.rs:115) | **unowned**. Needs `craftingInventory` in mc-sim's player or a shell hook after the player's update; proposed **WP-4.7** with WP-4.6 for the mc-sim side |
 | A screen opened by a click opens at the next tick hook; the rest of that tick's input goes to the game (Minecraft.java:995-1126) | README | yes (a number key or Q in the same tick as the right click on a chest) | **unowned**; proposed **WP-4.7** (`Game::process_input` sets `current_screen` after each controller call that raises a GUI) |
 | Portal with a workbench open: vanilla drops the 3 × 3 grid twice (EntityPlayerSP.java:45-47 skips `closeScreen`; the second `EntityItem`s share the first ones' `ItemStack`s); the port drops once | README | yes (rare) | **accepted divergence** of value-typed stacks unless the owner wants it emulated (Q31) |
 | Chest minecart cannot be opened (`InventoryRef` has no entity variant) | README; Gate 3 §4 | yes | scheduled **WP-4.6** |
@@ -463,7 +550,8 @@ chest-minecart `InventoryRef`. This review adds:
 1. `EntityFireball.getCollisionBorderSize` → 1.0 (entity/dispatch.rs:793-797;
    fix fireball.rs:10-12's "client" note).
 2. The stale docs in §3.3 (R3 row), including mappings.md:345 and
-   player.rs:824-827.
+   player.rs:824-827, and inventory/container/mod.rs:111-113: `te_gone`'s
+   "unreachable from the client, which closes the window" is wrong (§3.1 A).
 3. The cake fix is observable (§3.1 A). A unit test can pin it:
    `heartsLife` 15, eat cake, take 1 damage → vanilla takes the full branch
    and sets `heartsLife` 20.
@@ -489,8 +577,8 @@ chest-minecart `InventoryRef`. This review adds:
 
 | Proposed | Content | Crates | Size |
 |---|---|---|---|
-| **WP-4.7 Small parity remainder** | (1) Stats autosave: `func_27178_d` / `func_27425_c` / `func_27420_b` on `StatFileWriter`, the send run synchronously from the shell's tick, and the tags relabelled (§2.3). (2) Container close timing (README). (3) The screen-opened-by-click input routing (README). (4) Q33's two buttons if the owner wants them enabled (and doing nothing) | mc-sim `stats/` (fixture-neutral), mc-client `game.rs`, `gui/` | small to medium |
-| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): keep a snapshot of taken-out or removed entities for queries and references. (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4 | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
+| **WP-4.7 Small parity remainder** | (1) Stats autosave: `func_27178_d` / `func_27425_c` / `func_27420_b` on `StatFileWriter`, the send run synchronously from the shell's tick, and the tags relabelled (§2.3). (2) Container close timing (README): close in tick N after the player's update, so tick N+1's input goes to the game as in vanilla (§3.2 b), and the te_gone case of §3.1 A shrinks to an explosion after the player's update. (3) The screen-opened-by-click input routing (README). (4) Q33's two buttons if the owner wants them enabled (and doing nothing). (5) Removed references with a parity effect (§3.1 A): the projectile's shooter (arrow.rs:312: Peaceful bounce, difficulty scaling, knockback, `alertWolves`, the extra `Math.random` draw) and the mob's look target (living.rs:324); a copy of the removed entity's class and position held by the referrer is enough. (6) Optional: merge an existing `stats_<user>.dat` at start-up (`func_27180_b`, §2.3) | mc-sim `stats/` (fixture-neutral), mc-sim `entity/` for (5) (with WP-4.6 or after it), mc-client `game.rs`, `gui/` | small to medium |
+| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): trace the multi-site files of family 2 site by site, then keep a snapshot of taken-out or removed entities for queries and references (the general form of WP-4.7 item 5). (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4 | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
 | Rendering follow-up (or wave F) | The `f32` far-origin jitter, the pass-1 sort, the inventory preview's overlay/shadow/fire, anaglyph's second eye | mc-client | by WP-4.1's findings |
 
 ## 4. PLAN_v4 §5 reconciled with what was delivered (for PLAN_v5)
@@ -616,7 +704,7 @@ proceed (Gate 1 §5.1).
 | Q31 | **New.** The portal-with-workbench double drop (§3.2): accept the value-stack divergence, or emulate vanilla's shared `ItemStack`s? | this review | **open** | nothing |
 | Q32 | **New, restating PLAN Phase 6.** Decide each D3 item: multiplayer; texture packs; the sky dimension (unreachable in vanilla singleplayer, §2.3); pre-McRegion conversion (reachable for old saves; D5 refuses them today) | PLAN §5 Phase 6; D3 | **open** | Phase 6 |
 | Q33 | **New.** Vanilla enables the Multiplayer button and "Open texture pack folder"; the port disables both (D3). Keep them disabled, or enable them as no-ops / with a "not supported" screen? | this review | **open** | WP-4.1 checklist entries |
-| Q34 | **New.** Stats autosave (§2.3): schedule (proposed WP-4.7) or accept saving only at world change and shutdown? | this review | **open** | — |
+| Q34 | **New. Amend D2** (PLAN_v4.md:100): drop "stats sync" from D2's out-of-scope list, or narrow it to a server upload, which b1.7.3 never had, since every stats "sync" is local file I/O (§2.3). Then: schedule the stats autosave (proposed WP-4.7 item 1) or accept saving only at world change and shutdown; and merge an existing `stats_<user>.dat` (WP-4.7 item 6) or accept that divergence | this review | **open** | the D2 text in PLAN_v5; WP-4.7 items 1 and 6 |
 
 Totals:
 - resolved (4): Q9, Q19, Q26, Q27;
@@ -694,7 +782,11 @@ One documentation fix, in a module doc comment. No behaviour change.
   has no snooper (`grep -ri snoop` over the D2 tree finds nothing). The new
   text names the systems the same sentence's parenthesis lists
   (`ThreadCheckHasPaid`, `ThreadDownloadResources`). The stats item is still
-  mislabelled; §2.3 leaves it to the WP that ports the autosave.
+  mislabelled; §2.3 leaves it to the WP that ports the autosave. The
+  `deferred` word moved from line 88 to 89 (§2.1 row #6).
+- docs/GATE3_REVIEW.md:295 still lists "snooper" among game.rs's deferred
+  items. That line records what game.rs said at Gate 3; it is historical,
+  and this fix supersedes it.
 
 Not changed, deliberately: the stats labels (§2.3), the citation nits
 (§2.4) and the stale docs (§3.3). They are in files other WPs own and are
