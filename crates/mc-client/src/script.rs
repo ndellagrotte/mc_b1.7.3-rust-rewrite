@@ -336,8 +336,12 @@ pub enum Action {
     /// pointer moves to the row's centre ([`slot_row_center`]), the left
     /// button is held for two frames (`GuiSlot` polls it while drawing),
     /// and with `double` a second click follows four frames after the
-    /// first (within `GuiSlot`'s 250 ms: Play on the world list). Waits up
-    /// to 120 frames for a list with such a row.
+    /// first (Play on the world list). `GuiSlot` takes it as a double click
+    /// only when the second press comes under 250 ms of wall-clock time
+    /// after the first (`System.currentTimeMillis()`, GuiSlot.java:138), so
+    /// `double` needs frames under about 60 ms (above about 16 fps); on
+    /// slower frames the second press is a fresh single click. Waits up to
+    /// 120 frames for a list with such a row.
     ClickSlot {
         /// The row (0 = the first).
         index: i32,

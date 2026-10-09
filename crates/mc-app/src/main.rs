@@ -115,7 +115,8 @@ fn main() {
                 StartAction::World { name, seed: None }
             }
             Err(e) => {
-                eprintln!("mc_b173: {e}");
+                // The real file, not the staging copy (Gate 3 O4).
+                eprintln!("mc_b173: {}", e.naming_folder(&src));
                 std::process::exit(1);
             }
         }

@@ -108,7 +108,7 @@ impl GuiImportWorld {
                 ctx.sync();
             }
             Err(e) => {
-                bevy::log::warn!("import of {}: {e}", src.display());
+                bevy::log::warn!("import of {}: {}", src.display(), e.naming_folder(&src));
                 ctx.display_wrapping_this(move |this| {
                     Box::new(GuiImportRefused::new(Some(this), &e))
                 });

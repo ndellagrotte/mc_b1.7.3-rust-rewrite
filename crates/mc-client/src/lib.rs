@@ -237,7 +237,8 @@ fn run_startup_action(mut game: NonSendMut<Game>, mut action: ResMut<StartupActi
                     info!("imported {} as saves/{name}", path.display());
                     game.open_world(&name, None)
                 }
-                Err(e) => Err(e.to_string()),
+                // The log names the real file (Gate 3 O4).
+                Err(e) => Err(e.naming_folder(&path).to_string()),
             }
         }
     };

@@ -47,7 +47,7 @@ impl std::error::Error for ImportError {}
 const STAGING: &str = "import";
 
 /// A refusal of the staged copy, naming the file in the real folder
-/// (`<src>/level.dat`, not `import/level.dat`) for the log and the dialog.
+/// (`<src>/level.dat`, not `import/level.dat`).
 fn name_real_path(r: ImportRefusal, src: &Path) -> ImportRefusal {
     match r {
         ImportRefusal::Unreadable { path, reason } => {
@@ -65,6 +65,20 @@ fn name_real_path(r: ImportRefusal, src: &Path) -> ImportRefusal {
             ImportRefusal::Unreadable { path, reason }
         }
         other => other,
+    }
+}
+
+impl ImportError {
+    /// The error as the log names it (Gate 3 O4): a refusal of an
+    /// unreadable file names it in the real folder `src` (an absolute path).
+    /// The error itself keeps the staging-relative `import/<rel>`, which the
+    /// refusal dialog shows as `<rel>` (an absolute path has no spaces to
+    /// wrap at and would run past the dialog's right edge).
+    pub fn naming_folder(&self, src: &Path) -> ImportError {
+        match self {
+            ImportError::Refused(r) => ImportError::Refused(name_real_path(r.clone(), src)),
+            other => other.clone(),
+        }
     }
 }
 
@@ -113,7 +127,7 @@ pub fn import_world(data_dir: &Path, src: &Path) -> Result<String, ImportError> 
             .write(&format!("import/{rel}"), bytes)
             .map_err(|e| ImportError::Read(e.to_string()))?;
     }
-    validate(&mut staged, STAGING).map_err(|r| ImportError::Refused(name_real_path(r, src)))?;
+    validate(&mut staged, STAGING).map_err(ImportError::Refused)?;
 
     let fs = FsStorage::new(data_dir).map_err(|e| ImportError::Write(e.to_string()))?;
     let store = SaveStore::shared(Box::new(fs.clone()), Box::new(WallClock));
@@ -179,10 +193,14 @@ mod tests {
         let e = import_world(&data.0, &world).unwrap_err();
         assert!(matches!(e, ImportError::Refused(_)), "{e}");
         assert!(!data.0.join("saves").exists());
-        // The refusal names the real file, not the staging copy (Gate 3 O4).
+        // The log names the real file, not the staging copy (Gate 3 O4)...
         let real = world.join("level.dat").display().to_string();
-        assert!(e.to_string().contains(&real), "{e}");
-        assert!(!e.to_string().contains("import/"), "{e}");
+        let logged = e.naming_folder(&world).to_string();
+        assert!(logged.contains(&real), "{logged}");
+        assert!(!logged.contains("import/"), "{logged}");
+        // ...and the dialog the short name, which it can wrap.
+        let (_, lines) = crate::gui::menu::import_refused::refusal_text(&e);
+        assert!(lines[0].starts_with("Cannot read level.dat:"), "{lines:?}");
     }
 
     #[test]
