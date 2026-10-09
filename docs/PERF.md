@@ -90,8 +90,10 @@ directory first, development fallbacks only when they exist).
     `particles`, `gui`, `gui_flush`, `sky`, `hand`.
   - All three are kept over the last 600 frames (min / mean / nearest-rank p95 /
     max), with the start-up milestones and the native storage's counters.
-  - They are reported in `dump_debug` (`perf`, `storage`) and in three `[rust]`
-    lines in F3's right column.
+  - They are reported in `dump_debug` (`perf`, `storage`) and in four `[rust]`
+    lines in F3's right column, from y = 52 down, below the rows of the left
+    column's lines (frame and update min/avg/p95/max, then the phase means
+    in two short lines).
 - **Uncapped present mode:** `mc_b173 --vsync off` (`PresentMode::AutoNoVsync`).
   The compositor (KWin/Wayland) still paces the window while it is covered or
   hidden. Some runs were capped at 60 fps for that reason, both before and
@@ -334,7 +336,7 @@ with vsync on, at 854 × 480:
 
 `pngdiff.py` compares decoded pixels. The same binary run twice gives identical
 images. Between `70cdb29` and the final tree, **0 of 409,920 pixels differ in
-each of the three**. The three `[rust]` F3 lines are the only visual addition,
+each of the three**. The four `[rust]` F3 lines are the only visual addition,
 and they show only with F3 on.
 
 ### 4.5 Meshing: measured, left as it was

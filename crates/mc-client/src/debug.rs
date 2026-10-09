@@ -108,9 +108,15 @@ pub fn debug_text(g: &Game, src: &DebugSources) -> DebugText {
     }
 }
 
+/// The right column's first row of the project's lines: row 5 is y = 52,
+/// under the left column's lines at y = 2 to 42.
+// src: GuiIngame.java:172-176
+pub const PERF_FIRST_ROW: usize = 5;
+
 /// Fills [`DebugText`] every frame. With F3 on, the right column also
-/// gets the project's performance lines under vanilla's two memory lines
-/// ([`crate::perf::PerfStats::f3_lines`], WP-4.3).
+/// gets the project's performance lines ([`crate::perf::PerfStats::f3_lines`],
+/// WP-4.3) from row [`PERF_FIRST_ROW`] down, below the rows of the left
+/// column's five lines, so no row holds both.
 pub fn publish_debug_text(
     game: NonSend<Game>,
     src: Res<DebugSources>,
@@ -121,6 +127,9 @@ pub fn publish_debug_text(
     if !t.right.is_empty()
         && let Some(p) = perf
     {
+        // Rows 2 to 4 stay empty (an empty string draws no glyph).
+        t.right
+            .resize(PERF_FIRST_ROW.max(t.right.len()), String::new());
         t.right.extend(p.f3_lines());
     }
     if *out != t {

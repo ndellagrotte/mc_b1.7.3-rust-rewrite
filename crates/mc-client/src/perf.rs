@@ -23,9 +23,15 @@
 //!   first in-game frame.
 //!
 //! The numbers reach the `dump_debug` dev action (`perf`, `storage`) and the
-//! F3 screen's right column, under the memory lines, prefixed `[rust]`
-//! ([`PerfStats::f3_lines`]). Nothing here changes what the game draws
-//! without F3.
+//! F3 screen's right column, prefixed `[rust]` ([`PerfStats::f3_lines`]):
+//! from row 5 (y = 52) down, below the rows of the left column's five lines
+//! (GuiIngame.java:172-176, y = 2 to 42), so they share no row with vanilla
+//! text, and each at most about 200 scaled pixels wide, clear of the
+//! position lines (x 2 to about 130, y = 64 to 88) at the default 854 x 480
+//! window (427 scaled pixels). The frame and update lines give
+//! min/avg/p95/max of the last [`WINDOW`] frames; the phase lines give the
+//! phases' means ([`Phase::short`] names). Nothing here changes what the
+//! game draws without F3.
 
 #![allow(clippy::disallowed_types)]
 
@@ -95,7 +101,8 @@ impl Phase {
     }
 
     /// The short label on the F3 line.
-    fn short(self) -> &'static str {
+    /// The phase's name on the F3 lines.
+    pub fn short(self) -> &'static str {
         match self {
             Phase::Sim => "sim",
             Phase::Terrain => "ter",
@@ -270,32 +277,30 @@ impl PerfStats {
         })
     }
 
-    /// The project's F3 lines (module docs): the frame-time summary and the
-    /// phases' means, milliseconds.
+    /// The project's F3 lines (module docs): the frame and update times
+    /// (min/avg/p95/max, milliseconds) and the phases' means, short enough
+    /// to sit beside the position lines.
     pub fn f3_lines(&self) -> Vec<String> {
         let f = self.frame_summary();
         let u = self.update_summary();
-        let mut phases = String::from("[rust] ms");
-        for p in [
-            Phase::Sim,
-            Phase::Terrain,
-            Phase::Entities,
-            Phase::Particles,
-            Phase::Gui,
-            Phase::GuiFlush,
-        ] {
-            phases.push_str(&format!(" {} {:.2}", p.short(), self.phase_summary(p).avg));
-        }
+        let phases = |ps: [Phase; 3]| {
+            let mut line = String::from("[rust]");
+            for p in ps {
+                line.push_str(&format!(" {} {:.2}", p.short(), self.phase_summary(p).avg));
+            }
+            line
+        };
         vec![
             format!(
-                "[rust] frame ms {:.1}/{:.1}/{:.1}/{:.1} (min/avg/p95/max of {})",
-                f.min, f.avg, f.p95, f.max, f.n
+                "[rust] frame {:.1}/{:.1}/{:.1}/{:.1}",
+                f.min, f.avg, f.p95, f.max
             ),
             format!(
-                "[rust] update ms {:.1}/{:.1}/{:.1}/{:.1}",
+                "[rust] update {:.1}/{:.1}/{:.1}/{:.1}",
                 u.min, u.avg, u.p95, u.max
             ),
-            phases,
+            phases([Phase::Sim, Phase::Terrain, Phase::Entities]),
+            phases([Phase::Particles, Phase::Gui, Phase::GuiFlush]),
         ]
     }
 }
@@ -401,8 +406,15 @@ mod tests {
         assert_eq!(stats.phases[Phase::Hand.index()].len(), 1);
         assert_eq!(FRAME_ACC[Phase::Hand.index()].load(Ordering::Relaxed), 0);
         let lines = stats.f3_lines();
-        assert!(lines[0].starts_with("[rust] frame ms"));
-        assert!(lines[1].starts_with("[rust] update ms"));
-        assert!(lines[2].starts_with("[rust] ms sim "));
+        assert_eq!(lines.len(), 4);
+        assert!(lines[0].starts_with("[rust] frame "));
+        assert!(lines[1].starts_with("[rust] update "));
+        assert!(lines[2].starts_with("[rust] sim "));
+        assert!(lines[3].starts_with("[rust] fx "));
+        // Short enough for 427 scaled pixels beside the position lines
+        // (module docs): at most 6 pixels a character in the default font.
+        for l in &lines {
+            assert!(l.len() <= 36, "{l}");
+        }
     }
 }

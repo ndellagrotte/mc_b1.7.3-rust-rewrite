@@ -55,6 +55,21 @@
 //! the disk are the ones the synchronous path writes; only the moment and
 //! the number of writes change.
 //!
+//! **Errors.** A failed queued operation does not stop the next one, as a
+//! failed `RegionFile.write` or `saveWorldInfoAndPlayer` only prints its
+//! stack trace (RegionFile.java:233-234, SaveHandler.java:130-131): the
+//! writer logs it and keeps the first error per storage root, which
+//! [`flush_writes`] (the game's exit) and [`FsStorage::flush_writes`]
+//! return. No other call returns it: every `write`, `rename`, `delete`,
+//! `read` and `list` is carried out whatever failed before it, and a
+//! synchronous storage at the same root (the import) waits for the queue
+//! without taking the game's error.
+//!
+//! **Threads.** The writer is a `std::thread`. If it cannot be started,
+//! the queue falls back to executing every operation at once on the
+//! calling thread (logged once). `with_write_behind` is for native builds:
+//! Phase 5's wasm32 client has no threads and must not use it.
+//!
 //! This is the one place the client touches files for the simulation;
 //! the `#[allow(clippy::disallowed_*)]` attributes mark it (clippy.toml).
 
@@ -222,6 +237,9 @@ struct QueueState {
     in_flight: bool,
     /// The writer thread exists.
     started: bool,
+    /// The writer thread could not be started: operations run at once on
+    /// the calling thread (module docs, "Threads").
+    sync_fallback: bool,
     /// The first error the writer met since the last report, by storage
     /// root.
     errors: std::collections::BTreeMap<PathBuf, String>,
@@ -272,12 +290,36 @@ fn resolve(ops: &std::collections::VecDeque<Op>, p: &Path, upto: usize) -> Resol
 
 /// Queues an operation (coalescing a write with an earlier queued write of
 /// the same file that nothing in between touches) and starts the writer
-/// thread if needed.
+/// thread if needed. An earlier failure of the writer does not stop it
+/// (module docs, "Errors"); a failure to start the writer runs the
+/// operation at once instead ("Threads").
 fn enqueue(op: Op) -> Result<(), StorageError> {
     let q = queue();
     let mut st = lock(q);
-    if let Some(e) = st.errors.remove(op.root()) {
-        return Err(StorageError::Backend(e));
+    let spawn = || {
+        std::thread::Builder::new()
+            .name("mc-storage-writer".into())
+            .spawn(writer_loop)
+            .map(drop)
+    };
+    let run_now = queue_op(&mut st, op, spawn);
+    q.changed.notify_all();
+    match run_now {
+        // Under the lock, so the fallback keeps the call order.
+        Some(op) => execute(&op),
+        None => Ok(()),
+    }
+}
+
+/// [`enqueue`] on a locked state, with the writer's start as `spawn`:
+/// `Some(op)` when the caller must execute `op` itself (no writer).
+fn queue_op(
+    st: &mut QueueState,
+    op: Op,
+    spawn: impl FnOnce() -> std::io::Result<()>,
+) -> Option<Op> {
+    if st.sync_fallback {
+        return Some(op);
     }
     let mut coalesced = false;
     if let Op::Write { path, bytes, .. } = &op {
@@ -304,43 +346,59 @@ fn enqueue(op: Op) -> Result<(), StorageError> {
             break;
         }
     }
-    if !coalesced {
-        st.ops.push_back(op);
+    if st.started {
+        if !coalesced {
+            st.ops.push_back(op);
+        }
+        return None;
     }
-    if !st.started {
-        st.started = true;
-        std::thread::Builder::new()
-            .name("mc-storage-writer".into())
-            .spawn(writer_loop)
-            .map_err(|e| StorageError::Backend(format!("cannot start the storage writer: {e}")))?;
+    // Not started: the queue is empty (nothing was coalesced).
+    match spawn() {
+        Ok(()) => {
+            st.started = true;
+            st.ops.push_back(op);
+            None
+        }
+        Err(e) => {
+            log::warn!(
+                "storage: cannot start the storage writer ({e}); writing on the game thread"
+            );
+            st.sync_fallback = true;
+            Some(op)
+        }
     }
-    q.changed.notify_all();
-    Ok(())
 }
 
 /// Waits until every queued operation is done; returns (and clears) the
 /// first error the writer met, of any storage. The game calls it before
 /// exiting.
 pub fn flush_writes() -> Result<(), StorageError> {
-    flush(None)
+    let mut st = wait_idle();
+    match st.errors.pop_first() {
+        Some((_, e)) => Err(StorageError::Backend(e)),
+        None => Ok(()),
+    }
 }
 
-/// Waits until the queue is empty; returns (and clears) the first error of
-/// the storage at `root` (`None`: any).
-fn flush(root: Option<&Path>) -> Result<(), StorageError> {
+/// Waits until every queued operation is done; returns (and clears) the
+/// first error the writer met on the storage at `root`.
+fn flush_root(root: &Path) -> Result<(), StorageError> {
+    let mut st = wait_idle();
+    match st.errors.remove(root) {
+        Some(e) => Err(StorageError::Backend(e)),
+        None => Ok(()),
+    }
+}
+
+/// Waits until the queue is empty, leaving the writer's errors where they
+/// are (module docs, "Errors"); returns the locked state.
+fn wait_idle() -> MutexGuard<'static, QueueState> {
     let q = queue();
     let mut st = lock(q);
     while !st.ops.is_empty() {
         st = q.changed.wait(st).unwrap_or_else(|e| e.into_inner());
     }
-    let e = match root {
-        Some(r) => st.errors.remove(r),
-        None => st.errors.pop_first().map(|(_, e)| e),
-    };
-    match e {
-        Some(e) => Err(StorageError::Backend(e)),
-        None => Ok(()),
-    }
+    st
 }
 
 /// The writer thread: executes the queued operations in order.
@@ -676,6 +734,13 @@ impl FsStorage {
         &self.root
     }
 
+    /// Waits for the write-behind queue; returns (and clears) the first
+    /// error the writer met on this storage's root since the last report
+    /// (module docs, "Errors").
+    pub fn flush_writes(&self) -> Result<(), StorageError> {
+        flush_root(&self.root)
+    }
+
     /// The file-system path of a storage path (checked).
     pub fn fs_path(&self, path: &str) -> Result<PathBuf, StorageError> {
         check(path)?;
@@ -697,7 +762,7 @@ impl FsStorage {
         match r {
             Ok(v) => Ok(v),
             Err(()) => {
-                flush(Some(&self.root))?;
+                drop(wait_idle());
                 Ok(None)
             }
         }
@@ -730,7 +795,7 @@ impl Storage for FsStorage {
                 return Ok(v.map(|b| b.as_ref().clone()));
             }
         } else {
-            flush(Some(&self.root))?;
+            drop(wait_idle());
         }
         read_now(&p)
     }
@@ -744,7 +809,7 @@ impl Storage for FsStorage {
                 bytes: Arc::new(bytes.to_vec()),
             });
         }
-        flush(Some(&self.root))?;
+        drop(wait_idle());
         let t0 = crate::clock::nano_time();
         let r = atomic_write(&p, bytes).map_err(|e| backend(&p, e));
         WRITES.fetch_add(1, Ordering::Relaxed);
@@ -757,7 +822,7 @@ impl Storage for FsStorage {
     }
 
     fn list(&mut self, dir: &str) -> Result<Vec<String>, StorageError> {
-        flush(Some(&self.root))?;
+        drop(wait_idle());
         let p = if dir.is_empty() {
             self.root.clone()
         } else {
@@ -803,7 +868,7 @@ impl Storage for FsStorage {
                 to: t,
             });
         }
-        flush(Some(&self.root))?;
+        drop(wait_idle());
         rename_now(&self.root, &f, &t).map_err(|e| match e {
             StorageError::NotFound(_) => StorageError::NotFound(from.to_string()),
             e => e,
@@ -818,7 +883,7 @@ impl Storage for FsStorage {
                 path: p,
             });
         }
-        flush(Some(&self.root))?;
+        drop(wait_idle());
         delete_now(&self.root, &p)
     }
 }
@@ -856,8 +921,9 @@ pub(crate) mod tests {
 
     impl Drop for TempDir {
         fn drop(&mut self) {
-            // A write-behind storage may still have operations queued here.
-            let _ = flush_writes();
+            // A write-behind storage may still have operations queued here
+            // (waiting leaves other tests' errors alone).
+            drop(wait_idle());
             let _ = fs::remove_dir_all(&self.0);
         }
     }
@@ -962,7 +1028,7 @@ pub(crate) mod tests {
         let a = region_bytes(64 * PAGE, 3);
         s.write(path, &a).unwrap();
         assert_eq!(s.read(path).unwrap().as_deref(), Some(&a[..]));
-        flush_writes().unwrap();
+        s.flush_writes().unwrap();
         assert_eq!(fs::read(&disk).unwrap(), a);
         // Two writes in a row: the second replaces the first in the queue;
         // a few changed sectors go through the journal.
@@ -974,7 +1040,7 @@ pub(crate) mod tests {
         s.write(path, &b).unwrap();
         s.write(path, &c).unwrap();
         assert_eq!(s.read(path).unwrap().as_deref(), Some(&c[..]));
-        flush_writes().unwrap();
+        s.flush_writes().unwrap();
         assert_eq!(fs::read(&disk).unwrap(), c);
         assert!(!journal_path(&disk).exists());
         // list waits for the queue and hides journals and temporaries.
@@ -986,7 +1052,7 @@ pub(crate) mod tests {
         s.write(path, &c).unwrap();
         s.delete(path).unwrap();
         assert_eq!(s.read(path).unwrap(), None);
-        flush_writes().unwrap();
+        s.flush_writes().unwrap();
         assert!(!disk.exists());
     }
 
@@ -1023,7 +1089,7 @@ pub(crate) mod tests {
             wb.rename("w/nope", "w/x"),
             Err(StorageError::NotFound(_))
         ));
-        flush_writes().unwrap();
+        wb.flush_writes().unwrap();
         for name in ["level.dat", "level.dat_old", "level.dat_new"] {
             assert_eq!(
                 fs::read(a.0.join("w").join(name)).ok(),
@@ -1086,11 +1152,65 @@ pub(crate) mod tests {
             h.save_world_info_and_player(&mut info, None).unwrap();
             let back = h.load_world_info().unwrap();
             assert_eq!(back.random_seed, 42);
-            flush_writes().unwrap();
+            flush_root(&d.0).unwrap();
             assert!(d.0.join("saves/W/level.dat_old").exists());
             assert!(d.0.join("saves/W/level.dat").exists());
             assert!(!d.0.join("saves/W/level.dat_new").exists());
             assert!(d.0.join("saves/W/session.lock").exists());
         }
+    }
+
+    #[test]
+    fn a_failed_queued_write_does_not_stop_the_next() {
+        // RegionFile.java:233-234: a failed write prints its stack trace;
+        // the next write is carried out.
+        let d = TempDir::new("wb_error");
+        let mut s = FsStorage::new(&d.0).unwrap().with_write_behind();
+        // "w/blocker" is a file, so "w/blocker/region/r.0.0.mcr" cannot be
+        // created (its parent is not a directory).
+        s.write("w/blocker", b"file").unwrap();
+        s.write("w/blocker/region/r.0.0.mcr", b"lost").unwrap();
+        drop(wait_idle());
+        // The writer's error does not fail or drop the next operations.
+        let a = region_bytes(4 * PAGE, 9);
+        s.write("w/region/r.1.0.mcr", &a).unwrap();
+        s.write("w/level.dat", b"next").unwrap();
+        s.rename("w/level.dat", "w/level.dat_old").unwrap();
+        // A synchronous storage at the same root works and leaves the
+        // error to the write-behind one.
+        let mut sync = FsStorage::new(&d.0).unwrap();
+        sync.write("w/other", b"sync").unwrap();
+        assert_eq!(sync.read("w/other").unwrap().as_deref(), Some(&b"sync"[..]));
+        assert_eq!(fs::read(d.0.join("w/region/r.1.0.mcr")).unwrap(), a);
+        assert_eq!(fs::read(d.0.join("w/level.dat_old")).unwrap(), b"next");
+        assert!(!d.0.join("w/level.dat").exists());
+        // The error is reported once, by the explicit flush.
+        assert!(matches!(s.flush_writes(), Err(StorageError::Backend(_))));
+        s.flush_writes().unwrap();
+    }
+
+    #[test]
+    fn a_writer_that_cannot_start_runs_operations_at_once() {
+        let op = |n: &str| Op::Write {
+            root: PathBuf::from("/r"),
+            path: PathBuf::from(format!("/r/{n}")),
+            bytes: Arc::new(vec![1]),
+        };
+        // The spawn fails: the operation comes back to run at once, the
+        // queue stays empty and not started, and no later spawn is tried.
+        let mut st = QueueState::default();
+        let back = queue_op(&mut st, op("a"), || {
+            Err(std::io::Error::other("no threads"))
+        });
+        assert!(matches!(back, Some(Op::Write { ref path, .. }) if path == Path::new("/r/a")));
+        assert!(!st.started && st.sync_fallback && st.ops.is_empty());
+        let back = queue_op(&mut st, op("b"), || panic!("no second spawn"));
+        assert!(back.is_some() && st.ops.is_empty());
+        // The spawn succeeds: queued, started.
+        let mut st = QueueState::default();
+        assert!(queue_op(&mut st, op("a"), || Ok(())).is_none());
+        assert!(st.started && !st.sync_fallback && st.ops.len() == 1);
+        assert!(queue_op(&mut st, op("b"), || panic!("already started")).is_none());
+        assert_eq!(st.ops.len(), 2);
     }
 }

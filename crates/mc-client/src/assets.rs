@@ -87,12 +87,12 @@ impl std::fmt::Display for AssetError {
         match self {
             AssetError::Jar { path, reason } => write!(
                 f,
-                "cannot read minecraft.jar at {} ({reason}); copy your own Beta 1.7.3 client jar there, or pass it with --jar <path> (docs/RUNNING.md)",
+                "cannot read minecraft.jar at {} ({reason}); give your own Beta 1.7.3 client jar with --jar <path>, or without --jar copy it to <data dir>/minecraft.jar (docs/RUNNING.md)",
                 path.display()
             ),
             AssetError::Resources { path } => write!(
                 f,
-                "no resources/ directory at {}; copy the directory with the sound/, music/, newsound/... folders there, or pass it with --resources <path> (docs/RUNNING.md)",
+                "no resources/ directory at {}; give the directory with the sound/, music/, newsound/... folders with --resources <path>, or without --resources copy it to <data dir>/resources (docs/RUNNING.md)",
                 path.display()
             ),
             AssetError::Missing { name, jar } => {

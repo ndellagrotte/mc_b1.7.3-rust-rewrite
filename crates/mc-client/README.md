@@ -1165,15 +1165,22 @@ are drawn.
   writes on the calling thread, the write-behind queue's region writes:
   queued, coalesced, journaled, whole, unchanged, bytes, and the writer
   thread's time).
-- With F3 on, the right column gets three `[rust]` lines under vanilla's
-  two memory lines: the frame time and the update time
-  (min/avg/p95/max of the window) and the phases' means.
+- With F3 on, the right column gets four `[rust]` lines from row 5
+  (y = 52) down, below the rows of the left column's five lines so no row
+  holds both: `[rust] frame` and `[rust] update` (min/avg/p95/max of the
+  window, ms) and two lines of the phases' means (`sim ter ent`,
+  `fx gui flush`).
 - `storage::FsStorage::with_write_behind` (the game's storage): `write`,
   `rename` and `delete` are queued for a background thread in call order,
   reads see the queued state, a region file is written once per batch and
   only in its changed sectors, through a journal (module docs). Call
   `storage::flush_writes()` before reading save files with anything but
-  the game's `Storage` (the game does before it exits).
+  the game's `Storage` (the game does before it exits). A failed queued
+  operation is logged and does not stop the next (RegionFile.java:233-234
+  prints and goes on); the first error per root comes back only from
+  `flush_writes()` / `FsStorage::flush_writes()`. If the writer thread
+  cannot start, operations run at once on the calling thread. Not for
+  wasm32 (no threads).
 
 ## Scripted-input dev mode
 

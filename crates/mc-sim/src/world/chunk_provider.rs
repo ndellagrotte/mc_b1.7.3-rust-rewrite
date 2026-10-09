@@ -39,9 +39,11 @@
 //! # Lookup cost (WP-4.3)
 //!
 //! Every `World.getBlockId` goes through `chunkMap`, so the map is the
-//! simulation's hottest data structure. Java's is a `HashMap` used for
-//! lookup only (ChunkProvider.java:28-29, :45, :73; never iterated, the save
-//! and unload loops walk `chunkList` and `droppedChunksSet`); here it is a
+//! simulation's hottest data structure. Java's is a `HashMap` used by key
+//! only (ChunkProvider.java:16 declares it; :28 containsKey, :34 get, :45
+//! put, :73 get, :164 get and :169 remove in unload100OldestChunks, :186
+//! size; never iterated, the save and unload loops walk `chunkList` and
+//! `droppedChunksSet`); here it is a
 //! hash map with a fixed multiplicative hasher ([`ChunkKeyHasher`]) over
 //! boxed chunks. Nothing iterates it, so its order is never observable
 //! (PLAN_v4 §3.4 rule 4).

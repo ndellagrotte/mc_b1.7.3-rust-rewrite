@@ -58,7 +58,7 @@ If a file is missing, the game stops and prints the path it tried, for
 example:
 
 ```text
-mc_b173: cannot read minecraft.jar at /home/you/.local/share/mc_b173/minecraft.jar (No such file or directory (os error 2)); copy your own Beta 1.7.3 client jar there, or pass it with --jar <path> (docs/RUNNING.md)
+mc_b173: cannot read minecraft.jar at /home/you/.local/share/mc_b173/minecraft.jar (No such file or directory (os error 2)); give your own Beta 1.7.3 client jar with --jar <path>, or without --jar copy it to <data dir>/minecraft.jar (docs/RUNNING.md)
 ```
 
 ## 3. Or point at them
@@ -81,8 +81,10 @@ mc_b173 --jar ~/Games/b1.7.3/minecraft.jar --resources ~/Games/b1.7.3/resources
 | `--vsync on\|off` | wait for the display's refresh (default `on`). Use `off` to measure frame times (F3 shows them) | `on` |
 | `--script FILE` | the scripted-input dev mode (`crates/mc-client/README.md`) | — |
 
-`--jar` and `--resources` are resolved against `--data-dir` when that is given:
-`mc_b173 --data-dir /tmp/mc` looks for `/tmp/mc/minecraft.jar` and `/tmp/mc/resources`.
+Without `--jar`/`--resources`, the defaults are taken from `--data-dir` when it
+is given: `mc_b173 --data-dir /tmp/mc` looks for `/tmp/mc/minecraft.jar` and
+`/tmp/mc/resources`. Explicit paths are used as given (a relative one is relative
+to the current directory).
 
 Worlds can also be imported in the game: Singleplayer, then "Import...", then
 type or paste the path of the save folder.
