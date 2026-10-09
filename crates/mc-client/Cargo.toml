@@ -23,6 +23,9 @@ log.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 zip.workspace = true
+# The world export's chunk digests (WP-4.5, export.rs): the same blake3 as
+# the Tier S `chunk_digest` lines of mc-golden.
+blake3.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 # `localtime_r` for the screenshot file name (ScreenShotHelper's local-time

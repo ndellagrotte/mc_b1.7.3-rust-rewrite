@@ -37,6 +37,8 @@
 //! item, the screen overlays, `renderItem`; `EntityRenderer.renderHand`).
 //! WP-3.5b: [`render`] (`RenderManager`, every `Render*`, the tile-entity
 //! special renderers, `RenderGlobal.renderEntities`).
+//! WP-4.5: [`export`] (the world export, PLAN_v4 D5: validate, copy,
+//! re-read and compare), its screens in [`gui::menu::export_world`].
 
 pub mod app;
 pub mod assets;
@@ -45,6 +47,7 @@ pub mod clock;
 pub mod clouds;
 pub mod debug;
 pub mod events;
+pub mod export;
 pub mod fog;
 pub mod game;
 pub mod gl_material;
