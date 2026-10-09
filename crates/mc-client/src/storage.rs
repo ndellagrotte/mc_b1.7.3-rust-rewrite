@@ -63,7 +63,8 @@
 //! return. No other call returns it: every `write`, `rename`, `delete`,
 //! `read` and `list` is carried out whatever failed before it, and a
 //! synchronous storage at the same root (the import) waits for the queue
-//! without taking the game's error.
+//! without taking the game's error, and so does the world export before it
+//! reads the world folder ([`wait_writes`]).
 //!
 //! **Threads.** The writer is a `std::thread`. If it cannot be started,
 //! the queue falls back to executing every operation at once on the
@@ -378,6 +379,13 @@ pub fn flush_writes() -> Result<(), StorageError> {
         Some((_, e)) => Err(StorageError::Backend(e)),
         None => Ok(()),
     }
+}
+
+/// Waits until every queued operation is done, leaving the writer's errors
+/// for [`flush_writes`] (module docs, "Errors"). The world export calls it
+/// before reading the world folder with `std::fs` (`export::export_from_game`).
+pub fn wait_writes() {
+    drop(wait_idle());
 }
 
 /// Waits until every queued operation is done; returns (and clears) the

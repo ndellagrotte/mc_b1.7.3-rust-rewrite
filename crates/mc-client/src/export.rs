@@ -757,6 +757,10 @@ pub fn export_from_game(
             .map_err(|e| ExportError::Save(e.to_string()))?;
     }
     game.save_loader.flush_cache();
+    // The game's storage writes behind (WP-4.3, `storage` module docs); the
+    // export reads the folder with `std::fs`, so the queued writes of this
+    // save (or of a world closed just before) must be on disk first.
+    crate::storage::wait_writes();
     export_world(&game.paths.data_dir.join(SAVES_DIR), name, target)
 }
 
