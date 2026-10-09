@@ -551,15 +551,108 @@ pub fn on_death(e: &mut Entity, world: &mut World, var1: Option<&Entity>) {
     add_stat(e, stat(sl::DEATHS_STAT), 1);
 }
 
-/// `EntityPlayer.addToPlayerScore(victim, score)`.
+/// `EntityPlayer.addToPlayerScore(victim, score)`. `victim_is_player` is
+/// `victim instanceof EntityPlayer`.
 // src: EntityPlayer.java:239-247
-pub fn add_to_player_score(e: &mut Entity, victim: &Entity, var2: i32) {
+pub fn add_to_player_score(e: &mut Entity, victim_is_player: bool, var2: i32) {
     let p = player_mut(e);
     p.score = p.score.wrapping_add(var2);
-    if victim.kind.is_player() {
+    if victim_is_player {
         add_stat(e, stat(sl::PLAYER_KILLS_STAT), 1);
     } else {
         add_stat(e, stat(sl::MOB_KILLS_STAT), 1);
+    }
+}
+
+/// The calls `EntityLiving.onDeath(attacker)` makes on its attacker, as
+/// data: `attacker.addToPlayerScore(this, scoreValue)` when
+/// `scoreValue >= 0`, then `attacker.onKillEntity(this)`. Only an
+/// `EntityPlayer` attacker does anything with them (Entity.java:759-760,
+/// :1094-1095 are empty), and it reads only two `instanceof` tests of the
+/// victim.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct KillHook {
+    /// The attacker's `entityId`.
+    pub attacker: i32,
+    /// `scoreValue` when `addToPlayerScore` is called (`>= 0`).
+    pub score: Option<i32>,
+    /// `victim instanceof EntityPlayer` (EntityPlayer.java:241).
+    pub victim_is_player: bool,
+    /// `victim instanceof EntityMob` (EntityPlayer.java:796).
+    pub victim_is_mob: bool,
+}
+
+impl KillHook {
+    /// Runs the hook on the attacker `e` (an `EntityPlayer`; other kinds have
+    /// the empty `Entity` bodies).
+    // src: EntityLiving.java:408-414
+    pub fn apply(&self, e: &mut Entity) {
+        if !e.kind.is_player() {
+            return;
+        }
+        if let Some(score) = self.score {
+            add_to_player_score(e, self.victim_is_player, score);
+        }
+        on_kill_entity(e, self.victim_is_mob);
+    }
+}
+
+/// `EntityLiving.onDeath`'s `attacker.addToPlayerScore(this, score)` (for
+/// `Some(score)`) and `attacker.onKillEntity(this)`, run on the attacker
+/// entity, not on the copy or borrow `attacker` the port holds (an arrow's
+/// owner is passed as a copy; the player's own melee hit lends itself).
+///
+/// A player attacker in its slot is changed there at once, in Java's
+/// order. One that is out of its slot is held up the stack (the player
+/// attacking with its own hand): the hook waits in
+/// `World::pending_kill_hooks` until [`take_pending_kill_hooks`] runs it on
+/// the player in hand (right after the hit, in
+/// [`attack_target_entity_with_current_item`], or when the world puts the
+/// player back in its slot). Nothing else reads the score or the
+/// statistics in between. An attacker that is no longer in the world is
+/// recorded: Java would still update the orphaned object, which nothing
+/// reads again.
+// src: EntityLiving.java:408-414
+pub fn kill_hooks(world: &mut World, attacker: &Entity, victim: &Entity, score: Option<i32>) {
+    if !attacker.kind.is_player() {
+        // src: Entity.java:759-760, :1094-1095 (empty)
+        return;
+    }
+    let h = KillHook {
+        attacker: attacker.base.entity_id,
+        score,
+        victim_is_player: victim.kind.is_player(),
+        victim_is_mob: is_instance_of(&victim.kind, "EntityMob"),
+    };
+    if world
+        .with_entity_mut(h.attacker, |_, p| h.apply(p))
+        .is_some()
+    {
+        return;
+    }
+    if world.entity_index(h.attacker).is_some() {
+        world.pending_kill_hooks.push(h);
+    } else {
+        world.note_unimplemented(
+            "EntityLiving.onDeath: the attacker is no longer in loadedEntityList (Java still holds it)",
+        );
+    }
+}
+
+/// Runs and removes the waiting [`KillHook`]s of the player `e`, now in
+/// hand ([`kill_hooks`]), in the order they were made.
+pub fn take_pending_kill_hooks(e: &mut Entity, world: &mut World) {
+    if world.pending_kill_hooks.is_empty() {
+        return;
+    }
+    let id = e.base.entity_id;
+    let (mine, rest): (Vec<KillHook>, Vec<KillHook>) =
+        std::mem::take(&mut world.pending_kill_hooks)
+            .into_iter()
+            .partition(|h| h.attacker == id);
+    world.pending_kill_hooks = rest;
+    for h in mine {
+        h.apply(e);
     }
 }
 
@@ -791,8 +884,8 @@ pub fn attack_entity_from(
             Some(oid) => match world.entity(oid) {
                 Some(o) => {
                     if o.kind.living().is_some() {
-                        let kind = o.kind.clone();
-                        alert_wolves(e, world, &kind, false);
+                        let o = o.clone();
+                        alert_wolves(e, world, &o, false);
                     }
                 }
                 None => world.note_unimplemented(
@@ -801,7 +894,7 @@ pub fn attack_entity_from(
             },
             None => {
                 if a.kind.living().is_some() {
-                    alert_wolves(e, world, &a.kind, false);
+                    alert_wolves(e, world, a, false);
                 }
             }
         }
@@ -816,26 +909,43 @@ pub fn is_pvp_enabled() -> bool {
     false
 }
 
-/// `alertWolves(attacker, onlySitting)`: every tamed wolf of this player
-/// within 16 blocks (4 vertically) without a target stands up and targets
-/// the attacker, unless it is a creeper, a ghast, the player's own wolf or
-/// a player.
+/// `alertWolves(attacker, skipSitting)`: unless the attacker is a creeper,
+/// a ghast or this player's own tamed wolf, and unless it is a player
+/// (`isPVPEnabled()` is false), every tamed wolf of this player within the
+/// box 16 blocks around the player (4 vertically) that has no target
+/// stands up and targets the attacker; with `skipSitting` (the player's own
+/// hit) a sitting wolf stays put.
 ///
-/// `EntityWolf` is not transcribed (WP-2.3) and cannot be constructed yet,
-/// so no wolf is ever in a port world: a wolf attacker or a wolf found by
-/// the search records `EntityWolf.isWolfTamed` and is taken as untamed
-/// (skipped), as any untamed wolf is in Java.
+/// `e` is the player (in hand), `var1` the attacker (in hand or a copy).
+/// The wolves found are changed in their slots. The attacker may itself be
+/// a wolf out of its slot (an angry wolf biting the player); it never
+/// passes the tests (a tamed wolf of this player returned at the top, any
+/// other is untamed or has another owner), so it is passed to the search as
+/// the entity in hand and skipped. A player without a username (Java's
+/// `NullPointerException` on `username.equals`) is recorded and matches no
+/// owner.
 // src: EntityPlayer.java:402-437
-pub fn alert_wolves(e: &Entity, world: &mut World, var1: &EntityKindData, var2: bool) {
-    let _ = var2;
-    if is_instance_of(var1, "EntityCreeper") || is_instance_of(var1, "EntityGhast") {
+pub fn alert_wolves(e: &Entity, world: &mut World, var1: &Entity, var2: bool) {
+    if is_instance_of(&var1.kind, "EntityCreeper") || is_instance_of(&var1.kind, "EntityGhast") {
         return;
     }
-    if let EntityKindData::Wolf(..) = var1 {
-        // src: EntityPlayer.java:404-409 (a tamed wolf of this player returns)
-        world.note_unimplemented("EntityWolf.isWolfTamed (EntityPlayer.alertWolves)");
+    let username = player(e).username.clone();
+    let is_owner = |world: &World, owner: &str| match username.as_deref() {
+        Some(u) => u == owner,
+        None => {
+            world.note_unimplemented(
+                "EntityPlayer.alertWolves with a null username (Java NullPointerException)",
+            );
+            false
+        }
+    };
+    if let EntityKindData::Wolf(..) = var1.kind {
+        // src: EntityPlayer.java:404-409
+        if super::wolf::is_wolf_tamed(var1) && is_owner(world, super::wolf::get_wolf_owner(var1)) {
+            return;
+        }
     }
-    if !var1.is_player() || is_pvp_enabled() {
+    if !var1.kind.is_player() || is_pvp_enabled() {
         let b = &e.base;
         let bb = Aabb::new(
             b.pos_x,
@@ -846,11 +956,38 @@ pub fn alert_wolves(e: &Entity, world: &mut World, var1: &EntityKindData, var2: 
             b.pos_z + 1.0,
         )
         .expand(16.0, 4.0, 16.0);
-        let var7 = world.get_entities_within_aabb("EntityWolf", &bb, None);
-        for _ in var7 {
-            // src: EntityPlayer.java:427-433: isWolfTamed, getTarget,
-            // getWolfOwner, isWolfSitting, setWolfSitting, setTarget (WP-2.3)
-            world.note_unimplemented("EntityWolf.isWolfTamed (EntityPlayer.alertWolves)");
+        let var7 = world.get_entities_within_aabb("EntityWolf", &bb, Some(var1));
+        let target = var1.base.entity_id;
+        for id in var7 {
+            if id == target {
+                // The attacking wolf (doc comment): fails the tests below.
+                continue;
+            }
+            let Some(var6) = world.entity(id) else {
+                world.note_unimplemented("EntityPlayer.alertWolves: a wolf out of its slot");
+                continue;
+            };
+            // src: EntityPlayer.java:425-430
+            if !super::wolf::is_wolf_tamed(var6) {
+                continue;
+            }
+            if super::creature::creature(&var6.kind).is_some_and(|c| c.player_to_attack.is_some()) {
+                continue;
+            }
+            if !is_owner(world, super::wolf::get_wolf_owner(var6)) {
+                continue;
+            }
+            if var2 && super::wolf::is_wolf_sitting(var6) {
+                continue;
+            }
+            // src: EntityPlayer.java:432-433 (setTarget: EntityCreature.java:178-180)
+            let var6 = world
+                .entity_mut(id)
+                .expect("the wolf was in its slot a moment ago");
+            super::wolf::set_wolf_sitting(var6, false);
+            if let Some(c) = super::creature::creature_mut(&mut var6.kind) {
+                c.player_to_attack = Some(target);
+            }
         }
     }
 }
@@ -939,6 +1076,10 @@ pub fn attack_target_entity_with_current_item(
             var2 = var2.wrapping_add(1);
         }
         dispatch::attack_entity_from(var1, world, Some(e), var2);
+        // A kill ran `onDeath`'s score and kill calls on this player, held
+        // here (kill_hooks): they run now, before the item's hitEntity.
+        // src: EntityLiving.java:408-414
+        take_pending_kill_hooks(e, world);
         // var3 = getCurrentEquippedItem(): the stack in hotbar slot currentItem.
         let held = current_item_slot(e);
         if let Some(slot) = held
@@ -952,7 +1093,7 @@ pub fn attack_target_entity_with_current_item(
         }
         if var1.kind.living().is_some() {
             if dispatch::is_entity_alive(var1) {
-                alert_wolves(e, world, &var1.kind, true);
+                alert_wolves(e, world, var1, true);
             }
             add_stat(e, stat(sl::DAMAGE_DEALT_STAT), var2);
         }
@@ -1353,10 +1494,10 @@ pub fn fall(e: &mut Entity, world: &mut World, var1: f32) {
 }
 
 /// `EntityPlayer.onKillEntity(victim)`: the `killEnemy` achievement for a
-/// mob.
+/// mob. `victim_is_mob` is `victim instanceof EntityMob`.
 // src: EntityPlayer.java:795-800
-pub fn on_kill_entity(e: &mut Entity, victim: &Entity) {
-    if is_instance_of(&victim.kind, "EntityMob") {
+pub fn on_kill_entity(e: &mut Entity, victim_is_mob: bool) {
+    if victim_is_mob {
         add_stat(e, stat(al::KILL_ENEMY), 1);
     }
 }

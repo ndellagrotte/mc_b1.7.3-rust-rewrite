@@ -73,7 +73,10 @@ impl World {
 
     /// Puts a taken entity back into its slot (found again by id: `f` may have
     /// appended entities, never removed any).
-    fn put_back(&mut self, e: Box<Entity>) {
+    /// A player's [`crate::entity::player::KillHook`]s that waited while it
+    /// was out of its slot run first.
+    fn put_back(&mut self, mut e: Box<Entity>) {
+        crate::entity::player::take_pending_kill_hooks(&mut e, self);
         let idx = self
             .entity_index(e.base.entity_id)
             .expect("an entity's slot disappeared while it was taken out");

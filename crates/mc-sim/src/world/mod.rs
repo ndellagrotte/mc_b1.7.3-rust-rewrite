@@ -201,6 +201,12 @@ pub struct World {
     /// ([`client_requests`]). Not Java state: `EntityPlayerSP` reaches the
     /// client through its `mc` field.
     pub client_requests: ClientRequestQueue,
+    /// `EntityLiving.onDeath`'s calls on an attacker that is out of its slot
+    /// (a player killing with its own hand: the player is held up the
+    /// stack), applied when the attacker is back in hand
+    /// ([`crate::entity::player::KillHook`]). Not Java state: Java calls the
+    /// attacker object directly. Empty between entity calls.
+    pub(crate) pending_kill_hooks: Vec<crate::entity::player::KillHook>,
     /// `chunkProvider` (the caching `ChunkProvider`).
     // src: World.java:41
     pub(crate) chunk_provider: ChunkProviderCache,
@@ -465,6 +471,7 @@ impl World {
             world_provider: provider,
             events: EventQueue::default(),
             client_requests: ClientRequestQueue::default(),
+            pending_kill_hooks: Vec::new(),
             chunk_provider: ChunkProviderCache::new(loader, generator),
             save_handler,
             session_lock_error: None,

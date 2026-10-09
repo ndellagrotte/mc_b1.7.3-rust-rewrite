@@ -9,8 +9,8 @@
 //! | 36-43 | `interact` | [`interact`] |
 //! | 45-47 | `getDropItemId` | [`get_drop_item_id`] |
 //! | 49-60 | `getSaddled`, `setSaddled` | [`get_saddled`], [`set_saddled`] |
-//! | 62-69 | `onStruckByLightning` | [`on_struck_by_lightning`] (the `EntityPigZombie` is WP-2.3: recorded) |
-//! | 71-77 | `fall` | [`fall`] (the `flyPig` achievement is WP-2.7: recorded) |
+//! | 62-69 | `onStruckByLightning` | [`on_struck_by_lightning`] (a zombie pigman takes the pig's place; WP-4.6) |
+//! | 71-77 | `fall` | [`fall`] (with the `flyPig` achievement) |
 
 use super::data_watcher::WatchValue;
 use super::{
@@ -92,14 +92,24 @@ pub fn get_drop_item_id(e: &Entity) -> i32 {
     }
 }
 
-/// `EntityPig.onStruckByLightning(bolt)`: becomes a zombie pigman. The
-/// `new EntityPigZombie(world)` (its constructor, `setLocationAndAngles`,
-/// `entityJoinedWorld`) is WP-2.3 and recorded; the pig still dies, so it
-/// leaves the world as in vanilla.
+/// `EntityPig.onStruckByLightning(bolt)`: a zombie pigman takes the pig's
+/// place: `new EntityPigZombie(world)` (its constructor draws, and the next
+/// entity id), at the pig's position and angles, joined; then the pig dies.
+/// Unlike `Entity.onStruckByLightning` there is no fire damage. The pig is
+/// out of its slot (the bolt's update holds it), so the new entity is
+/// appended behind it in `loadedEntityList`, as in Java.
 // src: EntityPig.java:62-69
 pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World) {
     if !world.multiplayer_world {
-        world.note_unimplemented("EntityPig.onStruckByLightning");
+        let mut var2 = super::pig_zombie::new_entity_pig_zombie(world);
+        var2.base.set_location_and_angles(
+            e.base.pos_x,
+            e.base.pos_y,
+            e.base.pos_z,
+            e.base.rotation_yaw,
+            e.base.rotation_pitch,
+        );
+        world.spawn_entity_in_world(var2);
         super::dispatch::set_entity_dead(e, world);
     }
 }

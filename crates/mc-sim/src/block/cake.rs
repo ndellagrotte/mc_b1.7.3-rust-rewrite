@@ -7,11 +7,11 @@
 //! `onNeighborBlockChange`, `canBlockStay`. Data methods (`quantityDropped`,
 //! `idDropped`, the texture methods, …) are in [`crate::block`].
 //!
-//! `eatCakeSlice` calls `EntityLiving.heal` on the player. Entity behaviour
-//! is Phase 2 and the port has no `heal` yet, so [`heal`] here is a private
-//! transcription of it; the one field it writes that `Entity` does not have
-//! yet, `heartsLife` (Entity.java:56), is recorded as
-//! `"EntityLiving.heal heartsLife"` with [`World::note_unimplemented`].
+//! `eatCakeSlice` calls `EntityLiving.heal` on the player (no subclass in
+//! singleplayer overrides it), [`crate::entity::living::heal`], which also
+//! restarts half the damage-resistance window (`heartsLife`): a hit soon
+//! after a slice deals full damage again (WP-4.6; Phase 1 had a private copy
+//! without that field).
 
 use mc_core::Aabb;
 
@@ -100,7 +100,8 @@ fn eat_cake_slice(world: &mut World, x: i32, y: i32, z: i32, var5: &mut Entity) 
         .expect("BlockCake.eatCakeSlice: the player is an EntityLiving")
         .health;
     if health < 20 {
-        heal(world, var5, 3);
+        // src: BlockCake.java:78 (EntityPlayer does not override heal)
+        crate::entity::living::heal(var5, 3);
         let var6 = world.get_block_metadata(x, y, z) + 1;
         if var6 >= 6 {
             world.set_block_with_notify(x, y, z, 0);
@@ -108,25 +109,6 @@ fn eat_cake_slice(world: &mut World, x: i32, y: i32, z: i32, var5: &mut Entity) 
             world.set_block_metadata_with_notify(x, y, z, var6);
             world.mark_block_as_needs_update(x, y, z);
         }
-    }
-}
-
-/// `EntityLiving.heal(amount)` (not overridden by `EntityPlayer`): adds to
-/// a living entity's health, capped at 20. Private copy (module docs).
-// src: EntityLiving.java:296-305
-fn heal(world: &mut World, e: &mut Entity, var1: i32) {
-    let l = e
-        .kind
-        .living_mut()
-        .expect("EntityLiving.heal on an EntityLiving");
-    if l.health > 0 {
-        l.health += var1;
-        if l.health > 20 {
-            l.health = 20;
-        }
-        // src: EntityLiving.java:303: this.heartsLife = this.heartsHalvesLife / 2;
-        // Entity.heartsLife is not in EntityBase yet (Phase 2).
-        world.note_unimplemented("EntityLiving.heal heartsLife");
     }
 }
 

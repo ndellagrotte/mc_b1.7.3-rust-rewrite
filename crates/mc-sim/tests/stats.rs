@@ -206,11 +206,12 @@ fn crafting_counts_and_unlocks() {
 }
 
 /// Killing a zombie with a diamond sword through
-/// `PlayerController.attackEntity`: damage dealt and the sword's use stat.
-/// `EntityLiving.onDeath` does not call the killer's `addToPlayerScore` /
-/// `onKillEntity` yet (recorded gaps in entity/living.rs, reported); the
-/// two are called as it would: the mob kill, `killEnemy` once
-/// `buildSword` is unlocked, and a player kill.
+/// `PlayerController.attackEntity`: damage dealt, the sword's use stat, and
+/// `EntityLiving.onDeath`'s calls on the killer (WP-4.6): the player is out
+/// of its slot while it attacks, so `addToPlayerScore` (the mob kill;
+/// `scoreValue` 0) and `onKillEntity` (`killEnemy`, unlocked by
+/// `buildSword`) wait for it and run right after the hit. Then a player
+/// kill through the dispatch.
 #[test]
 fn a_kill_counts() {
     let mut w = world();
@@ -228,36 +229,94 @@ fn a_kill_counts() {
             pd.stat_file_writer.entity_player_sp_add_stat(stat(a), 1);
         }
     }
+    let pid = p.base.entity_id;
+    assert!(w.spawn_entity_in_world(p));
     let mut z = zombie::new_entity_zombie(&mut w);
     z.base.set_location_and_angles(1.5, 61.0, 0.5, 0.0, 0.0);
     z.kind.living_mut().unwrap().health = 1;
-    player_controller::attack_entity(&mut w, &mut p, &mut z);
-    assert!(z.kind.living().unwrap().health <= 0);
+    let zid = z.base.entity_id;
+    assert!(w.spawn_entity_in_world(z));
+    w.with_entity_mut(pid, |w, p| {
+        w.with_entity_mut(zid, |w, z| {
+            player_controller::attack_entity(w, p, z);
+            assert!(z.kind.living().unwrap().health <= 0);
+        })
+        .unwrap();
+        // Applied before the player went back into its slot.
+        assert_eq!(value(p, sl::MOB_KILLS_STAT), 1);
+    })
+    .unwrap();
+    let p = w.entity(pid).unwrap();
     // Diamond sword: 4 + 3 * 2 = 10 (ItemSword.java:10).
-    assert_eq!(value(&p, sl::DAMAGE_DEALT_STAT), 10);
-    assert_eq!(value(&p, sl::USE_ITEM_BASE + SWORD_DIAMOND), 1);
-    assert_eq!(
+    assert_eq!(value(p, sl::DAMAGE_DEALT_STAT), 10);
+    assert_eq!(value(p, sl::USE_ITEM_BASE + SWORD_DIAMOND), 1);
+    assert_eq!(value(p, sl::MOB_KILLS_STAT), 1);
+    assert_eq!(value(p, al::KILL_ENEMY), 1);
+    assert_eq!(p.kind.player().unwrap().score, 0);
+    assert!(
+        w.unimplemented_hits.borrow().is_empty(),
+        "{:?}",
         w.unimplemented_hits
-            .borrow()
-            .get("EntityPlayer.addToPlayerScore"),
-        Some(&1)
     );
-    assert_eq!(
-        w.unimplemented_hits
-            .borrow()
-            .get("EntityPlayer.onKillEntity"),
-        Some(&1)
-    );
-    // src: EntityLiving.java:407-414 (onDeath: addToPlayerScore, onKillEntity)
-    dispatch::add_to_player_score(&mut p, &mut w, &z, 0);
-    dispatch::on_kill_entity(&mut p, &mut w, &z);
-    assert_eq!(value(&p, sl::MOB_KILLS_STAT), 1);
-    assert_eq!(value(&p, al::KILL_ENEMY), 1);
+    // src: EntityPlayer.java:239-247, :795-800 (a player victim)
+    let mut p = w.entity(pid).unwrap().clone();
     let other = new_entity_player_sp(&mut w);
     dispatch::add_to_player_score(&mut p, &mut w, &other, 0);
     dispatch::on_kill_entity(&mut p, &mut w, &other);
     assert_eq!(value(&p, sl::PLAYER_KILLS_STAT), 1);
     assert_eq!(value(&p, al::KILL_ENEMY), 1);
+}
+
+/// `onDeath`'s calls reach a killer held as a copy (an arrow's owner,
+/// arrow.rs `attack_entity_by_id`): the player in its slot gets them at
+/// once. A killer held up the stack whose caller does not run the hooks
+/// gets them when the world puts it back (`World::with_entity_mut`).
+/// A non-player killer (a wolf) has `Entity`'s empty bodies.
+#[test]
+fn a_kill_reaches_the_killer_in_its_slot() {
+    let mut w = world();
+    let mut p = new_entity_player_sp(&mut w);
+    p.base.set_location_and_angles(0.5, 61.0, 0.5, 0.0, 0.0);
+    let pid = p.base.entity_id;
+    assert!(w.spawn_entity_in_world(p));
+    let spawn_zombie = |w: &mut World, x: f64| {
+        let mut z = zombie::new_entity_zombie(w);
+        z.base.set_location_and_angles(x, 61.0, 0.5, 0.0, 0.0);
+        z.kind.living_mut().unwrap().health = 1;
+        let id = z.base.entity_id;
+        assert!(w.spawn_entity_in_world(z));
+        id
+    };
+    // A copy of the player as the attacker, the player in its slot.
+    let z1 = spawn_zombie(&mut w, 2.5);
+    let copy = w.entity(pid).unwrap().clone();
+    w.with_entity_mut(z1, |w, z| {
+        dispatch::attack_entity_from(z, w, Some(&copy), 5)
+    })
+    .unwrap();
+    assert_eq!(value(w.entity(pid).unwrap(), sl::MOB_KILLS_STAT), 1);
+    // The player out of its slot, hooks left to the put-back.
+    let z2 = spawn_zombie(&mut w, 3.5);
+    w.with_entity_mut(pid, |w, p| {
+        w.with_entity_mut(z2, |w, z| dispatch::attack_entity_from(z, w, Some(p), 5))
+            .unwrap();
+        assert_eq!(value(p, sl::MOB_KILLS_STAT), 1);
+    })
+    .unwrap();
+    assert_eq!(value(w.entity(pid).unwrap(), sl::MOB_KILLS_STAT), 2);
+    // A wolf killer: nothing.
+    let z3 = spawn_zombie(&mut w, 4.5);
+    let wolf = mc_sim::entity::wolf::new_entity_wolf(&mut w);
+    w.with_entity_mut(z3, |w, z| {
+        dispatch::attack_entity_from(z, w, Some(&wolf), 5)
+    })
+    .unwrap();
+    assert_eq!(value(w.entity(pid).unwrap(), sl::MOB_KILLS_STAT), 2);
+    assert!(
+        w.unimplemented_hits.borrow().is_empty(),
+        "{:?}",
+        w.unimplemented_hits
+    );
 }
 
 /// `jump` and `fall` (EntityPlayer.java:721-724, :787-793): one jump; a

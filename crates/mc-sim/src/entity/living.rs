@@ -50,9 +50,9 @@
 //! `attackEntityFrom` is in hand as `&Entity` (a copy for the projectile and
 //! harness callers); `onDeath`'s `attacker.addToPlayerScore(this, …)` and
 //! `attacker.onKillEntity(this)` mutate only an `EntityPlayer` (both are
-//! empty in `Entity`), which a shared reference cannot reach: they record
-//! `EntityPlayer.addToPlayerScore` / `EntityPlayer.onKillEntity` as the
-//! dispatch would (WP-2.5).
+//! empty in `Entity`), so they go to the attacker entity by id, in its slot
+//! or, when it is held up the stack, when it is back in hand
+//! ([`super::player::kill_hooks`], WP-4.6).
 
 use mc_core::math::{self, floor_double, jmath};
 use mc_core::{Aabb, Vec3D};
@@ -759,23 +759,20 @@ pub fn knock_back(e: &mut Entity, _var1: &Entity, _var2: i32, var3: f64, var5: f
     }
 }
 
-/// `EntityLiving.onDeath(attacker)`: score and kill hooks of the attacker
-/// (module docs), the drops, the death state.
+/// `EntityLiving.onDeath(attacker)`: the attacker's `addToPlayerScore`
+/// (when `scoreValue >= 0`, which it always is in b1.7.3: no class changes
+/// the initial 0) and `onKillEntity`, the drops, the death state.
+///
+/// Java calls the attacker object; the port holds `attacker` as a copy or a
+/// shared borrow, so the calls go to the attacker entity itself
+/// ([`super::player::kill_hooks`]): only `EntityPlayer` overrides them
+/// (Entity.java:759-760, :1094-1095 are empty).
 // src: EntityLiving.java:407-422
 pub fn on_death(e: &mut Entity, world: &mut World, var1: Option<&Entity>) {
-    if lv(e).score_value >= 0
-        && let Some(a) = var1
-        && a.kind.is_player()
-    {
-        // var1.addToPlayerScore(this, scoreValue): Entity's body is empty
-        // (Entity.java:759-760), EntityPlayer's is WP-2.5.
-        world.note_unimplemented("EntityPlayer.addToPlayerScore");
-    }
-    if let Some(a) = var1
-        && a.kind.is_player()
-    {
-        // var1.onKillEntity(this): empty in Entity (Entity.java:1094-1095).
-        world.note_unimplemented("EntityPlayer.onKillEntity");
+    if let Some(a) = var1 {
+        // src: EntityLiving.java:408-414
+        let score = lv(e).score_value;
+        super::player::kill_hooks(world, a, e, (score >= 0).then_some(score));
     }
     lv_mut(e).unused_flag = true;
     if !world.multiplayer_world {

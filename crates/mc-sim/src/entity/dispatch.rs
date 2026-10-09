@@ -165,9 +165,9 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "onUpdate",
         ],
     ),
-    // src: EntityPig.java:36-43, :71-77 (super::pig, WP-2.2). `onStruckByLightning`
-    // records the EntityPigZombie it would spawn (WP-2.3).
-    ("EntityPig", &["fall", "interact"]),
+    // src: EntityPig.java:36-43, :62-77 (super::pig, WP-2.2; the pigman of
+    // `onStruckByLightning` since WP-4.6)
+    ("EntityPig", &["fall", "interact", "onStruckByLightning"]),
     // src: EntityPigZombie.java:18-25, :49-65 (super::pig_zombie, WP-2.3)
     ("EntityPigZombie", &["attackEntityFrom", "onUpdate"]),
     // src: EntityPlayer.java:59-125, :140-156, :239-247, :349-351, :357-396,
@@ -653,7 +653,7 @@ pub fn add_to_player_score(e: &mut Entity, world: &mut World, victim: &Entity, s
     let _ = world;
     if let K::PlayerSp(..) = e.kind {
         // src: EntityPlayer.java:239-247
-        player::add_to_player_score(e, victim, score);
+        player::add_to_player_score(e, victim.kind.is_player(), score);
     }
     // src: Entity.java:759-760 (empty)
 }
@@ -865,7 +865,7 @@ pub fn perform_hurt_animation(e: &mut Entity, _world: &mut World) {
 /// `onStruckByLightning(bolt)`.
 pub fn on_struck_by_lightning(e: &mut Entity, world: &mut World, bolt: &Entity) {
     match e.kind {
-        // src: EntityPig.java:62-69 (partial: records the EntityPigZombie, WP-2.3)
+        // src: EntityPig.java:62-69
         K::Pig(..) => pig::on_struck_by_lightning(e, world),
         // src: EntityCreeper.java:141-144
         K::Creeper(..) => creeper::on_struck_by_lightning(e, world, bolt),
@@ -879,7 +879,7 @@ pub fn on_kill_entity(e: &mut Entity, world: &mut World, victim: &Entity) {
     let _ = world;
     if let K::PlayerSp(..) = e.kind {
         // src: EntityPlayer.java:795-800
-        player::on_kill_entity(e, victim);
+        player::on_kill_entity(e, crate::world::is_instance_of(&victim.kind, "EntityMob"));
     }
     // src: Entity.java:1094-1095 (empty)
 }
