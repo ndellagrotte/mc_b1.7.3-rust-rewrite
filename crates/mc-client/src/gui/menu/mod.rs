@@ -16,6 +16,7 @@
 //! | [`stats`] | `GuiStats`, `GuiSlotStats`, `GuiSlotStatsGeneral`, `GuiSlotStatsItem`, `GuiSlotStatsBlock`, `SorterStatsItem`, `SorterStatsBlock` |
 //! | [`texture_packs`] | `GuiTexturePacks`, `GuiTexturePackSlot` (the default pack only) |
 //! | [`import_world`], [`import_refused`] | — (project-owned: the D5 import and its refusal dialog) |
+//! | [`export_world`] | — (project-owned, WP-4.5: the export screen and its result dialog) |
 //!
 //! The loading screen's drawing (`LoadingScreenRenderer`) is
 //! [`super::loading`]; the registrations by class name are
@@ -46,6 +47,7 @@
 pub mod achievements;
 pub mod controls;
 pub mod create_world;
+pub mod export_world;
 pub mod import_refused;
 pub mod import_world;
 pub mod ingame_menu;

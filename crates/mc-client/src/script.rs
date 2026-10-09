@@ -349,6 +349,21 @@ pub enum Action {
         #[serde(default)]
         double: bool,
     },
+    /// Dev (WP-4.5): exports the world `saves/<name>` into the folder
+    /// `path` (as `<path>/<name>`) through [`crate::export::export_from_game`]:
+    /// the open world is saved first when it is that world; the world is
+    /// validated, copied and read back. With `report`, the result (the
+    /// report with every file's and chunk's digest, or the error) is written
+    /// there as JSON.
+    ExportWorld {
+        /// The world's folder in `saves/`.
+        name: String,
+        /// The target folder.
+        path: PathBuf,
+        /// The JSON report.
+        #[serde(default)]
+        report: Option<PathBuf>,
+    },
 }
 
 /// The centre of row `index` of `slot` (a list of `size` rows) in scaled
@@ -997,6 +1012,32 @@ pub fn run_script(
                     }
                 }
             }
+            Action::ExportWorld { name, path, report } => {
+                let v = match crate::export::export_from_game(&mut game, &name, &path) {
+                    Ok(r) => {
+                        info!(
+                            "script: exported saves/{name} to {} ({} files, {} chunks checked)",
+                            r.path.display(),
+                            r.files,
+                            r.digest.chunks.len()
+                        );
+                        serde_json::json!({"ok": true, "report": r.to_json()})
+                    }
+                    Err(e) => {
+                        error!("script: export_world {name}: {e}");
+                        serde_json::json!({"ok": false, "error": e.to_string()})
+                    }
+                };
+                if let Some(report) = report {
+                    if let Some(d) = report.parent() {
+                        let _ = std::fs::create_dir_all(d);
+                    }
+                    let text = serde_json::to_string_pretty(&v).unwrap_or_default();
+                    if let Err(e) = std::fs::write(&report, text + "\n") {
+                        error!("script: {}: {e}", report.display());
+                    }
+                }
+            }
             Action::DumpInventory { path } => {
                 let v = inventory_json(&game);
                 if let Some(d) = path.parent() {
@@ -1338,6 +1379,32 @@ mod tests {
                 ..Default::default()
             })
         );
+    }
+
+    #[test]
+    fn parses_the_wp_4_5_export_action() {
+        let s = Script::parse(
+            r#"[{"action": "export_world", "name": "w", "path": "/tmp/out"},
+                {"action": "export_world", "name": "w", "path": "o", "report": "r.json"}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::ExportWorld {
+                name: "w".into(),
+                path: "/tmp/out".into(),
+                report: None
+            }
+        );
+        assert_eq!(
+            s.steps[1].action,
+            Action::ExportWorld {
+                name: "w".into(),
+                path: "o".into(),
+                report: Some("r.json".into())
+            }
+        );
+        assert!(Script::parse(r#"[{"action": "export_world", "name": "w"}]"#).is_err());
     }
 
     #[test]

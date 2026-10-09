@@ -13,6 +13,7 @@ use mc_sim::save::{SaveFormat, SaveFormatComparator};
 
 use super::create_world::GuiCreateWorld;
 use super::display_parent;
+use super::export_world::GuiExportWorld;
 use super::import_world::GuiImportWorld;
 use super::rename_world::GuiRenameWorld;
 use super::world_slot::{WorldSlotList, new_slot};
@@ -28,6 +29,10 @@ use crate::gui::widgets::yesno::GuiYesNo;
 pub const IMPORT_BUTTON: i32 = 100;
 /// Its label.
 pub const IMPORT_LABEL: &str = "Import...";
+/// The Export... button's id (project-owned, WP-4.5).
+pub const EXPORT_BUTTON: i32 = 101;
+/// Its label.
+pub const EXPORT_LABEL: &str = "Export...";
 
 /// `GuiSelectWorld`.
 pub struct GuiSelectWorld {
@@ -53,6 +58,8 @@ pub struct GuiSelectWorld {
     /// `buttonSelect`, `buttonRename`, `buttonDelete` as control-list
     /// indices.
     buttons: [usize; 3],
+    /// The Export... button's control-list index (WP-4.5).
+    export_button: Option<usize>,
 }
 
 impl GuiSelectWorld {
@@ -71,6 +78,7 @@ impl GuiSelectWorld {
             localized_must_convert_text: String::new(),
             deleting: false,
             buttons: [0, 1, 2],
+            export_button: None,
         }
     }
 
@@ -144,6 +152,18 @@ impl GuiSelectWorld {
             20,
             IMPORT_LABEL,
         ));
+        // WP-4.5: the export of the selected world (project-owned).
+        c.push(GuiButton::with_size(
+            EXPORT_BUTTON,
+            4,
+            6,
+            70,
+            20,
+            EXPORT_LABEL,
+        ));
+        let export = c.len() - 1;
+        c[export].enabled = false;
+        self.export_button = Some(export);
     }
 }
 
@@ -268,6 +288,15 @@ impl Screen for GuiSelectWorld {
             display_parent(ctx, &mut self.parent_screen);
         } else if id == IMPORT_BUTTON {
             ctx.display_wrapping_this(|this| Box::new(GuiImportWorld::new(Some(this))));
+        } else if id == EXPORT_BUTTON {
+            if let (Some(world), Some(name)) = (
+                get_save_file_name(&self.save_list, self.selected_world),
+                get_save_name(ctx, &self.save_list, self.selected_world),
+            ) {
+                ctx.display_wrapping_this(move |this| {
+                    Box::new(GuiExportWorld::new(Some(this), world, name))
+                });
+            }
         } else if let Some(s) = self.world_slot_container.as_mut() {
             // worldSlotContainer.actionPerformed(button): the scroll buttons
             // 4 and 5 (never in the control list in Beta).
@@ -321,6 +350,14 @@ impl Screen for GuiSelectWorld {
             slot.draw_screen(&mut list, ctx, g, mx, my, p);
         }
         draw::draw_centered_string(g, ctx.font, &self.screen_title, w / 2, 20, 16777215);
+        // WP-4.5: Export... follows the selection, as the slot's
+        // elementClicked enables Play/Rename/Delete.
+        if let Some(b) = self
+            .export_button
+            .and_then(|i| self.base.control_list.get_mut(i))
+        {
+            b.enabled = get_save_file_name(&self.save_list, self.selected_world).is_some();
+        }
         default_draw_screen(&mut self.base, ctx, g, mx, my);
     }
 }
