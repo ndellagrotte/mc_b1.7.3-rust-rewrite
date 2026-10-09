@@ -816,17 +816,22 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   which also weighs a batch's distance (a batch at z −200 sorts before the
   background drawn at z 0). The map is therefore drawn at z 0 and the
   lines, frames and icons are cut to the tiled rectangle on the CPU
-  (`gui::menu::Clip`). **For WP-3.6a/3.6b**: `gui::render::flush_gui`'s
-  `sort_bias: n` is outweighed by z differences between batches; a
-  screen drawing at another z (containers' items at z 100+) can draw out
-  of call order. A bias that dominates (e.g. `n × 1e5`) or a sort by index
-  only would fix it.
-- **Item icons**: `gui::menu::draw_item_into_gui(g, colorize, clip, id,
-  damage, icon, x, y)` is the hook the achievement map and the statistics
-  rows call for `RenderItem.drawItemIntoGui`. It draws the flat icon
-  (terrain.png or items.png) as vanilla's 2D branch; blocks vanilla draws
-  as a lit cube (`renderItemIn3d`) are drawn flat for now. WP-3.6b's GUI
-  item renderer should take over its body.
+  (`gui::menu::Clip`). (`gui::render::flush_gui` orders the batches by
+  `sort_bias` = index × 4096 since WP-3.6b, which outweighs the z
+  differences, so screens drawing at other z keep call order; see "Draw
+  order" under WP-3.6b.)
+- **Item icons** (WP-3.9): the achievement map and the statistics rows
+  call WP-3.6b's `gui::render_item::draw_item_into_gui_with(ig, g,
+  statics, colorize, clip, id, damage, icon, x, y)`
+  (`RenderItem.drawItemIntoGui`): blocks as the lit 3D cube
+  (`renderItemIn3d`), other items as the flat icon. `colorize` is
+  `field_27004_a` (`GuiAchievements` clears it for an achievement that
+  cannot be taken yet: the icon keeps the 0.1 grey); `clip` cuts the
+  drawing to the map window in GUI pixels (a 3D item's quads are clipped
+  polygon by polygon, `gui::render_item` module docs, "Clipping").
+  `draw_item_into_gui` (the hotbar, containers, the popup) is the same
+  with `true, None`. The old flat stand-in `gui::menu::draw_item_into_gui`
+  is gone.
 - **Statistics**: General, Blocks and Items (disabled while empty); column
   sorting by the header icons (descending, ascending, off), the tooltips;
   values in each stat's format (`1,234`, `1.50 km`, `2.00 h`).
@@ -839,8 +844,10 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   the next tick's `handleInput` begins (vanilla's `this`): wait at least a
   tick (`{"action": "wait", "ticks": 2}`) after a click that opens a screen
   before typing into it, or the keys go to the old screen. A world-list row
-  is clicked with `mouse_to` + `mouse_down`, a few frames, `mouse_up`
-  (`GuiSlot` polls the held button while drawing).
+  is clicked with `click_slot` (WP-3.9: by index, where `GuiSlot` draws
+  it; `GuiSlot` centres a short list, so the first row is not at the
+  list's top), or by hand with `mouse_to` + `mouse_down`, a few frames,
+  `mouse_up` (`GuiSlot` polls the held button while drawing).
 
 ## Particles (WP-3.7a)
 
@@ -933,9 +940,11 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   in that order (`item_renderer::order`), on an `Rgba8Unorm` mirror of the
   live terrain atlas (`particles::render::sync_mirror`). The portal overlay
   is `GuiIngame`'s (WP-3.6b).
-- **For WP-3.5b (held items in third person):** `RenderPlayer.renderSpecials`
-  and `RenderBiped.renderEquippedItems` call `itemRenderer.renderItem(entity,
-  stack)`. Use the resource `item_renderer::render_item::HeldItemHook`:
+- **Held items in third person (WP-3.9):** `RenderPlayer.renderSpecials`
+  and `RenderBiped.renderEquippedItems` reach `renderItem` through
+  WP-3.5b's `render::held_item::HeldItemHook`, filled here with
+  `render_item::EntityGlItemRenderer` (the "Entity renderers" section).
+  The mesh-returning hook below is what the hand pass uses:
   `(hook.render_item)(&mut ItemMeshCache, &mut Assets<Mesh>, &RenderItemArgs
   { item_id, damage, icon: render_item::get_item_icon(entity, stack),
   brightness: getEntityBrightness(1.0), statics, colorizers })` returns an
@@ -944,16 +953,18 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   (`texture_srgb` 1, lighting on, alpha test 0.1, cull off), `glColor` =
   `gl_color` or the entity's brightness. `render_item::is_full_3d`,
   `should_rotate_around_when_rendering`, `is_block_3d` give the branches of
-  those methods. The hook is defined here because WP-3.5b's
-  `render::HeldItemHook` was not in this tree; the integrator may move it.
+  those methods. (It was defined here before WP-3.5b's hook was in the
+  tree; the third-person draws now go through `render_item_on_entity_gl`,
+  the same geometry on `EntityGl`.)
 - **For WP-3.5b and WP-3.6b (the arm's `isRiding`):** the arm is
   `RenderPlayer.modelBipedMain`'s, whose `isRiding` every draw of the
   player sets (RenderLiving.java:26) and nothing resets. Whenever the local
   player is drawn with the player model (`GuiInventory`'s preview,
   GuiInventory.java:58; any third-person draw), call
   `ItemRenderer::player_model_drawn(player.base.is_riding())` on the
-  `item_renderer::ItemRenderer` resource. `render_hand` already does it for
-  third person and sleeping.
+  `item_renderer::ItemRenderer` resource. `render_hand` does it for third
+  person and sleeping, and the entity pass after each `RenderPlayer` draw
+  (WP-3.9); `GuiInventory`'s preview does not yet.
 - **Not done:** the skin download (`getTextureForDownloadableImage`,
   deferred, D2: always `/mob/char.png`); anaglyph's second pass (the shell
   draws one eye); `cameraZoom` (only the unused high-resolution screenshot
@@ -1040,15 +1051,19 @@ GL emulation), `render/apply.rs` (the Bevy side).
 
 ### For WP-3.7b
 
-**Integration status (WP-3.5b merge):** WP-3.7b, merged first, defined its
-own hook for this call, `item_renderer::render_item::HeldItemHook` (a
-function returning an `ItemDraw { mesh, atlas, matrix, gl_color }`), and
-fills it; nothing yet inserts the `render::held_item::HeldItemHook` below,
-so third-person held items are not drawn. Bridging the two (an
-`EntityGl` draw of a prebuilt mesh, or `renderItem` transcribed on
-`EntityGl`) is a follow-up. Likewise the third-person player draw does not
-yet call `ItemRenderer::player_model_drawn` (WP-3.7b's note on the arm's
-`isRiding`); `render_hand` covers third person and sleeping.
+**Integration status (WP-3.9):** WP-3.7b, merged first, defined its own
+hook for the hand pass, `item_renderer::render_item::HeldItemHook` (a
+function returning an `ItemDraw { mesh, atlas, matrix, gl_color }`).
+WP-3.9 bridges the two: `ItemRendererPlugin` inserts
+`render::held_item::HeldItemHook(Some(Arc::new(EntityGlItemRenderer)))`,
+whose `render_item` is `renderItem` transcribed on `EntityGl`
+(`item_renderer::render_item::render_item_on_entity_gl`: a 3D block
+through `render_block_as_item`, else WP-3.7b's `extruded_icon` under
+`GL_RESCALE_NORMAL` and `renderItem`'s matrix calls). Skeletons hold their
+bow, pig zombies their golden sword, the third-person player its held
+item and its helmet block. The entity pass calls
+`ItemRenderer::player_model_drawn(isRiding)` after each `RenderPlayer`
+draw (`render_hand` also still does for third person and sleeping).
 
 `ItemRenderer.renderItem(entity, stack)` (the held items of `RenderPlayer`
 and `RenderBiped`, the helmet slot's block) calls
@@ -1110,7 +1125,7 @@ Actions run in order, as many per frame as are due.
 | `screenshot` | `path` | Captures the window into a PNG (parent directories created); the script waits until it is written |
 | `dump` | `path` | Writes a JSON of the state: app state, `ticks_ran`, screen, focus, pause, third person, F3, the mouse-over, the world (dir, level name, seed, dimension, world time, loaded chunks, entities, spawn, rain) and the player (id, position, rotation, motion, on ground, health, dimension, hotbar slot, name, the portal state `in_portal` / `time_in_portal` / `time_until_portal`, `y_size`) |
 | `save` | — | `saveWorldIndirectly` (saves the world and the player now) |
-| `use_portal` | — | Dev: `Minecraft.usePortal()` at once |
+| `use_portal` | — | Dev: `Minecraft.usePortal()` at once. It bypasses `EntityPlayerSP.onLivingUpdate`'s portal timers: `timeUntilPortal` is not set to 10 and `timeInPortal` is not reset, so used while standing in a portal the arrival portal sends the player straight back (Gate 3 O2). The real path is walking into a portal (`key.forward`): `timeInPortal` rises 0.0125 a tick and `usePortal` runs at 1.0 (80 ticks), `timeUntilPortal` 10 keeps the arrival portal from firing until the player has been out of it for 10 ticks (EntityPlayerSP.java:39-69, EntityPlayer.java:811-817) |
 | `respawn` | — | Dev: `Minecraft.respawn(false, 0)` |
 | `quit` | — | `Minecraft.shutdown()`: leaves the world (saving it and the player) and exits |
 | `dump_texture` | `name`, `path` | Dev (WP-3.2): writes the texture's current pixels (for `"terrain"` / `"items"` the atlas with its animated tiles; else a jar path as `getTexture` takes it) to a PNG |
@@ -1125,15 +1140,15 @@ Actions run in order, as many per frame as are due.
 | `open_screen` | `name` | Dev (WP-3.6a): `displayGuiScreen(new X())` for a screen class name (`"GuiConflictWarning"`, `"GuiErrorScreen"`, `"GuiIngameMenu"`, …; an unregistered one is a placeholder) |
 | `mouse_to` | `x`, `y` | Dev (WP-3.6a): puts the pointer on scaled GUI pixel `(x, y)` (hover; later button events carry the position) |
 | `type_text` | `text` | Dev (WP-3.6a): a key press and release per character, carrying the character (`keyTyped`) |
+| `click_slot` | `index`, `double` (false) | Dev (WP-3.9): clicks row `index` (0 = the first) of the current screen's `GuiSlot` list (the world list, the statistics tables, the texture packs): the pointer moves to the row's centre where `GuiSlot` draws it (`script::slot_row_center`; a short list is centred, a scrolled one moved), the left button is held two frames (`GuiSlot` polls it while drawing); with `double`, a second click four frames later, within `GuiSlot`'s 250 ms (on the world list: Play). A row scrolled out of the list is not clicked (an error is logged). Waits up to 120 frames for such a row |
 | `click_button` | `label` | Dev (WP-3.6c): presses the enabled button labelled `label` (its text as drawn, e.g. `"Singleplayer"`, `"Options..."`, `"Done"`, `"Save and quit to title"`, `"Import..."`) on the current screen: the pointer moves to its centre, then a left press and release. Waits up to 120 frames for such a button |
 | `particle` | `name`, `x`, `y`, `z`, `dx`, `dy`, `dz` (default 0), `ahead` (optional) | Dev (WP-3.7a): queues `world.spawnParticle(name, x, y, z, dx, dy, dz)` as the simulation would (`smoke`, `flame`, `reddust`, `explode`, `heart`, `note`, `bubble`, `portal`, `lava`, `splash`, `largesmoke`, `snowballpoof`, `snowshovel`, `slime`, `footstep`); with `ahead: d`, `x`, `y`, `z` are offsets from the point `d` blocks along the player's look from the eye |
-| `give_item` | `id`, `count` (1), `damage` (0), `slot` (optional) | Dev (WP-3.7b): puts the stack into main-inventory slot `slot` (0-8: the hotbar; replacing what is there), or without `slot` as a pickup does (`addItemStackToInventory`). Select it with the number keys (`key_down` `"1"`…`"9"`) or `wheel` |
+| `give` (alias `give_item`) | `id`, `count` (1), `damage` (0), `slot` (optional), `armor` (optional) | Dev (WP-3.6b, WP-3.7b; merged in WP-3.9): puts `new ItemStack(id, count, damage)` into armour slot `armor` (0 boots … 3 helmet) when given, else into main-inventory slot `slot` (0-8: the hotbar; replacing what is there) when given, else into the inventory as a pickup does (`addItemStackToInventory`). Select it with the number keys (`key_down` `"1"`…`"9"`) or `wheel`. `give_item` is the same action (old scripts keep working) |
 | `set_fire` | `ticks` | Dev (WP-3.7b): sets the player's `fire` (`isBurning()`, the fire overlay; the simulation counts it down, burns the player every 20 ticks, and water puts it out) |
 | `spawn_entity` | `kind` (an `EntityList` name, or `"LightningBolt"`, `"Fireball"`, `"Egg"`), `x`, `y`, `z`, `ahead`, `yaw`, `pitch`; per kind `item` (`[id, count, damage]`), `minecart_type`, `direction` (painting), `block_id` (falling block), `fuse` (primed TNT, default 80), `fire`, `hurt_time`, `health`, `powered`, `saddled`, `sheared`, `fleece`, `size`, `angry`, `tamed`, `shake` | Dev (WP-3.5b): spawns the entity as the simulation would (its constructor, `spawnEntityInWorld`; a bolt with `addWeatherEffect`); with `ahead: d`, `x, y, z` are offsets from the point `d` blocks ahead of the player horizontally, at its feet |
 | `set_block` | `x`, `y`, `z`, `id`, `meta` (default 0), `to` (`[x, y, z]`: a box), `ahead`, `text` (a sign's four lines), `raw` (default false), `rel` (default false) | Dev (WP-3.3b, WP-3.3d, WP-3.5b, WP-3.7b): `world.setBlockAndMetadataWithNotify(x, y, z, id, meta)` as the simulation would (`onBlockAdded` and the neighbours' updates run, as for a placed block: a redstone torch powers its wire, a piston beside a torch extends, a placed flowing source, id 8 or 10, then flows); with `raw`, `setBlockAndMetadata` without neighbour updates, the metadata forced again (`onBlockAdded`, e.g. a rail's, may change it) and the block marked for re-render: shapes the game would not keep (a lone curved rail, a powered wire with no source). A new world starts with tens of thousands of scheduled ticks from population (sand and gravel placed by the populators), run at most 1000 a tick in time order, so there a new block's first tick can wait hundreds of ticks (seed 123: more than 400, less than 1500); an opened save starts with none (b1.7.3 saves no scheduled ticks). With `rel` (WP-3.7b), the coordinates are offsets from the player's block (`floor(posX)`, `floor(posY)`, `floor(posZ)`; `posY` is the eye): `{"id": 9, "rel": true}` puts water at the eye (the water overlay), `1` stone (the inside-of-block overlay). With `to` (WP-3.5b), every block of the box from `x, y, z` to `to`; with `ahead: d`, the coordinates are offsets from the point `d` blocks ahead of the player horizontally, at its feet; with `text`, a sign's four lines (walls for paintings, signs, mob spawners) |
 | `equip` | `slot` (0-35 inventory, 100-103 armour: boots … helmet), `item` (`[id, count, damage]`, absent: empty) | Dev (WP-3.5b): puts a stack into one of the player's slots (armour on the third-person player) |
 | `chat` | `text` | Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` |
-| `give` | `id`, `count` (1), `damage` (0), `armor` (optional slot 0 boots … 3 helmet) | Dev (WP-3.6b): adds the stack to the player's inventory (`addItemStackToInventory`), or puts it in that armour slot |
 | `dump_inventory` | `path` | Dev (WP-3.6b): the player's 36 main and 4 armour slots and the cursor stack, each `[id, count, damage]` or null, as JSON |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
