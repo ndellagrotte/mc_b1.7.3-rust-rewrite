@@ -541,6 +541,7 @@ pub fn compute_hand(
     mut frame: ResMut<HandFrame>,
     font: Option<Res<FontRenderer>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Hand);
     drain_resets(&mut ir, &mut cursor, &msgs);
     *frame = HandFrame::default();
     let Some(setup) = cam.setup else {
@@ -747,6 +748,7 @@ pub fn apply_hand(
     mut cams: Query<(&mut Camera, &mut Projection), With<HandCamera>>,
     mut slots: SlotQuery,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Hand);
     let pool = &mut *pool;
     if let Ok((mut cam, mut proj)) = cams.single_mut() {
         let active = frame.active && frame.projection.is_some();

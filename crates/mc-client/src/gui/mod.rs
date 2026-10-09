@@ -305,6 +305,7 @@ pub fn open_screen_by_name(world: &mut World, name: &str) {
 
 /// [`GuiSet::Begin`].
 fn begin_gui_frame(mut g: ResMut<GuiGl>) {
+    let _perf = crate::perf::time(crate::perf::Phase::Gui);
     g.begin_frame();
 }
 
@@ -468,6 +469,7 @@ pub fn draw_current_screen(
     mut clipboard: Option<ResMut<bevy::clipboard::Clipboard>>,
     mut g: ResMut<GuiGl>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Gui);
     let mut read = clipboard_reader(clipboard.as_deref_mut());
     let mut ctx = ScreenCtx::new(
         &mut game,

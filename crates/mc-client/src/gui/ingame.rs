@@ -712,6 +712,7 @@ pub fn draw_game_overlay(
     font: Res<FontRenderer>,
     debug: Res<DebugText>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Gui);
     let gm = &mut *game;
     if gm.pending.is_some() || gm.skip_render_world || gm.the_world.is_none() {
         return;
@@ -821,6 +822,7 @@ pub fn collect_gui_messages(
 /// with the depth buffer cleared (no depth test here).
 // src: Minecraft.java:579-583, :670-744
 pub fn draw_debug_graph(game: NonSend<Game>, mut g: ResMut<GuiGl>) {
+    let _perf = crate::perf::time(crate::perf::Phase::Gui);
     if !game.game_settings.show_debug_info || game.pending.is_some() {
         return;
     }

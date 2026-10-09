@@ -235,6 +235,7 @@ pub fn draw_achievement_window(
     mut g: ResMut<GuiGl>,
     font: Res<FontRenderer>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Gui);
     let r = ScaledResolution::new(
         game.game_settings.gui_scale,
         game.display_width,

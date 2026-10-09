@@ -39,6 +39,8 @@
 //! special renderers, `RenderGlobal.renderEntities`).
 //! WP-4.5: [`export`] (the world export, PLAN_v4 D5: validate, copy,
 //! re-read and compare), its screens in [`gui::menu::export_world`].
+//! WP-4.3: [`perf`] (frame-time window, phase timings, start-up
+//! milestones; a project addition).
 
 pub mod app;
 pub mod assets;
@@ -62,6 +64,7 @@ pub mod loading;
 pub mod model;
 pub mod particles;
 pub mod paths;
+pub mod perf;
 pub mod render;
 pub mod screenshot;
 pub mod script;
@@ -213,6 +216,8 @@ impl Plugin for ClientPlugin {
         app.add_plugins(item_renderer::ItemRendererPlugin);
         // WP-3.5b: RenderManager, the entity and tile-entity renderers.
         app.add_plugins(render::RenderPlugin);
+        // WP-4.3: frame-time and phase counters (dump_debug, F3).
+        perf::build(app);
     }
 }
 

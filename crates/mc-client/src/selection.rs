@@ -198,6 +198,7 @@ pub fn apply_selection(
     mut materials: ResMut<Assets<GlMaterial>>,
     mut q: Query<(&mut Transform, &mut Visibility), With<SelectionBox>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let Some(h) = handles else {
         return;
     };

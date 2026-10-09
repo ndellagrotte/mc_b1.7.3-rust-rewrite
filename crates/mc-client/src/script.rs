@@ -717,6 +717,12 @@ pub fn run_script(
                     let src = w.get_resource::<crate::debug::DebugSources>().cloned();
                     let stats = w.get_resource::<crate::terrain::TerrainStats>().copied();
                     let fps_line = w.get_non_send::<Game>().map(|g| g.debug.clone());
+                    // WP-4.3: the frame-time window, phases, start-up and
+                    // the storage counters.
+                    let perf = w
+                        .get_resource::<crate::perf::PerfStats>()
+                        .map(|p| p.to_json());
+                    let storage = crate::storage::StorageCounters::now().to_json();
                     let v = json!({
                         "debug": fps_line,
                         "left": text.as_ref().map(|t| t.left.clone()),
@@ -731,6 +737,8 @@ pub fn run_script(
                             "mesh_ms_total": s.mesh_nanos_total as f64 / 1e6,
                             "terrain_frame_ms": s.frame_nanos as f64 / 1e6,
                         })),
+                        "perf": perf,
+                        "storage": storage,
                     });
                     if let Some(d) = path.parent() {
                         let _ = std::fs::create_dir_all(d);

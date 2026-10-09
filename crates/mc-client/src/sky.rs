@@ -385,6 +385,7 @@ pub fn compute_render_frame(
     mut weather_frame: ResMut<WeatherFrame>,
     mut sel: ResMut<SelectionFrame>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let g = &mut *game;
     let setup = camera.setup;
     let view = gather_view(g);
@@ -607,6 +608,7 @@ pub fn apply_sky(
     mut materials: ResMut<Assets<GlMaterial>>,
     mut parts: Query<(&SkyPart, &mut Transform, &mut Visibility)>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let Some(h) = handles else {
         return;
     };

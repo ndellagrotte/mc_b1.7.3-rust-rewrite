@@ -246,6 +246,7 @@ pub fn apply_draws(
         ),
     >,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Entities);
     let v = &mut *visuals;
     v.frame += 1;
     let now = v.frame;

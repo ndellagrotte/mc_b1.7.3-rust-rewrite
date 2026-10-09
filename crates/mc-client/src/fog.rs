@@ -231,6 +231,7 @@ pub fn apply_fog(
     mut clear: ResMut<ClearColor>,
     cams: Query<(Entity, Option<&DistanceFog>), With<MainCamera>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let c = if fog.active { fog.color } else { [0.0; 3] };
     let want = Color::srgb(c[0], c[1], c[2]);
     if clear.0 != want {

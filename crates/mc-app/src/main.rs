@@ -8,6 +8,7 @@
 //! ```text
 //! mc_b173 [--data-dir DIR] [--jar FILE] [--resources DIR] [--username NAME]
 //!         [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
+//!         [--vsync on|off]
 //! ```
 //!
 //! See `crates/mc-client/README.md`.
@@ -19,7 +20,7 @@ use bevy::DefaultPlugins;
 use bevy::asset::AssetMetaCheck;
 use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
+use bevy::window::{PresentMode, PrimaryWindow};
 use bevy::winit::WINIT_WINDOWS;
 use mc_client::paths::ClientPaths;
 use mc_client::{ClientConfig, ClientPlugin, StartAction};
@@ -36,11 +37,14 @@ struct Args {
     seed: Option<String>,
     import: Option<PathBuf>,
     script: Option<PathBuf>,
+    /// `--vsync off`: present without waiting for the display (WP-4.3).
+    no_vsync: bool,
 }
 
 const USAGE: &str =
     "usage: mc_b173 [--data-dir DIR] [--jar FILE] [--resources DIR] [--username NAME]
                [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
+               [--vsync on|off]
 
   --data-dir DIR    options, saves, screenshots, stats (default: the platform data dir + mc_b173)
   --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang)
@@ -49,7 +53,9 @@ const USAGE: &str =
   --world NAME      open saves/NAME, creating it when missing (skips the title screen)
   --seed SEED       the new world's seed, as the Create World screen reads it
   --import DIR      import a vanilla save folder into saves/, then open it
-  --script FILE     scripted-input dev mode (crates/mc-client/README.md)";
+  --script FILE     scripted-input dev mode (crates/mc-client/README.md)
+  --vsync on|off    wait for the display's refresh (default on); off measures the real
+                    frame time (F3 and dump_debug show it)";
 
 fn parse_args() -> Result<Args, String> {
     let mut a = Args::default();
@@ -65,6 +71,13 @@ fn parse_args() -> Result<Args, String> {
             "--seed" => a.seed = Some(value("--seed")?),
             "--import" => a.import = Some(value("--import")?.into()),
             "--script" => a.script = Some(value("--script")?.into()),
+            "--vsync" => {
+                a.no_vsync = match value("--vsync")?.as_str() {
+                    "on" => false,
+                    "off" => true,
+                    v => return Err(format!("--vsync takes on or off, not {v}")),
+                }
+            }
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown argument {other}")),
         }
@@ -89,6 +102,7 @@ fn fail(msg: &str) -> ! {
 }
 
 fn main() {
+    mc_client::perf::mark_process_start();
     let args = parse_args().unwrap_or_else(|e| fail(&e));
     let mut paths = ClientPaths::default();
     if let Some(d) = args.data_dir {
@@ -147,6 +161,13 @@ fn main() {
                         fit_canvas_to_parent: true,
                         // Tells wasm not to override default event handling, like F5 and Ctrl+R
                         prevent_default_event_handling: false,
+                        // Project addition (WP-4.3): `--vsync off` measures
+                        // the frame time uncapped.
+                        present_mode: if args.no_vsync {
+                            PresentMode::AutoNoVsync
+                        } else {
+                            PresentMode::AutoVsync
+                        },
                         ..default()
                     }),
                     // The close button is `Display.isCloseRequested()`: the game

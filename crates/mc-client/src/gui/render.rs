@@ -328,6 +328,7 @@ pub fn flush_gui(
     mut cams: Query<(&GuiCamera, &mut Projection)>,
     mut vis: Query<&mut Visibility>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::GuiFlush);
     let r = ScaledResolution::new(
         game.game_settings.gui_scale,
         game.display_width,

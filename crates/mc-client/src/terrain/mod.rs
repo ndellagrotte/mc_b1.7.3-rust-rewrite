@@ -434,6 +434,7 @@ pub fn terrain_frame(
     mut tile_entities: ResMut<TerrainTileEntities>,
     mut vis: Query<&mut Visibility, With<SectionMesh>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Terrain);
     let Some(handles) = handles else { return };
     let frame_t0 = clock::nano_time();
     let t = &mut *terrain;
@@ -711,6 +712,7 @@ pub fn draw_block_breaking(
     mut materials: ResMut<Assets<TerrainMaterial>>,
     mut q: Query<(&mut Transform, &mut Visibility, &mut Mesh3d), With<crack::CrackOverlay>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Terrain);
     let Some(handles) = handles else { return };
     let Ok((mut tr, mut vis, mut mesh3d)) = q.single_mut() else {
         return;

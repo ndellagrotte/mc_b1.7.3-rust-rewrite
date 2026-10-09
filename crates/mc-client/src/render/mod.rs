@@ -671,6 +671,7 @@ pub fn render_entities(
     mut events: MessageReader<ClientEvent>,
     mut item_renderer: Option<ResMut<crate::item_renderer::ItemRenderer>>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Entities);
     let rm = &mut *rm;
     track_load_renderers(rm, &mut events, &game);
     frame.visible = false;
@@ -858,6 +859,7 @@ pub fn render_pickups(
     hook: Res<HeldItemHook>,
     colorizers: Res<Colorizers>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Entities);
     if !frame.visible || pickups.draws.is_empty() {
         return;
     }

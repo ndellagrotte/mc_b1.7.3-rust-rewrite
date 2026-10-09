@@ -341,6 +341,7 @@ pub fn apply_weather(
     mut materials: ResMut<Assets<GlMaterial>>,
     mut q: Query<(&WeatherPart, &mut Transform, &mut Visibility)>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let Some(h) = handles else {
         return;
     };

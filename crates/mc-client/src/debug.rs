@@ -108,9 +108,21 @@ pub fn debug_text(g: &Game, src: &DebugSources) -> DebugText {
     }
 }
 
-/// Fills [`DebugText`] every frame.
-pub fn publish_debug_text(game: NonSend<Game>, src: Res<DebugSources>, mut out: ResMut<DebugText>) {
-    let t = debug_text(&game, &src);
+/// Fills [`DebugText`] every frame. With F3 on, the right column also
+/// gets the project's performance lines under vanilla's two memory lines
+/// ([`crate::perf::PerfStats::f3_lines`], WP-4.3).
+pub fn publish_debug_text(
+    game: NonSend<Game>,
+    src: Res<DebugSources>,
+    perf: Option<Res<crate::perf::PerfStats>>,
+    mut out: ResMut<DebugText>,
+) {
+    let mut t = debug_text(&game, &src);
+    if !t.right.is_empty()
+        && let Some(p) = perf
+    {
+        t.right.extend(p.f3_lines());
+    }
     if *out != t {
         *out = t;
     }

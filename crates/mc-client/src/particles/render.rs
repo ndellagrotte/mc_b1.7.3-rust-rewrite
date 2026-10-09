@@ -188,6 +188,7 @@ pub fn compute_particles(
     mut frame: ResMut<ParticlesFrame>,
     mut pickups: ResMut<PickupFxFrame>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Particles);
     pickups.draws.clear();
     for b in &mut frame.batches {
         *b = TessBatch::default();
@@ -298,6 +299,7 @@ pub fn apply_particles(
     mut materials: ResMut<Assets<GlMaterial>>,
     mut q: Query<(&ParticleLayer, &mut Transform, &mut Visibility)>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Particles);
     let Some(mut h) = handles else {
         return;
     };

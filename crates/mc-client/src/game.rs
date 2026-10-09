@@ -446,8 +446,11 @@ impl Game {
     ) -> Result<Game, String> {
         let now = clock::current_time_millis();
         let nano = clock::nano_time();
+        // Saves are written behind, region files incrementally (WP-4.3,
+        // `storage` module docs).
         let mut fs = FsStorage::new(&paths.data_dir)
-            .map_err(|e| format!("cannot use the data directory: {e}"))?;
+            .map_err(|e| format!("cannot use the data directory: {e}"))?
+            .with_write_behind();
         // src: Minecraft.java:238 (new GameSettings(this, mcDataDir))
         let game_settings = settings::load_options(&mut fs);
         // src: Minecraft.java:247 (new StatFileWriter(session, mcDataDir))
@@ -2330,6 +2333,7 @@ fn run_tick(bw: &mut bevy::ecs::world::World) {
 /// system of [`crate::ClientPlugin`].
 // src: Minecraft.java:513-614
 pub fn game_frame(bw: &mut bevy::ecs::world::World) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sim);
     let exit = {
         let mut g = bw.non_send_mut::<Game>();
         if !g.running && !g.exit_requested {
@@ -2340,6 +2344,11 @@ pub fn game_frame(bw: &mut bevy::ecs::world::World) {
     };
     if exit {
         flush_outbox(bw);
+        // The files queued by the last save reach the disk before the
+        // process ends (`storage` module docs).
+        if let Err(e) = crate::storage::flush_writes() {
+            error!("{e}");
+        }
         bw.write_message(AppExit::Success);
         return;
     }

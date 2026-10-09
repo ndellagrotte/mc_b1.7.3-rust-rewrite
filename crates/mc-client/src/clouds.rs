@@ -345,6 +345,7 @@ pub fn apply_clouds(
     mut materials: ResMut<Assets<GlMaterial>>,
     mut parts: Query<(&CloudPart, &mut Transform, &mut Visibility)>,
 ) {
+    let _perf = crate::perf::time(crate::perf::Phase::Sky);
     let Some(h) = handles else {
         return;
     };
