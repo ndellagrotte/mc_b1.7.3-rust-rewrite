@@ -31,6 +31,15 @@ cargo run -p mc-app -- [--data-dir DIR] [--jar FILE] [--resources DIR] [--userna
 A missing jar or `resources/` directory stops the program with a message
 naming the path.
 
+Since WP-4.3, `--jar` and `--resources` default to `<data-dir>/minecraft.jar`
+and `<data-dir>/resources`; the two paths in the table above are only
+development fallbacks, used when the data-directory file is missing and the
+fallback exists (`paths` module docs, `docs/RUNNING.md`). Also since WP-4.3:
+
+| Flag | Meaning | Default |
+|---|---|---|
+| `--vsync on\|off` | `off` presents with `PresentMode::AutoNoVsync`, to measure the frame time (project addition) | `on` |
+
 ## Module map
 
 | Module | Vanilla | What |
@@ -1137,6 +1146,34 @@ Skins and cloaks (`loadDownloadableImageTexture` binds the entity's own
 texture), `deadmau5`'s ears, other players' name tags (none in
 singleplayer). The F3 entity-id labels of `RenderLiving.passSpecialRender`
 are drawn.
+
+## Performance counters and saves (WP-4.3)
+
+- `perf` (a project addition, no vanilla counterpart): `PerfStats` keeps the
+  last 600 frames' frame time (wall time between two app updates) and
+  update time (the main schedule's own time, `First` to `Last`: the CPU
+  work of the frame, without the wait for the render thread and the
+  display), the time per phase, and the start-up milestones. A phase is
+  timed inside its systems with `let _perf = perf::time(Phase::X);`
+  (`Phase`: `Sim` = `game_frame`, `Terrain`, `Entities`, `Particles`,
+  `Gui` = the screen and HUD draws, `GuiFlush` = `flush_gui`, `Sky` = sky,
+  clouds, weather, fog and selection, `Hand`). A new system that should
+  count toward a phase adds that line.
+- `dump_debug` also writes `perf` (`frame`, `update`, `phases.<name>`: each
+  `n`, `min_ms`, `avg_ms`, `p95_ms`, `max_ms`; `startup`: `plugin_built_ms`,
+  `title_ms`, `in_game_ms`, from the process start) and `storage` (the
+  writes on the calling thread, the write-behind queue's region writes:
+  queued, coalesced, journaled, whole, unchanged, bytes, and the writer
+  thread's time).
+- With F3 on, the right column gets three `[rust]` lines under vanilla's
+  two memory lines: the frame time and the update time
+  (min/avg/p95/max of the window) and the phases' means.
+- `storage::FsStorage::with_write_behind` (the game's storage): `write`,
+  `rename` and `delete` are queued for a background thread in call order,
+  reads see the queued state, a region file is written once per batch and
+  only in its changed sectors, through a journal (module docs). Call
+  `storage::flush_writes()` before reading save files with anything but
+  the game's `Storage` (the game does before it exits).
 
 ## Scripted-input dev mode
 

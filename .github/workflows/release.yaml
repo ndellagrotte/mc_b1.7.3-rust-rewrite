@@ -49,7 +49,7 @@ jobs:
           targets: aarch64-apple-darwin
       - name: Build release for Apple Silicon
         run: |
-          SDKROOT=$(xcrun -sdk macosx --show-sdk-path) cargo build --profile dist --target=aarch64-apple-darwin
+          SDKROOT=$(xcrun -sdk macosx --show-sdk-path) cargo build --profile dist -p mc-app --target=aarch64-apple-darwin
       - name: Install rust toolchain for Apple x86
         uses: dtolnay/rust-toolchain@master
         with:
@@ -57,7 +57,7 @@ jobs:
           targets: x86_64-apple-darwin
       - name: Build release for x86 Apple
         run: |
-          SDKROOT=$(xcrun -sdk macosx --show-sdk-path) cargo build --profile dist --target=x86_64-apple-darwin
+          SDKROOT=$(xcrun -sdk macosx --show-sdk-path) cargo build --profile dist -p mc-app --target=x86_64-apple-darwin
       - name: Create Universal Binary
         run: |
           lipo -create -output target/dist/${{ env.GAME_EXECUTABLE_NAME }} target/aarch64-apple-darwin/dist/${{ env.GAME_EXECUTABLE_NAME }} target/x86_64-apple-darwin/dist/${{ env.GAME_EXECUTABLE_NAME }}
@@ -66,6 +66,7 @@ jobs:
           mkdir -p build/macos/src/Game.app/Contents/MacOS/assets
           cp -r assets/ build/macos/src/Game.app/Contents/MacOS/assets
           cp -r credits/ build/macos/src/Game.app/Contents/MacOS/credits
+          cp NOTICE LICENSE docs/RUNNING.md build/macos/src/Game.app/Contents/MacOS/
           cp target/dist/${{ env.GAME_EXECUTABLE_NAME }} build/macos/src/Game.app/Contents/MacOS/
           mv build/macos/src/Game.app build/macos/src/${{ env.GAME_OSX_APP_NAME }}.app
           ln -s /Applications build/macos/src/
@@ -93,17 +94,20 @@ jobs:
         with:
           toolchain: stable
       - name: Install Dependencies
-        run: sudo apt-get update; sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 libwayland-dev
+        run: sudo apt-get update; sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 libwayland-dev libxkbcommon-dev
       - name: Build release
         run: |
-          cargo build --profile dist
+          cargo build --profile dist -p mc-app
       - name: Prepare release
         run: |
           chmod +x target/dist/${{ env.GAME_EXECUTABLE_NAME }}
           mv target/dist/${{ env.GAME_EXECUTABLE_NAME }} .
+          cp docs/RUNNING.md .
       - name: Bundle release
+        # The game needs the player's own minecraft.jar and resources/ (PLAN_v4 D8):
+        # RUNNING.md says where to put them. NOTICE carries the Apache-2.0 credit (D4).
         run: |
-          tar -czf ${{ env.GAME_EXECUTABLE_NAME }}_linux.tar.gz ${{ env.GAME_EXECUTABLE_NAME }} assets credits
+          tar -czf ${{ env.GAME_EXECUTABLE_NAME }}_linux.tar.gz ${{ env.GAME_EXECUTABLE_NAME }} assets credits NOTICE LICENSE RUNNING.md
       - name: Upload release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -134,15 +138,16 @@ jobs:
           global-json-file: build/windows/installer/global.json
       - name: Build release
         run: |
-          cargo build --profile dist
+          cargo build --profile dist -p mc-app
       - name: Prepare release
         run: |
           mkdir target/dist/assets && cp -r assets target/dist/assets
           mkdir target/dist/credits && cp -r credits target/dist/credits
+          cp NOTICE LICENSE docs/RUNNING.md target/dist/
       - name: Zip release
         uses: vimtor/action-zip@v1.1
         with:
-          files: target/dist/assets/ target/dist/credits/ target/dist/${{ env.GAME_EXECUTABLE_NAME }}.exe
+          files: target/dist/assets/ target/dist/credits/ target/dist/NOTICE target/dist/LICENSE target/dist/RUNNING.md target/dist/${{ env.GAME_EXECUTABLE_NAME }}.exe
           dest: ${{ env.GAME_EXECUTABLE_NAME }}_windows.zip
       - name: Create Installer
         if: ${{ env.BUILD_INSTALLER }}
@@ -171,6 +176,9 @@ jobs:
           overwrite: true
 
   build-web:
+    # The browser build is Phase 5 (PLAN_v4 §5): mc-client does not build for
+    # wasm32-unknown-unknown yet, so this job is off until then.
+    if: false
     runs-on: ubuntu-latest
     needs: get-version
     env:

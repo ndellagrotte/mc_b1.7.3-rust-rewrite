@@ -47,8 +47,8 @@ const USAGE: &str =
                [--vsync on|off]
 
   --data-dir DIR    options, saves, screenshots, stats (default: the platform data dir + mc_b173)
-  --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang)
-  --resources DIR   the resources/ directory (sounds, music)
+  --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang; default: DATA-DIR/minecraft.jar)
+  --resources DIR   the resources/ directory (sounds, music; default: DATA-DIR/resources)
   --username NAME   the player name (default: Player<millis % 1000>)
   --world NAME      open saves/NAME, creating it when missing (skips the title screen)
   --seed SEED       the new world's seed, as the Create World screen reads it
@@ -104,10 +104,12 @@ fn fail(msg: &str) -> ! {
 fn main() {
     mc_client::perf::mark_process_start();
     let args = parse_args().unwrap_or_else(|e| fail(&e));
-    let mut paths = ClientPaths::default();
-    if let Some(d) = args.data_dir {
-        paths.data_dir = d;
-    }
+    // The jar and resources/ default to the (possibly given) data
+    // directory, with development fallbacks (mc_client::paths docs).
+    let mut paths = match args.data_dir {
+        Some(d) => ClientPaths::for_data_dir(d),
+        None => ClientPaths::default(),
+    };
     if let Some(j) = args.jar {
         paths.jar = j;
     }

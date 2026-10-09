@@ -1,4 +1,6 @@
 name: deploy-github-page
+# The browser build is Phase 5 (PLAN_v4 §5); until mc-client builds for
+# wasm32-unknown-unknown this manual workflow fails at "trunk build".
 
 on:
   workflow_dispatch:

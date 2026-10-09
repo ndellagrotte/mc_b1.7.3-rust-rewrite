@@ -24,6 +24,11 @@ for the phases and work packages.
 - The read-only reference tree under `.reference/` for development; see
   `docs/REFERENCES.md`. It is git-ignored and never committed.
 
+Since Phase 3 the game is playable from the title screen (create, import,
+play, save, reload; `docs/GATE3_REVIEW.md`). How to supply `minecraft.jar` and
+`resources/` and the command-line flags: [`docs/RUNNING.md`](docs/RUNNING.md).
+Performance measurements and their method: [`docs/PERF.md`](docs/PERF.md).
+
 ## Build and run
 
 ```
@@ -33,6 +38,11 @@ cargo clippy --workspace -- -Dwarnings
 ```
 
 Add `--features dev` to `cargo run` for Bevy dynamic linking during development.
+
+The release build is `cargo build --profile dist -p mc-app` (opt-level 3, LTO;
+`target/dist/mc_b173`), which `.github/workflows/release.yaml` packages for
+Linux, Windows and macOS with `docs/RUNNING.md`, `NOTICE`, `LICENSE` and
+`credits/`.
 
 ### Browser build (Phase 5)
 
