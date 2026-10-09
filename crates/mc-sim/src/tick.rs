@@ -26,6 +26,7 @@ use crate::block::{self, dispatch as block_dispatch};
 use crate::spawner;
 use crate::world::World;
 use crate::world::chunk::block_index;
+use crate::world::chunk_provider::chunk_key;
 use crate::world::events::WorldEvent;
 use crate::world::lighting::EnumSkyBlock;
 
@@ -261,21 +262,41 @@ impl World {
     /// snow/ice roll, and 80 random block ticks.
     // src: World.java:1868-1965
     pub fn update_blocks_and_play_cave_sounds(&mut self) {
-        self.positions_to_update.clear();
-
-        // src: World.java:1871-1886
-        let players = self.player_entities.clone();
-        for pid in players {
-            let Some(p) = self.entity(pid) else { continue };
-            let var3 = floor_double(p.base.pos_x / 16.0);
-            let var4 = floor_double(p.base.pos_z / 16.0);
-            let var5 = 9;
-            for var6 in -var5..=var5 {
-                for var7 in -var5..=var5 {
-                    self.positions_to_update
-                        .insert(ChunkCoordIntPair::new(var6 + var3, var7 + var4));
+        // src: World.java:1871-1886. The set is cleared and refilled from
+        // the players' chunks each tick. A `JavaHashSet`'s layout (and so its
+        // iteration order) after `clear()` and a run of inserts depends only
+        // on its capacity and the inserted keys, so when the players are in
+        // the same chunks as at the last fill and that fill did not grow the
+        // table, refilling would rebuild the set it already holds; the port
+        // then keeps it (WP-4.3; nothing else writes the set).
+        let centres: Vec<(i32, i32)> = self
+            .player_entities
+            .iter()
+            .filter_map(|&pid| self.entity(pid))
+            .map(|p| {
+                (
+                    floor_double(p.base.pos_x / 16.0),
+                    floor_double(p.base.pos_z / 16.0),
+                )
+            })
+            .collect();
+        let capacity = self.positions_to_update.capacity();
+        let unchanged = self
+            .positions_filled_from
+            .as_ref()
+            .is_some_and(|(c, cap)| *c == centres && *cap == capacity);
+        if !unchanged {
+            self.positions_to_update.clear();
+            for &(var3, var4) in &centres {
+                let var5 = 9;
+                for var6 in -var5..=var5 {
+                    for var7 in -var5..=var5 {
+                        self.positions_to_update
+                            .insert(ChunkCoordIntPair::new(var6 + var3, var7 + var4));
+                    }
                 }
             }
+            self.positions_filled_from = Some((centres, capacity));
         }
 
         if self.sound_counter > 0 {
@@ -405,14 +426,42 @@ impl World {
                 }
             }
 
-            // Random ticks (World.java:1952-1962).
-            for _ in 0..80 {
-                let var7 = self.next_lcg() >> 2;
-                let var8 = var7 & 15;
-                let var9 = var7 >> 8 & 15;
-                let var10 = var7 >> 16 & 127;
-                let var15 = self.chunk_mut(cx, cz).blocks[block_index(var8, var10, var9)] as i32;
-                if block::tick_on_load(var15) {
+            // Random ticks (World.java:1952-1962). Java reads `var14.blocks`
+            // of the chunk it fetched above for all 80 draws; the port looks
+            // the chunk up once per run of draws that hit no ticking block
+            // and again after each `updateTick`, which may load chunks into
+            // the map (nothing unloads during a tick in singleplayer), so the
+            // reads and the draw order are the Java's (WP-4.3: one map
+            // lookup per tick instead of one per draw).
+            let key = chunk_key(cx, cz);
+            let mut left = 80;
+            while left > 0 {
+                let mut hit = None;
+                let blocks = &self
+                    .chunk_provider
+                    .chunk_map
+                    .get(&key)
+                    .expect("fetched by get_chunk_from_chunk_coords above")
+                    .blocks;
+                // `next_lcg`'s state in a local while `blocks` is borrowed,
+                // stored back before any `updateTick` and after the draws.
+                let mut lcg = self.field_9437_g;
+                while left > 0 {
+                    left -= 1;
+                    // src: World.java:1953
+                    lcg = lcg.wrapping_mul(3).wrapping_add(1013904223);
+                    let var7 = lcg >> 2;
+                    let var8 = var7 & 15;
+                    let var9 = var7 >> 8 & 15;
+                    let var10 = var7 >> 16 & 127;
+                    let var15 = blocks[block_index(var8, var10, var9)] as i32;
+                    if block::tick_on_load(var15) {
+                        hit = Some((var15, var8, var10, var9));
+                        break;
+                    }
+                }
+                self.field_9437_g = lcg;
+                if let Some((var15, var8, var10, var9)) = hit {
                     block_dispatch::update_tick(
                         self,
                         var15,

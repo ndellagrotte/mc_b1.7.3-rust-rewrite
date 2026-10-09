@@ -268,6 +268,12 @@ pub struct World {
     /// `HashSet` order (PLAN_v4 §3.4 rule 4).
     // src: World.java:53
     pub(crate) positions_to_update: JavaHashSet<ChunkCoordIntPair>,
+    /// Not in Java (WP-4.3): the players' chunk coordinates
+    /// `positions_to_update` was last filled from and the set's capacity
+    /// before that fill; `updateBlocksAndPlayCaveSounds` skips its
+    /// clear-and-refill when both are unchanged, which would rebuild the
+    /// identical set ([`World::update_blocks_and_play_cave_sounds`]).
+    pub(crate) positions_filled_from: Option<(Vec<(i32, i32)>, usize)>,
     /// `soundCounter`: ticks until the next cave-sound attempt.
     // src: World.java:54
     pub(crate) sound_counter: i32,
@@ -498,6 +504,7 @@ impl World {
             spawn_peaceful_mobs: true,
             lighting_updates_scheduled: 0,
             positions_to_update: JavaHashSet::new(),
+            positions_filled_from: None,
             sound_counter,
             multiplayer_world: false,
             next_entity_id: 0,

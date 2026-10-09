@@ -35,8 +35,18 @@
 //! `chunk_list` holds keys where Java holds `Chunk` objects
 //! (ChunkProvider.java:46,133-134), so with `chunkXZ2Int` aliasing Java saves
 //! both aliased chunks while this port saves the current one twice.
+//!
+//! # Lookup cost (WP-4.3)
+//!
+//! Every `World.getBlockId` goes through `chunkMap`, so the map is the
+//! simulation's hottest data structure. Java's is a `HashMap` used for
+//! lookup only (ChunkProvider.java:28-29, :45, :73; never iterated, the save
+//! and unload loops walk `chunkList` and `droppedChunksSet`); here it is a
+//! hash map with a fixed multiplicative hasher ([`ChunkKeyHasher`]) over
+//! boxed chunks. Nothing iterates it, so its order is never observable
+//! (PLAN_v4 §3.4 rule 4).
 
-use std::collections::BTreeMap;
+use std::hash::{BuildHasherDefault, Hasher};
 
 use mc_core::JavaRandom;
 use mc_core::java_hash::{ChunkCoordIntPair, JavaHashSet};
@@ -153,9 +163,9 @@ pub struct ChunkProviderCache {
     pub generator: Option<ChunkGenerator>,
     /// `chunkLoader` (`None` for `SaveHandlerMP`).
     pub chunk_loader: Option<Box<dyn ChunkLoader>>,
-    /// `chunkMap`, keyed by `chunkXZ2Int` (module docs). Lookup only, so a
-    /// `BTreeMap`.
-    pub chunk_map: BTreeMap<i32, Chunk>,
+    /// `chunkMap`, keyed by `chunkXZ2Int` (module docs). Lookup only (never
+    /// iterated), so a hash map ("Lookup cost" in the module docs).
+    pub chunk_map: ChunkMap,
     /// `chunkList`: load order, used by `saveChunks`. Holds chunk keys.
     pub chunk_list: Vec<i32>,
     /// How many `loadChunkFromFile` calls failed (Java prints the exception
@@ -195,10 +205,39 @@ impl ChunkProviderCache {
             dropped_chunks_set: JavaHashSet::new(),
             generator: Some(generator),
             chunk_loader,
-            chunk_map: BTreeMap::new(),
+            chunk_map: ChunkMap::default(),
             chunk_list: Vec::new(),
             load_errors: 0,
         }
+    }
+}
+
+/// `chunkMap`'s type: lookup only (module docs, "Lookup cost"), so the
+/// `HashMap` ban of clippy.toml (PLAN_v4 §3.4 rule 4) does not apply.
+#[allow(clippy::disallowed_types)]
+pub type ChunkMap = std::collections::HashMap<i32, Box<Chunk>, BuildHasherDefault<ChunkKeyHasher>>;
+
+/// A fixed (unseeded, so deterministic and wasm-safe) hasher for the
+/// `chunkXZ2Int` keys of [`ChunkMap`]: a 64-bit multiply by the golden ratio
+/// with the high half folded into the low half, so both the bucket index
+/// (low bits) and the control byte (high bits) depend on every key bit.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ChunkKeyHasher(u64);
+
+impl Hasher for ChunkKeyHasher {
+    fn finish(&self) -> u64 {
+        let h = self.0.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        h ^ (h >> 32)
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0 << 8 | u64::from(b)).rotate_left(5);
+        }
+    }
+
+    fn write_i32(&mut self, i: i32) {
+        self.0 = u64::from(i as u32);
     }
 }
 
@@ -223,7 +262,10 @@ impl World {
     /// The loaded chunk at `(x, z)` (by cache key, so aliasing applies), or
     /// `None`. Never loads.
     pub fn loaded_chunk(&self, x: i32, z: i32) -> Option<&Chunk> {
-        self.chunk_provider.chunk_map.get(&chunk_key(x, z))
+        self.chunk_provider
+            .chunk_map
+            .get(&chunk_key(x, z))
+            .map(|c| &**c)
     }
 
     /// The chunk at `(x, z)`, which must be loaded (used right after
@@ -239,10 +281,14 @@ impl World {
     /// the cached chunk, loading or generating it first if needed.
     // src: ChunkProvider.java:72-75, World.java:366-368
     pub fn get_chunk_from_chunk_coords(&mut self, x: i32, z: i32) -> &mut Chunk {
-        if !self.chunk_exists(x, z) {
+        let key = chunk_key(x, z);
+        if !self.chunk_provider.chunk_map.contains_key(&key) {
             self.prepare_chunk(x, z);
         }
-        self.chunk_mut(x, z)
+        self.chunk_provider
+            .chunk_map
+            .get_mut(&key)
+            .expect("prepare_chunk registers the chunk")
     }
 
     /// `getChunkFromBlockCoords(x, z)`.
@@ -274,7 +320,7 @@ impl World {
                 (c, Vec::new())
             }
         };
-        self.chunk_provider.chunk_map.insert(var3, var4);
+        self.chunk_provider.chunk_map.insert(var3, Box::new(var4));
         self.chunk_provider.chunk_list.push(var3);
         // var4.func_4143_d() is empty (Chunk.java:133-134).
         // The entities read with the chunk join `loadedEntityList` here, in
