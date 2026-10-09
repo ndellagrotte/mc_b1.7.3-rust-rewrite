@@ -376,3 +376,77 @@ impl Default for HeldItemHook {
         }
     }
 }
+
+/// `renderManager.itemRenderer` for the entity renderers: fills WP-3.5b's
+/// [`crate::render::held_item::HeldItemHook`] (inserted by
+/// [`super::ItemRendererPlugin`]), so `RenderPlayer.renderSpecials` and
+/// `RenderBiped.renderEquippedItems` draw the held item and the helmet
+/// block in third person ([`render_item_on_entity_gl`]).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct EntityGlItemRenderer;
+
+impl crate::render::held_item::HeldItemRenderer for EntityGlItemRenderer {
+    fn render_item(
+        &self,
+        gl: &mut crate::render::gl::EntityGl,
+        args: &crate::render::held_item::HeldItemArgs,
+    ) {
+        render_item_on_entity_gl(gl, args);
+    }
+}
+
+/// `ItemRenderer.renderItem(entity, stack)` transcribed on the entity
+/// renderers' GL ([`crate::render::gl::EntityGl`]), under the caller's
+/// matrix and `glColor` (the arm's `postRender` and the held-item
+/// transform, `RenderLiving`'s brightness): a 3D block through
+/// `renderBlockOnInventory` (its `glColor4f` of `getRenderColor(meta) ×
+/// getEntityBrightness(1.0F)`), anything else as the extruded icon of
+/// `getItemIcon` ([`extruded_icon`]) under `GL_RESCALE_NORMAL` and
+/// [`flat_item_matrix`]'s calls, lit per vertex as GL lights it. The same
+/// geometry the first-person hand draws from [`ItemMeshCache`].
+// src: ItemRenderer.java:20-127
+pub fn render_item_on_entity_gl(
+    gl: &mut crate::render::gl::EntityGl,
+    a: &crate::render::held_item::HeldItemArgs,
+) {
+    use crate::gui::batch::gl as glc;
+    let var1 = a.entity;
+    let var2 = a.stack;
+    if item::item(var2.item_id).is_none() && blocks::def(var2.item_id).is_none() {
+        // Item.itemsList[id] is null: vanilla would throw; nothing drawn.
+        return;
+    }
+    gl.push_matrix();
+    if is_block_3d(var2.item_id) {
+        gl.bind_texture(crate::textures::TERRAIN_PNG);
+        if let Some(d) = render_block_as_item(
+            a.statics,
+            a.colorizers,
+            var2.item_id,
+            var2.get_item_damage(),
+            a.brightness,
+        ) {
+            if let Some([r, g, b, al]) = d.gl_color {
+                gl.color4f(r, g, b, al);
+            }
+            gl.draw_tessellator(&d.tess);
+        }
+    } else {
+        gl.bind_texture(ItemAtlas::of(var2.item_id).path());
+        let var4 = get_item_icon(var1, var2);
+        let var10 = 0.0f32;
+        let var11 = 0.3f32;
+        gl.enable(glc::RESCALE_NORMAL);
+        gl.translatef(-var10, -var11, 0.0);
+        let var12 = 1.5f32;
+        gl.scalef(var12, var12, var12);
+        gl.rotatef(50.0, 0.0, 1.0, 0.0);
+        gl.rotatef(335.0, 0.0, 0.0, 1.0);
+        gl.translatef(-0.9375, -0.0625, 0.0);
+        // The six Tessellator draws (front, back, the x and y slabs) under
+        // one state: drawn as one.
+        gl.draw_tessellator(&extruded_icon(var4));
+        gl.disable(glc::RESCALE_NORMAL);
+    }
+    gl.pop_matrix();
+}

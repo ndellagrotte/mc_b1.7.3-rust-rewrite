@@ -5,7 +5,7 @@
 //!
 //! | Module | Vanilla |
 //! |---|---|
-//! | [`render_item`] | `renderItem` (3D blocks through `renderBlockOnInventory`, the extruded icon), `Item.isFull3D` / `shouldRotateAroundWhenRendering` / `getColorFromDamage`, `getItemIcon`; [`render_item::HeldItemHook`] for WP-3.5b |
+//! | [`render_item`] | `renderItem` (3D blocks through `renderBlockOnInventory`, the extruded icon), `Item.isFull3D` / `shouldRotateAroundWhenRendering` / `getColorFromDamage`, `getItemIcon`; [`render_item::HeldItemHook`] (the hand pass's meshes) and [`render_item::EntityGlItemRenderer`], which fills WP-3.5b's [`crate::render::held_item::HeldItemHook`] (the third-person held items) |
 //! | [`first_person`] | `renderItemInFirstPerson` |
 //! | [`overlays`] | `renderOverlays`, `renderInsideOfBlock`, `renderWarpedTextureOverlay`, `renderFireInFirstPerson` |
 //! | [`map`] | `MapItemRenderer`, the map background |
@@ -1082,6 +1082,12 @@ impl Plugin for ItemRendererPlugin {
             .init_resource::<HandPool>()
             .init_resource::<ItemMeshCache>()
             .init_resource::<render_item::HeldItemHook>()
+            // The third-person held items: WP-3.5b's hook, filled with
+            // renderItem on its GL (RenderPlayer.java:118, :215,
+            // RenderBiped.java:42).
+            .insert_resource(crate::render::held_item::HeldItemHook(Some(
+                std::sync::Arc::new(render_item::EntityGlItemRenderer),
+            )))
             .add_systems(Startup, spawn_hand_camera)
             // updateEquippedItem() before addRainParticles()
             // (EntityRenderer.java:75-76).

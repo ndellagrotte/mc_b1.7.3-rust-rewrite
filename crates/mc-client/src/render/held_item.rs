@@ -3,23 +3,24 @@
 //! matrix (RenderPlayer.java:118, :215, RenderBiped.java:42).
 //! `ItemRenderer` is WP-3.7b's; it plugs in here.
 //!
-//! # For WP-3.7b
+//! # Filled by WP-3.7b's item renderer (WP-3.9)
 //!
-//! Implement [`HeldItemRenderer`] and insert it:
-//! `app.insert_resource(HeldItemHook(Some(Arc::new(MyItemRenderer))))`.
+//! `item_renderer::ItemRendererPlugin` inserts
+//! `HeldItemHook(Some(Arc::new(item_renderer::render_item::EntityGlItemRenderer)))`:
 //! `render_item(gl, args)` is `ItemRenderer.renderItem(args.entity,
-//! args.stack)`: transcribe it on [`EntityGl`], which is the GL these
-//! renderers draw with — `gl.push_matrix()`, `gl.bind_texture("/terrain.png")`,
-//! `gl.enable(gl::RESCALE_NORMAL)`, `gl.translatef`/`rotatef`/`scalef`,
-//! `gl.start_drawing_quads()`, `gl.set_normal(…)`,
-//! `gl.add_vertex_with_uv(…)`, `gl.draw()`, `gl.pop_matrix()`. The current
-//! modelview is the hand's (the caller's `postRender` and placement), the
-//! current `glColor` the entity's; lighting is computed per vertex as GL
-//! does. A 3D block is `terrain::render_blocks::render_block_as_item(
-//! args.statics, args.colorizers, id, meta, args.brightness)`, drawn with
-//! `gl.color4f` of its `gl_color` and `gl.draw_tessellator(&d.tess)`.
-//! `args.brightness` is `entity.getEntityBrightness(1.0F)`
-//! (ItemRenderer.java:24). Without a hook nothing is drawn.
+//! args.stack)` transcribed on [`EntityGl`]
+//! (`item_renderer::render_item::render_item_on_entity_gl`) — a 3D block
+//! through `terrain::render_blocks::render_block_as_item(args.statics,
+//! args.colorizers, id, meta, args.brightness)` with `gl.color4f` of its
+//! `gl_color` and `gl.draw_tessellator`, anything else as the extruded icon
+//! (`item_renderer::render_item::extruded_icon`, the geometry the
+//! first-person hand uses) under `GL_RESCALE_NORMAL` and `renderItem`'s
+//! `glTranslatef`/`glScalef`/`glRotatef`s. The current modelview is the
+//! hand's (the caller's `postRender` and placement, [`super::player::
+//! held_item_transform`]), the current `glColor` the entity's; lighting is
+//! computed per vertex as GL does. `args.brightness` is
+//! `entity.getEntityBrightness(1.0F)` (ItemRenderer.java:24). Without a
+//! hook nothing is drawn (the unit tests' renderers).
 
 use std::sync::Arc;
 

@@ -669,6 +669,7 @@ pub fn render_entities(
     colorizers: Res<Colorizers>,
     mut debug: ResMut<DebugSources>,
     mut events: MessageReader<ClientEvent>,
+    mut item_renderer: Option<ResMut<crate::item_renderer::ItemRenderer>>,
 ) {
     let rm = &mut *rm;
     track_load_renderers(rm, &mut events, &game);
@@ -802,6 +803,14 @@ pub fn render_entities(
                         held_item: hook.0.as_deref(),
                     };
                     render_entity(renderers, &mut cx, &e, partial);
+                    // RenderPlayer's doRenderLiving set the shared
+                    // modelBipedMain.isRiding, which the first-person arm
+                    // keeps (RenderLiving.java:26; WP-3.7b's ItemRenderer).
+                    if RendererId::of(&e.kind) == RendererId::Player
+                        && let Some(ir) = item_renderer.as_deref_mut()
+                    {
+                        ir.player_model_drawn(e.base.is_riding());
+                    }
                 }
             }
             world.loaded_entity_list[i].entity = Some(e);

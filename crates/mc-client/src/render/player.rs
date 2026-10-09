@@ -283,3 +283,181 @@ pub fn func_22017_a(
         r.rotate_corpse_base(cx, var1, var3, var4);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use bevy::math::{Mat4, Vec3};
+    use mc_sim::block::BlockStatics;
+
+    use super::*;
+    use crate::gui::font::{ChatAllowedCharacters, FontRenderer};
+    use crate::render::{Ctx, RenderInfo};
+    use crate::textures::{ArgbImage, Colorizers};
+
+    fn world() -> mc_sim::world::World {
+        mc_sim::world::World::new(
+            Box::new(mc_sim::save::NoSave),
+            "r",
+            mc_sim::world::provider::WorldProvider::new(
+                mc_sim::world::provider::Dimension::Surface,
+            ),
+            1,
+            mc_sim::world::chunk_provider::ChunkGenerator::Empty(
+                mc_sim::world::chunk_provider::EmptyChunkProvider,
+            ),
+            mc_sim::world::WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        )
+    }
+
+    /// Runs `f` with a renderer context over an empty world.
+    fn with_ctx(f: impl FnOnce(&mut Ctx)) {
+        let mut gl = EntityGl::new(false);
+        let mut w = world();
+        let info = RenderInfo::default();
+        let statics = BlockStatics::default();
+        let colorizers = Colorizers::default();
+        let chars: Vec<char> = (32u8..128).map(char::from).collect();
+        let font = FontRenderer::new(
+            &ArgbImage::new(128, 128),
+            false,
+            ChatAllowedCharacters::from_chars(chars),
+        );
+        let mut cx = Ctx {
+            gl: &mut gl,
+            world: &mut w,
+            info: &info,
+            statics: &statics,
+            colorizers: &colorizers,
+            font: &font,
+            held_item: None,
+        };
+        f(&mut cx);
+    }
+
+    /// One GL matrix call, as written in the Java.
+    enum Op {
+        T(f32, f32, f32),
+        R(f32, f32, f32, f32),
+        S(f32, f32, f32),
+    }
+
+    /// The matrix of `ops` applied in order (`glTranslatef` & co. each
+    /// post-multiply the modelview).
+    fn java(ops: &[Op]) -> Mat4 {
+        let mut m = Mat4::IDENTITY;
+        for op in ops {
+            m *= match *op {
+                Op::T(x, y, z) => Mat4::from_translation(Vec3::new(x, y, z)),
+                Op::R(a, x, y, z) => {
+                    Mat4::from_axis_angle(Vec3::new(x, y, z).normalize(), a.to_radians())
+                }
+                Op::S(x, y, z) => Mat4::from_scale(Vec3::new(x, y, z)),
+            };
+        }
+        m
+    }
+
+    fn transform_of(id: i32, rotate_around: bool) -> Mat4 {
+        let mut out = Mat4::IDENTITY;
+        with_ctx(|cx| {
+            held_item_transform(cx, &ItemStack::new(id, 1, 0), rotate_around);
+            out = cx.gl.matrix();
+        });
+        out
+    }
+
+    #[test]
+    fn held_item_transforms_follow_the_java_calls() {
+        use Op::*;
+        // A 3D block (stone, 1): RenderPlayer.java:189-194, RenderBiped.java:21-26.
+        let block = java(&[
+            T(0.0, 0.1875, -0.3125),
+            R(20.0, 1.0, 0.0, 0.0),
+            R(45.0, 0.0, 1.0, 0.0),
+            S(0.375, -0.375, 0.375),
+        ]);
+        // A full-3D tool (diamond sword, 276): RenderPlayer.java:196-205.
+        let tool = java(&[
+            T(0.0, 0.1875, 0.0),
+            S(0.625, -0.625, 0.625),
+            R(-100.0, 1.0, 0.0, 0.0),
+            R(45.0, 0.0, 1.0, 0.0),
+        ]);
+        // A flat item (the bow, 261, is not isFull3D in b1.7.3):
+        // RenderPlayer.java:207-212, RenderBiped.java:34-39.
+        let flat = java(&[
+            T(0.25, 0.1875, -0.1875),
+            S(0.375, 0.375, 0.375),
+            R(60.0, 0.0, 0.0, 1.0),
+            R(-90.0, 1.0, 0.0, 0.0),
+            R(20.0, 0.0, 0.0, 1.0),
+        ]);
+        // The fishing rod held by a player turns round first
+        // (RenderPlayer.java:197-200); RenderBiped has no such branch.
+        let rod = java(&[
+            R(180.0, 0.0, 0.0, 1.0),
+            T(0.0, -0.125, 0.0),
+            T(0.0, 0.1875, 0.0),
+            S(0.625, -0.625, 0.625),
+            R(-100.0, 1.0, 0.0, 0.0),
+            R(45.0, 0.0, 1.0, 0.0),
+        ]);
+        for (id, rotate, want) in [
+            (1, true, &block),
+            (1, false, &block),
+            (276, true, &tool),
+            (276, false, &tool),
+            (280, true, &tool), // the stick: setFull3D (Item.java:298)
+            (261, true, &flat),
+            (261, false, &flat),
+            (346, true, &rod),
+            (346, false, &tool),
+        ] {
+            let got = transform_of(id, rotate);
+            assert!(got.abs_diff_eq(*want, 1e-5), "id {id}: {got:?} vs {want:?}");
+        }
+        // The order matters: the block's scale after its rotations.
+        assert!(!block.abs_diff_eq(
+            java(&[
+                T(0.0, 0.1875, -0.3125),
+                S(0.375, -0.375, 0.375),
+                R(20.0, 1.0, 0.0, 0.0),
+                R(45.0, 0.0, 1.0, 0.0),
+            ]),
+            1e-3
+        ));
+    }
+
+    #[test]
+    fn held_items_draw_through_the_hook() {
+        use crate::item_renderer::render_item::EntityGlItemRenderer;
+        static HOOK: EntityGlItemRenderer = EntityGlItemRenderer;
+        let mut w = world();
+        let holder = mc_sim::save::entity_list::create_entity_in_world("Skeleton", &mut w)
+            .expect("skeleton");
+        with_ctx(|cx| {
+            cx.held_item = Some(&HOOK);
+            cx.gl.color3f(0.5, 0.5, 0.5);
+            // The bow: the extruded icon from /gui/items.png, 66 quads.
+            cx.render_item(&holder, &ItemStack::new(261, 1, 0));
+            let d = cx.gl.out.tess.last().expect("a batch");
+            assert_eq!(d.spec.texture, Some(crate::textures::ITEMS_PNG.into()));
+            assert_eq!(d.positions.len(), 66 * 6);
+            // GL_RESCALE_NORMAL is switched off again, the matrix restored.
+            assert!(!cx.gl.state.rescale_normal);
+            assert_eq!(cx.gl.matrix(), Mat4::IDENTITY);
+            // A block: renderBlockOnInventory from /terrain.png, its six
+            // faces, glColor set by it.
+            let n = cx.gl.out.tess.len();
+            cx.render_item(&holder, &ItemStack::new(1, 1, 0));
+            assert!(cx.gl.out.tess.len() > n);
+            let d = cx.gl.out.tess.last().expect("a batch");
+            assert_eq!(d.spec.texture, Some(crate::textures::TERRAIN_PNG.into()));
+            assert_eq!(d.positions.len(), 6 * 6);
+        });
+    }
+}
