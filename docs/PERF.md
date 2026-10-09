@@ -409,18 +409,23 @@ waits for synced region writes. The terrain preload's per-frame budget
     `deploy-page.yaml` (manual only) has a note saying the same.
 - `ci.yml` already matched the layout and is unchanged.
 - **Proof:**
-  - `cargo build --profile dist -p mc-app` succeeds. The binary is 75 MB,
-    stripped.
+  - `cargo build --profile dist -p mc-app` succeeds (7 min 10 s from the dev
+    build's cache). The binary is 75 MB, stripped.
+  - The proof below was re-run on the dist build of `0518d31` (the review
+    fixes; the first run, at 15:52, used a binary built before the step-4
+    commit, so it did not prove the committed tree).
   - The Linux bundle was packed as the workflow packs it: `mc_b173`,
     `assets/`, `credits/`, `NOTICE`, `LICENSE`, `RUNNING.md`.
   - It was unpacked into an empty scratch directory and run there with
-    explicit `--jar`/`--resources`. It created world `dist` (seed 123)
-    and played 200 ticks (`build/screens/wp43/dist_smoke/02_ingame.png`:
-    the seed-123 beach, lake, trees, clouds, the hand and the HUD). It
-    quit and saved (`level.dat`, four region files). A second start
-    listed the world (`04_select.png`: "dist (10/9/26 4:03 PM, 1.23
-    MB)").
-  - `--jar /nonexistent/minecraft.jar` stops with the path in the message.
+    explicit `--jar`/`--resources`. It created world `dist` (seed 123),
+    was in game after 1,053 ms and played 200 ticks
+    (`build/screens/wp43/dist_fix/01_ingame.png`, `02_f3.png`: the seed-123
+    beach and lake, trees, clouds, the sun, the hand and the HUD; with F3,
+    the four `[rust]` lines under the left column's rows). It quit and
+    saved (`level.dat`, `level.dat_old`, `session.lock`, four region files,
+    no journal or temporary left). A second start listed the world
+    (`03_select.png`: "dist (10/9/26 7:33 PM, 3.23 MB)").
+  - `--jar <scratch>/nope.jar` stops with the path in the message.
 
 ## 6. Owner questions
 
