@@ -748,6 +748,7 @@ final class TickScenario {
     private static Container openContainer;
     private static String openSpec;
     private static final Pattern AT = Pattern.compile("(workbench|chest|furnace|dispenser) at (-?[0-9]+),(-?[0-9]+),(-?[0-9]+)");
+    private static final Pattern CART = Pattern.compile("minecart ([0-9]+)");
 
     /**
      * The container a slot_click names. {@code "player"}: the player's own
@@ -761,16 +762,28 @@ final class TickScenario {
      * BlockChest.blockActivated would open (BlockChest.java:186, :198-212: the large-chest
      * wrapping with each neighbouring chest; the normal-cube checks that may refuse to open are
      * not applied); {@code "furnace at x,y,z"} / {@code "dispenser at x,y,z"} = the container on
-     * the tile entity there.
+     * the tile entity there; {@code "minecart <id>"} = {@code new ContainerChest(inventory, cart)}
+     * on the chest minecart (minecartType 1) with that entityId in loadedEntityList, the window
+     * EntityMinecart.interact opens (EntityMinecart.java:772-775, the cart is the IInventory; WP-4.6).
      */
+    @SuppressWarnings("unchecked")
     private static Container container(HarnessWorld hw, String spec) {
         EntityPlayer p = hw.player;
         if (spec.equals("player")) return p.inventorySlots;
         if (spec.equals(openSpec)) return openContainer;
         World w = hw.world;
         Container c;
+        Matcher cart = CART.matcher(spec);
         if (spec.equals("workbench")) {
             c = new ContainerWorkbench(p.inventory, w, 0, 0, 0);
+        } else if (cart.matches()) {
+            long id = Long.parseLong(cart.group(1));
+            EntityMinecart m = null;
+            for (Entity e : (List<Entity>) w.loadedEntityList) {
+                if (e.entityId == id && e instanceof EntityMinecart && ((EntityMinecart) e).minecartType == 1) m = (EntityMinecart) e;
+            }
+            if (m == null) throw new IllegalArgumentException("slot_click: no chest minecart with id " + id + " in loadedEntityList");
+            c = new ContainerChest(p.inventory, m);
         } else {
             Matcher m = AT.matcher(spec);
             if (!m.matches()) throw new IllegalArgumentException("slot_click: unknown container \"" + spec + "\"");

@@ -115,6 +115,7 @@ use mc_sim::entity::player::{
     MovementInput, new_entity_player_sp, swing_item, use_current_item_on_entity,
 };
 use mc_sim::golden::{StateValue, entity_state_fields};
+use mc_sim::inventory::InventoryRef;
 use mc_sim::inventory::container::chest::new_container_chest;
 use mc_sim::inventory::container::dispenser::new_container_dispenser;
 use mc_sim::inventory::container::furnace::new_container_furnace;
@@ -1151,8 +1152,10 @@ fn craft(t: u32, grid: &[Option<[i32; 3]>]) -> Result<Option<ItemStack>, GoldenE
 /// (`"workbench"` at 0,0,0, or `"workbench at x,y,z"`), `ContainerChest` on
 /// the inventory `BlockChest.blockActivated` builds
 /// ([`mc_sim::inventory::large_chest::chest_inventory`]), `ContainerFurnace`
-/// or `ContainerDispenser` on the tile entity at `x,y,z`, replacing the
-/// previous one without `onCraftGuiClosed`.
+/// or `ContainerDispenser` on the tile entity at `x,y,z`, or
+/// (`"minecart <id>"`, WP-4.6) `ContainerChest` over the chest minecart with
+/// that id ([`InventoryRef::Entity`]), replacing the previous one without
+/// `onCraftGuiClosed`.
 fn open_container<'h>(
     world: &mut World,
     h: &'h mut Harness,
@@ -1169,8 +1172,25 @@ fn open_container<'h>(
         return Ok(&mut h.open_container.as_mut().expect("checked").1);
     }
     let bad = |what: &str| GoldenError::other(format!("t={t}: slot_click: {what}"));
+    let cart = spec
+        .strip_prefix("minecart ")
+        .filter(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()));
     let c = if spec == "workbench" {
         new_container_workbench(0, 0, 0)
+    } else if let Some(digits) = cart {
+        // TickScenario.java's CART regex: `minecart ([0-9]+)`.
+        let id: i32 = digits
+            .parse()
+            .map_err(|_| bad(&format!("unknown container {spec:?}")))?;
+        let is_chest_cart = world.entity(id).is_some_and(|e| {
+            matches!(&e.kind, mc_sim::entity::EntityKindData::Minecart(d) if d.minecart_type == 1)
+        });
+        if !is_chest_cart {
+            return Err(bad(&format!(
+                "no chest minecart with id {id} in loadedEntityList"
+            )));
+        }
+        new_container_chest(world, InventoryRef::Entity(id))
     } else {
         let (kind, pos) = spec
             .split_once(" at ")

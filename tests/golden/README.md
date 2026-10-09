@@ -664,7 +664,7 @@ were not loaded yet (population and moving entities may load more).
 | `attack` | `target_id`, `attacker_id?`, `damage` (unless the attacker is the player) | attacker = the player: `swingItem` then `attackTargetEntityWithCurrentItem` (Minecraft.java:802-814, PlayerController.java:92-94). Otherwise `target.attackEntityFrom(attacker or null, damage)` (Entity.java:746, EntityLiving.java:307) | `target_id`, `via` (`player` \| `direct`), `result` (direct only) |
 | `explode` | `x,y,z` (f64: integer or bit pattern), `size` (f32), `flaming?` (false) | `World.createExplosion(null, x, y, z, size)` (World.java:1518-1520: `newExplosion(…, false)`, Explosion.java:29-164). With `flaming`: the body of `World.newExplosion(null, x, y, z, size, true)` (World.java:1522-1528) with the explosion's `ExplosionRNG` (a clock-seeded `new Random()`, Explosion.java:11, census §2) set to `mix(seed, -6)` before `doExplosionA`; only the fire roll draws it (Explosion.java:118). No exploder: no entity is excluded, the attacker is null. Not part of the implicit preload (WP-1.8) | `destroyed` (size of `destroyedBlockPositions`) |
 | `craft` | `grid`: 9 (3×3) or 4 (2×2) entries, each `null` or `[id, count, damage]` | `CraftingManager.getInstance().findMatchingRecipe(grid)` (CraftingManager.java:160-169) over a new `InventoryCrafting` of that size, entry `i` put into slot `i` (column `i % w`, row `i / w`) with `setInventorySlotContents`; the grid's event handler is a `Container` without slots, so nothing else runs. Needs no player (WP-2.5) | `result` (`{id,count,damage}` or `null`: the first matching recipe's `getCraftingResult`) |
-| `slot_click` | `container`, `slot`, `button`, `shift?` (false) | needs a player. `container.slotClick(slot, button, shift, player)` (Container.java:47-150), as `PlayerController.handleMouseClick` passes a GUI click (PlayerController.java:96-98), with the player's `inventory.getItemStack()` as the stack on the cursor. `container`: `"player"` is the player's own `inventorySlots` (the `ContainerPlayer` its constructor built, EntityPlayer.java:42); any other spec is opened by the op: `"workbench"` (`new ContainerWorkbench(inventory, world, 0, 0, 0)`; the position only feeds `isUsableByPlayer`, which `slotClick` never calls), `"workbench at x,y,z"`, `"chest at x,y,z"` (`new ContainerChest(inventory, chest)` on the inventory `BlockChest.blockActivated` would open, BlockChest.java:186, :198-212: the chest's tile entity wrapped in `InventoryLargeChest("Large chest", …)` with each neighbouring chest, −x and −z as the upper half, +x and +z as the lower; the normal-cube checks that may refuse to open are not applied), `"furnace at x,y,z"` (`ContainerFurnace` on the `TileEntityFurnace` there), `"dispenser at x,y,z"` (`ContainerDispenser`). A spec equal to the previous non-`"player"` one reuses that container (its crafting grid survives); a different spec replaces it without `onCraftGuiClosed` (a workbench grid's stacks are then lost). `slot` is a slot number of the container (each container class's module documents its layout, e.g. player: 0 output, 1–4 grid, 5–8 armour helmet first, 9–35 main, 36–44 hotbar) or −999 (outside the window: the held stack, or one item of it, goes to `dropPlayerItem`); any other value is a scenario error. `button` 0 left, 1 right (others do nothing). `shift` runs the container's `getStackInSlot(slot)` override (b1.7.3's shift-click move) | `slot`, `result` (`slotClick`'s return value: a copy of the slot's stack before the click, or `null`), `stack` (`getSlot(slot).getStack()` afterwards; `null` for −999), `held` (`inventory.getItemStack()` afterwards) |
+| `slot_click` | `container`, `slot`, `button`, `shift?` (false) | needs a player. `container.slotClick(slot, button, shift, player)` (Container.java:47-150), as `PlayerController.handleMouseClick` passes a GUI click (PlayerController.java:96-98), with the player's `inventory.getItemStack()` as the stack on the cursor. `container`: `"player"` is the player's own `inventorySlots` (the `ContainerPlayer` its constructor built, EntityPlayer.java:42); any other spec is opened by the op: `"workbench"` (`new ContainerWorkbench(inventory, world, 0, 0, 0)`; the position only feeds `isUsableByPlayer`, which `slotClick` never calls), `"workbench at x,y,z"`, `"chest at x,y,z"` (`new ContainerChest(inventory, chest)` on the inventory `BlockChest.blockActivated` would open, BlockChest.java:186, :198-212: the chest's tile entity wrapped in `InventoryLargeChest("Large chest", …)` with each neighbouring chest, −x and −z as the upper half, +x and +z as the lower; the normal-cube checks that may refuse to open are not applied), `"furnace at x,y,z"` (`ContainerFurnace` on the `TileEntityFurnace` there), `"dispenser at x,y,z"` (`ContainerDispenser`), `"minecart <id>"` (`new ContainerChest(inventory, cart)` on the chest minecart, `minecartType` 1, with that entity id in `loadedEntityList`: the window `EntityMinecart.interact` opens, EntityMinecart.java:772-775, with the cart as the `IInventory`; WP-4.6). A spec equal to the previous non-`"player"` one reuses that container (its crafting grid survives); a different spec replaces it without `onCraftGuiClosed` (a workbench grid's stacks are then lost). `slot` is a slot number of the container (each container class's module documents its layout, e.g. player: 0 output, 1–4 grid, 5–8 armour helmet first, 9–35 main, 36–44 hotbar) or −999 (outside the window: the held stack, or one item of it, goes to `dropPlayerItem`); any other value is a scenario error. `button` 0 left, 1 right (others do nothing). `shift` runs the container's `getStackInSlot(slot)` override (b1.7.3's shift-click move) | `slot`, `result` (`slotClick`'s return value: a copy of the slot's stack before the click, or `null`), `stack` (`getSlot(slot).getStack()` afterwards; `null` for −999), `held` (`inventory.getItemStack()` afterwards) |
 | `save` | `chunks?` (list of `{x,z}`) | Tier S, below; needs `"save_format": "mcregion"` or `"world": "load"` | — then the Tier S lines |
 | `reload` | — | quit the world and open its save again in the same run; needs `"save_format": "mcregion"` or `"world": "load"`; see "Reload" below (WP-2.G) | `chunks` (loaded chunks afterwards), `entities` (`loadedEntityList` size), `tile_entities` (`loadedTileEntityList` size), `player` (the new player's entity id, or `null` without a `player` op) |
 
@@ -1130,6 +1130,10 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   and trapdoors (`collisionRayTrace` with the bounds from the metadata).
 - `tick/door-support-removed`, `tick/ladder-placement`, the support removals in
   `trapdoor-toggle`, `bed-place-and-break` and `cake-eat`: `onNeighborBlockChange` drops.
+- `tick/cake-heal-window` (Tier C, player, WP-4.6): `eatCakeSlice` heals through
+  `EntityLiving.heal`, which also sets `heartsLife = heartsHalvesLife / 2`: a direct `attack`
+  hit right after a slice counts in full where the old window would have absorbed it; three
+  slices, five hits, `player_state` and the cake every tick.
 - `tick/portal-frame` (Tier C): portal blocks filled silently into obsidian frames, an
   item falling through them (null collision box), the frames broken.
 - `tick/fence-stairs-step-bounds` (Tier C): falling sand and items on fences, both stairs
@@ -1219,6 +1223,11 @@ stone platform unless stated, `rng_state` and `entity_state` every tick:
 - `entity/lightning-strike`: a bolt (harness kind `LightningBolt`, difficulty 0), its thunder
   draws, re-strikes that set fire, an item in range destroyed by `onStruckByLightning`; also
   `weather` every tick.
+- `entity/pig-lightning-pigman` (Tier C, difficulty 1, WP-4.6): a bolt on a pig:
+  `EntityPig.onStruckByLightning` joins a new `EntityPigZombie` (its constructor's draws, the
+  next entity id, the pig's position and angles) and the pig dies without fire damage; a cow
+  in range takes `Entity`'s fire and 5 points; the pigman, immune to fire, is struck again
+  while the bolt lasts.
 - `entity/fishing-hook` (player, 600 ticks): a rod given through a workbench `use_item`, then
   the harness kind `FishingHook`; the bobber flies into a 5-deep pool, floats and draws its
   bite rolls. `catchFish` needs the rod's right click (WP-2.6) and is unit-tested only
@@ -1296,14 +1305,19 @@ animals' 8-block look range and out of reach of the drops (its look-at target ne
   `EntityPlayer.getEyeHeight`): the wolf picks the player as its look target and, seeing a
   bone in hand, keeps facing it (`looksWithInterest`, `numTicksToChaseTarget = 10`).
 
-Not pinned: the tamed wolf. The oracle's `HarnessPlayer` has a null `username` (only
-`EntityPlayerSP` copies the session's), so a successful taming throws
-`NullPointerException` in `setWolfOwner` (`DataWatcher.updateObject`), as do the owner checks
-(`username.equalsIgnoreCase`); the bone fixtures' ticks are chosen so that every taming roll
-fails. Following and teleporting to the owner, sitting, feeding meat and the tamed branches
-of `attackEntityFrom`/`attackEntity` are unit-tested only (`crates/mc-sim/tests/animals.rs`).
-Anger needs a player (or a player's arrow) as the attacker: the `attack` op's player branch is
-WP-2.5.
+- `entity/wolf-defends-owner` (Tier C, player, 300 ticks, WP-4.6): three bones tame the wolf
+  (the third roll succeeds with seed 123; owner `"Player"`, sitting). `alertWolves`
+  (EntityPlayer.java:402-437): the player's punch on a pig skips the sitting wolf
+  (`onlySitting`); a pig's direct hit on the player stands it up and sets its target
+  (`setTarget`), and it chases and bites (4 points, tamed); the wolf's own bite on the player
+  returns at once (its owner's wolf); the player's next punch sends the standing, idle wolf
+  after that pig. Before WP-4.6 every wolf counted as untamed here.
+
+The bone fixtures above keep their taming rolls failing (with seed 123 and the flipped seed
+of `check-sensitivity.sh`) because they predate the harness's `"Player"` username (WP-2.5:
+before it a taming threw `NullPointerException` in `setWolfOwner`); `wolf-defends-owner` is
+the tamed wolf's fixture. Following and teleporting to the owner, sitting and feeding meat
+are unit-tested only (`crates/mc-sim/tests/animals.rs`).
 
 Minecart and boat (WP-2.4, task 2), empty world, seed 123, `"mob_spawning": "none"`, the
 stone platform unless stated, `rng_state` and `entity_state` every tick (of the vehicles and
@@ -1324,11 +1338,17 @@ their drops only where a player is present: the player's own update is WP-2.5):
   (`dz * prevPosX`, EntityMinecart.java:676) skips every push.
 - `entity/minecart-break-drops`: direct `attack`s break a plain, a chest (`type` 1) and a
   furnace (`type` 2) cart: minecart, chest and furnace items. A chest cart's cargo drop is
-  not pinned (no op fills its inventory).
+  not pinned here (`minecart-chest-container` drops one).
 - `entity/minecart-furnace-push` (player): `interact` with coal fuels a furnace cart and
   pushes it away from the player; it runs into a plain and a chest cart (the furnace branches
-  of `applyEntityCollision`) and jams them against a wall; `interact` on the chest cart is
-  the GUI gap.
+  of `applyEntityCollision`) and jams them against a wall; `interact` on the chest cart opens
+  nothing for the harness's `EntityPlayer` (its `displayGUIChest` is empty).
+- `entity/minecart-chest-container` (player, 40 ticks, WP-4.6): the chest cart as an
+  `IInventory` (EntityMinecart.java:716-761) through `slot_click` on `"minecart 1"`, a
+  `ContainerChest` with the cart's 27 slots first: cobblestone in and shifted back out
+  (`ContainerChest.getStackInSlot`), planks right- and left-clicked into slots 1, 26 and 2;
+  then a direct hit breaks the cart and its cargo drops with the cart and chest items, and
+  the player picks the cart item up; `inventory` every tick.
 - `entity/minecart-player-ride` (player): `interact` puts the player in a cart on a slope; it
   rides down (the rider's 0.75 move and 0.997 friction); a hit wobbles it, a second breaks it
   and puts the rider off. Dismounting by `interact` is not pinned: the dismounted player then

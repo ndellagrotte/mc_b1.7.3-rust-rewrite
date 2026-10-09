@@ -1,0 +1,10 @@
+{"name":"pig-lightning-pigman","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":80,"mob_spawning":"none","difficulty":1,
+ "comment":"WP-4.6. EntityPig.onStruckByLightning (EntityPig.java:62-69): a pig (id 0) at (0.5, 61, 0.5) on the stone platform, a cow (id 1) at (2.5, 61, 0.5) and a second pig (id 2) at (8.5, 61, 0.5), out of the bolt's reach. t=3 an EntityLightningBolt (harness kind LightningBolt, id 3) at the first pig. Its first update (EntityLightningBolt.java:62-72) calls onStruckByLightning on every entity within 3 blocks: the pig becomes a new EntityPigZombie (id 4: its constructor's Math.random() draws, setLocationAndAngles at the pig's position and angles, entityJoinedWorld, rand seeded at join) and dies without fire damage; the cow takes Entity.onStruckByLightning (5 fire damage, fire). The pigman, immune to fire, is struck again while lightningState >= 0. Difficulty 1 so that EntityMob.onUpdate does not remove the pigman at once (difficultySetting 0 kills monsters, EntityMob.java:22-24); no player, mob_spawning none, so nothing spawns; the bolt's constructor places no fire below difficulty 2. rng_state, entity_state every tick, the blocks around the strike.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":12,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x3fe0000000000000",61,"0x3fe0000000000000"],"yaw":90,"pitch":0,"id":0},
+        {"t":0,"op":"spawn","kind":"Cow","pos":["0x4004000000000000",61,"0x3fe0000000000000"],"yaw":0,"pitch":0,"id":1},
+        {"t":0,"op":"spawn","kind":"Pig","pos":["0x4021000000000000",61,"0x3fe0000000000000"],"yaw":0,"pitch":0,"id":2},
+        {"t":3,"op":"spawn","kind":"LightningBolt","pos":["0x3fe0000000000000",61,"0x3fe0000000000000"],"id":3}],
+ "dumps":[{"every":1,"what":"rng_state"},
+          {"every":1,"what":"entity_state","which":"all"},
+          {"every":5,"what":"block_box","x0":-2,"y0":60,"z0":-2,"x1":3,"y1":62,"z1":2}]}

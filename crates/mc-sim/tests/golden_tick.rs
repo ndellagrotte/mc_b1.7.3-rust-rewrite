@@ -114,6 +114,11 @@ fixtures! {
     entity_wolf_rain_shake => "entity" / "wolf-rain-shake";
     entity_wolf_bone_refused => "entity" / "wolf-bone-refused";
     entity_wolf_begs_bone => "entity" / "wolf-begs-bone";
+    // WP-4.6: Gate 2's R2 sites and the tamed-wolf branch of alertWolves.
+    entity_pig_lightning_pigman => "entity" / "pig-lightning-pigman";
+    entity_wolf_defends_owner => "entity" / "wolf-defends-owner";
+    // WP-4.6: the chest minecart as an IInventory (slot_click "minecart <id>").
+    entity_minecart_chest_container => "entity" / "minecart-chest-container";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
     light_blocklight_glowstone => "light" / "blocklight-glowstone";
@@ -128,6 +133,8 @@ fixtures! {
     // WP-2.6: item behaviour (ItemStack.useItem through the item dispatch).
     tick_block_item_placement => "tick" / "block-item-placement";
     tick_cake_eat => "tick" / "cake-eat";
+    // WP-4.6: the cake's heal through EntityLiving.heal (heartsLife).
+    tick_cake_heal_window => "tick" / "cake-heal-window";
     tick_door_iron_powered => "tick" / "door-iron-powered";
     // Tier S (a `save` op): listed in golden_save.rs's COVERED_IN_GOLDEN_TICK.
     tick_dungeon_chest_save => "tick" / "dungeon-chest-save";
