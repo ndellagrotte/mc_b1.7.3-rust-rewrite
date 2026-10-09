@@ -43,6 +43,31 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
+/// The in-memory prefix the folder is staged under for the check.
+const STAGING: &str = "import";
+
+/// A refusal of the staged copy, naming the file in the real folder
+/// (`<src>/level.dat`, not `import/level.dat`) for the log and the dialog.
+fn name_real_path(r: ImportRefusal, src: &Path) -> ImportRefusal {
+    match r {
+        ImportRefusal::Unreadable { path, reason } => {
+            let path = match path.strip_prefix(STAGING) {
+                Some(rest) => {
+                    let rel = rest.trim_start_matches('/');
+                    if rel.is_empty() {
+                        src.display().to_string()
+                    } else {
+                        src.join(rel).display().to_string()
+                    }
+                }
+                None => path,
+            };
+            ImportRefusal::Unreadable { path, reason }
+        }
+        other => other,
+    }
+}
+
 /// The files under `root`, as `/`-separated paths relative to it, sorted.
 fn read_tree(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
     let mut out = Vec::new();
@@ -88,7 +113,7 @@ pub fn import_world(data_dir: &Path, src: &Path) -> Result<String, ImportError> 
             .write(&format!("import/{rel}"), bytes)
             .map_err(|e| ImportError::Read(e.to_string()))?;
     }
-    validate(&mut staged, "import").map_err(ImportError::Refused)?;
+    validate(&mut staged, STAGING).map_err(|r| ImportError::Refused(name_real_path(r, src)))?;
 
     let fs = FsStorage::new(data_dir).map_err(|e| ImportError::Write(e.to_string()))?;
     let store = SaveStore::shared(Box::new(fs.clone()), Box::new(WallClock));
@@ -154,6 +179,10 @@ mod tests {
         let e = import_world(&data.0, &world).unwrap_err();
         assert!(matches!(e, ImportError::Refused(_)), "{e}");
         assert!(!data.0.join("saves").exists());
+        // The refusal names the real file, not the staging copy (Gate 3 O4).
+        let real = world.join("level.dat").display().to_string();
+        assert!(e.to_string().contains(&real), "{e}");
+        assert!(!e.to_string().contains("import/"), "{e}");
     }
 
     #[test]
