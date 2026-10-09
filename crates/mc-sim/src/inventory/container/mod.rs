@@ -29,7 +29,8 @@ use super::crafting::{InventoryCraftResult, InventoryCrafting};
 use super::slot::Slot;
 use super::{InventoryRef, drop_player_item, inventory_of, inventory_of_mut};
 use crate::crafting::CraftingManager;
-use crate::entity::Entity;
+use crate::entity::minecart::MinecartData;
+use crate::entity::{Entity, EntityKindData};
 use crate::item::ItemStack;
 use crate::tile_entity;
 use crate::world::World;
@@ -115,6 +116,42 @@ fn te_gone(world: &World) {
     world.note_unimplemented("Container over a tile entity no longer in the world");
 }
 
+/// The chest minecart behind [`InventoryRef::Entity`] `id`, or `None` (and
+/// recorded) when it is no longer in the world or out of its slot: Java
+/// would keep using the orphaned object; the client closes the window when
+/// `isUsableByPlayer` fails (a dead cart, EntityMinecart.java:811-817).
+/// Panics where Java's `(IInventory)` reference would not be a minecart
+/// (never: only `EntityMinecart.interact` opens one).
+fn cart(world: &World, id: i32) -> Option<&MinecartData> {
+    match world.entity(id).map(|e| &e.kind) {
+        Some(EntityKindData::Minecart(d)) => Some(d),
+        Some(other) => panic!("InventoryRef::Entity({id}) is not an IInventory: {other:?}"),
+        None => {
+            entity_gone(world);
+            None
+        }
+    }
+}
+
+/// [`cart`], mutably.
+fn cart_mut(world: &mut World, id: i32) -> Option<&mut MinecartData> {
+    if world.entity(id).is_none() {
+        entity_gone(world);
+        return None;
+    }
+    match world.entity_mut(id).map(|e| &mut e.kind) {
+        Some(EntityKindData::Minecart(d)) => Some(d),
+        Some(other) => panic!("InventoryRef::Entity({id}) is not an IInventory: {other:?}"),
+        None => None,
+    }
+}
+
+fn entity_gone(world: &World) {
+    world.note_unimplemented(
+        "Container over an entity no longer in loadedEntityList or out of its slot",
+    );
+}
+
 impl Container {
     /// A container of `kind` with no slots yet (the field initialisers of
     /// Container.java:9-14).
@@ -148,6 +185,8 @@ impl Container {
             InventoryRef::LargeChest(lc) => self
                 .inv_get_size_inventory(world, &lc.upper_chest)
                 .wrapping_add(self.inv_get_size_inventory(world, &lc.lower_chest)),
+            // src: EntityMinecart.java:716-718
+            InventoryRef::Entity(id) => cart(world, *id).map_or(0, |d| d.get_size_inventory()),
         }
     }
 
@@ -178,6 +217,10 @@ impl Container {
                 } else {
                     self.inv_get_stack_in_slot(world, player, &lc.upper_chest, idx)
                 }
+            }
+            // src: EntityMinecart.java:720-722
+            InventoryRef::Entity(id) => {
+                cart(world, *id).and_then(|d| d.get_stack_in_slot(idx).copied())
             }
         }
     }
@@ -219,6 +262,10 @@ impl Container {
                 } else {
                     self.inv_decr_stack_size(world, player, &lc.upper_chest, idx, n)
                 }
+            }
+            // src: EntityMinecart.java:724-742
+            InventoryRef::Entity(id) => {
+                cart_mut(world, *id).and_then(|d| d.decr_stack_size(idx, n))
             }
         }
     }
@@ -273,6 +320,12 @@ impl Container {
                     );
                 }
             }
+            // src: EntityMinecart.java:744-750
+            InventoryRef::Entity(id) => {
+                if let Some(d) = cart_mut(world, *id) {
+                    d.set_inventory_slot_contents(idx, stack);
+                }
+            }
         }
     }
 
@@ -286,6 +339,8 @@ impl Container {
             InventoryRef::CraftResult => self.craft_result().get_inventory_stack_limit(),
             InventoryRef::TileEntity(_) => tile_entity::INVENTORY_STACK_LIMIT,
             InventoryRef::LargeChest(lc) => self.inv_get_inventory_stack_limit(&lc.upper_chest),
+            // src: EntityMinecart.java:756-758
+            InventoryRef::Entity(_) => 64,
         }
     }
 
@@ -308,6 +363,8 @@ impl Container {
                 self.inv_on_inventory_changed(world, player, &lc.upper_chest);
                 self.inv_on_inventory_changed(world, player, &lc.lower_chest);
             }
+            // src: EntityMinecart.java:760-761 (empty)
+            InventoryRef::Entity(_) => {}
         }
     }
 
@@ -331,6 +388,15 @@ impl Container {
                 self.inv_can_interact_with(world, player, &lc.upper_chest)
                     && self.inv_can_interact_with(world, player, &lc.lower_chest)
             }
+            // src: EntityMinecart.java:811-817 (a cart no longer in the
+            // world is recorded and cannot be used)
+            InventoryRef::Entity(id) => match world.entity(*id) {
+                Some(c) => crate::entity::minecart::can_interact_with(c, player),
+                None => {
+                    entity_gone(world);
+                    false
+                }
+            },
         }
     }
 
@@ -376,6 +442,17 @@ impl Container {
                     self.inv_stack_mut(world, player, &lc.upper_chest, idx, f)
                 }
             }
+            // `cargoItems[idx]` (36 slots, or 27 after readEntityFromNBT).
+            InventoryRef::Entity(id) => match cart_mut(world, *id) {
+                Some(d) => {
+                    let len = d.cargo_items.len();
+                    match usize::try_from(idx) {
+                        Ok(i) if i < len => f(&mut d.cargo_items[i]),
+                        _ => panic!("ArrayIndexOutOfBoundsException: {idx} (length {len})"),
+                    }
+                }
+                None => f(&mut None),
+            },
         }
     }
 

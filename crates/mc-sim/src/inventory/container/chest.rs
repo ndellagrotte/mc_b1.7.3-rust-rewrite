@@ -1,6 +1,5 @@
-//! `ContainerChest` (ContainerChest.java): a chest's (or double chest's)
-//! window. A chest minecart's window is not yet reachable: `InventoryRef`
-//! has no entity variant.
+//! `ContainerChest` (ContainerChest.java): a chest's, double chest's or
+//! chest minecart's window (the minecart as [`InventoryRef::Entity`]).
 //!
 //! Slots: the chest's `numRows * 9` first, then the main inventory
 //! (`InventoryPlayer` slots 9–35), then the hotbar (0–8).

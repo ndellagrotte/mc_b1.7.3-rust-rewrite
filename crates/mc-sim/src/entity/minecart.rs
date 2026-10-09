@@ -34,7 +34,7 @@
 //!   a position where a motion belongs), so far from x = 0 carts pass
 //!   through each other unless they meet on the same z.
 //!
-//! # Gaps
+//! # The chest GUI
 //!
 //! `interact` of a chest cart opens its GUI (`displayGUIChest`, a client
 //! screen and `ContainerChest`): [`super::player::display_gui`] with
@@ -42,9 +42,10 @@
 //! (EntityPlayerSP.java:117-119); EntityPlayer's version is empty
 //! (EntityPlayer.java:340-341), so the oracle's HarnessPlayer (an
 //! EntityPlayer) does nothing here, as the Rust side does for a player
-//! without `client_additions`. The cart's container (its `IInventory` in
-//! a `ContainerChest`) is not modelled by [`crate::inventory`] yet: the
-//! request names the cart by id.
+//! without `client_additions`. The request names the cart by id; the
+//! client builds `new ContainerChest(player.inventory, cart)` over
+//! [`crate::inventory::InventoryRef::Entity`] (WP-4.6), whose slots reach
+//! the [`MinecartData`] `IInventory` methods below.
 
 use mc_core::Vec3D;
 use mc_core::math::{self, floor_double, jmath};
@@ -995,7 +996,7 @@ pub fn apply_entity_collision(e: &mut Entity, world: &mut World, var1: &mut Enti
 
 /// `EntityMinecart.interact(player)` (`player` in hand): a plain cart takes
 /// the player on (unless another player rides it), a chest cart opens its
-/// GUI (recorded gap, module docs), a furnace cart takes one coal from the
+/// GUI (module docs), a furnace cart takes one coal from the
 /// player's hand for 1200 fuel and is pushed away from the player. Always
 /// true.
 // src: EntityMinecart.java:763-791

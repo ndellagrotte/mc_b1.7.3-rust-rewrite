@@ -512,10 +512,9 @@ pub struct PendingPlayerGuis(pub Vec<PlayerGui>);
 
 /// `EntityPlayerSP.displayGUIChest` / `displayWorkbenchGUI` /
 /// `displayGUIFurnace` / `displayGUIDispenser` / `displayGUIEditSign`:
-/// `mc.displayGuiScreen(new Gui…(…))`. A request vanilla would have
-/// thrown on (a null tile entity) or that the simulation cannot serve yet
-/// (the chest minecart: `InventoryRef` has no entity variant) is logged
-/// and dropped.
+/// `mc.displayGuiScreen(new Gui…(…))`. A chest minecart opens a `GuiChest`
+/// over the cart itself ([`InventoryRef::Entity`], WP-4.6). A request
+/// vanilla would have thrown on (a null tile entity) is logged and dropped.
 // src: EntityPlayerSP.java:113-131
 pub fn open_player_gui(ctx: &mut ScreenCtx, gui: PlayerGui) {
     let screen: Box<dyn Screen> = match gui {
@@ -527,6 +526,14 @@ pub fn open_player_gui(ctx: &mut ScreenCtx, gui: PlayerGui) {
                 return;
             };
             Box::new(chest::new_gui_chest(world, inv))
+        }
+        // src: EntityMinecart.java:774, EntityPlayerSP.java:117-119
+        // (`displayGUIChest(this)`: the cart is the IInventory)
+        PlayerGui::MinecartChest { entity_id } => {
+            let Some(world) = ctx.game.the_world.as_ref() else {
+                return;
+            };
+            Box::new(chest::new_gui_chest(world, InventoryRef::Entity(entity_id)))
         }
         PlayerGui::Workbench { x, y, z } => Box::new(GuiContainer::new(
             Some(new_container_workbench(x, y, z)),
@@ -593,7 +600,7 @@ pub fn world_and_player<R>(
 
 /// `inventory.getInvName()` of an `IInventory` reference.
 // src: InventoryPlayer.java:258-260, InventoryCrafting.java:32-34, InventoryCraftResult.java:14-16,
-// TileEntityChest.java:45-47, InventoryLargeChest.java:18-20
+// TileEntityChest.java:45-47, InventoryLargeChest.java:18-20, EntityMinecart.java:752-754
 pub fn inv_name(world: &World, inv: &InventoryRef) -> String {
     match inv {
         InventoryRef::Player => "Inventory".into(),
@@ -606,6 +613,10 @@ pub fn inv_name(world: &World, inv: &InventoryRef) -> String {
             .unwrap_or("")
             .into(),
         InventoryRef::LargeChest(lc) => lc.get_inv_name().into(),
+        InventoryRef::Entity(id) => match world.entity(*id).map(|e| &e.kind) {
+            Some(mc_sim::entity::EntityKindData::Minecart(d)) => d.get_inv_name().into(),
+            _ => String::new(),
+        },
     }
 }
 

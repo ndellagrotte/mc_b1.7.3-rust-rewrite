@@ -731,6 +731,10 @@ destination alpha anyway.
   `updateScreen`. Not openable: the chest minecart (`InventoryRef` has no
   entity variant), a chest/furnace/dispenser request without its tile
   entity (vanilla would throw); both are logged.
+  *WP-4.6:* the chest minecart opens now: `PlayerGui::MinecartChest`
+  builds `chest::new_gui_chest` over `InventoryRef::Entity(entity_id)`
+  (`mc_sim`'s `ContainerChest` over the cart's `cargoItems`), titled
+  `"Minecart"` (`inv_name`, EntityMinecart.java:752-754).
 - **Previews drawn through the batcher:** the inventory's player
   (`container::inventory::render_player_preview`: `RenderPlayer` /
   `RenderLiving` matrices, `ModelBiped`, the armour passes and
@@ -768,6 +772,7 @@ destination alpha anyway.
     empty). The simulation's stacks are values: it drops once.
   - *Chest minecart.* `PlayerGui::MinecartChest` is logged and not opened:
     `InventoryRef` has no entity variant in `mc-sim`.
+    Closed by WP-4.6 (`InventoryRef::Entity`, see above).
   - *Inventory preview.* No hurt/death red overlay (needs
     `glDepthFunc(GL_EQUAL)` in `GuiGl`), no shadow or fire
     (`Render.doRenderShadowAndFire`, WP-3.5b).

@@ -10,14 +10,15 @@
 //! | `InventoryLargeChest` | [`large_chest::InventoryLargeChest`] |
 //! | `InventoryBasic` | [`basic::InventoryBasic`] (only the multiplayer client builds one, NetClientHandler.java:488: deferred, D3) |
 //! | `TileEntityChest` / `TileEntityFurnace` / `TileEntityDispenser` as `IInventory` | [`crate::tile_entity`] (WP-1.8), reached through a [`crate::world::tile_entity::TileEntityRef`] |
+//! | `EntityMinecart` as `IInventory` (a chest cart) | [`crate::entity::minecart::MinecartData`], reached through [`InventoryRef::Entity`] (WP-4.6) |
 //! | `IInventory` (an object reference held by a `Slot`) | [`InventoryRef`] |
 //! | `Container` + `ContainerPlayer`, `ContainerWorkbench`, `ContainerChest`, `ContainerFurnace`, `ContainerDispenser` | [`container::Container`] with a [`container::ContainerKind`] |
 //! | `Slot`, `SlotArmor`, `SlotCrafting`, `SlotFurnace` | [`slot::Slot`] with a [`slot::SlotKind`] |
 //!
 //! A `Slot` holds an `IInventory` reference. The objects behind it live in
-//! three places in the port: the player's [`InventoryPlayer`] (inside the
-//! player entity), the container's own crafting grid and result, and the
-//! world's tile entities. Every `IInventory` call therefore goes through
+//! four places in the port: the player's [`InventoryPlayer`] (inside the
+//! player entity), the container's own crafting grid and result, the
+//! world's tile entities, and a chest minecart in the world's entity list. Every `IInventory` call therefore goes through
 //! the container ([`container::Container`]'s `inv_*` methods), which is
 //! given the world and the player entity (`EntityPlayer`, the one the
 //! container was built for: `InventoryPlayer.player`, `SlotCrafting` /
@@ -79,6 +80,10 @@ pub enum InventoryRef {
     TileEntity(TileEntityRef),
     /// An `InventoryLargeChest` (a double chest).
     LargeChest(Box<large_chest::InventoryLargeChest>),
+    /// An entity that is an `IInventory`, by `entityId`: in b1.7.3 only
+    /// `EntityMinecart` (EntityMinecart.java:5), opened by a chest cart's
+    /// `interact` (`displayGUIChest(this)`, EntityMinecart.java:774).
+    Entity(i32),
 }
 
 /// `player.dropPlayerItemWithRandomChoice(stack, flag)`: an `EntityItem`
