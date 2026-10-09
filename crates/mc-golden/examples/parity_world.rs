@@ -1282,7 +1282,8 @@ fn chests(w: &mut World, v: &mut Views) {
 /// Spots for the screen and interaction checks (blocks to click).
 fn stations(w: &mut World, v: &mut Views) {
     let (x, z) = (20, -40);
-    // workbench, furnace, dispenser, bed, sign spot, note block, lever, door, TNT on a pad
+    // workbench, furnace, dispenser, bed, sign spot; a note block, a door and a
+    // lever with no view of their own (the sound stations cover them)
     put(w, x, G + 1, z, 58, 0);
     put(w, x + 3, G + 1, z, 61, 3);
     put(w, x + 6, G + 1, z, 23, 3);
@@ -1305,9 +1306,6 @@ fn stations(w: &mut World, v: &mut Views) {
             "st_sign",
             "stone block: right click with a sign in hand places a sign and opens the editor",
         ),
-        ("st_note", "note block: right click plays a note"),
-        ("st_door", "wooden door: right click opens/closes"),
-        ("st_lever", "lever: right click toggles"),
     ]
     .iter()
     .enumerate()
@@ -1384,7 +1382,7 @@ fn sound_stations(w: &mut World, v: &mut Views) {
         "snd_note",
         40.0,
         1.7,
-        "note block on wood (bass) and one on stone? right click three times",
+        "note block: right click three times (harp, rising pitch)",
     );
     put(w, bx, G + 1, z, 25, 0);
     let bx = next(
@@ -1452,7 +1450,7 @@ fn sound_stations(w: &mut World, v: &mut Views) {
         "snd_dispenser",
         31.0,
         1.7,
-        "lever beside a dispenser holding arrows and cobblestone: right click (dispense)",
+        "lever beside a dispenser holding 8 arrows: right click (dispense)",
     );
     put(w, bx, G + 1, z, LEVER, 5);
     put(w, bx + 1, G + 1, z, 23, 3);
@@ -1519,7 +1517,7 @@ fn sound_stations(w: &mut World, v: &mut Views) {
         "snd_portal",
         0.0,
         0.0,
-        "the player stands in a nether portal: trigger, then travel",
+        "the player starts standing in a nether portal (EntityPlayer.timeUntilPortal is 20 at spawn and setInPortal keeps resetting it to 10: no trigger, in vanilla too)",
     );
     for dx in -1..3 {
         put(w, bx + dx, G + 1, z, OBSIDIAN, 0);
@@ -1603,7 +1601,9 @@ fn extra_views(v: &mut Views) {
     if let Some(mut e) = v.0.iter().find(|e| e["name"] == "snd_portal").cloned() {
         e["name"] = json!("snd_portal_walk");
         e["z"] = json!(e["z"].as_f64().unwrap_or(0.0) - 3.0);
-        e["what"] = json!("walk into the nether portal from 2.5 blocks away: trigger, then travel");
+        e["what"] = json!(
+            "walk into the nether portal from 3 blocks away: trigger (stay inside for travel)"
+        );
         v.0.push(e);
     }
     if let Some(mut e) = v.0.iter().find(|e| e["name"] == "snd_fall").cloned() {
