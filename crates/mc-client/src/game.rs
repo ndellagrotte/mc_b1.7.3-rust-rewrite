@@ -85,9 +85,9 @@
 //!
 //! # Out of scope here
 //!
-//! Applet, multiplayer, the snooper and stats sync (deferred, D2/D3: the
-//! `mcApplet`, `serverName`/`GuiConnecting`, `ThreadCheckHasPaid`,
-//! `ThreadDownloadResources`, `func_27178_d`), texture packs
+//! Applet, multiplayer, the has-paid check, resource downloads and stats sync
+//! (deferred, D2/D3: the `mcApplet`, `serverName`/`GuiConnecting`,
+//! `ThreadCheckHasPaid`, `ThreadDownloadResources`, `func_27178_d`), texture packs
 //! (`TexturePackList`, D3), `OpenGlCapsChecker`, `checkGLError`, the
 //! out-of-memory handler `func_28002_e` (no reserve buffer `field_28006_b`
 //! to free), `Controllers`, the AWT canvas and `loadScreen`'s Mojang logo
