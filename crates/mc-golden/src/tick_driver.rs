@@ -1178,17 +1178,22 @@ fn open_container<'h>(
     let c = if spec == "workbench" {
         new_container_workbench(0, 0, 0)
     } else if let Some(digits) = cart {
-        // TickScenario.java's CART regex: `minecart ([0-9]+)`.
-        let id: i32 = digits
+        // TickScenario.java's CART regex: `minecart ([0-9]+)`, read with
+        // `Long.parseLong`: an id past i32 names no entity.
+        let id: i64 = digits
             .parse()
             .map_err(|_| bad(&format!("unknown container {spec:?}")))?;
+        let no_cart = || {
+            bad(&format!(
+                "no chest minecart with id {id} in loadedEntityList"
+            ))
+        };
+        let id = i32::try_from(id).map_err(|_| no_cart())?;
         let is_chest_cart = world.entity(id).is_some_and(|e| {
             matches!(&e.kind, mc_sim::entity::EntityKindData::Minecart(d) if d.minecart_type == 1)
         });
         if !is_chest_cart {
-            return Err(bad(&format!(
-                "no chest minecart with id {id} in loadedEntityList"
-            )));
+            return Err(no_cart());
         }
         new_container_chest(world, InventoryRef::Entity(id))
     } else {

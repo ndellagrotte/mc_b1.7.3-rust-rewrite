@@ -1411,6 +1411,15 @@ after `World.tick` has recomputed `skylightSubtracted`:
 - `entity/skeleton-shoot` (night, 300 ticks): the skeleton at a player behind a fence row:
   an arrow every 30 ticks (`attackTime`), the arrows (ids 1-12 dumped) stick in the floor or
   hit the player.
+- `entity/skeleton-arrow-after-death` (night, difficulty 1, player, 100 ticks, WP-4.6
+  review): the skeleton's first arrow is still in flight when the skeleton is removed
+  (killed by a direct `attack` at t = 3, removed in tick 23 when `deathTime` passes 20); the player,
+  moved into the falling arrow's path at t = 24, is hit in tick 28. `EntityArrow` passes its
+  `owner`, the dead skeleton object (EntityArrow.java:163): 2 damage at difficulty 1 (the
+  `EntityMob` scaling, EntityPlayer.java:366-378), the knock-back away from the skeleton's
+  last position, and `alertWolves` stands the player's sitting tamed wolf up (tamed with one
+  bone at t = 4) and gives it the dead skeleton as its target, dropped at its next AI update.
+  The port keeps the removed skeleton while a field names it (`World::removed_entity`).
 - `entity/skeleton-sunburn` (noon, no player, 600 ticks): the daylight burn roll, fire damage
   every 20 ticks, the wander, death and the arrow/bone drop.
 - `entity/spider-leap` (night, 200 ticks): `EntitySpider.findPlayerToAttack` in the dark, the

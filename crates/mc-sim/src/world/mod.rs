@@ -116,6 +116,18 @@ pub struct World {
     /// `unloadedEntityList`, as entity ids.
     // src: World.java:16
     pub(crate) unloaded_entity_list: Vec<i32>,
+    /// The entities removed from `loadedEntityList` that a loaded entity
+    /// still names in one of its entity fields (an arrow's `owner`, a
+    /// fireball's `shootingEntity`, a creature's `playerToAttack`, ...), by
+    /// id. Not Java state: Java's field holds the object itself, which
+    /// outlives its removal unchanged (nothing updates it again), e.g. a
+    /// skeleton removed 20 ticks after its death while its arrow is still
+    /// in flight (EntityLiving.java:154-158, EntityArrow.java:163). The port
+    /// holds ids, so it keeps the removed entity here, as it was when it left
+    /// the list, for as long as a field names it ([`World::removed_entity`]).
+    /// Pruned after every removal pass; never saved (Java saves no object
+    /// reference).
+    pub(crate) removed_entities: BTreeMap<i32, Box<Entity>>,
     /// `scheduledTickTreeSet`: `TreeSet` order, see [`NextTickListEntry`].
     // src: World.java:17
     pub(crate) scheduled_tick_tree_set: BTreeSet<NextTickListEntry>,
@@ -472,6 +484,7 @@ impl World {
             events: EventQueue::default(),
             client_requests: ClientRequestQueue::default(),
             pending_kill_hooks: Vec::new(),
+            removed_entities: BTreeMap::new(),
             chunk_provider: ChunkProviderCache::new(loader, generator),
             save_handler,
             session_lock_error: None,

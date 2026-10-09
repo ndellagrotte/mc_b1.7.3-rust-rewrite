@@ -119,6 +119,8 @@ fixtures! {
     entity_wolf_defends_owner => "entity" / "wolf-defends-owner";
     // WP-4.6: the chest minecart as an IInventory (slot_click "minecart <id>").
     entity_minecart_chest_container => "entity" / "minecart-chest-container";
+    // WP-4.6 review: an arrow passes its removed (dead) shooter as the attacker.
+    entity_skeleton_arrow_after_death => "entity" / "skeleton-arrow-after-death";
 
     // ---- tests/golden/light (WP-1.3) -------------------------------------------------
     light_blocklight_glowstone => "light" / "blocklight-glowstone";

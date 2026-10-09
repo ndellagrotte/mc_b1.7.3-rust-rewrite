@@ -319,6 +319,47 @@ fn a_kill_reaches_the_killer_in_its_slot() {
     );
 }
 
+/// EntityLiving.java:408-414 with a killer that has left `loadedEntityList`
+/// (a player dead for 20 ticks whose arrow is still in flight): Java calls
+/// the orphaned player object, so the hook reaches the removed player the
+/// world keeps while the arrow names it. Recorded, because the client's
+/// copy of the dead player (game-over screen, stats writer) misses it.
+#[test]
+fn a_kill_by_a_removed_players_arrow() {
+    let mut w = world();
+    let mut p = new_entity_player_sp(&mut w);
+    p.base.set_location_and_angles(0.5, 61.0, 0.5, 0.0, 0.0);
+    let pid = p.base.entity_id;
+    assert!(w.spawn_entity_in_world(p));
+    let mut z = zombie::new_entity_zombie(&mut w);
+    z.base.set_location_and_angles(4.5, 61.0, 0.5, 0.0, 0.0);
+    z.kind.living_mut().unwrap().health = 1;
+    let zid = z.base.entity_id;
+    assert!(w.spawn_entity_in_world(z));
+    let bb = w.entity(zid).unwrap().base.bounding_box;
+    let shooter = w.entity(pid).unwrap().clone();
+    let mut a = mc_sim::entity::arrow::new_entity_arrow_shot(&mut w, &shooter);
+    a.base.set_position(3.5, (bb.min_y + bb.max_y) / 2.0, 0.5);
+    a.base.motion_x = 1.0;
+    a.base.motion_y = 0.0;
+    a.base.motion_z = 0.0;
+    let aid = a.base.entity_id;
+    assert!(w.spawn_entity_in_world(a));
+    w.entity_mut(pid).unwrap().base.is_dead = true;
+    w.update_entity_list();
+    assert!(w.entity_index(pid).is_none());
+    w.with_entity_mut(aid, |w, a| mc_sim::entity::arrow::on_update(a, w))
+        .unwrap();
+    assert!(w.entity(zid).unwrap().kind.living().unwrap().health <= 0);
+    assert_eq!(value(w.removed_entity(pid).unwrap(), sl::MOB_KILLS_STAT), 1);
+    assert_eq!(
+        w.unimplemented_hits.borrow().get(
+            "EntityLiving.onDeath: the attacker player has left loadedEntityList; the client's copy of it misses the hook"
+        ),
+        Some(&1)
+    );
+}
+
 /// `jump` and `fall` (EntityPlayer.java:721-724, :787-793): one jump; a
 /// 3-block fall is 300 cm; under 2 blocks nothing.
 #[test]

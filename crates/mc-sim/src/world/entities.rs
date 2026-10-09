@@ -43,17 +43,46 @@ impl World {
     }
 
     /// Java's `entity.isDead` for an entity held by reference, e.g.
-    /// `ridingEntity.isDead`: true if it is dead or no longer in the list
-    /// (it can only have left by dying or unloading), false if it is taken out
-    /// for an update further up the stack (it is running, so not removed).
+    /// `ridingEntity.isDead`: false if it is taken out for an update further
+    /// up the stack (it is running, so not removed); for one no longer in the
+    /// list, the removed object's flag ([`World::removed_entity`]), or true
+    /// (recorded) if the port no longer has it (it can only have left by
+    /// dying or unloading).
     pub fn is_entity_dead_or_gone(&self, id: i32) -> bool {
         match self.loaded_entity_list.iter().find(|s| s.entity_id == id) {
-            None => {
-                self.note_unimplemented("Entity ref to an entity no longer in loadedEntityList");
-                true
-            }
+            None => match self.removed_entities.get(&id) {
+                Some(o) => o.base.is_dead,
+                None => {
+                    self.note_unimplemented(
+                        "Entity ref to an entity no longer in loadedEntityList",
+                    );
+                    true
+                }
+            },
             Some(s) => s.entity.as_ref().is_some_and(|e| e.base.is_dead),
         }
+    }
+
+    /// The object Java still holds for entity `id` after it left
+    /// `loadedEntityList`, as it was when it left (`World::removed_entities`):
+    /// kept while a loaded entity's field names it, `None` otherwise or while
+    /// `id` is in the list.
+    pub fn removed_entity(&self, id: i32) -> Option<&Entity> {
+        self.removed_entities.get(&id).map(|b| &**b)
+    }
+
+    /// [`World::removed_entity`], mutably: Java's calls on the orphaned
+    /// object (e.g. `EntityLiving.onDeath`'s `attacker.onKillEntity`).
+    pub fn removed_entity_mut(&mut self, id: i32) -> Option<&mut Entity> {
+        self.removed_entities.get_mut(&id).map(|b| &mut **b)
+    }
+
+    /// The object a Java field naming entity `id` refers to: the loaded
+    /// entity in its slot, else the removed one ([`World::removed_entity`]).
+    /// `None` if it is taken out (being updated further up the stack) or the
+    /// port no longer has it.
+    pub fn entity_object(&self, id: i32) -> Option<&Entity> {
+        self.entity(id).or_else(|| self.removed_entity(id))
     }
 
     /// Runs `f` on entity `id` taken out of its slot, with the world free for
@@ -98,6 +127,10 @@ impl World {
             return false;
         }
         let id = e.base.entity_id;
+        // An id names one object in the port: a new entity with the id of a
+        // removed one (the respawned player keeps the dead player's id,
+        // Minecraft.java:1451, :1468) replaces it.
+        self.removed_entities.remove(&id);
         if var4 {
             self.player_entities.push(id);
         }
@@ -239,6 +272,9 @@ impl World {
         for id in &unloaded {
             self.release_entity_skin(*id);
         }
+        for slot in removed {
+            self.keep_removed_entity(slot);
+        }
         // unloadedEntityList.clear(): done by the take above.
     }
 
@@ -314,12 +350,14 @@ impl World {
                 if added && self.chunk_exists(x, z) {
                     self.chunk_mut(x, z).remove_entity(id, y);
                 }
-                self.loaded_entity_list.remove(i);
+                let slot = self.loaded_entity_list.remove(i);
+                self.keep_removed_entity(slot);
                 self.release_entity_skin(id);
             } else {
                 i += 1;
             }
         }
+        self.prune_removed_entities();
 
         // Tile entities (World.java:1235-1253).
         self.field_31055_l = true;
@@ -534,12 +572,42 @@ impl World {
                 if added && self.chunk_exists(x, z) {
                     self.chunk_mut(x, z).remove_entity(id, y);
                 }
-                self.loaded_entity_list.remove(i);
+                let slot = self.loaded_entity_list.remove(i);
+                self.keep_removed_entity(slot);
                 self.release_entity_skin(id);
             } else {
                 i += 1;
             }
         }
+        self.prune_removed_entities();
+    }
+
+    // ---- removed entities still referenced ---------------------------------------------------
+
+    /// Files an entity that just left `loadedEntityList` in
+    /// `World::removed_entities` (kept only while referenced, see
+    /// [`World::prune_removed_entities`]).
+    fn keep_removed_entity(&mut self, slot: EntitySlot) {
+        if let Some(e) = slot.entity {
+            self.removed_entities.insert(slot.entity_id, e);
+        }
+    }
+
+    /// Drops every removed entity that no loaded entity names any more in
+    /// an entity field ([`referenced_entity_ids`]): Java's object is then
+    /// unreachable. Runs after each removal pass, when every loaded entity
+    /// is in its slot.
+    fn prune_removed_entities(&mut self) {
+        if self.removed_entities.is_empty() {
+            return;
+        }
+        let mut refs = Vec::new();
+        for slot in &self.loaded_entity_list {
+            if let Some(e) = slot.entity.as_deref() {
+                referenced_entity_ids(e, &mut refs);
+            }
+        }
+        self.removed_entities.retain(|id, _| refs.contains(id));
     }
 
     // ---- box queries ----------------------------------------------------------------------
@@ -966,5 +1034,41 @@ pub fn java_class_chain(kind: &EntityKindData) -> &'static [&'static str] {
             "Entity",
         ],
         K::PlayerSp(..) => &["EntityPlayerSP", "EntityPlayer", "EntityLiving", "Entity"],
+    }
+}
+
+/// The entity ids `e` holds in its entity fields, i.e. the objects a Java
+/// field of it would keep alive: `ridingEntity`, `riddenByEntity`,
+/// `EntityLiving.currentTarget`, `EntityCreature.playerToAttack`,
+/// `EntityGhast.targetedEntity`, `EntityPlayer.fishEntity`,
+/// `EntityArrow.owner`, `EntitySnowball`/`EntityEgg.thrower`,
+/// `EntityFireball.shootingEntity`, `EntityFish.angler` and `bobber`.
+/// These are every entity-typed field of the simulation's entity classes
+/// (the client's `EntityPickupFX` and `EntityRenderer` hold the others).
+// src: Entity.java:11-12, EntityLiving.java:57, EntityCreature.java:5,
+// EntityGhast.java:8, EntityPlayer.java:38, EntityArrow.java:14,
+// EntitySnowball.java:12, EntityEgg.java:12, EntityFireball.java:12,
+// EntityFish.java:12, :16
+fn referenced_entity_ids(e: &Entity, out: &mut Vec<i32>) {
+    use EntityKindData as K;
+    out.extend(e.base.riding_entity);
+    out.extend(e.base.ridden_by_entity);
+    if let Some(l) = e.kind.living() {
+        out.extend(l.current_target);
+    }
+    if let Some(c) = crate::entity::creature::creature(&e.kind) {
+        out.extend(c.player_to_attack);
+    }
+    match &e.kind {
+        K::Arrow(d) => out.extend(d.owner),
+        K::Snowball(d) | K::Egg(d) => out.extend(d.thrower),
+        K::Fireball(d) => out.extend(d.shooting_entity),
+        K::Fish(d) => {
+            out.extend(d.angler);
+            out.extend(d.bobber);
+        }
+        K::Ghast(_, _, g) => out.extend(g.targeted_entity),
+        K::PlayerSp(_, p, _) => out.extend(p.fish_entity),
+        _ => {}
     }
 }

@@ -609,9 +609,13 @@ impl KillHook {
 /// the player in hand (right after the hit, in
 /// [`attack_target_entity_with_current_item`], or when the world puts the
 /// player back in its slot). Nothing else reads the score or the
-/// statistics in between. An attacker that is no longer in the world is
-/// recorded: Java would still update the orphaned object, which nothing
-/// reads again.
+/// statistics in between. A player that has left `loadedEntityList` (dead
+/// for 20 ticks, its arrow still in flight) gets the hook on the removed
+/// object the world keeps while the arrow names it
+/// ([`World::removed_entity`]), as Java updates the orphaned object. That
+/// case is also recorded: the client shows and keeps the dead player from
+/// its own copy (the game-over score, `Minecraft.statFileWriter`), which
+/// does not see the hook.
 // src: EntityLiving.java:408-414
 pub fn kill_hooks(world: &mut World, attacker: &Entity, victim: &Entity, score: Option<i32>) {
     if !attacker.kind.is_player() {
@@ -632,6 +636,11 @@ pub fn kill_hooks(world: &mut World, attacker: &Entity, victim: &Entity, score: 
     }
     if world.entity_index(h.attacker).is_some() {
         world.pending_kill_hooks.push(h);
+    } else if let Some(p) = world.removed_entity_mut(h.attacker) {
+        h.apply(p);
+        world.note_unimplemented(
+            "EntityLiving.onDeath: the attacker player has left loadedEntityList; the client's copy of it misses the hook",
+        );
     } else {
         world.note_unimplemented(
             "EntityLiving.onDeath: the attacker is no longer in loadedEntityList (Java still holds it)",
@@ -881,7 +890,9 @@ pub fn attack_entity_from(
                 // The shooter is this player: alertWolves returns at once
                 // for a player attacker (isPVPEnabled() is false).
             }
-            Some(oid) => match world.entity(oid) {
+            // The loaded owner, or the removed one Java's field still
+            // holds (World::removed_entity).
+            Some(oid) => match world.entity_object(oid) {
                 Some(o) => {
                     if o.kind.living().is_some() {
                         let o = o.clone();
@@ -889,7 +900,7 @@ pub fn attack_entity_from(
                     }
                 }
                 None => world.note_unimplemented(
-                    "EntityPlayer.attackEntityFrom: the arrow's owner is not in loadedEntityList (Java still holds it)",
+                    "EntityPlayer.attackEntityFrom: the arrow's owner is out of its slot or no longer kept",
                 ),
             },
             None => {

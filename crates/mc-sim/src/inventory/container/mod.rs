@@ -388,14 +388,15 @@ impl Container {
                 self.inv_can_interact_with(world, player, &lc.upper_chest)
                     && self.inv_can_interact_with(world, player, &lc.lower_chest)
             }
-            // src: EntityMinecart.java:811-817 (a cart no longer in the
-            // world is recorded and cannot be used)
+            // src: EntityMinecart.java:811-817. A cart leaves
+            // loadedEntityList only after setEntityDead (EntityMinecart.java:136-162,
+            // World.java:1222-1230; single player never unloads chunks), so a
+            // cart no longer in the world is Java's dead cart: `isDead`,
+            // false. The ordinary case: a chest cart broken while its
+            // GuiChest is open, the client's check in the next tick.
             InventoryRef::Entity(id) => match world.entity(*id) {
                 Some(c) => crate::entity::minecart::can_interact_with(c, player),
-                None => {
-                    entity_gone(world);
-                    false
-                }
+                None => false,
             },
         }
     }

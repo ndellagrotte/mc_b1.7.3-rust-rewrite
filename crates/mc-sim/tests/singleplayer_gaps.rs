@@ -7,12 +7,19 @@
 //! (EntityPlayer.java:402-437) and the chest minecart as the `IInventory` of a
 //! `ContainerChest` (EntityMinecart.java:716-761, :811-817). The kill hooks of
 //! `EntityLiving.onDeath` are in `stats.rs` (`a_kill_*`).
+//!
+//! The review fix: an entity removed from `loadedEntityList` that a field
+//! still names (a dead skeleton and its arrow in flight) stays the object
+//! Java passes on (`World::removed_entity`, fixture
+//! `entity/skeleton-arrow-after-death`).
 
 use mc_sim::block::dispatch as bd;
+use mc_sim::entity::arrow::{self, new_entity_arrow_shot};
 use mc_sim::entity::creature::creature;
 use mc_sim::entity::lightning_bolt::new_entity_lightning_bolt;
 use mc_sim::entity::minecart::new_entity_minecart;
 use mc_sim::entity::player::{self, new_entity_player_sp};
+use mc_sim::entity::skeleton::new_entity_skeleton;
 use mc_sim::entity::{Entity, EntityKindData, creeper, dispatch, pig, wolf};
 use mc_sim::inventory::InventoryRef;
 use mc_sim::inventory::container::chest::new_container_chest;
@@ -295,4 +302,134 @@ fn a_chest_cart_gone_from_the_world_is_recorded() {
             .get("Container over an entity no longer in loadedEntityList or out of its slot"),
         Some(&1)
     );
+}
+
+/// A gone cart's window is not usable (Java's dead cart, `isDead`,
+/// EntityMinecart.java:811-817), and the check records nothing: a cart
+/// leaves `loadedEntityList` only by dying.
+#[test]
+fn a_gone_chest_cart_is_not_usable_and_not_recorded() {
+    let mut w = world();
+    let pid = join_player(&mut w, 0.5, 0.5);
+    let p = w.entity(pid).unwrap().clone();
+    // Building the window over the gone cart reads its size: recorded.
+    let c = new_container_chest(&w, InventoryRef::Entity(99));
+    w.unimplemented_hits.borrow_mut().clear();
+    assert!(!c.inv_can_interact_with(&mut w, &p, &InventoryRef::Entity(99)));
+    assert!(
+        w.unimplemented_hits.borrow().is_empty(),
+        "{:?}",
+        w.unimplemented_hits
+    );
+}
+
+/// EntityArrow.java:163 with a shooter that has left `loadedEntityList`
+/// (EntityLiving.java:154-158: removed 21 ticks after its death): Java's
+/// `owner` field still holds the dead skeleton, so the player takes the
+/// difficulty-scaled damage of an `EntityMob` (4 / 3 + 1 = 2 at difficulty 1,
+/// EntityPlayer.java:366-378), is knocked away from the skeleton
+/// (EntityLiving.java:337-345) and alerts its sitting tamed wolf, which
+/// targets the dead skeleton (EntityPlayer.java:385-390, :402-437) and drops
+/// it on its next AI update (EntityCreature.java:24-25). The removed
+/// skeleton is kept while the arrow or the wolf names it, then pruned.
+#[test]
+fn a_removed_shooter_is_still_the_arrows_attacker() {
+    let mut w = world();
+    w.difficulty_setting = 1;
+    let pid = join_player(&mut w, 0.5, 0.5);
+    let wolf_id = join_wolf(&mut w, 3.5, 3.5, Some("Player"), true);
+    let mut sk = new_entity_skeleton(&mut w);
+    sk.base.set_location_and_angles(-5.5, 61.0, 0.5, 0.0, 0.0);
+    let skel = sk.base.entity_id;
+    assert!(w.spawn_entity_in_world(sk));
+    let sk = w.entity(skel).unwrap().clone();
+    // An arrow of the skeleton's, just short of the player, flying at it.
+    let bb = w.entity(pid).unwrap().base.bounding_box;
+    let y = (bb.min_y + bb.max_y) / 2.0;
+    let mut a = new_entity_arrow_shot(&mut w, &sk);
+    a.base.set_position(-0.5, y, 0.5);
+    a.base.motion_x = 1.0;
+    a.base.motion_y = 0.0;
+    a.base.motion_z = 0.0;
+    let aid = a.base.entity_id;
+    assert!(w.spawn_entity_in_world(a));
+
+    // The skeleton dies and leaves the list; its arrow keeps it.
+    w.entity_mut(skel).unwrap().base.is_dead = true;
+    w.update_entity_list();
+    assert!(w.entity_index(skel).is_none());
+    assert!(w.removed_entity(skel).is_some_and(|e| e.base.is_dead));
+
+    w.with_entity_mut(aid, |w, a| arrow::on_update(a, w))
+        .unwrap();
+    assert!(w.entity(aid).unwrap().base.is_dead, "the arrow hit");
+    let p = w.entity(pid).unwrap();
+    assert_eq!(p.kind.living().unwrap().health, 18);
+    assert!(p.base.motion_x > 0.0, "knocked away from the skeleton");
+    assert!(!wolf::is_wolf_sitting(w.entity(wolf_id).unwrap()));
+    assert_eq!(target_of(&w, wolf_id), Some(skel));
+    // Only Gate 2 R5's AABB-query record (the arrow is out of its slot
+    // during its own update): nothing about the shooter.
+    assert!(
+        w.unimplemented_hits
+            .borrow()
+            .keys()
+            .all(|k| *k == "World.getEntitiesWithinAABB over a taken-out entity"),
+        "{:?}",
+        w.unimplemented_hits
+    );
+
+    // The arrow leaves; the wolf still names the skeleton until its AI
+    // drops the dead target; then nothing names it.
+    w.update_entities();
+    assert!(w.entity_index(aid).is_none());
+    assert_eq!(target_of(&w, wolf_id), None);
+    w.update_entities();
+    assert!(w.removed_entity(skel).is_none());
+    assert!(
+        !w.unimplemented_hits
+            .borrow()
+            .keys()
+            .any(|k| k.contains("loadedEntityList")),
+        "{:?}",
+        w.unimplemented_hits
+    );
+}
+
+/// A removed entity is pruned at once when nothing names it, and an
+/// entity joining with a removed one's id replaces it (the respawned
+/// player keeps the dead player's id, Minecraft.java:1451, :1468).
+#[test]
+fn removed_entities_are_kept_only_while_named() {
+    let mut w = world();
+    let pig = joined_pig(&mut w, 2.5, 2.5);
+    let pig_id = pig.base.entity_id;
+    assert!(w.spawn_entity_in_world(pig));
+    w.entity_mut(pig_id).unwrap().base.is_dead = true;
+    w.update_entity_list();
+    assert!(w.entity_index(pig_id).is_none());
+    assert!(w.removed_entity(pig_id).is_none());
+
+    let mut sk = new_entity_skeleton(&mut w);
+    sk.base.set_location_and_angles(-5.5, 61.0, 0.5, 0.0, 0.0);
+    let skel = sk.base.entity_id;
+    assert!(w.spawn_entity_in_world(sk));
+    let sk = w.entity(skel).unwrap().clone();
+    let mut a = new_entity_arrow_shot(&mut w, &sk);
+    a.base.set_position(-5.5, 90.0, 0.5);
+    assert!(w.spawn_entity_in_world(a));
+    w.entity_mut(skel).unwrap().base.is_dead = true;
+    w.update_entity_list();
+    assert!(w.removed_entity(skel).is_some());
+    assert!(w.entity_object(skel).is_some());
+    assert!(w.is_entity_dead_or_gone(skel));
+    // A new entity with the same id replaces the removed one.
+    let mut again = new_entity_skeleton(&mut w);
+    again.base.entity_id = skel;
+    again
+        .base
+        .set_location_and_angles(-4.5, 61.0, 0.5, 0.0, 0.0);
+    assert!(w.spawn_entity_in_world(again));
+    assert!(w.removed_entity(skel).is_none());
+    assert!(!w.entity_object(skel).unwrap().base.is_dead);
 }

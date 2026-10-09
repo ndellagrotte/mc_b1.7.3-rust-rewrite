@@ -17,7 +17,11 @@
 //! passes it as the attacker of `attackEntityFrom`, the port passes a copy of
 //! the owner taken from the world ([`attack_entity_by_id`]): no
 //! `attackEntityFrom` body in b1.7.3 writes to its attacker, so the copy
-//! reads exactly what the Java object would.
+//! reads exactly what the Java object would. An owner that has left
+//! `loadedEntityList` (a skeleton removed 20 ticks after its death, its
+//! arrow still in flight) is the removed object the world keeps while the
+//! arrow names it ([`World::removed_entity`]), as Java's field still holds
+//! it.
 
 use mc_core::math::{self, jmath};
 use mc_core::{Aabb, Vec3D};
@@ -294,10 +298,16 @@ pub(super) fn entity_hit(world: &World, id: i32) -> MovingObjectPosition {
 
 /// `target.attackEntityFrom(attacker, damage)` where Java holds both as
 /// objects and the port as ids: the target is taken out of its slot for the
-/// call, the attacker is passed as a copy (module docs). An attacker id that
-/// is no longer in the world (Java would still hold the object) is recorded
+/// call, the attacker is passed as a copy (module docs): of the loaded
+/// entity, or of the removed one when it has left `loadedEntityList` (Java's
+/// field still holds the dead object: its class, position and `isDead`
+/// reach the target, e.g. `EntityPlayer.attackEntityFrom`'s difficulty
+/// scaling for an `EntityMob` and `alertWolves`, EntityPlayer.java:366-390).
+/// An attacker the world has neither in its slot nor removed is recorded
 /// and passed as null. A target that is not in its slot is recorded and
 /// counts as `false`.
+// src: EntityArrow.java:163, EntityFireball.java:124, EntitySnowball.java:153,
+// EntityEgg.java:153, EntityFish.java:225
 pub(super) fn attack_entity_by_id(
     world: &mut World,
     target: i32,
@@ -306,11 +316,11 @@ pub(super) fn attack_entity_by_id(
 ) -> bool {
     let attacker_copy = match attacker {
         None => None,
-        Some(a) => match world.entity(a) {
+        Some(a) => match world.entity_object(a) {
             Some(o) => Some(o.clone()),
             None => {
                 world.note_unimplemented(
-                    "Projectile attackEntityFrom: attacker no longer in loadedEntityList",
+                    "Projectile attackEntityFrom: attacker out of its slot or no longer kept",
                 );
                 None
             }
