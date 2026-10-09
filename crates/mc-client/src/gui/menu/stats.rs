@@ -18,12 +18,14 @@
 //! buttons), only the GL state they start from differs (blending is off
 //! again; the tooltip's gradient and font set what they draw with).
 
+use mc_sim::block::BlockStatics;
 use mc_sim::stats::{StatBase, StatFileWriter, StatList};
 
-use super::{display_parent, draw_item_into_gui, stat_name};
+use super::{display_parent, stat_name};
 use crate::app::ScreenKind;
 use crate::gui::batch::{GuiGl, gl};
 use crate::gui::draw;
+use crate::gui::render_item::{ItemGl, draw_item_into_gui};
 use crate::gui::screen::{
     Screen, ScreenBase, ScreenCtx, default_draw_screen, draw_default_background,
 };
@@ -84,15 +86,28 @@ pub fn draw_sprite(g: &mut GuiGl, z_level: f32, var1: i32, var2: i32, var3: i32,
 /// `GuiStats.drawItemSprite(x, y, id)`: the slot frame, then the item's
 /// icon (`getIconFromDamage(0)`) 2 pixels in.
 // src: GuiStats.java:74-88
-pub fn draw_item_sprite(g: &mut GuiGl, z_level: f32, var1: i32, var2: i32, var3: i32) {
+pub fn draw_item_sprite(
+    g: &mut GuiGl,
+    statics: &BlockStatics,
+    z_level: f32,
+    var1: i32,
+    var2: i32,
+    var3: i32,
+) {
     draw_sprite(g, z_level, var1 + 1, var2 + 1, 0, 0);
+    let mut ig = ItemGl::new();
     g.enable(gl::RESCALE_NORMAL);
-    // RenderHelper.enableStandardItemLighting under a 180° X rotation: the
-    // item renderer's (super::draw_item_into_gui).
+    ig.rescale_normal = true;
+    ig.push_matrix(g);
+    ig.rotatef(g, 180.0, 1.0, 0.0, 0.0);
+    ig.enable_standard_item_lighting(g);
+    ig.pop_matrix(g);
+    // GuiStats.renderItem (a static new RenderItem(): field_27004_a true).
     let icon = mc_sim::item::item(var3)
         .map(|i| i.get_icon_from_damage(0))
         .unwrap_or(-1);
-    draw_item_into_gui(g, true, None, var3, 0, icon, var1 + 2, var2 + 2);
+    draw_item_into_gui(&mut ig, g, statics, var3, 0, icon, var1 + 2, var2 + 2);
+    ig.disable_standard_item_lighting(g);
     g.disable(gl::RESCALE_NORMAL);
 }
 
@@ -388,7 +403,15 @@ impl SlotList for StatsSlot {
     ) {
         let var6 = self.rows[var1 as usize];
         let var7 = var6.get_item_id().unwrap_or(0);
-        draw_item_sprite(g, 0.0, var2 + 40, var3, var7);
+        {
+            let default_statics = BlockStatics::default();
+            let statics = ctx
+                .game
+                .the_world
+                .as_ref()
+                .map_or(&default_statics, |w| &w.block_statics);
+            draw_item_sprite(g, statics, 0.0, var2 + 40, var3, var7);
+        }
         let [a, b, c] = columns(self.table, var7);
         let even = var1 % 2 == 0;
         Self::draw_value(ctx, g, a, var2 + 115, var3, even);
@@ -630,6 +653,15 @@ impl Screen for GuiStats {
     }
     fn kind(&self) -> ScreenKind {
         ScreenKind::Other("GuiStats".into())
+    }
+
+    // The selected tab's list, `selectedSlot` (GuiStats.java:55-61).
+    fn gui_slot(&self) -> Option<(&GuiSlot, i32)> {
+        match self.selected_slot {
+            Tab::General => self.general.as_ref().map(|(s, l)| (s, l.get_size())),
+            Tab::Item => self.item.as_ref().map(|(s, l)| (s, l.get_size())),
+            Tab::Block => self.block.as_ref().map(|(s, l)| (s, l.get_size())),
+        }
     }
 
     // src: GuiStats.java:21-31

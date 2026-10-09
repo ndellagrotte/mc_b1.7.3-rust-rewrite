@@ -21,11 +21,15 @@
 //! distance, so a batch at z −200 would be drawn before the background
 //! (reported).
 //!
-//! # Not ported
+//! # The icons
 //!
-//! `RenderHelper.enableStandardItemLighting` / `GL_RESCALE_NORMAL` /
-//! `GL_COLOR_MATERIAL` / `GL_CULL_FACE`: the item icons' lighting belongs
-//! to the GUI item renderer ([`super::draw_item_into_gui`], WP-3.6b).
+//! `new RenderItem()`'s `renderItemIntoGUI` is WP-3.6b's GUI item renderer
+//! ([`draw_item_into_gui_with`]): blocks as the lit 3D cube, under
+//! `RenderHelper.enableStandardItemLighting` set up once under a 180° X
+//! rotation, `GL_RESCALE_NORMAL` and `GL_CULL_FACE` ([`ItemGl`]), cut to
+//! the window like the other quads; `field_27004_a` cleared for an
+//! achievement that cannot be taken yet, so the icon keeps the 0.1 grey.
+//! (`GL_COLOR_MATERIAL` is always on in the item renderer's lighting.)
 
 use mc_core::java_random::JavaRandom;
 use mc_core::jmath;
@@ -33,11 +37,12 @@ use mc_core::math::floor_double;
 use mc_sim::stats::achievement_list::OPEN_INVENTORY;
 use mc_sim::stats::{StatBase, StatFileWriter, StatList, stat};
 
-use super::{Clip, draw_item_into_gui, draw_textured_rect_clipped, stat_name};
+use super::{Clip, draw_textured_rect_clipped, stat_name};
 use crate::app::ScreenKind;
 use crate::clock;
 use crate::gui::batch::{GuiGl, gl};
 use crate::gui::draw;
+use crate::gui::render_item::{ItemGl, draw_item_into_gui_with};
 use crate::gui::screen::{
     Screen, ScreenBase, ScreenCtx, default_draw_screen, default_key_typed, draw_default_background,
 };
@@ -406,10 +411,22 @@ impl GuiAchievements {
         }
 
         let mut var27: Option<(&'static StatBase, Taken)> = None;
-        // RenderHelper.enableStandardItemLighting() under a 180° X rotation:
-        // the item renderer's (module docs).
+        // RenderItem var29 = new RenderItem(); the lights set under a 180° X
+        // rotation, then lighting off until each icon (module docs).
+        let mut ig = ItemGl::new();
+        ig.push_matrix(g);
+        ig.rotatef(g, 180.0, 1.0, 0.0, 0.0);
+        ig.enable_standard_item_lighting(g);
+        ig.pop_matrix(g);
         g.disable(gl::LIGHTING);
         g.enable(gl::RESCALE_NORMAL);
+        ig.rescale_normal = true;
+        let default_statics = mc_sim::block::BlockStatics::default();
+        let statics = ctx
+            .game
+            .the_world
+            .as_ref()
+            .map_or(&default_statics, |w| &w.block_statics);
         for (i, var30) in list.iter().enumerate() {
             let t = taken[i];
             let Some(a) = var30.achievement() else {
@@ -454,12 +471,16 @@ impl GuiAchievements {
                 }
                 g.enable(gl::LIGHTING);
                 g.enable(gl::CULL_FACE);
+                ig.cull_face = true;
+                // var29.renderItemIntoGUI(…, var30.theItemStack, x + 3, y + 3)
                 let st = &a.the_item_stack;
                 let icon = mc_sim::item::item(st.item_id)
                     .map(|i| i.get_icon_index(st))
                     .unwrap_or(-1);
-                draw_item_into_gui(
+                draw_item_into_gui_with(
+                    &mut ig,
                     g,
+                    statics,
                     colorize,
                     Some(clip),
                     st.item_id,

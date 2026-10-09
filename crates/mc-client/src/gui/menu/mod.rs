@@ -60,7 +60,7 @@ pub mod world_slot;
 
 use mc_sim::stats::StatBase;
 
-use super::batch::{GuiGl, gl};
+use super::batch::GuiGl;
 use super::screen::{Screen, ScreenCtx};
 use crate::lang::StringTranslate;
 
@@ -86,7 +86,8 @@ pub fn display_parent(ctx: &mut ScreenCtx, parent: &mut Option<Box<dyn Screen>>)
 }
 
 /// A clip rectangle `[x0, x1) × [y0, y1)` in scaled pixels (the
-/// achievement map's window; [`achievements`] module docs).
+/// achievement map's window; [`achievements`] module docs). The item icons
+/// are cut to it by [`super::render_item::draw_item_into_gui_with`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Clip {
     /// Left.
@@ -147,67 +148,6 @@ pub fn draw_textured_rect_clipped(
     g.add_vertex_with_uv(x1 as f64, y0 as f64, z, t(u1), t(v0));
     g.add_vertex_with_uv(x0 as f64, y0 as f64, z, t(u0), t(v0));
     g.draw();
-}
-
-/// `RenderItem.drawItemIntoGui(font, renderEngine, id, damage, icon, x, y)`
-/// as the menus need it (the achievement icons, the statistics rows), with
-/// `field_27004_a` (`colorize`: apply `getColorFromDamage` as `glColor`)
-/// and an optional clip (the achievement map's depth clipping, done here
-/// on the quad).
-///
-/// The GUI half of `RenderItem` belongs to WP-3.6b; until its function is
-/// merged this is the hook the menus call. The flat-icon branch is
-/// transcribed (RenderItem.java:142-160); a block drawn in 3D
-/// (`RenderBlocks.renderItemIn3d`, RenderItem.java:119-141) is drawn here as
-/// its flat terrain icon instead of the lit, rotated cube (WP-3.6b replaces
-/// this body with its own call).
-// src: RenderItem.java:117-163
-#[allow(clippy::too_many_arguments)]
-pub fn draw_item_into_gui(
-    g: &mut GuiGl,
-    colorize: bool,
-    clip: Option<Clip>,
-    var3: i32,
-    var4: i32,
-    var5: i32,
-    var6: i32,
-    var7: i32,
-) {
-    let Some(item) = mc_sim::item::item(var3) else {
-        return;
-    };
-    if var5 < 0 {
-        return;
-    }
-    g.disable(gl::LIGHTING);
-    if var3 < 256 {
-        g.bind_texture("/terrain.png");
-    } else {
-        g.bind_texture("/gui/items.png");
-    }
-    let var8 = item.get_color_from_damage(var4);
-    let var9 = (var8 >> 16 & 255) as f32 / 255.0;
-    let var10 = (var8 >> 8 & 255) as f32 / 255.0;
-    let var11 = (var8 & 255) as f32 / 255.0;
-    if colorize {
-        g.color4f(var9, var10, var11, 1.0);
-    }
-    // renderTexturedQuad(x, y, icon % 16 * 16, icon / 16 * 16, 16, 16) at
-    // z 0 (`var7 = 0.0F`), texel 1/256.
-    draw_textured_rect_clipped(
-        g,
-        0.0,
-        clip,
-        var6,
-        var7,
-        var5 % 16 * 16,
-        var5 / 16 * 16,
-        16,
-        16,
-        0.00390625,
-    );
-    g.enable(gl::LIGHTING);
-    g.enable(gl::CULL_FACE);
 }
 
 #[cfg(test)]
