@@ -259,7 +259,8 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// The files under `root`, as `/`-separated paths relative to it, sorted
-/// (symbolic links followed; the storage temporaries skipped).
+/// (links to files followed, a link to a directory refused; the storage
+/// temporaries skipped).
 pub fn read_tree(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
     let mut out = Vec::new();
     let mut stack = vec![(root.to_path_buf(), String::new())];
@@ -278,7 +279,14 @@ pub fn read_tree(root: &Path) -> Result<Vec<(String, Vec<u8>)>, String> {
                 format!("{prefix}/{name}")
             };
             let meta = fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-            if meta.is_dir() {
+            let link = fs::symlink_metadata(&path)
+                .map_err(|e| format!("{}: {e}", path.display()))?
+                .file_type()
+                .is_symlink();
+            if meta.is_dir() && link {
+                // Never followed: a link to a parent would never end.
+                return Err(format!("{}: a link to a directory", path.display()));
+            } else if meta.is_dir() {
                 stack.push((path, r));
             } else if meta.is_file() {
                 let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
@@ -344,7 +352,16 @@ pub fn world_digest(files: &[(String, Vec<u8>)]) -> Result<WorldDigest, ExportEr
             .map_err(|e| ExportError::Read(format!("{r}: {e}")))?;
     }
     // D5: level.dat and every id (the import's scan).
-    validate(&mut st, STAGE).map_err(ExportError::Refused)?;
+    validate(&mut st, STAGE).map_err(|r| {
+        ExportError::Refused(match r {
+            // The path inside the world folder, not the staging prefix.
+            ImportRefusal::Unreadable { path, reason } => ImportRefusal::Unreadable {
+                path: rel(&path).to_string(),
+                reason,
+            },
+            other => other,
+        })
+    })?;
     let (root_name, root) =
         level_dat_tree(&mut st).ok_or_else(|| corrupt("world/level.dat", "does not decode"))?;
     let level_dat = hex(&mc_sim::save::mc_nbt::write_named(&root_name, &root)
@@ -368,13 +385,10 @@ pub fn world_digest(files: &[(String, Vec<u8>)]) -> Result<WorldDigest, ExportEr
     }
     let player_pos = match &info.player_tag {
         Some(Tag::Compound(p)) => match p.get("Pos") {
-            Some(Tag::List { items, .. }) if items.len() == 3 => {
-                let d = |t: &Tag| match t {
-                    Tag::Double(v) => *v,
-                    _ => f64::NAN,
-                };
-                Some([d(&items[0]), d(&items[1]), d(&items[2])])
-            }
+            Some(Tag::List { items, .. }) if items.len() == 3 => match items.as_slice() {
+                [Tag::Double(x), Tag::Double(y), Tag::Double(z)] => Some([*x, *y, *z]),
+                _ => None,
+            },
             _ => None,
         },
         _ => None,
@@ -865,10 +879,30 @@ mod tests {
         let src = make_world(&d.0, "NoLevel", 4);
         fs::remove_file(src.join("level.dat")).unwrap();
         let e = export_world(&d.0.join("saves"), "NoLevel", &d.0.join("out")).unwrap_err();
+        assert_eq!(
+            e,
+            ExportError::Refused(ImportRefusal::Unreadable {
+                path: "level.dat".into(),
+                reason: "missing".into()
+            })
+        );
+        assert!(!d.0.join("out").exists());
+    }
+
+    /// A link to a directory is refused (a link to a parent would never
+    /// end); nothing is copied.
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_link_to_a_directory() {
+        let d = TempDir::new("export_link");
+        let src = make_world(&d.0, "Linked", 4);
+        std::os::unix::fs::symlink(&src, src.join("loop")).unwrap();
+        let e = export_world(&d.0.join("saves"), "Linked", &d.0.join("out")).unwrap_err();
         assert!(
-            matches!(e, ExportError::Refused(ImportRefusal::Unreadable { .. })),
+            matches!(&e, ExportError::Read(m) if m.ends_with("loop: a link to a directory")),
             "{e}"
         );
+        assert!(!d.0.join("out").exists());
     }
 
     #[test]

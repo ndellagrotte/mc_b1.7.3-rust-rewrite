@@ -48,6 +48,7 @@ naming the path.
 | `app` | `GuiScreen` (two flags), `ScaledResolution` | `AppState` (`Title`, `Loading`, `InGame`, `Paused`), the screen slot |
 | `screenshot` | `ScreenShotHelper` | F2 → `<data>/screenshots/yyyy-MM-dd_HH.mm.ss[_N].png` |
 | `import` | — (D5) | the import of a vanilla save |
+| `export` (WP-4.5) | — (D5) | the export of a world: validate, copy, re-read and compare (below, "Export") |
 | `debug` | `GuiIngame`'s F3 block | the F3 text (`DebugText`, `DebugSources`) |
 | `events` | `IWorldAccess`, `SoundManager` call sites, `EntityPlayerSP`'s calls into `Minecraft` | `WorldEventMsg`, `ClientSound`, `ClientEvent` |
 | `sound` (WP-3.8) | `SoundManager`, `SoundPool`, `SoundPoolEntry`, `CodecMus`/`MusInputStream`, `RenderGlobal.playSound`/`playRecord`/`playAuxSFX` (sound half) | the `SoundManager` resource on `bevy_kira_audio` (below) |
@@ -811,6 +812,15 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   N is not a Beta 1.7.3 block. First found in chunk (x, z) (…)" (or the
   item id, or the file it cannot read), Back returns to the path. The copy
   runs inside the click.
+- **Export** (D5, WP-4.5, project-owned): the select-world screen's
+  "Export..." button (top left, 70 × 20, mirroring Import...; enabled
+  while a world is selected) opens `export_world::GuiExportWorld` for the
+  selected world: a folder box (default `<data-dir>/exports`), Export and
+  Cancel. Export runs `export::export_from_game` inside the click; the
+  result dialog (`GuiExportResult`) says "World exported" with the path,
+  the files, region files and chunks checked and the player position (Done:
+  the world list), or "Export refused" / "Export failed" with the problem
+  and "Nothing was exported." (Back: the export screen). See "Export" below.
 - **Pause menu**: Back to game, Achievements, Statistics, Options..., Save
   and quit to title (`changeWorld1(null)` then a new title screen), the
   blinking "Saving level.." while `quickSaveWorld` has chunks left (it is
@@ -853,6 +863,30 @@ from the jar's `/title/splashes.txt`, and draws the loading screen.
   it; `GuiSlot` centres a short list, so the first row is not at the
   list's top), or by hand with `mouse_to` + `mouse_down`, a few frames,
   `mouse_up` (`GuiSlot` polls the held button while drawing).
+
+## Export (WP-4.5)
+
+`export::export_world(saves_dir, name, target)` copies `saves/<name>` to
+`<target>/<name>` so that the real Beta 1.7.3 client can open it (the
+native format already is McRegion, D5: nothing is converted or stripped).
+In order: the target must be absent or an empty folder (never overwritten,
+never inside the world); the world is read into memory and validated
+(`mc_sim::save::import::validate` for `level.dat` and every block and item
+id, then McRegion version 19132, `SaveOldDir.loadWorldInfo`, and every
+chunk a region header lists must read back and load through
+`McRegionChunkLoader`; a truncated region file, which the import's scan
+lets through as vanilla would regenerate those chunks, is refused); its
+digest is taken (`export::WorldDigest`: blake3 of each loaded chunk's five
+arrays, the Tier S `chunk_digest` `"loaded"`, of its NBT tree, of the
+`level.dat` tree and of every file); the files are written through
+`std::fs` into a hidden staging folder `<target>/.mc_export-<name>-<pid>`,
+read back from disk, digested again and compared (`export::compare`, the
+first differing file or chunk); then the staging folder is renamed to
+`<target>/<name>`. Any failure removes the staging folder.
+`export::export_from_game` saves the open world first
+(`World.try_save_world(true)`) when it is the one exported and flushes the
+region cache. How it was checked against the vanilla client:
+`docs/EXPORT.md`.
 
 ## Particles (WP-3.7a)
 
@@ -1155,6 +1189,7 @@ Actions run in order, as many per frame as are due.
 | `equip` | `slot` (0-35 inventory, 100-103 armour: boots … helmet), `item` (`[id, count, damage]`, absent: empty) | Dev (WP-3.5b): puts a stack into one of the player's slots (armour on the third-person player) |
 | `chat` | `text` | Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` |
 | `dump_inventory` | `path` | Dev (WP-3.6b): the player's 36 main and 4 armour slots and the cursor stack, each `[id, count, damage]` or null, as JSON |
+| `export_world` | `name`, `path`, `report` (optional) | Dev (WP-4.5): exports `saves/<name>` to `<path>/<name>` (`export::export_from_game`: the open world is saved first when it is that world; then validated, copied and read back). With `report`, writes `{"ok": true, "report": {path, files, bytes, regions, chunks, digest}}` (the digest lists every file's and every chunk's blake3) or `{"ok": false, "error": …}` |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
 

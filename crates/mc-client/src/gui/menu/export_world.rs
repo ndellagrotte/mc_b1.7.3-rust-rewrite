@@ -69,7 +69,6 @@ impl GuiExportWorld {
 
     /// Export: the shell's export, then the result dialog.
     fn do_export(&mut self, ctx: &mut ScreenCtx) {
-        #[allow(clippy::disallowed_methods)]
         let home = std::env::var_os("HOME").map(PathBuf::from);
         let target = resolve_path(self.field.get_text(), home.as_deref());
         let world = self.world.clone();
