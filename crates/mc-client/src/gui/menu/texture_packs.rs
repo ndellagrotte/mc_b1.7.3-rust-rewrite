@@ -126,6 +126,9 @@ impl Screen for GuiTexturePacks {
     fn base(&self) -> &ScreenBase {
         &self.base
     }
+    fn gui_slot(&self) -> Option<(&GuiSlot, i32)> {
+        self.slot.as_ref().map(|(s, l)| (s, l.get_size()))
+    }
     fn base_mut(&mut self) -> &mut ScreenBase {
         &mut self.base
     }

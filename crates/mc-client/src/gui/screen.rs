@@ -144,6 +144,12 @@ pub trait Screen: Send + Sync + 'static {
     // src: GuiScreen.java:170-171
     fn select_next_field(&mut self, _ctx: &mut ScreenCtx) {}
 
+    /// Dev (the `click_slot` script action, WP-3.9; not vanilla): the
+    /// `GuiSlot` list the screen shows and its `getSize()`, if any.
+    fn gui_slot(&self) -> Option<(&super::widgets::slot::GuiSlot, i32)> {
+        None
+    }
+
     /// The shell's description of this screen.
     fn slot(&self) -> ScreenSlot {
         ScreenSlot {

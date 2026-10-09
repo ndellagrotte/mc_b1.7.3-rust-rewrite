@@ -232,6 +232,9 @@ impl Screen for DebugList {
     fn kind(&self) -> ScreenKind {
         ScreenKind::Other("DebugList".into())
     }
+    fn gui_slot(&self) -> Option<(&GuiSlot, i32)> {
+        self.slot.as_ref().map(|s| (s, self.rows.get_size()))
+    }
     fn init_gui(&mut self, _ctx: &mut ScreenCtx) {
         let (w, h) = (self.base.width, self.base.height);
         let mut s = GuiSlot::new(w, h, 32, h - 64, 36);

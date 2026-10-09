@@ -214,6 +214,13 @@ impl Screen for GuiSelectWorld {
         ScreenKind::Other("GuiSelectWorld".into())
     }
 
+    // GuiWorldSlot.getSize() (GuiWorldSlot.java:13-15).
+    fn gui_slot(&self) -> Option<(&GuiSlot, i32)> {
+        self.world_slot_container
+            .as_ref()
+            .map(|s| (s, self.save_list.len() as i32))
+    }
+
     // src: GuiSelectWorld.java:27-36
     fn init_gui(&mut self, ctx: &mut ScreenCtx) {
         let var1 = ctx.lang;

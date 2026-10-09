@@ -262,23 +262,6 @@ pub enum Action {
         #[serde(default)]
         ahead: Option<f64>,
     },
-    /// Dev (WP-3.7b): puts `count` of item `id` with damage `damage` into
-    /// the player's inventory: into hotbar/main slot `slot` (replacing what
-    /// is there), or without `slot` as a pickup does
-    /// (`InventoryPlayer.addItemStackToInventory`).
-    GiveItem {
-        /// The item or block id.
-        id: i32,
-        /// The stack size.
-        #[serde(default = "one")]
-        count: i32,
-        /// The damage (metadata).
-        #[serde(default)]
-        damage: i32,
-        /// The main-inventory slot (0-8: the hotbar).
-        #[serde(default)]
-        slot: Option<i32>,
-    },
     /// Dev (WP-3.7b): sets the player's `fire` ticks (`isBurning()`: the
     /// first-person fire overlay; the simulation counts it down, burns the
     /// player every 20 ticks, and water puts it out).
@@ -318,9 +301,12 @@ pub enum Action {
         /// The file.
         path: PathBuf,
     },
-    /// Dev (WP-3.6b): puts `new ItemStack(id, count, damage)` into the
-    /// player's inventory (`InventoryPlayer.addItemStackToInventory`), or
-    /// into armour slot `armor` (0 boots … 3 helmet) when given.
+    /// Dev (WP-3.6b, WP-3.7b; merged in WP-3.9, `give_item` is an alias):
+    /// puts `new ItemStack(id, count, damage)` into armour slot `armor` (0
+    /// boots … 3 helmet) when given, else into main-inventory slot `slot`
+    /// (0-8: the hotbar; replacing what is there) when given, else into the
+    /// inventory as a pickup does (`InventoryPlayer.addItemStackToInventory`).
+    #[serde(alias = "give_item")]
     Give {
         /// Item or block id.
         id: i32,
@@ -330,6 +316,9 @@ pub enum Action {
         /// Damage.
         #[serde(default)]
         damage: i32,
+        /// The main-inventory slot (0-8: the hotbar).
+        #[serde(default)]
+        slot: Option<i32>,
         /// Armour slot instead.
         #[serde(default)]
         armor: Option<usize>,
@@ -342,6 +331,43 @@ pub enum Action {
         /// The button's text (`displayString`), as drawn.
         label: String,
     },
+    /// Dev (WP-3.9): clicks row `index` of the current screen's `GuiSlot`
+    /// list (the world list, the statistics, the texture packs): the
+    /// pointer moves to the row's centre ([`slot_row_center`]), the left
+    /// button is held for two frames (`GuiSlot` polls it while drawing),
+    /// and with `double` a second click follows four frames after the
+    /// first (within `GuiSlot`'s 250 ms: Play on the world list). Waits up
+    /// to 120 frames for a list with such a row.
+    ClickSlot {
+        /// The row (0 = the first).
+        index: i32,
+        /// A double click.
+        #[serde(default)]
+        double: bool,
+    },
+}
+
+/// The centre of row `index` of `slot` (a list of `size` rows) in scaled
+/// GUI pixels, if the row exists and its centre is inside the list
+/// (`top ..= bottom`, where `GuiSlot` takes clicks): `GuiSlot`'s row top
+/// `top + 4 - (int) amountScrolled + index · posZ + headerPadding`, plus
+/// half the row's `posZ - 4` height; the inverse of the click's row maths
+/// (GuiSlot.java:132-136, :199-207). A short list is centred (negative
+/// `amountScrolled`, [`GuiSlot::bind_amount_scrolled`]).
+///
+/// [`GuiSlot::bind_amount_scrolled`]: crate::gui::widgets::slot::GuiSlot::bind_amount_scrolled
+pub fn slot_row_center(
+    slot: &crate::gui::widgets::slot::GuiSlot,
+    size: i32,
+    index: i32,
+) -> Option<(i32, i32)> {
+    if index < 0 || index >= size {
+        return None;
+    }
+    let row_top =
+        slot.top + 4 - slot.amount_scrolled as i32 + index * slot.pos_z + slot.header_padding;
+    let y = row_top + (slot.pos_z - 4) / 2;
+    (y >= slot.top && y <= slot.bottom).then_some((slot.width / 2, y))
 }
 
 /// The default `step` of [`Action::SetOption`].
@@ -817,6 +843,68 @@ pub fn run_script(
                     }
                 }
             }
+            Action::ClickSlot { index, double } => {
+                let found = binder
+                    .as_deref()
+                    .filter(|b| b.bound_serial() == Some(game.screen_serial))
+                    .and_then(|b| b.screen())
+                    .and_then(|s| s.gui_slot())
+                    .and_then(|(slot, size)| slot_row_center(slot, size, index));
+                match found {
+                    Some((x, y)) => {
+                        r.click_waited = 0;
+                        let (dw, dh) = (game.display_width, game.display_height);
+                        let sr =
+                            crate::app::ScaledResolution::new(game.game_settings.gui_scale, dw, dh);
+                        let (mx, my) = crate::gui::scaled::gui_to_mouse(
+                            x,
+                            y,
+                            sr.scaled_width,
+                            sr.scaled_height,
+                            dw,
+                            dh,
+                        );
+                        game.input.mouse_x = mx;
+                        game.input.mouse_y = my;
+                        game.input.push_button(0, true);
+                        info!(
+                            "script: clicking row {index} at ({x}, {y}){}",
+                            if double { " twice" } else { "" }
+                        );
+                        let step = |action| Step {
+                            tick: None,
+                            frame: None,
+                            action,
+                        };
+                        let wait = |n| Action::Wait {
+                            ticks: None,
+                            frames: Some(n),
+                            in_game: false,
+                        };
+                        let left = ScriptButton::Left;
+                        let mut more = vec![step(wait(2)), step(Action::MouseUp { button: left })];
+                        if double {
+                            more.extend([
+                                step(wait(2)),
+                                step(Action::MouseDown { button: left }),
+                                step(wait(2)),
+                                step(Action::MouseUp { button: left }),
+                            ]);
+                        }
+                        let at = r.next;
+                        r.script.steps.splice(at..at, more);
+                    }
+                    None if r.click_waited < 120 => {
+                        r.click_waited += 1;
+                        r.next -= 1;
+                        return;
+                    }
+                    None => {
+                        r.click_waited = 0;
+                        error!("script: click_slot: no visible row {index}");
+                    }
+                }
+            }
             Action::TypeText { text } => {
                 for ch in text.chars() {
                     game.input.push_key(0, true, ch);
@@ -863,22 +951,6 @@ pub fn run_script(
                         });
                 }
             }
-            Action::GiveItem {
-                id,
-                count,
-                damage,
-                slot,
-            } => {
-                if let Some(d) = game.player_in_world_mut().and_then(|p| p.kind.player_mut()) {
-                    let mut stack = mc_sim::item::ItemStack::new(id, count, damage);
-                    match slot {
-                        Some(i) => d.inventory.set_inventory_slot_contents(i, Some(stack)),
-                        None => {
-                            d.inventory.add_item_stack_to_inventory(&mut stack);
-                        }
-                    }
-                }
-            }
             Action::SetFire { ticks } => {
                 if let Some(p) = game.player_in_world_mut() {
                     p.base.fire = ticks;
@@ -906,13 +978,16 @@ pub fn run_script(
                 id,
                 count,
                 damage,
+                slot,
                 armor,
             } => {
                 if let Some(d) = game.player_in_world_mut().and_then(|e| e.kind.player_mut()) {
                     let mut s = mc_sim::item::ItemStack::new(id, count, damage);
-                    match armor {
-                        Some(i) if i < 4 => d.inventory.armor_inventory[i] = Some(s),
-                        _ => {
+                    match (armor, slot) {
+                        (Some(i), _) if i < 4 => d.inventory.armor_inventory[i] = Some(s),
+                        (Some(i), _) => error!("script: give: no armour slot {i}"),
+                        (None, Some(i)) => d.inventory.set_inventory_slot_contents(i, Some(s)),
+                        (None, None) => {
                             d.inventory.add_item_stack_to_inventory(&mut s);
                         }
                     }
@@ -1224,22 +1299,25 @@ mod tests {
                 {"action": "set_block", "x": 0, "y": 0, "z": 0, "id": 9, "rel": true}]"#,
         )
         .unwrap();
+        // give_item is an alias of give (WP-3.9).
         assert_eq!(
             s.steps[0].action,
-            Action::GiveItem {
+            Action::Give {
                 id: 3,
                 count: 5,
                 damage: 0,
-                slot: Some(1)
+                slot: Some(1),
+                armor: None,
             }
         );
         assert_eq!(
             s.steps[1].action,
-            Action::GiveItem {
+            Action::Give {
                 id: 280,
                 count: 1,
                 damage: 0,
-                slot: None
+                slot: None,
+                armor: None,
             }
         );
         assert_eq!(s.steps[2].action, Action::SetFire { ticks: 300 });
@@ -1265,5 +1343,77 @@ mod tests {
         assert!(Script::parse(r#"[{"action": "fly"}]"#).is_err());
         assert!(Script::parse(r#"[{"action": "key_down", "key": "WW"}]"#).is_err());
         assert!(Script::parse(r#"[{"action": "key_down"}]"#).is_err());
+    }
+
+    #[test]
+    fn give_and_click_slot_parse() {
+        let s = Script::parse(
+            r#"[{"action": "give", "id": 298, "armor": 3},
+                {"action": "give", "id": 276, "slot": 0},
+                {"action": "click_slot", "index": 0},
+                {"action": "click_slot", "index": 2, "double": true}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            s.steps[0].action,
+            Action::Give {
+                id: 298,
+                count: 1,
+                damage: 0,
+                slot: None,
+                armor: Some(3),
+            }
+        );
+        assert!(matches!(
+            s.steps[1].action,
+            Action::Give { slot: Some(0), .. }
+        ));
+        assert_eq!(
+            s.steps[2].action,
+            Action::ClickSlot {
+                index: 0,
+                double: false
+            }
+        );
+        assert_eq!(
+            s.steps[3].action,
+            Action::ClickSlot {
+                index: 2,
+                double: true
+            }
+        );
+    }
+
+    #[test]
+    fn slot_rows_are_found_where_guislot_takes_the_click() {
+        use crate::gui::widgets::slot::GuiSlot;
+        // The world list at 854 × 480, scale 2 (427 × 240): GuiSlot(…, 32,
+        // height - 64, 36). One world: the short list is centred.
+        let mut slot = GuiSlot::new(427, 240, 32, 240 - 64, 36);
+        let content = 36;
+        slot.bind_amount_scrolled(content);
+        // (36 - (176 - 32 - 4)) / 2 = -52
+        assert_eq!(slot.amount_scrolled, -52.0);
+        let (x, y) = slot_row_center(&slot, 1, 0).unwrap();
+        assert_eq!((x, y), (213, 32 + 4 + 52 + 16));
+        // The O1 case: the first row is at y ≈ 92-124, not at the top.
+        assert!((88..=124).contains(&y));
+        // GuiSlot's own row maths picks the same row back.
+        assert_eq!(slot.get_slot_index_from_screen_coords(1, x, y), 0);
+        assert_eq!(slot_row_center(&slot, 1, 1), None);
+        assert_eq!(slot_row_center(&slot, 1, -1), None);
+        // A long, scrolled list with a header (the statistics tables).
+        let mut slot = GuiSlot::new(427, 240, 32, 176, 20);
+        slot.set_has_list_header(true, 20);
+        slot.amount_scrolled = 30.0;
+        for i in 0..6 {
+            if let Some((x, y)) = slot_row_center(&slot, 40, i) {
+                assert_eq!(slot.get_slot_index_from_screen_coords(40, x, y), i);
+            }
+        }
+        // Row 0 scrolled above the list: not clickable.
+        slot.amount_scrolled = 100.0;
+        assert_eq!(slot_row_center(&slot, 40, 0), None);
+        assert!(slot_row_center(&slot, 40, 6).is_some());
     }
 }
