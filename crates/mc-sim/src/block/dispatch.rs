@@ -1926,11 +1926,7 @@ pub fn drop_block_as_item_with_chance(
     use BlockKind as K;
     match b.kind {
         // src: BlockBed.java:194-199: Block's body unless isBlockFootOfBed
-        K::Bed => {
-            if super::bed::is_block_foot_of_bed(meta) {
-                return;
-            }
-        }
+        K::Bed if super::bed::is_block_foot_of_bed(meta) => return,
         // src: BlockPistonMoving.java:61-68
         K::PistonMoving => {
             return super::piston_moving::drop_block_as_item_with_chance(world, x, y, z);
@@ -1945,11 +1941,7 @@ pub fn drop_block_as_item_with_chance(
         }
         // src: BlockJukeBox.java:56-60: super's body, only off a multiplayer
         // client (the base tests it again).
-        K::JukeBox => {
-            if world.multiplayer_world {
-                return;
-            }
-        }
+        K::JukeBox if world.multiplayer_world => return,
         _ => {}
     }
     if !world.multiplayer_world {
