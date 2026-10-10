@@ -7,6 +7,16 @@ that carry no `deferred` tag, reconciles the §5 WP table with what was
 delivered, collects every open owner question, and audits git for
 Mojang-derived files (D8).
 
+**WP-4.8 update (2026-10-10, branch `wp-4.8` from `phase-4` at `d222a15`).**
+WP-4.8 ("Gap hygiene", §3.6) closed §2.4, §3.1 B and D, the N1/N4/N6/N7 and
+R4/R6/R7 rows of §3.3 and Q12/Q13, and traced §3.1 E site by site. Its
+results are marked "WP-4.8" in place; the trace and its findings are
+§3.1 E, "Update (WP-4.8)". In short: the sim now has 76 `note_unimplemented`
+call sites (96 at `d222a15`); a fixture's reached gaps are in
+`target/golden/<area>/<name>/gaps.json` and the game's in `dump_debug`'s
+`gaps`; the trace found five reachable divergences: four are fixed with
+new oracle fixtures, one (the reused player id) has a proposal (§3.1 E).
+
 Reviewed tree: branch `wp-4.4` at `d52ac6b` (the Gate 3 commit). The
 `phase-4` tip `70cdb29` adds only WP-4.2 (the soak fixtures, the `SOAK`
 modes of the oracle scripts and `golden_soak.rs`). It adds no `deferred`
@@ -306,6 +316,12 @@ accurate.
 
 They are outside this WP's files; a cleanup pass can take them.
 
+**WP-4.8:** the assets.rs, session.rs and sleep.rs nits are fixed as listed
+(comments only; sleep.rs is `crates/mc-client/src/gui/container/sleep.rs`).
+The README "Item renderer" sentence is left as it is: the README is edited
+additively only in wave F, and WP-4.9 rewrites that paragraph (anaglyph's
+second pass); its conclusion stands.
+
 - assets.rs:9 `TexturePackBase.java:27-29` → 28-29. assets.rs:12
   `TexturePackDefault.java:7-13` → the constructor is 13-18.
 - assets.rs:36 `TexturePackDefault.java:11` → 18 (line 11 is the field
@@ -326,7 +342,11 @@ They are outside this WP's files; a cleanup pass can take them.
 
 "Reachable" means reachable in the shipping singleplayer game. The client
 drains no `unimplemented_hits`, so a reached gap is silent there (§3.6,
-WP-4.8 item 1).
+WP-4.8 item 1). **WP-4.8:** `dump_debug` now writes the open world's
+`skipped_systems` and `unimplemented_hits` (`gaps`, crates/mc-client/README.md),
+and every tick or world-read fixture writes them to `gaps.json` next to its
+`actual.jsonl` (tests/golden/README.md, "The gaps file"). The counts below
+are WP-4.4's; WP-4.8 removed 20 sites (B: 14, D: 6), leaving 76.
 
 **A. Parity gaps (10 sites).** All are reachable, and none changes a
 current fixture.
@@ -354,6 +374,26 @@ implements these itself and never calls the sim's versions.
 
 They can go, or the sim arms can return the Java constants (WP-4.8 item 4).
 
+**WP-4.8: closed, by deleting the sim's arms.** §3.6 proposed removing them,
+and that is what fits the tree: the client already has every override,
+transcribed with citations and unit tests (`render::shadow::get_shadow_size`,
+`render::is_in_range_to_render_vec3d`, `render/tests.rs::in_range_overrides`),
+and the simulation never calls these methods on a tick path. Making the
+client call the sim instead would have moved render data into mc-sim and
+changed client files WP-4.9 is editing, for no gain. So
+`entity::dispatch::{get_shadow_size, is_in_range_to_render_vec3d,
+is_in_range_to_render_dist}` are gone; the three methods are in
+`dispatch::NOT_DISPATCHED` with the reason (the coverage test checks it),
+`getShadowSize` left the Boat and Minecart rows of `TRANSCRIBED`, and
+`base::is_in_range_to_render_vec3d` calls `Entity`'s own
+`isInRangeToRenderDist` (the base bodies stay: the client uses
+`base::is_in_range_to_render_dist`). The colorizer sites keep their arm:
+`BlockGrass`/`BlockLeaves.colorMultiplier` return what the headless Java
+returns before the client installs a colormap (0, also the oracle's value),
+which is the whole Java body for a world without a client, so they no longer
+record anything. The shipping client tints with its own copy and never calls
+them.
+
 **C. Multiplayer only (5 sites)**: `setVelocity` (Arrow, Egg, Fish,
 Snowball; entity/dispatch.rs:825, :828, :829, :832) and
 `setPositionAndRotation2` (Fish, :777). Only NetClientHandler.java:133,
@@ -369,6 +409,16 @@ Snowball; entity/dispatch.rs:825, :828, :829, :832) and
   28 `EntityKindData` variants has its own arm, so it is **unreachable**.
 - block/dispatch.rs:680: `untranscribed()`, reached only through the five
   all-`None` tails (§1).
+
+**WP-4.8: all removed.** The five tails and `untranscribed()`;
+`TileEntityKindData::Untranscribed` and its three arms; `EntityList`'s gap
+path (`FromNbt::Gap`, `construct_gap`, the two gap records of
+`EntityMapping`, `preserved()`) with the chunk loaders' preserved-compound
+plumbing (`LoadedChunk::preserved`, `McRegionChunkLoader::preserved`,
+`store_chunk_in_compound`'s parameter); `missing_constructors()` stays as the
+invariant the tests assert, and `create_entity_from_nbt` skips an id with no
+constructor row (none exists). The `readEntityFromNBT` fallthrough is an
+exhaustive empty arm for the kinds read before the `match`.
 
 **E. Defensive guards (62 sites)**: the take-out/put-back pattern and Java
 exception paths. None is a work item on its own. (The first version of this
@@ -474,6 +524,104 @@ Three families:
    taken out or removed while something still refers to them. WP-4.8 item
    2.
 
+**Update (WP-4.8): the multi-site files traced site by site.** Line numbers
+are at the WP-4.8 tip. "Out" means taken out of its slot further up the
+stack; "removed" means no longer in `loadedEntityList` (WP-4.6 keeps a removed
+entity in `World::removed_entities` while a loaded entity's field names it,
+`World::entity_object`). "Snapshot?" answers the brief's question: does
+parity need a copy of the out or removed entity at this site?
+
+Method: every site was read against its Java; every caller chain that can
+hold an entity out of its slot was listed (an entity's own update from
+`updateEntities`; its rider's update after the mount is put back; the
+client's player during a click, `use_item`, `attack`, `interact`; the
+target of a `with_entity_mut` inside those); and `gaps.json` was collected
+for all 230 default and 5 soak fixtures, with a temporary backtrace at the
+two R5 records to name each caller. The reachable cases were then run in
+the oracle as throwaway scenarios before any fix.
+
+| File:line (WP-4.8) | Java | What is out / removed | Reachable in SP? | Snapshot? | WP-4.8 |
+|---|---|---|---|---|---|
+| world/entities.rs:56 `is_entity_dead_or_gone` | `x.isDead` on a field | an id neither loaded nor kept | no: every entity-typed field keeps its referent (`referenced_entity_ids`) | already (WP-4.6) | — |
+| world/entities.rs:334, :563 (`updateEntities`, `updateEntityList` mount check) | World.java:1210-1217, :2339-2346 | the rider's mount, removed earlier in the pass (it died: `Entity.setEntityDead` does not dismount; a pig killed under its rider, a cart broken by an arrow) | **yes**; same outcome as Java (`mount.isDead`, dismount), but recorded | the removed object, kept already | **neutral fix**: read through `entity_object` (no record; the removed mount's `riddenByEntity` cleared as in Java). The one case whose outcome changes, a mount unloaded while its rider stays loaded (Java keeps the rider on it), now matches Java; rider and mount share a chunk column, so it is not reached |
+| world/entities.rs:713, :811 "Chunk entity list holds …" | — | invariant | no: dead and unloaded entities leave both lists in one pass (World.java:1189-1231) | no | — |
+| world/entities.rs:717 `getEntitiesWithinAABBExcludingEntity` over an out entity (R5) | World.java:2013-2029 | whoever the caller's chain holds | **yes** (3 default fixtures, the 5 soaks): only the placement check `World.canBlockBePlacedAt` → `checkIfAABBIsClear` meeting the `use_item` player; the placing item tests the player's box first (`item::behaviour::can_block_be_placed_at`), so nothing changes. The other callers run in an entity's own update with only that entity out (excluded): projectiles, boat, cart, `collideWithNearbyEntities`, the player's pickup scan, lightning, the piston push, `getCollidingBoundingBoxes`, `getCanSpawnHere`; the painting's `onValidSurface` with the player out keeps only `EntityPainting`s | no (box needed only if a match were possible; none found) | `pig_zombie` moved to the class query (below) |
+| world/entities.rs:819 `getEntitiesWithinAABB(class)` over an out entity | World.java:2031-2047 | as above | before WP-4.8: 10 fixtures, all `alertWolves` (class `EntityWolf`) meeting the out player or arrow | no | **neutral fix**: `EntitySlot::class_chain` keeps each entity's Java class chain, so an out entity of another class is skipped as Java's `isAssignableFrom` skips it, without a record. Left recorded: an out entity of the queried class. Traced callers: the wolf scans (the scanning wolf is in hand; the attacker of a calm wild wolf cannot be a wolf), `alertWolves` (attacker in hand), plates and detector rails (collider in hand), the mob spawner (no entity out). None reachable |
+| world/entities.rs:843 `countEntities` | World.java:2064-2075 | — | no: `performSpawning` runs from `World.tick` | no | — |
+| world/entities.rs:861 `joinEntityInSurroundings` | World.java:2294-2309 | the dead player, removed 20 ticks after death | **yes**, every 30 ticks on the Game Over screen; no effect (vanilla re-adds the dead object and the same `updateEntities` drops it again: one `releaseEntitySkin`, which loads nothing, D2) | no | — (WP-4.7's P4 dead-player work is next to it) |
+| world/entities.rs:908 `updateAllPlayersSleepingFlag` | World.java:2381-2393 | another player | no: one player in SP; the dying player has left `playerEntities` first | no | — |
+| entity/wolf.rs:338 owner out | EntityWolf.java:96-123 | the owner | no: `getPlayerEntityByName` only returns a player in its slot (it skips an out one silently, as `getClosestPlayer` does), and a wolf never updates inside the player's update | no | — |
+| entity/wolf.rs:398 look target out | EntityWolf.java:125-150 | `currentTarget`, a player | no | no | — (see "the reused id" below) |
+| entity/wolf.rs:552 path target out | EntityWolf.java:229-248 | the owner from :338 | no | no | — |
+| entity/wolf.rs:662 arrow's owner | EntityWolf.java:269 | — | no: no caller passes an arrow as the attacker (family 3) | no | — |
+| entity/wolf.rs:686 a wolf in range out | EntityWolf.java:272-283 | — | no: the ids come from the query, which returns only entities in their slot or in hand | no | — |
+| entity/wolf.rs:728, :757 attack target out | EntityWolf.java:304-324 | — | no: `EntityCreature` calls `attackEntity` only after finding the target in its slot | no | — |
+| entity/base.rs:1096 `updateRidden` mount out | Entity.java:916-968 | — | no: the rider updates after its mount is put back | no | — |
+| entity/base.rs:1198, :1209 `mountEntity` old mount / old rider out | Entity.java:996-1007 | — | no: the callers are the new mount's own `interact`, `attackEntityFrom`, `applyEntityCollision` (target in hand) and the spider jockey (not joined yet); the old mount or rider is in its slot | no | — |
+| entity/base.rs:1228 `mount_entity_in_world` | — | — | no caller outside the tests | no | — |
+| entity/base.rs:1248 `mountEntity(null)` mount out | Entity.java:983-991 | — | no: `World.setEntityDead` dismounts the rider with the mount in hand (`dismount_from`); `sleepInBedAt` has the mount in its slot | no | — |
+| entity/fish.rs:260 | EntityFish.java:146 | — | Java NPE (family 1) | — | — |
+| entity/fish.rs:269 angler out | EntityFish.java:145-150 | — | no: the bobber updates from `updateEntities`; a removed angler reads as dead, as in Java | no | — |
+| entity/fish.rs:295 hooked entity out | EntityFish.java:152-161 | — | no | no | — |
+| entity/fish.rs:503 `catchFish` hooked entity gone or out | EntityFish.java:348-360 | the hooked entity | in principle: the bobber may hook its own angler after 5 ticks in the air (EntityFish.java:205), and the angler is in the rod's hand; a straight-up cast in the oracle fell past the player, so not reproduced. The effect would be a small pull on the player | no (the angler is the `angler` parameter) | — (one `if` when reproduced) |
+| item/behaviour/projectiles.rs:122 `catchFish` on a bobber not in the list | ItemFishingRod.java:19-22 | the bobber, removed | **yes**: a bobber in the ground dies after 1200 ticks without clearing `angler.fishEntity` (EntityFish.java:168-176); the next click reels in the dead object, 2 rod damage; the port recorded and did 0 (oracle: 2 vs 0) | yes: the removed object, kept already | **fixed**: `catchFish` on `World::removed_entities`' copy; `entity/fishing-rod-dead-bobber` |
+| entity/boat.rs:173 `attackEntityFrom` rider out | EntityBoat.java:69-72 | the rider = the attacker, held by its own click | **yes**: punch the boat you ride until it breaks (3 fist hits); vanilla puts you on top of it, the port left you on the dead boat and dropped you in place next tick (oracle: position differs from t = 10) | no: the rider is in the caller's hand | **fixed**: the boat leaves it to `player_controller::attack_entity`, which runs `mountEntity` right after the attack (the order is not observable: nothing in between reads the player); `entity/boat-broken-by-rider` |
+| entity/boat.rs:327 `onUpdate` rider out | EntityBoat.java:195-198 | — | no: the boat updates from `updateEntities` | no | — |
+| entity/boat.rs:479 `interact` rider out | EntityBoat.java:336-346 | — | no: the other rider is in its slot | no | — |
+| entity/minecart.rs:309 `attackEntityFrom` rider out | EntityMinecart.java:79-82 | as the boat | **yes**, as the boat (oracle: the player's y differs at the break) | no | **fixed** as the boat; `entity/minecart-broken-by-rider` |
+| entity/minecart.rs:1071 `interact` rider out | EntityMinecart.java:763-771 | — | no | no | — |
+| entity/painting.rs:306, :407, :497 | — | — | Java NPE (family 1) | — | — |
+| tile_entity/mob_spawner.rs:163, :213 | TileEntityMobSpawner.java:51-80 | — | Java `ClassCastException` / an unjoined mob (family 1); a non-living spawner id needs an edited world | — | — |
+| spawner.rs:127, :424 | SpawnerAnimals.java:27-28, :175-185 | the player | no: both run from `World.tick` | no | — |
+| spawner.rs:383, :399 | Pathfinder over unloaded chunks | — | believed no (§3.1, below) | no | — |
+| block/pressure_plate.rs:189, :193 | BlockPressurePlate.java:75-88 | — | no: `moveEntity` runs only in the moving entity's own update (passed in hand); knock-back, pulls and pushes change motion only; the scheduled tick runs from `World.tick` | no | — |
+| entity/arrow.rs:322, :334 (WP-4.7's file) | EntityArrow.java:163 | the shooter or the target | no: the projectile updates from `updateEntities`; a removed shooter is kept (WP-4.6) | already | — |
+| entity/player.rs:537, :947 | — | — | Java NPE (family 1) | — | — |
+| entity/player.rs:641, :645 (WP-4.7's file) | EntityLiving.java:407-414 | the removed attacker player | yes, recorded by WP-4.6 (WP4.6_SIM_GAPS.md §3) | already | WP-4.7 |
+| entity/player.rs:902 arrow's owner | EntityPlayer.java:384 | — | no (family 3) | no | — |
+| entity/player.rs:978 a wolf out | EntityPlayer.java:402-437 | — | no: the attacker is in hand and skipped | no | — |
+| entity/player.rs:1260 another player out | World.java:2381-2393 | — | no: one player | no | — |
+| entity/player.rs:1450 `addMountedMovementStat` mount out | EntityPlayer.java:766-785 | — | no: the rider updates with its mount in its slot | no | — |
+| world/explosion.rs:345 (one-each in the first version: "believed unreachable") | Explosion.java:77-105 | the player that clicked a nether bed | **yes**: the blast's scan skipped the clicking player, who took no damage; vanilla's player next to the bed dies (oracle: health −28 at t = 1, the port's 20) | no: the player is the click's `&mut` | **fixed**: `BlockBed.blockActivated` runs `newExplosion`'s body with the player in hand, as the TNT and the fireball pass themselves; `tick/bed-nether-player-near`. No other explosion has a second entity out |
+
+What WP-4.8 changed (all in its files; the four fixes and their fixtures
+are one commit, "step 7"):
+
+- **Neutral**: `EntitySlot::class_chain` and its use in the class query;
+  `EntityPigZombie.attackEntityFrom`'s anger scan on the class query (same
+  ids in the same order, the pigman's own id dropped); the mount checks
+  through `entity_object`. Unit tests: `crates/mc-sim/tests/gap_hygiene.rs`.
+- **Behaviour (oracle-verified gaps)**: the bed explosion, the boat and
+  minecart broken by their rider, the rod on a dead bobber. Each new fixture
+  failed on the port before its fix (first difference as in the table) and
+  passes after; every other `expected.jsonl` is unchanged.
+
+Found and **not** changed (proposals):
+
+1. **The reused player id (family 3).** On respawn the new player gets the
+   dead player's `entityId` (Minecraft.java:1451, :1468), and the port's
+   fields hold ids, so every field that named the dead player now names the
+   respawned one; Java's fields still hold the dead object. Most fields drop
+   a dead target long before a respawn (`EntityCreature` drops a target that
+   is not `isEntityAlive`, EntityCreature.java:24-25; the ghast and the
+   look target drop `isDead`; the arrow pickup tests
+   `doesArrowBelongToPlayer`, not the owner, EntityArrow.java:257-266). What
+   lasts is a projectile's owner: an arrow, snowball or egg the player threw
+   before dying that hits after the respawn is attributed to the respawned
+   player (the victim's knock-back direction, `EntityMob`'s revenge target,
+   EntityMob.java:37, and the kill hooks, WP4.6_SIM_GAPS.md §3), where Java
+   attributes it to the dead object (dropped at the victim's next AI tick).
+   Rare (the projectile must outlive the Game Over screen) and not verified
+   in the oracle: the harness has no respawn op. Proposed remedy, in
+   world/entities.rs: when an entity joins with the id of a kept removed
+   one, move the removed object to a fresh negative "ghost" id and rewrite
+   the fields that named it (`referenced_entity_ids`' fields) to the ghost
+   id, so they keep pointing at the dead object. It touches the respawn
+   path WP-4.7 is changing (P4), so it is left to a follow-up after WP-4.7
+   merges.
+2. **The bobber hooking its own angler** (fish.rs:503, above): one `if`
+   once a scenario reproduces it.
+
 The two `SpawnerAnimals.performSleepSpawning` "Pathfinder read of an
 unloaded chunk" records (spawner.rs:383, :399) are believed unreachable.
 The random-tick pass keeps the 19 × 19 chunks around each player loaded
@@ -481,7 +629,7 @@ The random-tick pass keeps the 19 × 19 chunks around each player loaded
 
 **Also outside `note_unimplemented`:**
 - **`World::skip`** (world/entities.rs:185) is an invariant check, and its
-  doc (:177-179) is stale (Gate 1 N4).
+  doc (:177-179) is stale (Gate 1 N4). **WP-4.8:** the doc now says so.
 - **mc-golden** tick_driver.rs:621 is harness-only.
 
 ### 3.2 mc-client README "Known deviations" and the Gate 3 §4 gaps
@@ -528,17 +676,17 @@ The random-tick pass keeps the 19 × 19 chunks around each player loaded
 | K13 stats counted by the port, never by the oracle | open; unverified against vanilla except the registries. Add §2.3's autosave |
 | K14 reload keeps the old provider | owner Q15 (harness only) |
 | K15 Gate 2's real gaps | pickups closed (WP-2.H); `setInPortal` closed (WP-3.1b); the rest is §3.1 A → WP-4.6 |
-| Gate 1 N1 / Gate 2 R6 "every fixture has a test" checks missing for `math`, `block`, `item`, `recipe`, `stat` | open → WP-4.8 |
-| Gate 1 N2 / R4 five unreachable `untranscribed` tails | open → WP-4.8 |
-| Gate 1 N3 / R4 `TileEntityKindData::Untranscribed` | open → WP-4.8 |
-| Gate 1 N4 stale `add_loaded_entities` doc | open → WP-4.8 (or WP-4.6, which owns mc-sim) |
+| Gate 1 N1 / Gate 2 R6 "every fixture has a test" checks missing for `math`, `block`, `item`, `recipe`, `stat` | **closed (WP-4.8)**: `every_<area>_fixture_has_a_test` in mc-core `math_sweep_report.rs` and `golden_{block,item,recipe,stat}_table.rs` (`mc_golden::fixture_names`), and mc-golden `runner.rs::every_fixture_area_has_a_coverage_check` for a new area |
+| Gate 1 N2 / R4 five unreachable `untranscribed` tails | **closed (WP-4.8)**, §3.1 D |
+| Gate 1 N3 / R4 `TileEntityKindData::Untranscribed` | **closed (WP-4.8)**, §3.1 D (with `FromNbt::Gap`, `construct_gap` and the preserved compounds) |
+| Gate 1 N4 stale `add_loaded_entities` doc | **closed (WP-4.8)** |
 | Gate 1 N5 `save/testworld` compares one chunk | informational; Q11 |
-| Gate 1 N6 cross-read tests pass silently without `build/oracle` | open, Q12 → WP-4.8 |
-| Gate 1 N7 / Gate 2 R7 per-fixture gap reporting | open, Q13 → WP-4.8 |
+| Gate 1 N6 cross-read tests pass silently without `build/oracle` | **closed (WP-4.8)**: `#[ignore = "needs the oracle build …"]`; run with `--ignored` they panic without `build/oracle` or `java` (both pass after a regen) |
+| Gate 1 N7 / Gate 2 R7 per-fixture gap reporting | **closed (WP-4.8)**: `gaps.json` next to `actual.jsonl` (tests/golden/README.md) |
 | Gate 2 R1 `testworld-6000` dumps | fixed (WP-2.H) |
 | Gate 2 R2 wiring sites | `setInPortal` done (WP-3.1b); the rest → WP-4.6 |
 | Gate 2 R3 stale docs | item.rs, arrow.rs and portal.rs fixed. **Still stale:** spawner.rs:24-32; living.rs:768-770 ("EntityPlayer's is WP-2.5"); pig.rs:12-13 and :95-98 ("is WP-2.3"); cake.rs:127 ("not in EntityBase yet (Phase 2)"); world/entities.rs:177-179; docs/mappings.md:345 (§3.1 A). **New:** player.rs:824-827 ("`EntityWolf` is not transcribed (WP-2.3) and cannot be constructed yet"). These are WP-4.6's files; listed for it |
-| Gate 2 R5 taken-out guard | open → WP-4.8 |
+| Gate 2 R5 taken-out guard | **WP-4.8**: traced (§3.1 E update). Class queries test a taken-out entity's class (no record for another class); every default fixture's remaining record is the placement check over the `use_item` player, which the item tests itself. A box snapshot of taken-out entities is not needed for any reachable case found; the bed explosion, the one reachable case with an effect, now passes the player in hand |
 | Gate 0 skeleton Q8: `entity()` / `entity_index()` are linear scans | still linear (world/entities.rs:23-35). Relevant to WP-4.3's performance pass; listed for it |
 | Gate 1 decision 7: whole-region rewrite per chunk save | scheduled **WP-4.3** (incremental region writes) |
 
@@ -578,7 +726,7 @@ chest-minecart `InventoryRef`. This review adds:
 | Proposed | Content | Crates | Size |
 |---|---|---|---|
 | **WP-4.7 Small parity remainder** | (1) Stats autosave: `func_27178_d` / `func_27425_c` / `func_27420_b` on `StatFileWriter`, the send run synchronously from the shell's tick, and the tags relabelled (§2.3). (2) Container close timing (README): close in tick N after the player's update, so tick N+1's input goes to the game as in vanilla (§3.2 b), and the te_gone case of §3.1 A shrinks to an explosion after the player's update. (3) The screen-opened-by-click input routing (README). (4) Q33's two buttons if the owner wants them enabled (and doing nothing). (5) Removed references with a parity effect (§3.1 A): the projectile's shooter (arrow.rs:312: Peaceful bounce, difficulty scaling, knockback, `alertWolves`, the extra `Math.random` draw) and the mob's look target (living.rs:324); a copy of the removed entity's class and position held by the referrer is enough. (6) Optional: merge an existing `stats_<user>.dat` at start-up (`func_27180_b`, §2.3) | mc-sim `stats/` (fixture-neutral), mc-sim `entity/` for (5) (with WP-4.6 or after it), mc-client `game.rs`, `gui/` | small to medium |
-| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): trace the multi-site files of family 2 site by site, then keep a snapshot of taken-out or removed entities for queries and references (the general form of WP-4.7 item 5). (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4 | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
+| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): trace the multi-site files of family 2 site by site, then keep a snapshot of taken-out or removed entities for queries and references (the general form of WP-4.7 item 5). (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4. **Done (WP-4.8)**: (1), (3), (4), (5) in full; (2) traced, its neutral half done, four reachable gaps fixed with fixtures, one proposal left (§3.1 E update) | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
 | Rendering follow-up (or wave F) | The `f32` far-origin jitter, the pass-1 sort, the inventory preview's overlay/shadow/fire, anaglyph's second eye | mc-client | by WP-4.1's findings |
 
 ## 4. PLAN_v4 §5 reconciled with what was delivered (for PLAN_v5)
@@ -682,8 +830,8 @@ proceed (Gate 1 §5.1).
 | Q9 | Seeding the clock-seeded Randoms in the shipping game | G1 Q5 | **resolved by implementation** (WP-3.1/3.1b `seed_clock_randoms`); confirm | — |
 | Q10 | **`testWorld` licence.** REFERENCES.md: "Mojang-generated save data; local only". `tests/golden/README.md`: "not Mojang content". Three committed files are byte copies of it (§6) | G1 Q9; G2 Q8; G3 Q4 | **open** | Whether `save/testworld`, `nbt/testworld-level-dat` and the fixtures that load them (`tick/testworld-6000`, `soak/testworld` on `phase-4`) may stay in git; Q11 |
 | Q11 | Commit the full `testWorld` (784 chunks, four regions, 3.6 MB) as the `save/testworld` fixture | G1 Q6 | **open**, depends on Q10 | — |
-| Q12 | Cross-read tests should not pass silently without `build/oracle` | G1 Q7 | **open** | proposed WP-4.8 |
-| Q13 | Per-fixture gap reporting | G1 Q8; G2 Q9 | **open** | proposed WP-4.8 |
+| Q12 | Cross-read tests should not pass silently without `build/oracle` | G1 Q7 | **done (WP-4.8)** | `#[ignore]`d with the reason; fail when run without the oracle |
+| Q13 | Per-fixture gap reporting | G1 Q8; G2 Q9 | **done (WP-4.8)** | `gaps.json` per fixture; `dump_debug`'s `gaps` in the game |
 | Q14 | Tier S policy for unconstructible saved entities | G1 Q10 | **moot** (every constructor exists; dead code) | — |
 | Q15 | Confirm the reload protocol, including the kept provider (K14) | G2 Q4 | **open** | nothing |
 | Q16 | Confirm the `HarnessPlayer` model; add an oracle path for the `EntityPlayerSP` parts that move the player (`pushOutOfBlocks`, sneak `ySize`, portal timer)? | G2 Q5 | **open** | K12 stays unit-tested only |
