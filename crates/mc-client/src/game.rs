@@ -439,6 +439,9 @@ pub struct Game {
     /// scaled x and z of `usePortal`'s head (collected by
     /// [`Game::collect_world_events`], run after `updateEntities`).
     portal_requested: Option<(f64, f64)>,
+    /// That request, taken by the tick: the rest of `usePortal` is due
+    /// ([`Game::use_requested_portal`]).
+    portal_head: Option<(f64, f64)>,
 }
 
 impl Game {
@@ -523,6 +526,7 @@ impl Game {
             damage_partial_time: 0.0,
             resume_update_effects: false,
             portal_requested: None,
+            portal_head: None,
         })
     }
 
@@ -1437,16 +1441,37 @@ impl Game {
                         // Minecraft.usePortal(), reached from
                         // EntityPlayerSP.onLivingUpdate (EntityPlayerSP.java:59),
                         // whose head the player's update already ran
-                        // (player_fns::use_portal_head). The rest of the
-                        // player's update and of this tick run on the new
-                        // world when its terrain is in (Game::finish_load).
-                        self.use_portal_impl(false, Some(head));
+                        // (player_fns::use_portal_head): run next by
+                        // Game::use_requested_portal, once the shell has
+                        // started the sounds the update played first
+                        // (portal.travel, EntityPlayerSP.java:58). The rest
+                        // of the player's update and of this tick run on
+                        // the new world when its terrain is in
+                        // (Game::finish_load).
+                        self.portal_head = Some(head);
                         return;
                     }
                 }
                 self.run_tick_world_rest(paused);
             }
         }
+    }
+
+    /// Whether this tick's player update asked for `usePortal()` (its
+    /// head ran; [`Game::use_requested_portal`] runs the rest).
+    pub fn portal_due(&self) -> bool {
+        self.portal_head.is_some()
+    }
+
+    /// The rest of the `usePortal()` this tick's player update asked for
+    /// (the world change: it blocks for the save and the new world, then
+    /// the loading screen's frames follow). Returns whether there was one.
+    pub fn use_requested_portal(&mut self) -> bool {
+        let Some(head) = self.portal_head.take() else {
+            return false;
+        };
+        self.use_portal_impl(false, Some(head));
+        true
     }
 
     /// `runTick()` after `updateEntities`: `setAllowedMobSpawns`, `tick`,
@@ -2374,9 +2399,21 @@ fn run_tick(bw: &mut bevy::ecs::world::World) {
             run_hook(bw, RunTickHook::UpdateRenderer);
             run_hook(bw, RunTickHook::UpdateClouds);
         }
-        let go_on = {
+        let portal = {
             let mut g = bw.non_send_mut::<Game>();
             g.run_tick_world(WorldStage::Simulate);
+            g.portal_due()
+        };
+        if portal {
+            // EntityPlayerSP plays portal.travel, then calls usePortal
+            // (EntityPlayerSP.java:58-59): the sound starts before the world
+            // change blocks this frame (sound::play_client_sounds_now).
+            let sounds = std::mem::take(&mut bw.non_send_mut::<Game>().outbox.sounds);
+            crate::sound::play_client_sounds_now(bw, sounds);
+            bw.non_send_mut::<Game>().use_requested_portal();
+        }
+        let go_on = {
+            let g = bw.non_send::<Game>();
             g.pending.is_none() && g.the_world.is_some()
         };
         if go_on && !paused {
@@ -2635,6 +2672,7 @@ mod tests {
         if g.the_world.is_some() && g.pending.is_none() {
             g.run_tick_world(WorldStage::Begin);
             g.run_tick_world(WorldStage::Simulate);
+            g.use_requested_portal();
         }
         g.system_time = clock::current_time_millis();
     }

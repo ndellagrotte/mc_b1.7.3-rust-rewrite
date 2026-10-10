@@ -46,6 +46,7 @@ use bevy_kira_audio::{
 };
 use kira::sound::FromFileError;
 use kira::sound::PlaybackState as KiraState;
+use kira::sound::static_sound::StaticSoundHandle;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
 use mc_core::JavaRandom;
@@ -721,27 +722,7 @@ fn process_sound_messages(
         }
     }
     for s in client_sounds.read() {
-        match s {
-            ClientSound::PlaySound {
-                name,
-                x,
-                y,
-                z,
-                volume,
-                pitch,
-            } => m.play_sound(name, *x, *y, *z, *volume, *pitch),
-            ClientSound::PlaySoundFx {
-                name,
-                volume,
-                pitch,
-            } => m.play_sound_fx(name, *volume, *pitch),
-            // src: Minecraft.java:1274
-            ClientSound::StopStreaming => m.play_streaming(None, 0.0, 0.0, 0.0, 0.0, 0.0),
-            ClientSound::Listener { pose } => m.func_338_a(*pose),
-            ClientSound::PlayRandomMusicIfReady => m.play_random_music_if_ready(),
-            ClientSound::ForceReload => m.force_reload(&mut *game, &resources),
-            ClientSound::Close => m.close_minecraft(),
-        }
+        client_sound(m, &mut game, &resources, s);
     }
     let game = &*game;
     let dist = |x: f64, y: f64, z: f64| game.render_view().map(|e| e.base.get_distance_sq(x, y, z));
@@ -780,12 +761,79 @@ fn process_sound_messages(
     }
 }
 
+/// One of the shell's direct `sndManager` calls.
+fn client_sound(m: &mut SoundManager, game: &mut Game, resources: &ResourcesDir, s: &ClientSound) {
+    match s {
+        ClientSound::PlaySound {
+            name,
+            x,
+            y,
+            z,
+            volume,
+            pitch,
+        } => m.play_sound(name, *x, *y, *z, *volume, *pitch),
+        ClientSound::PlaySoundFx {
+            name,
+            volume,
+            pitch,
+        } => m.play_sound_fx(name, *volume, *pitch),
+        // src: Minecraft.java:1274
+        ClientSound::StopStreaming => m.play_streaming(None, 0.0, 0.0, 0.0, 0.0, 0.0),
+        ClientSound::Listener { pose } => m.func_338_a(*pose),
+        ClientSound::PlayRandomMusicIfReady => m.play_random_music_if_ready(),
+        ClientSound::ForceReload => m.force_reload(game, resources),
+        ClientSound::Close => m.close_minecraft(),
+    }
+}
+
+/// Plays the shell's sound calls at once, from inside the frame, instead of
+/// in this frame's `PostUpdate` (WP-4.9, PARITY_CHECKLIST P7). For a call
+/// made just before the main thread blocks: `EntityPlayerSP` plays
+/// `portal.travel` and then calls `usePortal`, so vanilla's sound starts
+/// before the world change and its loading screen
+/// (EntityPlayerSP.java:58-59); the port's world change blocks the frame
+/// that raised it for seconds. The calls go through the `SoundManager` as
+/// usual; the static plays among the library's commands start on kira's
+/// own audio thread ([`StreamOutput`]'s manager) rather than as
+/// `bevy_kira_audio` commands, which only `PostUpdate` would run. Later
+/// updates and stops reach them like any other play.
+pub fn play_client_sounds_now(bw: &mut World, sounds: Vec<ClientSound>) {
+    use bevy::ecs::system::RunSystemOnce;
+    if sounds.is_empty() || bw.get_resource::<SoundManager>().is_none() {
+        return;
+    }
+    let resources = bw.resource::<ResourcesDir>().clone();
+    bw.resource_scope(|bw, mut m: Mut<SoundManager>| {
+        let mut game = bw.non_send_mut::<Game>();
+        m.sync(&*game);
+        for s in &sounds {
+            client_sound(&mut m, &mut game, &resources, s);
+        }
+    });
+    let r = bw.run_system_once(
+        |m: ResMut<SoundManager>,
+         be: ResMut<KiraBackend>,
+         out: NonSendMut<StreamOutput>,
+         audio: Res<Audio>,
+         sources: ResMut<Assets<AudioSource>>,
+         instances: ResMut<Assets<AudioInstance>>| {
+            apply_commands(m, be, out, audio, sources, instances, true);
+        },
+    );
+    if let Err(e) = r {
+        warn!("sound: {e}");
+    }
+}
+
 /// A sound the backend has started (or is reading).
 struct Live {
     /// A static sound's `bevy_kira_audio` instance.
     instance: Option<Handle<AudioInstance>>,
     /// A streaming sound (music, records) on [`StreamOutput`]'s manager.
     stream: Option<StreamingSoundHandle<FromFileError>>,
+    /// A static sound started at once ([`play_client_sounds_now`]) on
+    /// [`StreamOutput`]'s manager.
+    direct: Option<StaticSoundHandle>,
     /// A streaming sound's file being read off the main thread.
     reading: Option<Task<Result<FileBytes, String>>>,
     mono: bool,
@@ -919,12 +967,26 @@ fn is_playing_state(s: &PlaybackState) -> bool {
 
 /// The library's commands into kira (module docs).
 fn apply_sound_commands(
+    m: ResMut<SoundManager>,
+    be: ResMut<KiraBackend>,
+    out: NonSendMut<StreamOutput>,
+    audio: Res<Audio>,
+    sources: ResMut<Assets<AudioSource>>,
+    instances: ResMut<Assets<AudioInstance>>,
+) {
+    apply_commands(m, be, out, audio, sources, instances, false);
+}
+
+/// [`apply_sound_commands`]; with `direct`, static plays start at once on
+/// [`StreamOutput`]'s manager ([`play_client_sounds_now`]).
+fn apply_commands(
     mut m: ResMut<SoundManager>,
     mut be: ResMut<KiraBackend>,
     mut out: NonSendMut<StreamOutput>,
     audio: Res<Audio>,
     mut sources: ResMut<Assets<AudioSource>>,
     mut instances: ResMut<Assets<AudioInstance>>,
+    direct: bool,
 ) {
     let log = m.log;
     let Some(lib) = m.snd_system.as_mut() else {
@@ -935,6 +997,12 @@ fn apply_sound_commands(
     // 1. ended sounds, the output check, updates left pending last frame
     let mut ended = Vec::new();
     for (&id, l) in be.live.iter_mut() {
+        if let Some(h) = l.direct.as_ref() {
+            if h.state() == KiraState::Stopped {
+                ended.push(id);
+            }
+            continue;
+        }
         if let Some(h) = l.stream.as_mut() {
             if let Some(e) = h.pop_error() {
                 warn!("sound: cannot decode {}: {e}", l.name);
@@ -1019,6 +1087,7 @@ fn apply_sound_commands(
                 }
                 let mut l = Live {
                     instance: None,
+                    direct: None,
                     stream: None,
                     reading: None,
                     mono: false,
@@ -1053,7 +1122,18 @@ fn apply_sound_commands(
                         continue;
                     };
                     l.mono = mono;
-                    l.instance = Some(start(&audio, h, &l));
+                    let started = if direct {
+                        sources
+                            .get(&h)
+                            .map(|a| a.sound.clone())
+                            .and_then(|data| start_direct(out, data, &l))
+                    } else {
+                        None
+                    };
+                    match started {
+                        Some(handle) => l.direct = Some(handle),
+                        None => l.instance = Some(start(&audio, h, &l)),
+                    }
                 }
                 be.live.insert(id, l);
             }
@@ -1062,6 +1142,11 @@ fn apply_sound_commands(
                     l.gain = gain;
                     l.pan = pan;
                     if let Some(s) = l.stream.as_mut() {
+                        s.set_volume(decibels(gain), Tween::default());
+                        if l.mono {
+                            s.set_panning(pan, Tween::default());
+                        }
+                    } else if let Some(s) = l.direct.as_mut() {
                         s.set_volume(decibels(gain), Tween::default());
                         if l.mono {
                             s.set_panning(pan, Tween::default());
@@ -1093,11 +1178,34 @@ fn apply_sound_commands(
                     {
                         i.stop(AudioTween::default());
                     }
+                    if let Some(s) = l.direct.as_mut() {
+                        s.stop(Tween::default());
+                    }
                     if log {
                         info!("sound: stop {}", l.name);
                     }
                 }
             }
+        }
+    }
+}
+
+/// Starts a static sound at once on [`StreamOutput`]'s manager with its
+/// current gain, pan and pitch (`None` without an output).
+fn start_direct(
+    out: &mut StreamOutput,
+    data: StaticSoundData,
+    l: &Live,
+) -> Option<StaticSoundHandle> {
+    let mut data = data.volume(decibels(l.gain)).playback_rate(l.pitch as f64);
+    if l.mono {
+        data = data.panning(l.pan);
+    }
+    match out.manager()?.play(data) {
+        Ok(h) => Some(h),
+        Err(e) => {
+            warn!("sound: cannot play {}: {e}", l.name);
+            None
         }
     }
 }
