@@ -803,6 +803,7 @@ pub fn run_script(
                     let v = json!({
                         "debug": fps_line,
                         "left": text.as_ref().map(|t| t.left.clone()),
+                        "right": text.as_ref().map(|t| t.right.clone()),
                         "renders": src.as_ref().map(|s| s.renders.clone()),
                         "terrain": stats.map(|s| json!({
                             "rebuilds_this_frame": s.rebuilds_this_frame,
