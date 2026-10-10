@@ -1131,7 +1131,12 @@ fn apply_commands(
                         None
                     };
                     match started {
-                        Some(handle) => l.direct = Some(handle),
+                        Some(handle) => {
+                            if log {
+                                info!("sound: {} started at once", l.name);
+                            }
+                            l.direct = Some(handle);
+                        }
                         None => l.instance = Some(start(&audio, h, &l)),
                     }
                 }

@@ -38,7 +38,16 @@
 //! phase ([`order::TRANSLUCENT`]), preceded with fancy graphics by its
 //! depth-only draw ([`order::TRANSLUCENT_DEPTH`]: vanilla draws pass 1 with
 //! `glColorMask(false…)` first, then again in colour, so only the nearest
-//! translucent surface shows, EntityRenderer.java:520-541). The mesh is in
+//! translucent surface shows, EntityRenderer.java:520-541). With fast
+//! graphics pass 1 is drawn once, blended with depth writes, so the order
+//! of the sections decides what shows through what: vanilla calls them
+//! nearest first, grouped by `RenderList` anchor
+//! ([`world_renderer::RenderGlobalTerrain::render_list_order`]); Bevy sorts
+//! the transparent phase back to front. Each fast-graphics pass-1 draw
+//! therefore has its own material whose sort bias is its place in
+//! vanilla's order ([`order::PASS1_STEP`]), set again whenever that order
+//! changes. With fancy graphics the depth-only draw makes the order
+//! irrelevant and one material serves every section. The mesh is in
 //! the section's coordinates under a `Transform` at the section, scaled by
 //! `1.000001` about its centre as the display list is
 //! (WorldRenderer.java:118-121). Bevy culls each entity against the camera;
@@ -95,9 +104,15 @@ pub mod order {
     /// Pass 1's depth-only draw (fancy graphics).
     // src: EntityRenderer.java:520-526
     pub const TRANSLUCENT_DEPTH: f32 = -0.8e6;
-    /// Pass 1.
+    /// Pass 1. With fast graphics each section's draw adds its place in
+    /// vanilla's call order times [`PASS1_STEP`] (module docs, "Entities").
     // src: EntityRenderer.java:527-545
     pub const TRANSLUCENT: f32 = -0.7e6;
+    /// The bias between two consecutive pass-1 sections (fast graphics):
+    /// more than any two sections' view-depth difference at Far (Bevy adds
+    /// the view depth of the mesh's centre to the bias), so the bias alone
+    /// orders them.
+    pub const PASS1_STEP: f32 = 1024.0;
     /// The crack overlay otherwise: after pass 1, before the selection box
     /// ([`crate::gl_material::order::SELECTION`]).
     // src: EntityRenderer.java:549-555
@@ -187,6 +202,9 @@ pub struct Terrain {
     render_end_nano_time: i64,
     /// The settings the grid was built with: fancy graphics, AO.
     built_with: Option<(bool, bool)>,
+    /// Fast graphics: each renderer's own pass-1 material and its sort
+    /// bias (module docs, "Entities").
+    pass1: Vec<Option<(Handle<TerrainMaterial>, f32)>>,
     /// A `loadRenderers` is due.
     reload: bool,
 }
@@ -216,8 +234,12 @@ impl Plugin for TerrainPlugin {
             .init_resource::<TerrainTileEntities>()
             .init_resource::<TerrainStats>()
             .add_systems(Startup, spawn_terrain_handles)
-            .add_systems(First, mark_render_end)
-            .add_systems(Last, power_saver_sleep.after(crate::perf::perf_frame_end))
+            .add_systems(
+                Last,
+                (power_saver_sleep, mark_render_end)
+                    .chain()
+                    .after(crate::perf::perf_frame_end),
+            )
             .add_systems(
                 Update,
                 (terrain_frame, draw_block_breaking, update_terrain_materials)
@@ -244,13 +266,19 @@ fn max_pending_jobs() -> usize {
 }
 
 /// `renderEndNanoTime = System.nanoTime()` (EntityRenderer.java:390):
-/// vanilla takes it when `renderWorld` returns, before the GUI and
-/// `Display.update`, and gives the next frame's `updateRenderers` until
-/// `1/120` or `1/40` s after it (EntityRenderer.java:364-378). Bevy presents
-/// with vsync after this app's systems ran, so the matching point is the
-/// start of the next frame, once the previous present returned: taken from
-/// the end of [`terrain_frame`] instead, the vsync wait would use up the
-/// budget and `updateRenderers` would run once a frame whatever the limit.
+/// vanilla takes it when `renderWorld` returns (after the Power saver
+/// sleep), before the GUI overlay and the next frame's `Display.update` and
+/// ticks, and gives the next frame's `updateRenderers` until `1/120` (or
+/// `1/40`) s after it (EntityRenderer.java:364-378). Here it is taken at the
+/// end of the frame (`Last`, after [`power_saver_sleep`]): the next frame's
+/// budget then holds what vanilla's holds, the wait for the GPU (Bevy's
+/// extract waits for the previous frame's render, as `Display.update`
+/// waits for the swap) and the ticks, but not the frame's own GUI, drawn
+/// after the world in both. (Until WP-4.9 it was taken at the next
+/// `First`, which kept the vsync wait out of the budget while vsync was
+/// the default; with `--vsync on` the wait now uses up the budget and
+/// `updateRenderers` runs about once a frame, as vanilla's would with the
+/// driver's vsync forced on.)
 // src: EntityRenderer.java:364-391
 pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
     terrain.render_end_nano_time = clock::nano_time();
@@ -263,9 +291,8 @@ pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
 /// (the default) and "Max" never sleep, so vanilla runs uncapped there
 /// (the window does not wait for the display either: b1.7.3 never turns
 /// LWJGL's vsync on). Vanilla sleeps before taking `renderEndNanoTime` and
-/// drawing the GUI; here the sleep ends the frame (`Last`) and the next
-/// `First` takes the time ([`mark_render_end`]), which gives the same
-/// period. The binary's `--vsync on` additionally waits for the display.
+/// drawing the GUI; here the sleep ends the frame (`Last`), right before
+/// [`mark_render_end`] takes the time, which gives the same period. The binary's `--vsync on` additionally waits for the display.
 // src: EntityRenderer.java:364-372, :381-391, :403-416
 pub fn power_saver_sleep(game: NonSend<Game>, terrain: Res<Terrain>) {
     let s = &game.game_settings;
@@ -348,6 +375,7 @@ impl Terrain {
                 commands.entity(e).despawn();
             }
         }
+        self.pass1.clear();
         self.pending.clear();
     }
 }
@@ -455,6 +483,11 @@ fn apply_section(
                         commands.entity(e).despawn();
                     }
                 }
+                if pass == 1
+                    && let Some(m) = t.pass1.get_mut(i)
+                {
+                    *m = None;
+                }
             }
         }
     }
@@ -476,6 +509,7 @@ pub fn terrain_frame(
     mut debug: ResMut<DebugSources>,
     mut tile_entities: ResMut<TerrainTileEntities>,
     mut vis: Query<&mut Visibility, With<SectionMesh>>,
+    mut materials: ResMut<Assets<TerrainMaterial>>,
 ) {
     let _perf = crate::perf::time(crate::perf::Phase::Terrain);
     let Some(handles) = handles else { return };
@@ -564,6 +598,7 @@ pub fn terrain_frame(
         t.clear_entities(&mut commands);
         t.global.load_renderers(rd, Some(view_pos));
         t.entities = vec![[None; 3]; t.global.world_renderers.len()];
+        t.pass1 = vec![None; t.global.world_renderers.len()];
         t.built_with = Some((fancy, ao));
     }
     match &mut t.template {
@@ -726,6 +761,9 @@ pub fn terrain_frame(
             }
         }
     }
+    if !fancy {
+        order_pass1(t, &handles, &mut materials, &mut commands);
+    }
     let line = t.global.get_debug_info_renders();
     if debug.renders != line {
         debug.renders = line;
@@ -740,6 +778,49 @@ pub fn terrain_frame(
     stats.drawn = [d0, d1];
     stats.to_update = t.global.world_renderers_to_update.len();
     stats.frame_nanos = (clock::nano_time() - frame_t0).max(0) as u64;
+}
+
+/// Fast graphics: gives each drawn pass-1 section the sort bias of its
+/// place in vanilla's call order (module docs, "Entities"), with its own
+/// material (a copy of the shared pass-1 material) where it has none yet.
+// src: RenderGlobal.java:529-587
+fn order_pass1(
+    t: &mut Terrain,
+    handles: &TerrainHandles,
+    materials: &mut Assets<TerrainMaterial>,
+    commands: &mut Commands,
+) {
+    let list = t.global.render_list_order(1);
+    // Compressed when the band would overflow into the crack's (never at
+    // the four render distances' section counts in practice).
+    let room = order::CRACK - order::TRANSLUCENT - order::PASS1_STEP;
+    let step = order::PASS1_STEP.min(room / list.len().max(1) as f32);
+    for (rank, &i) in list.iter().enumerate() {
+        let Some(e) = t.entities.get(i).and_then(|s| s[1]) else {
+            continue;
+        };
+        let bias = order::TRANSLUCENT + rank as f32 * step;
+        match t.pass1.get_mut(i) {
+            Some(Some((h, b))) => {
+                if *b != bias {
+                    *b = bias;
+                    if let Some(mut m) = materials.get_mut(&*h) {
+                        m.sort_bias = bias;
+                    }
+                }
+            }
+            Some(slot @ None) => {
+                let Some(mut m) = materials.get(&handles.translucent).cloned() else {
+                    continue;
+                };
+                m.sort_bias = bias;
+                let h = materials.add(m);
+                commands.entity(e).insert(MeshMaterial3d(h.clone()));
+                *slot = Some((h, bias));
+            }
+            None => {}
+        }
+    }
 }
 
 /// `drawBlockBreaking` at the frame's call site ([`crack`]).
@@ -827,6 +908,7 @@ pub fn update_terrain_materials(
     fog: Res<FogState>,
     textures: Res<Textures>,
     handles: Option<Res<TerrainHandles>>,
+    terrain: Res<Terrain>,
     mut materials: ResMut<Assets<TerrainMaterial>>,
 ) {
     let Some(handles) = handles else { return };
@@ -837,12 +919,14 @@ pub fn update_terrain_materials(
         Vec4::ZERO
     };
     let fog_c = Vec4::new(fog.color[0], fog.color[1], fog.color[2], 1.0);
-    for h in [
+    let shared = [
         &handles.opaque,
         &handles.translucent,
         &handles.translucent_depth,
         &handles.crack,
-    ] {
+    ];
+    let own = terrain.pass1.iter().flatten().map(|(h, _)| h);
+    for h in shared.into_iter().chain(own) {
         let changed = materials.get(h).is_some_and(|m| {
             m.params.fog != fog_v || m.params.fog_color != fog_c || m.texture != tex
         });

@@ -758,6 +758,41 @@ impl RenderGlobalTerrain {
         var6
     }
 
+    /// The order `sortAndRender(view, pass)` calls the pass's display lists
+    /// in (`renderSortedRenderers`): the drawn sections in
+    /// `sortedWorldRenderers` order (nearest first), each added to the
+    /// `RenderList` of its 1024-block anchor (`posXMinus`…; the last list
+    /// with that anchor, else a new one), the lists then called one after
+    /// another (`renderAllRenderLists`). Vanilla has four lists and would
+    /// throw on a fifth anchor, which no render distance reaches.
+    // src: RenderGlobal.java:529-587, RenderList.java:17-56
+    pub fn render_list_order(&self, pass: usize) -> Vec<usize> {
+        let mut anchors: Vec<[i32; 3]> = Vec::new();
+        let mut lists: Vec<Vec<usize>> = Vec::new();
+        for &i in &self.sorted_world_renderers {
+            let r = &self.world_renderers[i];
+            if !(r.draws_pass(pass) && (!self.occlusion_enabled || r.is_visible)) {
+                continue;
+            }
+            let mut var17 = None;
+            for (var18, a) in anchors.iter().enumerate() {
+                if *a == r.pos_minus {
+                    var17 = Some(var18);
+                }
+            }
+            let k = match var17 {
+                Some(k) => k,
+                None => {
+                    anchors.push(r.pos_minus);
+                    lists.push(Vec::new());
+                    anchors.len() - 1
+                }
+            };
+            lists[k].push(i);
+        }
+        lists.into_iter().flatten().collect()
+    }
+
     /// `getDebugInfoRenders()`: the F3 line.
     // src: RenderGlobal.java:309-311
     pub fn get_debug_info_renders(&self) -> String {
@@ -997,6 +1032,45 @@ mod tests {
         g.mark_block_and_neighbors_needs_update(40, 0, 40);
         let top = g.renderer_index(2, 7, 2);
         assert!(g.world_renderers_to_update.contains(&Some(top)));
+    }
+
+    #[test]
+    fn pass_one_lists_nearest_first_grouped_by_anchor() {
+        // A view by the x = 1024 anchor line: sections on both sides.
+        let view = [1020.0, 70.0, 500.0];
+        let mut g = RenderGlobalTerrain::new();
+        g.load_renderers(3, Some(view));
+        for r in &mut g.world_renderers {
+            r.is_in_frustum = true;
+            r.skip_render_pass = [false, r.pos_y != 64];
+        }
+        let order = g.render_list_order(1);
+        assert_eq!(order.len(), 25);
+        // the first list is the nearest section's anchor, then the other
+        let first = g.world_renderers[order[0]].pos_minus;
+        let split = order
+            .iter()
+            .position(|&i| g.world_renderers[i].pos_minus != first)
+            .unwrap();
+        assert!(
+            order[split..]
+                .iter()
+                .all(|&i| g.world_renderers[i].pos_minus != first)
+        );
+        // each list keeps sortedWorldRenderers' order
+        let pos = |i: usize| {
+            g.sorted_world_renderers
+                .iter()
+                .position(|&j| j == i)
+                .unwrap()
+        };
+        for part in [&order[..split], &order[split..]] {
+            assert!(part.windows(2).all(|w| pos(w[0]) < pos(w[1])));
+        }
+        // a section out of the frustum or without the pass is not drawn
+        g.world_renderers[order[0]].is_in_frustum = false;
+        assert_eq!(g.render_list_order(1).len(), 24);
+        assert!(g.render_list_order(0).len() == 200 - 1);
     }
 
     #[test]

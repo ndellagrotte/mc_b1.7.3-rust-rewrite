@@ -426,6 +426,7 @@ pub fn capture_frames(
     let line = serde_json::json!({
         "frame": n,
         "nanos": crate::clock::nano_time(),
+        "millis": crate::clock::current_time_millis(),
         "state": format!("{:?}", state.get()),
         "ticks_ran": game.ticks_ran,
         "loading": game.pending.is_some(),
