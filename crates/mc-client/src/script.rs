@@ -723,6 +723,9 @@ pub fn run_script(
                         .get_resource::<crate::perf::PerfStats>()
                         .map(|p| p.to_json());
                     let storage = crate::storage::StorageCounters::now().to_json();
+                    // WP-4.8: the simulation's gap counters.
+                    let gaps =
+                        gaps_json(w.get_non_send::<Game>().and_then(|g| g.the_world.as_ref()));
                     let v = json!({
                         "debug": fps_line,
                         "left": text.as_ref().map(|t| t.left.clone()),
@@ -739,6 +742,7 @@ pub fn run_script(
                         })),
                         "perf": perf,
                         "storage": storage,
+                        "gaps": gaps,
                     });
                     if let Some(d) = path.parent() {
                         let _ = std::fs::create_dir_all(d);
@@ -1086,6 +1090,78 @@ pub fn inventory_json(g: &Game) -> serde_json::Value {
 pub fn install(app: &mut App, script: Script) {
     app.insert_resource(ScriptRunner::new(script))
         .insert_resource(DeviceInput(false));
+}
+
+/// The `gaps` object of `dump_debug` (WP-4.8; Gate 2 R7's counters, seen
+/// from the shipping game): the open world's `World::skipped_systems` and
+/// `World::unimplemented_hits`, each `{name: times reached}` with sorted
+/// keys, since the world was created or loaded (a dimension change starts
+/// a new `World`); `null` with no world. Both stay empty unless the game
+/// reached a recorded gap (crates/mc-sim lib docs, "Untranscribed code";
+/// docs/DEFERRED_REVIEW.md §3.1 lists every site).
+pub fn gaps_json(world: Option<&mc_sim::world::World>) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+    let Some(w) = world else {
+        return Value::Null;
+    };
+    let obj = |m: &std::collections::BTreeMap<&'static str, u64>| {
+        Value::Object(
+            m.iter()
+                .map(|(k, v)| ((*k).to_string(), json!(v)))
+                .collect::<Map<_, _>>(),
+        )
+    };
+    json!({
+        "skipped_systems": obj(&w.skipped_systems.borrow()),
+        "unimplemented_hits": obj(&w.unimplemented_hits.borrow()),
+    })
+}
+
+#[cfg(test)]
+mod gaps_tests {
+    use super::gaps_json;
+    use mc_sim::save::NoSave;
+    use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
+    use mc_sim::world::provider::{Dimension, WorldProvider};
+    use mc_sim::world::{World, WorldEnvironment};
+    use serde_json::json;
+
+    #[test]
+    fn gaps_lists_both_counters_sorted_or_null() {
+        assert_eq!(gaps_json(None), serde_json::Value::Null);
+        let w = World::new(
+            Box::new(NoSave),
+            "t",
+            WorldProvider::new(Dimension::Surface),
+            1,
+            ChunkGenerator::Empty(EmptyChunkProvider),
+            WorldEnvironment {
+                rand_seed: 0,
+                field_9437_g: 0,
+                lock_timestamp: 0,
+            },
+        );
+        assert_eq!(
+            gaps_json(Some(&w)),
+            json!({"skipped_systems": {}, "unimplemented_hits": {}})
+        );
+        w.note_unimplemented("B.b");
+        w.note_unimplemented("A.a");
+        w.note_unimplemented("B.b");
+        w.skip("S.s");
+        let v = gaps_json(Some(&w));
+        assert_eq!(
+            v,
+            json!({"skipped_systems": {"S.s": 1}, "unimplemented_hits": {"A.a": 1, "B.b": 2}})
+        );
+        let keys: Vec<_> = v["unimplemented_hits"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
+        assert_eq!(keys, ["A.a", "B.b"]);
+    }
 }
 
 #[cfg(test)]

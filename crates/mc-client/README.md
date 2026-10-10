@@ -1165,6 +1165,13 @@ are drawn.
   writes on the calling thread, the write-behind queue's region writes:
   queued, coalesced, journaled, whole, unchanged, bytes, and the writer
   thread's time).
+- `dump_debug` also writes `gaps` (WP-4.8, a project addition): the open
+  world's `World::skipped_systems` and `World::unimplemented_hits` as
+  `{name: times reached}` objects with sorted keys (`null` with no world;
+  `script::gaps_json`). The counters belong to the `World`, so they start
+  at zero with each world the shell creates or loads (a dimension change
+  too). In normal play both stay empty; `docs/DEFERRED_REVIEW.md` §3.1 says
+  what each record means.
 - With F3 on, the right column gets four `[rust]` lines from row 5
   (y = 52) down, below the rows of the left column's five lines so no row
   holds both: `[rust] frame` and `[rust] update` (min/avg/p95/max of the
