@@ -39,9 +39,6 @@ pub struct TileEntityRef(pub u32);
 /// `TileEntity`'s mapping table.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TileEntityKindData {
-    /// A `TileEntity` whose subclass is not transcribed yet, with its Java
-    /// class name (none is left: every vanilla class has a variant).
-    Untranscribed(&'static str),
     /// `TileEntityFurnace` (`"Furnace"`).
     Furnace(TileEntityFurnace),
     /// `TileEntityChest` (`"Chest"`).
@@ -65,7 +62,6 @@ impl TileEntityKindData {
     pub fn java_class(&self) -> &'static str {
         use TileEntityKindData as K;
         match self {
-            K::Untranscribed(c) => c,
             K::Furnace(_) => "TileEntityFurnace",
             K::Chest(_) => "TileEntityChest",
             K::RecordPlayer(_) => "TileEntityRecordPlayer",

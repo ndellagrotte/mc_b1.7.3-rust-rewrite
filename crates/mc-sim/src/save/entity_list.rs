@@ -2,34 +2,16 @@
 //! as data, and `createEntityFromNBT` / `createEntityInWorld` for the
 //! entity kinds the port can construct.
 //!
-//! # Kinds the port cannot construct yet (recorded gap)
-//!
 //! `createEntityFromNBT` instantiates the class saved under `id` with its
 //! `(World)` constructor, then `readFromNBT`. The port's `(World)`
-//! constructors are the rows of [`CONSTRUCTORS`] (one line per class: a
-//! task that transcribes a constructor adds its row, and every caller —
-//! [`create_entity_in_world`], [`create_entity_from_nbt`],
+//! constructors are the rows of [`CONSTRUCTORS`] (one line per class; every
+//! caller — [`create_entity_in_world`], [`create_entity_from_nbt`],
 //! [`new_instance`] for `SpawnerAnimals`, the mob spawner, the golden
-//! driver's `spawn` op — picks it up). For the other names of the table,
-//! [`create_entity_from_nbt`] returns [`FromNbt::Gap`] (the classes still
-//! missing: [`missing_constructors`], empty since the WP-2.3 merges, so the
-//! path below is not reached by any stored id now):
-//!
-//! - the side effects the Java constructor has on the world are made: the
-//!   entity id is consumed (`Entity.nextEntityID++`, Entity.java:76) and,
-//!   for `EntityLiving` subclasses, `EntityLiving`'s four `Math.random()`
-//!   draws (EntityLiving.java:38, :63, :65, :66; no subclass constructor
-//!   draws `Math.random()`), so ids and the `Math.random()` stream stay
-//!   aligned with vanilla;
-//! - the gap is recorded in [`World::unimplemented_hits`] under a record
-//!   naming the class ([`EntityMapping::new_instance_gap`],
-//!   [`EntityMapping::from_nbt_gap`]);
-//! - the stored compound itself is kept by the chunk loader and written
-//!   back, unchanged, after the chunk's live entities when the chunk is
-//!   saved again ([`super::chunk_loader`]), so loading and re-saving a
-//!   world never loses a pig. Vanilla would have re-written the pig's
-//!   current state in its section's list order; the port writes the stored
-//!   state at the end of the list. Nothing ticks the entity meanwhile.
+//! driver's `spawn` op — picks it up). Every concrete class of [`MAPPINGS`]
+//! has its row since the WP-2.3 merges ([`missing_constructors`] is empty,
+//! which `tests/squid_spawning.rs` and `tests/golden_save.rs` assert); the
+//! gap path that kept the stored compound of an unconstructible class was
+//! removed as dead code by WP-4.8 (Gate 2 R4, DEFERRED_REVIEW §3.1 D).
 //!
 //! `"Mob"` maps the abstract `EntityLiving` (EntityList.java:87): its
 //! `newInstance` throws `InstantiationException`, caught, so vanilla skips
@@ -37,8 +19,6 @@
 //! no id consumed). The player is not in the table: `EntityPlayer`s are
 //! never saved in chunks (`getEntityString` is null, so `addEntityID`
 //! returns false, Entity.java:780-789).
-
-use mc_nbt::Tag;
 
 use super::SaveError;
 use super::nbt::{self as n, Compound};
@@ -65,7 +45,7 @@ use crate::entity::squid::new_entity_squid;
 use crate::entity::tnt_primed::new_entity_tnt_primed_empty;
 use crate::entity::wolf::new_entity_wolf;
 use crate::entity::zombie::new_entity_zombie;
-use crate::entity::{Entity, EntityBase, EntityKindData, LivingData, nbt as entity_nbt};
+use crate::entity::{Entity, EntityKindData, nbt as entity_nbt};
 use crate::world::World;
 
 /// One `addMapping(class, name, id)` row.
@@ -80,21 +60,12 @@ pub struct EntityMapping {
     /// Whether the class can be instantiated (`EntityLiving` is abstract).
     pub concrete: bool,
     /// Whether it extends `EntityLiving` (its constructor draws
-    /// `Math.random()`; module docs).
+    /// `Math.random()`, EntityLiving.java:38, :63, :65, :66).
     pub living: bool,
-    /// The [`World::unimplemented_hits`] record of a [`new_instance`] of
-    /// this class while the port has no `(World)` constructor for it
-    /// (names the class, so a fixture's hits say which constructor it
-    /// reached).
-    pub new_instance_gap: &'static str,
-    /// The record of a [`create_entity_from_nbt`] of this class while the
-    /// port has no `(World)` constructor for it. Starts with
-    /// `"EntityList.createEntityFromNBT"`.
-    pub from_nbt_gap: &'static str,
 }
 
 /// One `addMapping(class, name, id)` row: `row!(class, name, id, living)`
-/// for a concrete class, with its two gap records naming the class.
+/// for a concrete class.
 macro_rules! row {
     ($class:literal, $name:literal, $id:expr, $living:expr) => {
         row!($class, $name, $id, $living, true)
@@ -106,16 +77,6 @@ macro_rules! row {
             id: $id,
             concrete: $concrete,
             living: $living,
-            new_instance_gap: concat!(
-                "EntityList: the ",
-                $class,
-                "(World) constructor (Phase 2; SpawnerAnimals, TileEntityMobSpawner)"
-            ),
-            from_nbt_gap: concat!(
-                "EntityList.createEntityFromNBT: the ",
-                $class,
-                "(World) constructor and readFromNBT (Phase 2)"
-            ),
         }
     };
 }
@@ -178,12 +139,6 @@ pub fn get_entity_id(kind: &EntityKindData) -> Option<i32> {
 pub enum FromNbt {
     /// The entity, read from the compound (not in any list yet).
     Created(Box<Entity>),
-    /// A class the port cannot construct yet (module docs): its constructor's
-    /// world side effects were made; keep the compound.
-    Gap {
-        /// The Java class's simple name.
-        class: &'static str,
-    },
     /// No class (unknown id, or the abstract `"Mob"`): vanilla prints
     /// "Skipping Entity with id …" and drops it.
     Skipped,
@@ -254,8 +209,8 @@ pub fn constructor(class: &str) -> Option<Constructor> {
 }
 
 /// The `EntityList` names whose class is concrete but has no row in
-/// [`CONSTRUCTORS`] yet, in `MAPPINGS` order (the remaining gaps; empty
-/// once every entity constructor is transcribed).
+/// [`CONSTRUCTORS`], in `MAPPINGS` order: empty (every entity constructor
+/// is transcribed); kept as the invariant the tests assert.
 pub fn missing_constructors() -> Vec<&'static str> {
     MAPPINGS
         .iter()
@@ -275,39 +230,22 @@ fn construct(class: &str, world: &mut World) -> Option<Entity> {
     constructor(class).map(|f| f(world))
 }
 
-/// The world side effects of `new <class>(world)` for a class the port
-/// cannot construct (module docs), and the record `what` (one of `m`'s gap
-/// records, which name the class).
-fn construct_gap(m: &EntityMapping, world: &mut World, what: &'static str) {
-    // src: Entity.java:75-113 (the id), EntityLiving.java:6-68 (the draws)
-    let mut b = EntityBase::new(world);
-    if m.living {
-        let _ = LivingData::new(world, &mut b);
-    }
-    world.note_unimplemented(what);
-}
-
 /// `entityClass.getConstructor(World.class).newInstance(world)` for the
 /// concrete class `class` of [`MAPPINGS`] (`SpawnerAnimals` holds classes,
-/// not names: SpawnerAnimals.java:231, :329). `None` for a class the port
-/// cannot construct yet: the constructor's world side effects are made
-/// (module docs) and the gap is recorded.
+/// not names: SpawnerAnimals.java:231, :329). `None`, recorded, for a class
+/// outside `EntityList`'s table or without a constructor row (neither
+/// happens: the callers pass table classes, and every row exists).
 pub fn new_instance(class: &str, world: &mut World) -> Option<Entity> {
-    if let Some(e) = construct(class, world) {
-        return Some(e);
+    let e = construct(class, world);
+    if e.is_none() {
+        world.note_unimplemented("EntityList: a class outside EntityList's table");
     }
-    match by_class(class).filter(|m| m.concrete) {
-        Some(m) => construct_gap(m, world, m.new_instance_gap),
-        None => world.note_unimplemented("EntityList: a class outside EntityList's table"),
-    }
-    None
+    e
 }
 
 /// `EntityList.createEntityInWorld(name, world)`: a new entity of the class
-/// saved as `name`, `None` for an unknown name, the abstract `"Mob"`
-/// (`newInstance` throws `InstantiationException`, caught) or a class the
-/// port cannot construct yet (its constructor's side effects made, and
-/// recorded).
+/// saved as `name`, `None` for an unknown name or the abstract `"Mob"`
+/// (`newInstance` throws `InstantiationException`, caught).
 // src: EntityList.java:19-32
 pub fn create_entity_in_world(name: &str, world: &mut World) -> Option<Entity> {
     let m = by_name(name)?;
@@ -324,23 +262,14 @@ pub fn create_entity_in_world(name: &str, world: &mut World) -> Option<Entity> {
 // src: EntityList.java:34-53
 pub fn create_entity_from_nbt(c: &Compound, world: &mut World) -> Result<FromNbt, SaveError> {
     let name = n::get_string(c, "id")?;
-    let Some(m) = by_name(&name).filter(|m| m.concrete) else {
+    // Every concrete class has a constructor ([`missing_constructors`]).
+    let Some(mut e) = by_name(&name)
+        .filter(|m| m.concrete)
+        .and_then(|m| construct(m.class, world))
+    else {
         // src: EntityList.java:49 (stdout only)
         return Ok(FromNbt::Skipped);
     };
-    match construct(m.class, world) {
-        Some(mut e) => {
-            entity_nbt::read_from_nbt(&mut e, c, world)?; // src: EntityList.java:47
-            Ok(FromNbt::Created(Box::new(e)))
-        }
-        None => {
-            construct_gap(m, world, m.from_nbt_gap);
-            Ok(FromNbt::Gap { class: m.class })
-        }
-    }
-}
-
-/// The stored compound of a [`FromNbt::Gap`] entity, as kept for re-saving.
-pub fn preserved(c: &Compound) -> Tag {
-    Tag::Compound(c.clone())
+    entity_nbt::read_from_nbt(&mut e, c, world)?; // src: EntityList.java:47
+    Ok(FromNbt::Created(Box::new(e)))
 }

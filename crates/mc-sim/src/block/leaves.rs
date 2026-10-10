@@ -128,7 +128,7 @@ pub fn color_multiplier(world: &mut World, x: i32, y: i32, z: i32) -> i32 {
         let var6 = m.temperature[0];
         let var8 = m.humidity[0];
         let index = super::grass::colormap_index(var6, var8);
-        world.note_unimplemented("ColorizerFoliage.getFoliageColor");
+        // The headless colormap, as BlockGrass (super::grass module docs).
         super::grass::colormap_lookup(index)
     }
 }

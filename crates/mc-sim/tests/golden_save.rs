@@ -1177,9 +1177,9 @@ fn save_list_rename_delete() {
 }
 
 /// A stored entity of every concrete `EntityList` class is built since the
-/// WP-2.3 merges (`missing_constructors` is empty), so the `FromNbt::Gap`
-/// path (the constructor's side effects, the record, the compound kept and
-/// written back) is no longer reachable from a stored id. What stays: a
+/// WP-2.3 merges (`missing_constructors` is empty); the gap path (the
+/// constructor's side effects, the record, the compound kept and written
+/// back) was removed as dead code by WP-4.8. What stays: a
 /// stored cow (the class this test kept as a gap until WP-2.3a) is built
 /// and read (`Health` 7), and re-saved as itself; `"Mob"`, the abstract
 /// `EntityLiving`, is skipped (no id consumed) and dropped on re-save

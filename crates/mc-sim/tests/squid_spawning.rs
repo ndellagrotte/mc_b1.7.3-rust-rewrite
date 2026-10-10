@@ -178,16 +178,14 @@ fn water_mob_spawn_test_is_only_the_entity_check() {
     assert!(!dispatch::get_can_spawn_here(&mut s, &mut w));
 }
 
-/// Which `EntityList` names construct after this task, and which are still
-/// gaps. The integrator updated `MISSING` as the parallel mob tasks merged;
-/// it is empty since WP-2.3c's merge. Every constructor builds its own class, and
-/// `createEntityInWorld` of a missing class makes the constructor's side
-/// effects (one id, and `EntityLiving`'s four `Math.random()` draws).
+/// Every concrete `EntityList` name constructs (`MISSING` is empty since
+/// WP-2.3c's merge; WP-4.8 removed the gap path that a missing constructor
+/// took), and every constructor builds its own class.
 #[test]
 fn entity_list_constructors_and_gaps() {
     // Every concrete class constructs since WP-2.3a (the animals), WP-2.3b
-    // (the monsters) and WP-2.3c (the squid) merged; the gap branch below
-    // stays for a class added to MAPPINGS without a constructor.
+    // (the monsters) and WP-2.3c (the squid) merged; a class added to
+    // MAPPINGS without a constructor fails here.
     const CONSTRUCTS: &[&str] = &[
         "Arrow",
         "Snowball",
@@ -218,7 +216,6 @@ fn entity_list_constructors_and_gaps() {
     let mut w = world();
     for m in MAPPINGS.iter() {
         let id_before = w.next_entity_id;
-        let mut r = w.math_random.clone();
         let e = create_entity_in_world(m.name, &mut w);
         match m.name {
             "Mob" => {
@@ -231,22 +228,7 @@ fn entity_list_constructors_and_gaps() {
                 assert_eq!(entity_list::get_entity_string(&e.kind), Some(n));
                 assert_eq!(w.next_entity_id, id_before + 1);
             }
-            n => {
-                assert!(MISSING.contains(&n), "{n} in neither list");
-                assert!(e.is_none());
-                assert_eq!(w.next_entity_id, id_before + 1);
-                for _ in 0..4 {
-                    r.next_double();
-                }
-                assert_eq!(
-                    w.math_random.state(),
-                    r.state(),
-                    "{n}: EntityLiving's draws"
-                );
-                let gap = m.new_instance_gap;
-                assert!(gap.contains(&format!("the {}(World) constructor", m.class)));
-                assert_eq!(w.unimplemented_hits.borrow().get(gap), Some(&1));
-            }
+            n => panic!("{n} is concrete but has no constructor"),
         }
     }
     assert_eq!(CONSTRUCTORS.len(), CONSTRUCTS.len());

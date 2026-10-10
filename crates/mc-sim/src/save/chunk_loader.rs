@@ -26,9 +26,7 @@
 //!   the chunk, as it does after any loader exception.
 //! - **Entities** are built ([`super::entity_list`]) and filed in the chunk's
 //!   sections by id, and handed to the caller ([`LoadedChunk::entities`])
-//!   instead of living in the chunk's lists; entity classes the port cannot
-//!   construct yet are kept as compounds ([`LoadedChunk::preserved`]) and
-//!   written back by [`store_chunk_in_compound`] after the live ones.
+//!   instead of living in the chunk's lists.
 //! - **Tile entities** go to [`World::tile_entities`] and the chunk's map.
 //!   `Chunk.addTileEntity` reads the chunk's own block to decide whether the
 //!   tile entity is kept (Chunk.java:423-446); the chunk is not in the
@@ -59,23 +57,16 @@ pub struct LoadedChunk {
     /// order `Chunk.onChunkLoad` hands them to `World.addLoadedEntities`,
     /// Chunk.java:459-467).
     pub entities: Vec<Entity>,
-    /// Stored entity compounds of classes the port cannot construct yet
-    /// ([`super::entity_list`], "Kinds the port cannot construct yet"), in
-    /// list order.
-    pub preserved: Vec<Tag>,
 }
 
 /// `ChunkLoader.storeChunkInCompound(chunk, world, compound)`: the `Level`
 /// compound of `chunk` (taken out of the world's chunk map by the caller).
-/// Clears and recomputes `hasEntities`. `preserved` are the stored compounds
-/// of entities the port could not construct (written after the live ones;
-/// [`super::entity_list`]). `Err` only for the session lock check
-/// (`MinecraftException`).
+/// Clears and recomputes `hasEntities`. `Err` only for the session lock
+/// check (`MinecraftException`).
 // src: ChunkLoader.java:108-149
 pub fn store_chunk_in_compound(
     chunk: &mut Chunk,
     world: &mut World,
-    preserved: &[Tag],
 ) -> Result<Compound, SaveError> {
     world.check_session_lock()?; // src: ChunkLoader.java:109
     let mut var2 = Compound::new();
@@ -120,11 +111,6 @@ pub fn store_chunk_in_compound(
                 ),
             }
         }
-    }
-    // Not vanilla: the entities the port could not construct (module docs).
-    if !preserved.is_empty() {
-        chunk.has_entities = true;
-        var3.extend(preserved.iter().cloned());
     }
     n::set(&mut var2, "Entities", n::list_of(TagType::Compound, var3));
     // src: ChunkLoader.java:138-148 (chunkTileEntityMap.values(), HashMap order)
@@ -188,7 +174,6 @@ pub fn load_chunk_into_world_from_compound(
     // never true for arrays read from a compound (module docs); dead code.
 
     let mut entities = Vec::new();
-    let mut preserved = Vec::new();
     // src: ChunkLoader.java:176-186
     let var5 = n::get_tag_list(var1, "Entities")?;
     for t in var5 {
@@ -200,7 +185,6 @@ pub fn load_chunk_into_world_from_compound(
                 var4.add_entity(&mut e.base);
                 entities.push(*e);
             }
-            FromNbt::Gap { .. } => preserved.push(entity_list::preserved(var7)),
             FromNbt::Skipped => {}
         }
     }
@@ -237,7 +221,6 @@ pub fn load_chunk_into_world_from_compound(
     Ok(LoadedChunk {
         chunk: var4,
         entities: ordered,
-        preserved,
     })
 }
 

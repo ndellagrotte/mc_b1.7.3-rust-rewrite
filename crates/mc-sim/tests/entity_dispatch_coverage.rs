@@ -22,7 +22,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use mc_core::Vec3D;
 use mc_sim::entity::item::ItemData;
 use mc_sim::entity::player::new_entity_player_sp;
 use mc_sim::entity::{
@@ -379,9 +378,6 @@ const PROBES: &[(&str, Probe)] = &[
     ("getMountedYOffset", |w, e, _| {
         d::get_mounted_y_offset(e, w);
     }),
-    ("getShadowSize", |w, e, _| {
-        d::get_shadow_size(e, w);
-    }),
     ("getYOffset", |w, e, _| {
         d::get_y_offset(e, w);
     }),
@@ -399,12 +395,6 @@ const PROBES: &[(&str, Probe)] = &[
     }),
     ("isEntityInsideOpaqueBlock", |w, e, _| {
         d::is_entity_inside_opaque_block(e, w);
-    }),
-    ("isInRangeToRenderDist", |w, e, _| {
-        d::is_in_range_to_render_dist(e, w, 100.0);
-    }),
-    ("isInRangeToRenderVec3D", |w, e, _| {
-        d::is_in_range_to_render_vec3d(e, w, &Vec3D::create_vector(0.0, 64.0, 0.0));
     }),
     ("isInWater", |w, e, _| {
         d::is_in_water(e, w);

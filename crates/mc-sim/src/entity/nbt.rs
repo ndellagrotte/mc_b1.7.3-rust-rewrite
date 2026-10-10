@@ -31,10 +31,9 @@
 //! | `EntityPlayerSP` | EntityPlayerSP.java:98-101 | EntityPlayerSP.java:103-106 |
 //!
 //! Every entity class of the port has its level here (the squid, WP-2.3c,
-//! was the last). The read side's `match` keeps a fallback arm (recording
-//! `"Entity*.readEntityFromNBT"` in [`World::unimplemented_hits`]) for the
-//! kinds read and returned before it (painting, pig, sheep, wolf, creeper,
-//! slime, player), so it is never reached.
+//! was the last). The read side's `match` is exhaustive: the kinds read and
+//! returned before it (painting, pig, sheep, wolf, creeper, slime, player)
+//! have an empty arm (WP-4.8 removed the recorded fallback, Gate 2 R4).
 //!
 //! Compound children are in `BTreeMap` order (vanilla's `HashMap` order only
 //! shows in bytes, never compared, PLAN_v4 §4.3).
@@ -451,12 +450,14 @@ fn read_entity_from_nbt(e: &mut Entity, c: &Compound, world: &mut World) -> Resu
         // src: EntitySquid.java:30-32, EntityWaterMob.java:16-18 (`super`
         // only)
         K::Squid(l, ..) => read_living(l, c)?,
-        other => {
-            if let Some(l) = other.living_mut() {
-                read_living(l, c)?;
-            }
-            world.note_unimplemented("Entity*.readEntityFromNBT");
-        }
+        // Read and returned above.
+        K::Painting(..)
+        | K::Pig(..)
+        | K::Sheep(..)
+        | K::Wolf(..)
+        | K::Creeper(..)
+        | K::Slime(..)
+        | K::PlayerSp(..) => {}
     }
     Ok(())
 }

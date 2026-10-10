@@ -1,18 +1,11 @@
 //! `McRegionChunkLoader` (McRegionChunkLoader.java): the [`ChunkLoader`] of
 //! McRegion saves, over the [`SaveStore`]'s region cache.
 //!
-//! Besides the Java's one field (`worldDir`), the port's loader keeps the
-//! stored compounds of entities it could not construct, per chunk, so a
-//! re-save writes them back ([`super::entity_list`]). They are replaced
-//! whenever the chunk is read again.
-//!
 //! Errors: `loadChunk` lets the region and NBT exceptions out (the Java's
 //! `IOException`s, caught by `ChunkProvider.loadChunkFromFile`,
 //! ChunkProvider.java:88-91); `saveChunk` catches everything after its
 //! first session-lock check and prints it (McRegionChunkLoader.java:55-57):
 //! the port keeps it in [`McRegionChunkLoader::last_error`].
-
-use std::collections::BTreeMap;
 
 use mc_nbt::Tag;
 
@@ -29,9 +22,6 @@ pub struct McRegionChunkLoader {
     store: SharedSaveStore,
     /// `worldDir`: the storage path of the world (or `DIM-1`) directory.
     world_dir: String,
-    /// Stored compounds of entities the port cannot construct yet, by chunk
-    /// position (module docs).
-    preserved: BTreeMap<(i32, i32), Vec<Tag>>,
     /// The last exception `saveChunk` caught and printed.
     pub last_error: Option<SaveError>,
 }
@@ -43,7 +33,6 @@ impl McRegionChunkLoader {
         McRegionChunkLoader {
             store,
             world_dir: world_dir.to_string(),
-            preserved: BTreeMap::new(),
             last_error: None,
         }
     }
@@ -51,11 +40,6 @@ impl McRegionChunkLoader {
     /// `worldDir`.
     pub fn world_dir(&self) -> &str {
         &self.world_dir
-    }
-
-    /// The stored entity compounds kept for chunk `(x, z)` (module docs).
-    pub fn preserved_entities(&self, x: i32, z: i32) -> &[Tag] {
-        self.preserved.get(&(x, z)).map_or(&[], Vec::as_slice)
     }
 
     /// The chunk's stored NBT (`RegionFileCache.getChunkInputStream` then
@@ -90,9 +74,8 @@ impl McRegionChunkLoader {
     /// The body of `saveChunk` inside its `try` (McRegionChunkLoader.java:46-54).
     fn save_chunk_body(&mut self, world: &mut World, chunk: &mut Chunk) -> Result<(), SaveError> {
         let key = (chunk.x_position, chunk.z_position);
-        let preserved = self.preserved.get(&key).cloned().unwrap_or_default();
         // src: McRegionChunkLoader.java:47-50
-        let var5 = chunk_loader::store_chunk_in_compound(chunk, world, &preserved)?;
+        let var5 = chunk_loader::store_chunk_in_compound(chunk, world)?;
         let mut var4 = n::Compound::new();
         n::set(&mut var4, "Level", Tag::Compound(var5));
         // src: McRegionChunkLoader.java:51 (CompressedStreamTools.write: the root named "")
@@ -154,10 +137,6 @@ impl ChunkLoader for McRegionChunkLoader {
             chunk_loader::discard(world, std::mem::replace(&mut var6, again));
         }
         chunk_loader::remove_unknown_blocks(&mut var6.chunk); // src: McRegionChunkLoader.java:34
-        self.preserved.insert(
-            (var6.chunk.x_position, var6.chunk.z_position),
-            var6.preserved.clone(),
-        );
         Ok(Some(var6))
     }
 

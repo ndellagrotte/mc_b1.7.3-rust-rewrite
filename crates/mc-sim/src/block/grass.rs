@@ -9,8 +9,12 @@
 //! installs from `misc/grasscolor.png` of the user's jar
 //! (`ColorizerGrass.setGrassBiomeColorizer`, D8, Phase 3). The simulation has
 //! no colormap: the lookup answers what Java's `new int[65536]` holds before
-//! the client sets it (0, which is also what the headless oracle sees) and
-//! records `"ColorizerGrass.getGrassColor"`.
+//! the client sets it (0, which is also what the headless oracle sees). That
+//! is the whole of the Java body for a world without a client, so nothing is
+//! recorded (WP-4.8; it recorded `"ColorizerGrass.getGrassColor"` before).
+//! The shipping client never calls this: it tints with its own copy and the
+//! jar's colormaps (`mc-client` `terrain::blocks::color_multiplier`,
+//! `particles::subclasses::block_color_multiplier`, `textures::Colorizers`).
 
 use super::dispatch::RandomSource;
 use super::{Material, ids};
@@ -85,7 +89,6 @@ pub(super) fn biome_grass_color(world: &mut World, x: i32, z: i32) -> i32 {
     let var5 = m.temperature[0];
     let var7 = m.humidity[0];
     let index = colormap_index(var5, var7);
-    world.note_unimplemented("ColorizerGrass.getGrassColor");
     colormap_lookup(index)
 }
 

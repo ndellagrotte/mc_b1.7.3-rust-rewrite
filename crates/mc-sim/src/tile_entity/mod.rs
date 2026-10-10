@@ -19,7 +19,7 @@
 //! | `TileEntityRecordPlayer` | [`record_player`] | base |
 //! | `TileEntityDispenser` | [`dispenser`] | base |
 //! | `TileEntitySign` | [`sign`] | base |
-//! | `TileEntityMobSpawner` | [`mob_spawner`] | spawning (mob constructors are WP-2.3, recorded) |
+//! | `TileEntityMobSpawner` | [`mob_spawner`] | spawning |
 //! | `TileEntityNote` | [`note`] | base |
 //! | `TileEntityPiston` | [`crate::world::tile_entity`] (pistons, WP-1.6) | the move |
 //!
@@ -190,14 +190,14 @@ pub fn write_base_to_nbt(te: &TileEntity, c: &mut BTreeMap<String, Tag>) {
 }
 
 /// `tileEntity.writeToNBT(new NBTTagCompound())`, dispatched on the class
-/// (each subclass calls `super.writeToNBT` first). `world` only records an
-/// untranscribed class's body.
+/// (each subclass calls `super.writeToNBT` first). Every vanilla subclass
+/// is transcribed; `world` is kept for the callers' signature.
 pub fn write_to_nbt(te: &TileEntity, world: &World) -> Tag {
+    let _ = world;
     let mut c = BTreeMap::new();
     write_base_to_nbt(te, &mut c);
     use TileEntityKindData as K;
     match &te.kind {
-        K::Untranscribed(_) => world.note_unimplemented("TileEntity*.writeToNBT"),
         K::Furnace(d) => d.write_to_nbt(&mut c),
         K::Chest(d) => d.write_to_nbt(&mut c),
         K::RecordPlayer(d) => d.write_to_nbt(&mut c),
@@ -252,12 +252,15 @@ pub fn create_and_load_entity(
     Ok(Some(te))
 }
 
-/// `tileEntity.readFromNBT(compound)`, dispatched on the class.
+/// `tileEntity.readFromNBT(compound)`, dispatched on the class (every
+/// vanilla subclass is transcribed; `world` is kept for the callers'
+/// signature).
 pub fn read_from_nbt(
     te: &mut TileEntity,
     c: &BTreeMap<String, Tag>,
     world: &World,
 ) -> Result<(), JavaException> {
+    let _ = world;
     use TileEntityKindData as K;
     if let K::Sign(d) = &mut te.kind {
         // src: TileEntitySign.java:16-17: the flag is cleared before super.readFromNBT.
@@ -265,10 +268,6 @@ pub fn read_from_nbt(
     }
     read_base_from_nbt(te, c)?;
     match &mut te.kind {
-        K::Untranscribed(_) => {
-            world.note_unimplemented("TileEntity*.readFromNBT");
-            Ok(())
-        }
         K::Furnace(d) => d.read_from_nbt(c),
         K::Chest(d) => d.read_from_nbt(c),
         K::RecordPlayer(d) => d.read_from_nbt(c),
@@ -294,7 +293,6 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
     };
     use TileEntityKindData as K;
     match t.kind {
-        K::Untranscribed(_) => world.note_unimplemented("TileEntity*.updateEntity"),
         // src: TileEntityFurnace.java:105-147
         K::Furnace(_) => furnace::update_entity(world, r),
         // src: TileEntityMobSpawner.java:25-87

@@ -47,8 +47,8 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
     // src: EntityArrow.java:86-233, :257-266 (super::arrow; the pickup
     // completed in WP-2.H)
     ("EntityArrow", &["onCollideWithPlayer", "onUpdate"]),
-    // src: EntityBoat.java:29-31, :36-46, :59-61, :63-316, :318-324, :332-346
-    // (super::boat)
+    // src: EntityBoat.java:29-31, :36-46, :59-61, :63-316, :318-324, :336-346
+    // (super::boat; getShadowSize, :332-334, is mc-client's: NOT_DISPATCHED)
     (
         "EntityBoat",
         &[
@@ -59,7 +59,6 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "getBoundingBox",
             "getCollisionBox",
             "getMountedYOffset",
-            "getShadowSize",
             "interact",
             "onUpdate",
             "performHurtAnimation",
@@ -130,8 +129,9 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "updateRidden",
         ],
     ),
-    // src: EntityMinecart.java:38-55, :69-495, :642-714, :763-809
-    // (super::minecart)
+    // src: EntityMinecart.java:38-55, :69-495, :646-714, :763-809
+    // (super::minecart; getShadowSize, :642-644, is mc-client's:
+    // NOT_DISPATCHED)
     (
         "EntityMinecart",
         &[
@@ -143,7 +143,6 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
             "getBoundingBox",
             "getCollisionBox",
             "getMountedYOffset",
-            "getShadowSize",
             "interact",
             "onUpdate",
             "performHurtAnimation",
@@ -251,6 +250,18 @@ pub const NOT_DISPATCHED: &[(&str, &str)] = &[
     (
         "updateCloak",
         "EntityPlayer's override builds an online cloak URL (EntityPlayer.java:135-138): out of scope, D2",
+    ),
+    (
+        "getShadowSize",
+        "render data: mc-client render/shadow.rs (get_shadow_size, every override); Entity's body is base::get_shadow_size (WP-4.8)",
+    ),
+    (
+        "isInRangeToRenderDist",
+        "render data: mc-client render/mod.rs (is_in_range_to_render_vec3d, the Egg/Fireball/Fish/Snowball overrides); Entity's body is base::is_in_range_to_render_dist (WP-4.8)",
+    ),
+    (
+        "isInRangeToRenderVec3D",
+        "render data: mc-client render/mod.rs (is_in_range_to_render_vec3d, the LightningBolt override); Entity's body is base::is_in_range_to_render_vec3d (WP-4.8)",
     ),
 ];
 
@@ -658,28 +669,6 @@ pub fn add_to_player_score(e: &mut Entity, world: &mut World, victim: &Entity, s
     // src: Entity.java:759-760 (empty)
 }
 
-/// `isInRangeToRenderVec3D(v)`.
-pub fn is_in_range_to_render_vec3d(e: &Entity, world: &World, v: &Vec3D) -> bool {
-    if let K::LightningBolt(..) = e.kind {
-        world.note_unimplemented("EntityLightningBolt.isInRangeToRenderVec3D");
-    }
-    // src: Entity.java:762-768
-    base::is_in_range_to_render_vec3d(e, world, v)
-}
-
-/// `isInRangeToRenderDist(distSq)`.
-pub fn is_in_range_to_render_dist(e: &Entity, world: &World, dist_sq: f64) -> bool {
-    match e.kind {
-        K::Egg(..) => world.note_unimplemented("EntityEgg.isInRangeToRenderDist"),
-        K::Fireball(..) => world.note_unimplemented("EntityFireball.isInRangeToRenderDist"),
-        K::Fish(..) => world.note_unimplemented("EntityFish.isInRangeToRenderDist"),
-        K::Snowball(..) => world.note_unimplemented("EntitySnowball.isInRangeToRenderDist"),
-        _ => {}
-    }
-    // src: Entity.java:770-774
-    base::is_in_range_to_render_dist(e, dist_sq)
-}
-
 /// `getEntityTexture()` (render): the texture path, `None` for Java's
 /// `null`.
 pub fn get_entity_texture(e: &Entity, world: &World) -> Option<&'static str> {
@@ -694,24 +683,6 @@ pub fn get_entity_texture(e: &Entity, world: &World) -> Option<&'static str> {
         // src: Entity.java:776-778
         None => None,
     }
-}
-
-/// `getShadowSize()` (render).
-pub fn get_shadow_size(e: &Entity, world: &World) -> f32 {
-    match e.kind {
-        K::Arrow(..) => world.note_unimplemented("EntityArrow.getShadowSize"),
-        // src: EntityBoat.java:332-334, EntityMinecart.java:642-644
-        K::Boat(..) | K::Minecart(..) => return 0.0,
-        K::Egg(..) => world.note_unimplemented("EntityEgg.getShadowSize"),
-        K::FallingSand(..) => world.note_unimplemented("EntityFallingSand.getShadowSize"),
-        K::Fireball(..) => world.note_unimplemented("EntityFireball.getShadowSize"),
-        K::Fish(..) => world.note_unimplemented("EntityFish.getShadowSize"),
-        K::Snowball(..) => world.note_unimplemented("EntitySnowball.getShadowSize"),
-        K::TntPrimed(..) => world.note_unimplemented("EntityTNTPrimed.getShadowSize"),
-        _ => {}
-    }
-    // src: Entity.java:869-871
-    base::get_shadow_size(e)
 }
 
 /// `isEntityInsideOpaqueBlock()`.

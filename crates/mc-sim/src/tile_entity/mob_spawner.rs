@@ -2,11 +2,9 @@
 //! 16 blocks, counts `delay` down and then tries to spawn four mobs.
 //!
 //! The mobs are `EntityList.createEntityInWorld(mobID, world)`
-//! ([`entity_list::create_entity_in_world`]). For a mob whose `(World)`
-//! constructor the port does not have yet, `createEntityInWorld` makes the
-//! constructor's world side effects (entity id, `Math.random()` draws),
-//! records the gap and answers `None`, and the update returns as Java does
-//! for an unknown id; from that attempt on it diverges from vanilla.
+//! ([`entity_list::create_entity_in_world`]); every `EntityList` class has
+//! its `(World)` constructor ([`entity_list::missing_constructors`] is
+//! empty).
 
 use std::collections::BTreeMap;
 
@@ -151,8 +149,7 @@ pub fn update_entity(world: &mut World, r: TileEntityRef) {
             // `var9 == null`: an id EntityList does not know, or "Mob", the
             // abstract `EntityLiving` (`newInstance` throws
             // `InstantiationException`, caught by createEntityInWorld,
-            // EntityList.java:27-29), or a class the port cannot construct
-            // yet (recorded by entity_list).
+            // EntityList.java:27-29).
             // src: TileEntityMobSpawner.java:51-54
             let Some(mut var9) = entity_list::create_entity_in_world(&mob_id, world) else {
                 return;

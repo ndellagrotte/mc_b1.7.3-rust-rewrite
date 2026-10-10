@@ -170,13 +170,12 @@ fn render_colours() {
     // Dead shrub (tall grass meta 0) is white.
     w.set_block_and_metadata(3, 61, 3, 31, 0);
     assert_eq!(d::color_multiplier(&mut w, 31, 3, 61, 3), 16777215);
-    // The grass and foliage colormaps are client textures: nothing installed.
+    // The grass and foliage colormaps are client textures: nothing installed,
+    // so the headless Java's 0, and nothing recorded (WP-4.8).
     assert_eq!(d::color_multiplier(&mut w, 2, 3, 60, 3), 0);
-    assert!(
-        w.unimplemented_hits
-            .borrow()
-            .contains_key("ColorizerGrass.getGrassColor")
-    );
+    w.set_block_and_metadata(4, 61, 4, 18, 0);
+    assert_eq!(d::color_multiplier(&mut w, 18, 4, 61, 4), 0);
+    assert!(w.unimplemented_hits.borrow().is_empty());
 }
 
 #[test]

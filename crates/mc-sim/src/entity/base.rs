@@ -49,11 +49,11 @@
 //! | 736-744 | `addVelocity`, `setBeenAttacked` | transcribed | [`EntityBase::add_velocity`] (dispatched), [`EntityBase::set_been_attacked`] |
 //! | 746-757 | `attackEntityFrom`, `canBeCollidedWith`, `canBePushed` | transcribed | [`attack_entity_from`], dispatched |
 //! | 759-760 | `addToPlayerScore` | empty body | dispatched |
-//! | 762-774 | `isInRangeToRenderVec3D`, `isInRangeToRenderDist` | transcribed (WP-2.1, render data) | [`is_in_range_to_render_vec3d`], [`is_in_range_to_render_dist`], dispatched |
+//! | 762-774 | `isInRangeToRenderVec3D`, `isInRangeToRenderDist` | transcribed (WP-2.1, render data) | [`is_in_range_to_render_vec3d`], [`is_in_range_to_render_dist`]; the overrides are mc-client's (not dispatched, WP-4.8) |
 //! | 776-778 | `getEntityTexture` | base `null` | dispatched |
 //! | 780-841 | `addEntityID`, `writeToNBT`, `readFromNBT`, `getEntityString`, the abstract NBT pair | transcribed (WP-1.9b) | [`super::nbt`] |
 //! | 843-867 | `newDoubleNBTList`, `newFloatNBTList` | transcribed, verified (WP-2.1) | [`super::nbt`] |
-//! | 869-871 | `getShadowSize` | transcribed (WP-2.1, render data) | [`get_shadow_size`], dispatched |
+//! | 869-871 | `getShadowSize` | transcribed (WP-2.1, render data) | [`get_shadow_size`]; the overrides are mc-client's (not dispatched, WP-4.8) |
 //! | 873-886 | `dropItem`, `dropItemWithOffset`, `entityDropItem` | transcribed | [`drop_item`], [`drop_item_with_offset`], [`entity_drop_item`] |
 //! | 888-890 | `isEntityAlive` | transcribed | dispatched |
 //! | 892-906 | `isEntityInsideOpaqueBlock` | transcribed (WP-2.1) | [`is_entity_inside_opaque_block`], dispatched |
@@ -1411,15 +1411,20 @@ pub fn apply_entity_collision(e: &mut Entity, world: &mut World, other: &mut Ent
     }
 }
 
-/// `isInRangeToRenderVec3D(v)`: the squared distance to `v` against the
-/// virtual `isInRangeToRenderDist`.
+/// `Entity.isInRangeToRenderVec3D(v)`: the squared distance to `v` against
+/// `isInRangeToRenderDist`, Entity's body for both. The overrides
+/// (`EntityLightningBolt`'s, and `isInRangeToRenderDist`'s of the egg,
+/// fireball, fish hook and snowball) are render data the client implements
+/// (`mc-client` `render::is_in_range_to_render_vec3d`); the simulation never
+/// calls these on a tick path ([`dispatch::NOT_DISPATCHED`]).
 // src: Entity.java:762-768
 pub fn is_in_range_to_render_vec3d(e: &Entity, world: &World, v: &mc_core::Vec3D) -> bool {
+    let _ = world;
     let var2 = e.base.pos_x - v.x_coord;
     let var4 = e.base.pos_y - v.y_coord;
     let var6 = e.base.pos_z - v.z_coord;
     let var8 = var2 * var2 + var4 * var4 + var6 * var6;
-    dispatch::is_in_range_to_render_dist(e, world, var8)
+    is_in_range_to_render_dist(e, var8)
 }
 
 /// `Entity.isInRangeToRenderDist(distSq)`: within 64 × the box's average edge
@@ -1431,7 +1436,9 @@ pub fn is_in_range_to_render_dist(e: &Entity, var1: f64) -> bool {
     var1 < var3 * var3
 }
 
-/// `Entity.getShadowSize()`: half the height.
+/// `Entity.getShadowSize()`: half the height. The overrides are render data
+/// the client implements (`mc-client` `render::shadow::get_shadow_size`;
+/// [`dispatch::NOT_DISPATCHED`]).
 // src: Entity.java:869-871
 pub fn get_shadow_size(e: &Entity) -> f32 {
     e.base.height / 2.0

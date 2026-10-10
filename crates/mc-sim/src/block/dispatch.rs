@@ -675,11 +675,6 @@ pub const DATA_METHODS: &[&str] = &[
     "tickRate",
 ];
 
-/// Records an untranscribed override that was reached.
-fn untranscribed(world: &World, what: &'static str) {
-    world.note_unimplemented(what);
-}
-
 /// `tickRate()`; fully transcribed ([`super::tick_rate`]). 10 for an empty id.
 // src: Block.java:309-311
 pub fn tick_rate(id: i32) -> i32 {
@@ -1067,7 +1062,7 @@ pub fn get_colliding_bounding_boxes(
 ) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockPistonBase.java:207-210
         K::PistonBase { .. } => {
             return super::piston_base::get_colliding_bounding_boxes(
@@ -1084,10 +1079,7 @@ pub fn get_colliding_bounding_boxes(
         K::Stairs { .. } => {
             return super::stairs::get_colliding_bounding_boxes(world, id, x, y, z, mask, list);
         }
-        _ => None,
-    };
-    if let Some(what) = what {
-        untranscribed(world, what);
+        _ => {}
     }
     if let Some(var7) = get_collision_bounding_box_from_pool(world, id, x, y, z)
         && mask.intersects_with(&var7)
@@ -1101,7 +1093,7 @@ pub fn get_colliding_bounding_boxes(
 pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) -> bool {
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockFlower.java:14-16
         K::Sapling | K::TallGrass | K::DeadBush | K::Flower | K::Mushroom | K::Crops => {
             return super::flower::can_place_block_at(world, id, x, y, z);
@@ -1154,10 +1146,7 @@ pub fn can_place_block_at(world: &mut World, id: i32, x: i32, y: i32, z: i32) ->
         K::RedstoneRepeater { .. } => return super::repeater::can_place_block_at(world, x, y, z),
         // src: BlockLockedChest.java:52-54
         K::LockedChest => return super::locked_chest::can_place_block_at(),
-        _ => None,
-    };
-    if let Some(what) = what {
-        untranscribed(world, what);
+        _ => {}
     }
     base_can_place_block_at(world, x, y, z)
 }
@@ -1182,7 +1171,7 @@ pub fn can_place_block_on_side(
 ) -> bool {
     let Some(b) = block(id) else { return false };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockPistonExtension.java:70-72
         K::PistonExtension => return super::piston_extension::can_place_block_on_side(),
         // src: BlockPistonMoving.java:32-34
@@ -1193,10 +1182,7 @@ pub fn can_place_block_on_side(
         K::Button => return super::button::can_place_block_on_side(world, x, y, z, side),
         // src: BlockTrapDoor.java:154-178
         K::TrapDoor => return super::trap_door::can_place_block_on_side(world, x, y, z, side),
-        _ => None,
-    };
-    if let Some(what) = what {
-        untranscribed(world, what);
+        _ => {}
     }
     can_place_block_at(world, id, x, y, z)
 }
@@ -1526,34 +1512,27 @@ pub fn collision_ray_trace(
 ) -> Option<crate::world::ray_trace::MovingObjectPosition> {
     let b = block(id)?;
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockDoor.java:179-182 (bounds from the state, then super)
         K::Door => {
             super::door::set_block_bounds_based_on_state(world, id, x, y, z);
-            None
         }
         // src: BlockRail.java:35-38: setBlockBoundsBasedOnState, then
         // `super.collisionRayTrace` (the base body below, which sets the
         // bounds once more, Block.java:376)
         K::Rail { .. } | K::DetectorRail => {
             super::rail::set_block_bounds_based_on_state(world, id, x, y, z);
-            None
         }
         // src: BlockTrapDoor.java:128-131 (bounds from the metadata, then super)
         K::TrapDoor => {
             super::trap_door::set_block_bounds_based_on_state(world, id, x, y, z);
-            None
         }
         // src: BlockTorch.java:136-153: the bounds for the metadata, then
         // `super.collisionRayTrace` (the base below)
         K::Torch | K::RedstoneTorch { .. } => {
             super::torch::set_bounds_for_ray_trace(world, id, x, y, z);
-            None
         }
-        _ => None,
-    };
-    if let Some(what) = what {
-        untranscribed(world, what);
+        _ => {}
     }
     base_collision_ray_trace(world, id, x, y, z, start, end)
 }
@@ -1945,13 +1924,12 @@ pub fn drop_block_as_item_with_chance(
 ) {
     let Some(b) = block(id) else { return };
     use BlockKind as K;
-    let what = match b.kind {
+    match b.kind {
         // src: BlockBed.java:194-199: Block's body unless isBlockFootOfBed
         K::Bed => {
             if super::bed::is_block_foot_of_bed(meta) {
                 return;
             }
-            None
         }
         // src: BlockPistonMoving.java:61-68
         K::PistonMoving => {
@@ -1971,12 +1949,8 @@ pub fn drop_block_as_item_with_chance(
             if world.multiplayer_world {
                 return;
             }
-            None
         }
-        _ => None,
-    };
-    if let Some(what) = what {
-        untranscribed(world, what);
+        _ => {}
     }
     if !world.multiplayer_world {
         let var7 = super::quantity_dropped(b, &mut world.rand);
