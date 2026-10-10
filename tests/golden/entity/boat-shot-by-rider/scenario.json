@@ -1,0 +1,13 @@
+{"name":"boat-shot-by-rider","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":25,"mob_spawning":"none",
+ "comment":"WP-4.8 review. The pool of entity/boat-broken-by-rider: the player (id 0, bow in slot 0 and arrows in slot 1, looking straight down) gets into the boat (id 1) with the interact op at t = 5, then shoots the boat it rides with the bow at t = 8 and t = 12 (use_item on the water below: no onItemUse, so sendUseItem, ItemBow.onItemRightClick). Each arrow hits the boat (the shooter is skipped while ticksInAir < 5) with attackEntityFrom(this.owner, 4) (EntityArrow.java:163): 40 boat damage, so the second passes 40 and EntityBoat.attackEntityFrom puts the rider off with riddenByEntity.mountEntity(this) (on top of the boat, Entity.java:992-995) before the drops and setEntityDead (EntityBoat.java:69-84). The port's arrow passes a copy of its shooter while the rider is in its slot: the boat must dismount it there. entity_state of the player and the boat and rng_state every tick.",
+ "ops":[{"t":0,"op":"preload","cx":0,"cz":0,"radius":3},
+        {"t":0,"op":"fill","x0":-7,"y0":57,"z0":-7,"x1":6,"y1":61,"z1":6,"id":1},
+        {"t":0,"op":"fill","x0":-5,"y0":58,"z0":-5,"x1":4,"y1":61,"z1":4,"id":0},
+        {"t":0,"op":"fill","x0":-5,"y0":58,"z0":-5,"x1":4,"y1":60,"z1":4,"id":9},
+        {"t":0,"op":"player","x":"0xc01a000000000000","y":62,"z":"0x3fe0000000000000","yaw":0,"pitch":90,"inventory":[{"slot":0,"id":261,"count":1},{"slot":1,"id":262,"count":10}]},
+        {"t":0,"op":"spawn","kind":"Boat","pos":["0xc00c000000000000",60,"0x3fe0000000000000"],"id":1},
+        {"t":5,"op":"interact","id":1},
+        {"t":8,"op":"use_item","x":-4,"y":60,"z":0,"side":1},
+        {"t":12,"op":"use_item","x":-4,"y":60,"z":0,"side":1}],
+ "dumps":[{"every":1,"what":"rng_state"},
+        {"every":1,"what":"entity_state","which":[0,1]}]}

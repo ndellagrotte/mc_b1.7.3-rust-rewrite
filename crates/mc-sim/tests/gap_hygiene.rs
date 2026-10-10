@@ -4,10 +4,13 @@
 //! no record; `EntityPigZombie.attackEntityFrom`'s anger query goes through
 //! it; and `updateEntities` reads a rider's removed mount through
 //! `World::entity_object` (the object Java still holds) instead of recording
-//! a gap.
+//! a gap. A boat or minecart broken by its own rider puts it off on top
+//! (Entity.java:992-995) whether the rider is in its slot (its own arrow
+//! passes a copy of it) or in the caller's hand (its own click).
 
 use mc_sim::entity::player::new_entity_player_sp;
-use mc_sim::entity::{Entity, base, dispatch, pig, pig_zombie, wolf};
+use mc_sim::entity::{Entity, base, boat, dispatch, minecart, pig, pig_zombie, wolf};
+use mc_sim::player_controller;
 use mc_sim::save::NoSave;
 use mc_sim::world::chunk_provider::{ChunkGenerator, EmptyChunkProvider};
 use mc_sim::world::provider::{Dimension, WorldProvider};
@@ -138,4 +141,100 @@ fn a_rider_reads_its_removed_mount_as_java_holds_it() {
     assert_eq!(hits(&w), []);
     // Nothing names the dead pig any more: it is not kept.
     assert!(w.removed_entity(mid).is_none());
+}
+
+/// The player rides `mount` (spawned at (0.5, 61, 0.5)); returns the player id,
+/// the mount id and where Java's dismount branch puts the player:
+/// `setLocationAndAngles(mount.posX, mount.boundingBox.minY + mount.height,
+/// mount.posZ)` (Entity.java:992-995), plus the player's `yOffset`.
+fn ride(w: &mut World, mount: Entity) -> (i32, i32, f64) {
+    let mid = join(w, mount, 0.5, 0.5);
+    let pl = new_entity_player_sp(w);
+    let plid = join(w, pl, 0.5, 2.5);
+    w.with_entity_mut(plid, |w, p| base::mount_entity_in_world(p, w, mid))
+        .unwrap();
+    assert_eq!(w.entity(plid).unwrap().base.riding_entity, Some(mid));
+    let m = w.entity(mid).unwrap();
+    let p = w.entity(plid).unwrap();
+    let y = m.base.bounding_box.min_y + m.base.height as f64 + p.base.y_offset as f64;
+    (plid, mid, y)
+}
+
+fn assert_put_off_on_top(w: &World, plid: i32, mid: i32, y: f64) {
+    let p = w.entity(plid).unwrap();
+    assert_eq!(p.base.riding_entity, None);
+    assert_eq!(p.base.pos_y, y);
+    let m = w.entity(mid).unwrap();
+    assert!(m.base.is_dead);
+    assert_eq!(m.base.ridden_by_entity, None);
+    assert_eq!(hits(w), []);
+}
+
+/// The rider's own arrow: `attackEntityFrom(this.owner, 4)` (EntityArrow.java:163),
+/// the shooter passed as a copy while it stays in its slot. Two hits pass 40.
+fn shoot_twice(w: &mut World, plid: i32, mid: i32) {
+    let shooter = w.entity(plid).unwrap().clone();
+    for _ in 0..2 {
+        assert!(
+            w.with_entity_mut(mid, |w, m| dispatch::attack_entity_from(
+                m,
+                w,
+                Some(&shooter),
+                4
+            ))
+            .unwrap()
+        );
+    }
+}
+
+/// The rider's own click: `PlayerController.attackEntity` with the player and
+/// the mount both out of their slots, until the mount dies.
+fn punch_until_broken(w: &mut World, plid: i32, mid: i32) {
+    for _ in 0..10 {
+        w.with_entity_mut(plid, |w, p| {
+            w.with_entity_mut(mid, |w, m| player_controller::attack_entity(w, p, m))
+        })
+        .unwrap()
+        .unwrap();
+        if w.entity(mid).unwrap().base.is_dead {
+            return;
+        }
+    }
+    panic!("the mount survived ten punches");
+}
+
+#[test]
+fn a_boat_shot_by_its_rider_puts_it_off_on_top() {
+    let mut w = world();
+    let b = boat::new_entity_boat(&mut w, 0.5, 61.0, 0.5);
+    let (plid, mid, y) = ride(&mut w, b);
+    shoot_twice(&mut w, plid, mid);
+    assert_put_off_on_top(&w, plid, mid, y);
+}
+
+#[test]
+fn a_minecart_shot_by_its_rider_puts_it_off_on_top() {
+    let mut w = world();
+    let c = minecart::new_entity_minecart(&mut w, 0.5, 61.0, 0.5, 0);
+    let (plid, mid, y) = ride(&mut w, c);
+    shoot_twice(&mut w, plid, mid);
+    assert_put_off_on_top(&w, plid, mid, y);
+}
+
+#[test]
+fn a_boat_punched_by_its_rider_puts_it_off_on_top() {
+    let mut w = world();
+    let b = boat::new_entity_boat(&mut w, 0.5, 61.0, 0.5);
+    let (plid, mid, y) = ride(&mut w, b);
+    punch_until_broken(&mut w, plid, mid);
+    assert_put_off_on_top(&w, plid, mid, y);
+}
+
+#[test]
+fn a_minecart_punched_by_its_rider_puts_it_off_on_top() {
+    let mut w = world();
+    let c = minecart::new_entity_minecart(&mut w, 0.5, 61.0, 0.5, 0);
+    let (plid, mid, y) = ride(&mut w, c);
+    punch_until_broken(&mut w, plid, mid);
+    assert_put_off_on_top(&w, plid, mid, y);
 }

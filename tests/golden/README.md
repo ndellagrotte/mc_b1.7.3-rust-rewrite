@@ -1424,6 +1424,12 @@ their drops only where a player is present: the player's own update is WP-2.5):
   `riddenByEntity.mountEntity(this)` puts the player off on top of it (EntityBoat.java:70-72,
   EntityMinecart.java:80-82). The port's player is out of its slot during its own attack, so
   `player_controller::attack_entity` dismounts it right after the attack returns.
+- `entity/boat-shot-by-rider`, `entity/minecart-shot-by-rider` (WP-4.8 review, player): the
+  rider, looking straight down, shoots the boat or cart it rides twice with a bow (`use_item`
+  on the block below: `ItemBow.onItemRightClick`); each arrow hits it with
+  `attackEntityFrom(this.owner, 4)` (EntityArrow.java:163) and the second breaks it and puts
+  the player off on top. The port's arrow passes a copy of its shooter, which stays in its
+  slot, so the mount's own arm dismounts it.
 - `entity/squid-swim` (WP-2.3, 600 ticks, no player): an 11-deep pool; one squid swims
   (`EntitySquid`'s stroke cycle and random swim direction, `isInWater`'s current push), one sits
   on a ledge (out of water it falls and tips over), one drops into the pool and is killed by a

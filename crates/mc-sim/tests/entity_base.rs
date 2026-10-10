@@ -287,12 +287,10 @@ fn render_data_bodies() {
     assert!(!base::is_in_range_to_render_dist(&e, 256.0));
     assert!(base::is_in_range_to_render_vec3d(
         &e,
-        &w,
         &Vec3D::create_vector(0.5, 64.0, 15.5)
     ));
     assert!(!base::is_in_range_to_render_vec3d(
         &e,
-        &w,
         &Vec3D::create_vector(0.5, 64.0, 16.5)
     ));
     assert_eq!(base::get_shadow_size(&e), 0.125);

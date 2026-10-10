@@ -67,6 +67,8 @@ fixtures! {
     entity_boat_player_ride => "entity" / "boat-player-ride";
     // WP-4.8: a mount broken by its own rider puts it off on top.
     entity_boat_broken_by_rider => "entity" / "boat-broken-by-rider";
+    // WP-4.8 review: the same through the rider's own arrow (a shooter copy).
+    entity_boat_shot_by_rider => "entity" / "boat-shot-by-rider";
     entity_minecart_rail_loop => "entity" / "minecart-rail-loop";
     entity_minecart_powered_brake => "entity" / "minecart-powered-brake";
     entity_minecart_detector_rail => "entity" / "minecart-detector-rail";
@@ -74,6 +76,7 @@ fixtures! {
     entity_minecart_break_drops => "entity" / "minecart-break-drops";
     entity_minecart_player_ride => "entity" / "minecart-player-ride";
     entity_minecart_broken_by_rider => "entity" / "minecart-broken-by-rider";
+    entity_minecart_shot_by_rider => "entity" / "minecart-shot-by-rider";
     // WP-2.3 (squid, water mobs, spawn rules).
     entity_squid_swim => "entity" / "squid-swim";
     entity_squid_flowing_water => "entity" / "squid-flowing-water";

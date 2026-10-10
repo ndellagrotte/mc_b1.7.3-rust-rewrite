@@ -296,15 +296,18 @@ pub fn attack_entity_from(
         if d.minecart_current_damage > 40 {
             if let Some(rider) = e.base.ridden_by_entity {
                 // `this.riddenByEntity.mountEntity(this)`: the rider, already
-                // on this cart, gets off on top of it. A rider punching its
-                // own cart is the attacker, held out of its slot by the
-                // caller: `player_controller::attack_entity` puts it off
-                // right after this returns (the cargo and item drops in
+                // on this cart, gets off on top of it (Entity.java:992-995).
+                // A rider in its slot is put off here, also when it is the
+                // attacker passed as a copy (its own arrow, EntityArrow.java:163,
+                // or the harness's direct attack). A rider out of its slot
+                // that is the attacker is a rider punching its own cart, held
+                // by the caller: `player_controller::attack_entity` puts it
+                // off right after this returns (the cargo and item drops in
                 // between read neither; WP-4.8, entity/minecart-broken-by-rider).
-                if attacker.is_some_and(|a| a.base.entity_id == rider) {
-                } else if world
+                if world
                     .with_entity_mut(rider, |w, r| base::mount_entity(r, w, Some(e)))
                     .is_none()
+                    && !attacker.is_some_and(|a| a.base.entity_id == rider)
                 {
                     world.note_unimplemented(
                         "EntityMinecart.attackEntityFrom: rider out of its slot",

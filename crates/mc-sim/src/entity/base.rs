@@ -1418,8 +1418,7 @@ pub fn apply_entity_collision(e: &mut Entity, world: &mut World, other: &mut Ent
 /// (`mc-client` `render::is_in_range_to_render_vec3d`); the simulation never
 /// calls these on a tick path ([`dispatch::NOT_DISPATCHED`]).
 // src: Entity.java:762-768
-pub fn is_in_range_to_render_vec3d(e: &Entity, world: &World, v: &mc_core::Vec3D) -> bool {
-    let _ = world;
+pub fn is_in_range_to_render_vec3d(e: &Entity, v: &mc_core::Vec3D) -> bool {
     let var2 = e.base.pos_x - v.x_coord;
     let var4 = e.base.pos_y - v.y_coord;
     let var6 = e.base.pos_z - v.z_coord;
