@@ -38,7 +38,7 @@
 //! [`crate::entity::player`]).
 
 use crate::block::{self, dispatch as block_dispatch};
-use crate::entity::{Entity, player};
+use crate::entity::{Entity, EntityKindData, player};
 use crate::inventory::InventoryPlayer;
 use crate::item::RightClickResult;
 use crate::world::World;
@@ -200,9 +200,32 @@ fn player_inventory(p: &mut Entity) -> &mut InventoryPlayer {
 
 /// `PlayerController.attackEntity(player, target)` (not overridden):
 /// `player.attackTargetEntityWithCurrentItem(target)`.
+///
+/// A boat or minecart broken by the player riding it puts the player off
+/// (`riddenByEntity.mountEntity(this)`, EntityBoat.java:70-72,
+/// EntityMinecart.java:80-82) inside its `attackEntityFrom`, where the
+/// port's player is in this caller's hand (the boat and cart arms leave it
+/// here): the dismount runs right after the attack. In Java it comes before
+/// the mount's drops and `setEntityDead`, and after it the attack reads
+/// nothing for a non-living target (EntityPlayer.java:496-512), so the
+/// order is not observable (WP-4.8; before, the player stayed on the dead
+/// mount and only left it, without being moved on top, in the next
+/// `updateEntities`).
 // src: PlayerController.java:92-94
 pub fn attack_entity(world: &mut World, p: &mut Entity, target: &mut Entity) {
+    let was_dead = target.base.is_dead;
     player::attack_target_entity_with_current_item(p, world, target);
+    if !was_dead
+        && target.base.is_dead
+        && matches!(
+            target.kind,
+            EntityKindData::Boat(..) | EntityKindData::Minecart(..)
+        )
+        && p.base.riding_entity == Some(target.base.entity_id)
+        && target.base.ridden_by_entity == Some(p.base.entity_id)
+    {
+        crate::entity::base::mount_entity(p, world, Some(target));
+    }
 }
 
 /// `PlayerController.sendBlockRemoved(x, y, z, side)`: the break effect

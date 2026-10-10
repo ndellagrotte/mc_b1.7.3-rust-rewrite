@@ -55,6 +55,8 @@ fixtures! {
     entity_arrow_in_ground_pickup => "entity" / "arrow-in-ground-pickup";
     entity_fireball_explode => "entity" / "fireball-explode";
     entity_fishing_hook => "entity" / "fishing-hook";
+    // WP-4.8: the rod reels in a bobber that died in the ground.
+    entity_fishing_rod_dead_bobber => "entity" / "fishing-rod-dead-bobber";
     entity_flat_item_drop => "entity" / "flat-item-drop";
     // WP-2.2 (EntityLiving, EntityCreature, EntityAnimal, EntityPig, Pathfinder).
     entity_flat_pig_falls => "entity" / "flat-pig-falls";
@@ -63,12 +65,15 @@ fixtures! {
     // WP-2.4b: minecart and boat.
     entity_boat_on_water => "entity" / "boat-on-water";
     entity_boat_player_ride => "entity" / "boat-player-ride";
+    // WP-4.8: a mount broken by its own rider puts it off on top.
+    entity_boat_broken_by_rider => "entity" / "boat-broken-by-rider";
     entity_minecart_rail_loop => "entity" / "minecart-rail-loop";
     entity_minecart_powered_brake => "entity" / "minecart-powered-brake";
     entity_minecart_detector_rail => "entity" / "minecart-detector-rail";
     entity_minecart_derail_collide => "entity" / "minecart-derail-collide";
     entity_minecart_break_drops => "entity" / "minecart-break-drops";
     entity_minecart_player_ride => "entity" / "minecart-player-ride";
+    entity_minecart_broken_by_rider => "entity" / "minecart-broken-by-rider";
     // WP-2.3 (squid, water mobs, spawn rules).
     entity_squid_swim => "entity" / "squid-swim";
     entity_squid_flowing_water => "entity" / "squid-flowing-water";
@@ -131,6 +136,8 @@ fixtures! {
     // ---- tests/golden/tick -------------------------------------------------------
     tick_activate_workbench_stairs => "tick" / "activate-workbench-stairs";
     tick_bed_nether => "tick" / "bed-nether";
+    // WP-4.8: the bed explosion finds the activating player.
+    tick_bed_nether_player_near => "tick" / "bed-nether-player-near";
     tick_bed_place_and_break => "tick" / "bed-place-and-break";
     // WP-2.6: item behaviour (ItemStack.useItem through the item dispatch).
     tick_block_item_placement => "tick" / "block-item-placement";

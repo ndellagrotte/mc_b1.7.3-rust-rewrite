@@ -900,12 +900,14 @@ the end of the drive, also when the drive failed part-way.
   after its first difference.
 - Drivers that build no world (Tier A kinds, `terrain`) record nothing; a stale `gaps.json`
   from an earlier run of the same directory is removed.
-- At WP-4.8 (`d222a15` plus this WP) every default fixture's file has an empty
-  `skipped_systems`. `unimplemented_hits` is empty except for the taken-out-entity record of
-  the box queries (Gate 2 R5, docs/DEFERRED_REVIEW.md §3.1 E): the block-placement check
-  over the player held by `use_item` (`tick/block-item-placement`, `tick/gate2-session`,
-  `tick/place-stairs-slabs-doors-beds-signs` and the five soaks) and the bed explosion
-  (`tick/bed-nether`, whose player is beyond the blast).
+- At WP-4.8 every default fixture's file has an empty `skipped_systems`, and
+  `unimplemented_hits` is empty except for one record in three fixtures and the five soaks:
+  `World.getEntitiesWithinAABBExcludingEntity over a taken-out entity` (Gate 2 R5,
+  docs/DEFERRED_REVIEW.md §3.1 E), the block-placement check (`World.canBlockBePlacedAt` →
+  `checkIfAABBIsClear`) meeting the player that `use_item` holds out of its slot
+  (`tick/block-item-placement`, `tick/gate2-session`,
+  `tick/place-stairs-slabs-doors-beds-signs`). It changes nothing: the placing item tests the
+  player's box itself first (`item::behaviour::can_block_be_placed_at`).
 
 ### Committed Tier B/C/S scenarios
 
@@ -1206,6 +1208,10 @@ then `entity_state` lists the drops' ids (the port's player does not update yet)
   `tryToCreatePortal`) need the redstone and fire tasks, both in.
 - `tick/bed-nether` needs `Explosion` (WP-1.8, in). `tick/block-item-placement`
   (`ItemBlock` and the other placing items) passes since WP-2.6.
+- `tick/bed-nether-player-near` (WP-4.8): `tick/bed-nether` with the player 1.5 blocks from
+  the bed. The explosion's entity scan finds the activating player, which the port holds
+  out of its slot during the click: the bed passes it in hand, and the blast kills it
+  (health −28 at t = 1).
 
 Tile entities, container blocks and explosions (WP-1.8), empty world, seed 123, the stone
 platform at y = 60 (none needs a player unless it says so):
@@ -1281,6 +1287,11 @@ stone platform unless stated, `rng_state` and `entity_state` every tick:
   the harness kind `FishingHook`; the bobber flies into a 5-deep pool, floats and draws its
   bite rolls. `catchFish` needs the rod's right click (WP-2.6) and is unit-tested only
   (`crates/mc-sim/tests/non_living_entities.rs`).
+- `entity/fishing-rod-dead-bobber` (WP-4.8, player, 1300 ticks): the same cast onto bare
+  stone; the bobber stays in the ground and dies after 1200 ticks without clearing
+  `angler.fishEntity` (EntityFish.java:168-176). The right click at t = 1290 reels in the dead
+  object, which the port keeps in `World::removed_entities` while the player names it:
+  `catchFish` returns 2 and the rod takes 2 damage (the op line's `stack`).
 
 Living entities (WP-2.2: `EntityLiving`, `EntityCreature`, `EntityAnimal`, `EntityPig`,
 `Pathfinder`), empty world, seed 123, `"mob_spawning": "none"`, the stone platform unless
@@ -1408,6 +1419,11 @@ their drops only where a player is present: the player's own update is WP-2.5):
   by two direct hits.
 - `entity/boat-player-ride` (player): `interact` puts the player in a boat, which is sent into
   the rim and breaks with its rider; the run ends before the player could pick up the drops.
+- `entity/boat-broken-by-rider`, `entity/minecart-broken-by-rider` (WP-4.8, player): the
+  rider punches the boat or cart it rides (`attack` with `attacker_id` 0) until it breaks;
+  `riddenByEntity.mountEntity(this)` puts the player off on top of it (EntityBoat.java:70-72,
+  EntityMinecart.java:80-82). The port's player is out of its slot during its own attack, so
+  `player_controller::attack_entity` dismounts it right after the attack returns.
 - `entity/squid-swim` (WP-2.3, 600 ticks, no player): an 11-deep pool; one squid swims
   (`EntitySquid`'s stroke cycle and random swim direction, `isInWater`'s current push), one sits
   on a ledge (out of water it falls and tips over), one drops into the pool and is killed by a

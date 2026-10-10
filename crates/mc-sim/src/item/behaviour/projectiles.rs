@@ -103,16 +103,29 @@ pub fn fishing_rod_on_item_right_click(
     if let Some(fish) = fish {
         let var4 = match var2.with_entity_mut(fish, |w, f| catch_fish(f, w, var3)) {
             Some(v) => v,
-            None => {
-                // Java holds the bobber object even after it left
-                // loadedEntityList (an unloaded chunk); the port cannot reach
-                // it: recorded, and taken as a catch of nothing.
-                var2.note_unimplemented("EntityFish.catchFish: bobber not in loadedEntityList");
-                if let Some(p) = var3.kind.player_mut() {
-                    p.fish_entity = None;
+            // Java holds the bobber object after it left loadedEntityList:
+            // a bobber left in the ground dies after 1200 ticks without
+            // clearing `angler.fishEntity` (EntityFish.java:168-176), so the
+            // next click reels in the dead object (2 from the ground). The
+            // port keeps that object while the player's `fishEntity` names
+            // it (World::removed_entities, WP-4.6) and runs catchFish on it
+            // (WP-4.8; before, the rod lost nothing: entity/fishing-rod-dead-bobber).
+            None => match var2.removed_entities.remove(&fish) {
+                Some(mut f) => {
+                    let v = catch_fish(&mut f, var2, var3);
+                    var2.removed_entities.insert(fish, f);
+                    v
                 }
-                0
-            }
+                None => {
+                    // Neither loaded nor kept (cannot happen: the field
+                    // names it): recorded, a catch of nothing.
+                    var2.note_unimplemented("EntityFish.catchFish: bobber not in loadedEntityList");
+                    if let Some(p) = var3.kind.player_mut() {
+                        p.fish_entity = None;
+                    }
+                    0
+                }
+            },
         };
         var1.damage_item_by(var4, var3);
         player::swing_item(var3);

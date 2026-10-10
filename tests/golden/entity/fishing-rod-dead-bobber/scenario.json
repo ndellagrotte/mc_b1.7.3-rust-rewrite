@@ -1,0 +1,11 @@
+{"name":"fishing-rod-dead-bobber","tier":"C","kind":"tick","seed":123,"dimension":"overworld","world":"empty","ticks":1300,"mob_spawning":"none",
+ "comment":"WP-4.8. entity/fishing-hook without the water: the bobber (id 1, harness kind FishingHook, so player.fishEntity is set) lands on the stone and stays in the ground. After 1200 ticks in the ground it dies (EntityFish.java:168-176) without clearing angler.fishEntity, so World.updateEntities removes it while the player still names it. At t = 1290 the right click with the rod (use_item on stone: no onItemUse, so sendUseItem, ItemFishingRod.onItemRightClick, ItemFishingRod.java:18-23) reels in that dead object: catchFish returns 2 (inGround, EntityFish.java:376-382) and the rod takes 2 damage (stack.damage 2 on the op line). The port keeps the removed bobber while the player's fishEntity names it (World::removed_entities); before WP-4.8 it recorded the gap and the rod took 0. entity_state of the bobber every 50 ticks and rng_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"fill","x0":-8,"y0":55,"z0":-8,"x1":8,"y1":59,"z1":8,"id":1},
+        {"t":0,"op":"set_block","x":-3,"y":61,"z":0,"id":58},
+        {"t":0,"op":"player","x":"0xbff8000000000000","y":61,"z":"0x3fe0000000000000","yaw":-90,"pitch":30},
+        {"t":0,"op":"use_item","item_id":346,"x":-3,"y":61,"z":0,"side":1},
+        {"t":0,"op":"spawn","kind":"FishingHook","pos":["0xbff8000000000000",61,"0x3fe0000000000000"],"id":1},
+        {"t":1290,"op":"use_item","x":-1,"y":60,"z":3,"side":1}],
+ "dumps":[{"every":50,"what":"entity_state","which":[1]},
+        {"every":1,"what":"rng_state"}]}

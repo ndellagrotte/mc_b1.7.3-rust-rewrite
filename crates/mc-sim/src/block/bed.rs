@@ -16,7 +16,8 @@
 //!
 //! The player side, `EntityPlayer.sleepInBedAt` and `bedChunkCoordinates`,
 //! is [`crate::entity::player`] (WP-2.5). The bed exploding outside the
-//! overworld is [`World::new_explosion`] (WP-1.8).
+//! overworld is `World.newExplosion` (WP-1.8), run with the activating
+//! player in hand ([`Explosion::do_explosion_a`], WP-4.8).
 //! `addChatMessage` is a client-only message: `EntityPlayer`'s body is empty
 //! (EntityPlayer.java:698-699), `EntityPlayerSP`'s writes to the chat GUI
 //! (EntityPlayerSP.java:172-174): [`crate::entity::player::add_chat_message`]
@@ -27,6 +28,7 @@ use mc_core::java_hash::ChunkCoordinates;
 use super::BlockBounds;
 use crate::entity::Entity;
 use crate::world::World;
+use crate::world::explosion::Explosion;
 
 /// `headBlockToFootBlockMap`: `{dx, dz}` per direction.
 // src: BlockBed.java:7
@@ -103,15 +105,24 @@ pub fn block_activated(
         // never used; the explosion is centred on the second block,
         // `(double)((float)var2 + 0.5F)` etc., with power 5.0F and fire.
         let _ = (var16, var17, var11);
-        // src: BlockBed.java:45
-        world.new_explosion(
+        // src: BlockBed.java:45, World.java:1522-1528 (`newExplosion`: the
+        // explosion, flaming, both passes). The activating player is out of
+        // its slot here (the client's click), but vanilla's entity scan
+        // still finds it: it is passed in hand, as the TNT and the fireball
+        // pass themselves, so the blast hurts and pushes it (before WP-4.8
+        // the scan skipped it: the player next to a nether bed took no
+        // damage, where vanilla's usually dies; tick/bed-nether-player-near).
+        let mut var10 = Explosion::new(
+            world,
             None,
             (var2 as f32 + 0.5) as f64,
             (var3 as f32 + 0.5) as f64,
             (var4 as f32 + 0.5) as f64,
             5.0,
-            true,
         );
+        var10.is_flaming = true;
+        var10.do_explosion_a(world, None, Some(player));
+        var10.do_explosion_b(world, true);
         return true;
     }
     if is_bed_occupied(var6) {

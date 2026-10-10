@@ -1,0 +1,9 @@
+{"name":"bed-nether-player-near","tier":"B","kind":"tick","seed":123,"dimension":"nether","world":"empty","ticks":6,"mob_spawning":"none",
+ "comment":"WP-4.8. tick/bed-nether with the player (id 0) standing next to the bed, at (0.5, 61, 2.5), 1.5 blocks west of it, as a player who clicks a bed always is. BlockBed.blockActivated in the nether removes both halves and runs World.newExplosion(null, x + 0.5F, y + 0.5F, z + 0.5F, 5.0F, true) (BlockBed.java:30-46, World.java:1522-1528); the explosion's entity scan (Explosion.java:77-105) finds the activating player, which the port holds out of its slot during the click: it must be tested where the scan reaches it (passed in hand, as EntityTNTPrimed passes itself). The player is pushed away and killed (health -28 at t=1, deathTime counting). Before WP-4.8 the port skipped it (recorded the R5 taken-out-entity gap) and the player stood unhurt. entity_state of the player and rng_state every tick.",
+ "ops":[{"t":0,"op":"fill","x0":-8,"y0":60,"z0":-8,"x1":8,"y1":60,"z1":8,"id":1},
+        {"t":0,"op":"player","x":"0x3fe0000000000000","y":61,"z":"0x4004000000000000"},
+        {"t":0,"op":"set_block","x":2,"y":61,"z":2,"id":26},
+        {"t":0,"op":"set_block","x":2,"y":61,"z":3,"id":26,"meta":8},
+        {"t":1,"op":"use_item","x":2,"y":61,"z":2,"side":1}],
+ "dumps":[{"every":1,"what":"entity_state","which":[0]},
+        {"every":1,"what":"rng_state"}]}
