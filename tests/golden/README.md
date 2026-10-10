@@ -858,6 +858,39 @@ D5 import refusal, the `level.dat` shapes of `nbt/level-dat-shape` and
 read from `<parent>/world` exactly as a `world_read` scenario, `write <parent>` saves a small
 vanilla world there; run when `build/oracle` exists).
 
+### The gaps file (`gaps.json`, WP-4.8)
+
+Next to `actual.jsonl`, `mc_golden::run` writes `target/golden/<area>/<name>/gaps.json` for
+every fixture whose driver builds an `mc_sim` world (`kind: "tick"` through
+`tick_driver::drive`/`drive_in`, and `kind: "world_read"`): the world's two gap counters at
+the end of the drive, also when the drive failed part-way.
+
+```json
+{
+  "skipped_systems": {"<Java world system>": <times reached>},
+  "unimplemented_hits": {"<Class.method or guard record>": <times reached>}
+}
+```
+
+- `skipped_systems` is `World::skipped_systems` (untranscribed world systems, e.g.
+  `World.addLoadedEntities (chunk-stored entities)`); `unimplemented_hits` is
+  `World::unimplemented_hits` (untranscribed overrides, the take-out/put-back guards, Java
+  exception paths). Both are `BTreeMap`s, so the keys are sorted. A `reload` op carries both
+  counters over to the new world (`World::adopt_statics`), so the file covers the whole
+  scenario.
+- The file is a diagnostic (Gate 1 N7, Gate 2 R7): it is never compared, a passing test
+  prints nothing about it, and no `expected.jsonl` changes because of it. It shows which
+  recorded gaps a fixture reaches, and for a failing fixture which gaps it met before and
+  after its first difference.
+- Drivers that build no world (Tier A kinds, `terrain`) record nothing; a stale `gaps.json`
+  from an earlier run of the same directory is removed.
+- At WP-4.8 (`d222a15` plus this WP) every default fixture's file has an empty
+  `skipped_systems`. `unimplemented_hits` is empty except for the taken-out-entity record of
+  the box queries (Gate 2 R5, docs/DEFERRED_REVIEW.md §3.1 E): the block-placement check
+  over the player held by `use_item` (`tick/block-item-placement`, `tick/gate2-session`,
+  `tick/place-stairs-slabs-doors-beds-signs` and the five soaks) and the bed explosion
+  (`tick/bed-nether`, whose player is beyond the blast).
+
 ### Committed Tier B/C/S scenarios
 
 Generated terrain, seed 123 (ocean around the origin; grass at y = 66 near (−26, −58)):

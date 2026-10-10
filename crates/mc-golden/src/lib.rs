@@ -10,7 +10,9 @@
 //! API overview:
 //!
 //! - [`run`] — load a fixture, call a drive closure that fills a
-//!   [`TraceWriter`], write `target/golden/<area>/<name>/actual.jsonl`, compare.
+//!   [`TraceWriter`], write `target/golden/<area>/<name>/actual.jsonl` (and
+//!   `gaps.json`, the simulation's gap counters, for the tick and world-read
+//!   drivers: [`gaps`]), compare.
 //! - [`Scenario`] / [`ScenarioKind`] — the parsed `scenario.json`.
 //! - [`TraceLine`] and its event constructors ([`TraceLine::rng`],
 //!   [`TraceLine::sine_table`], [`TraceLine::math`],
@@ -63,6 +65,7 @@ pub mod bits;
 pub mod compare;
 pub mod digest;
 pub mod error;
+pub mod gaps;
 // Host-only file access for a test-support crate. PLAN_v4 D9 bans `std::fs`
 // in the simulation crates; clippy.toml applies the ban workspace-wide, so the
 // single module that touches files opts out here, visibly (see `io.rs`).
@@ -79,7 +82,11 @@ pub use bits::{Bits32, Bits64, hex_bytes, parse_hex_bytes};
 pub use compare::{Mismatch, MismatchKind, compare};
 pub use digest::blake3_hex;
 pub use error::GoldenError;
-pub use runner::{all_fixture_dirs, fixture_dir, read_sidecar, run, target_dir, workspace_root};
+pub use gaps::Gaps;
+pub use runner::{
+    GAPS_FILE, actual_dir_of, all_fixture_dirs, fixture_dir, read_sidecar, run, target_dir,
+    workspace_root,
+};
 pub use scenario::{
     ChunkPos, ChunkSel, Dimension, Draw, Dump, DumpKind, EntityWhich, HashOp, ItemSpec, NbtNode,
     Op, OpKind, Scenario, ScenarioKind, TickScenario, Tier, WorldSource,

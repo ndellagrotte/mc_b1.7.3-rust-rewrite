@@ -47,6 +47,14 @@ pub(crate) fn write_bytes(path: &Path, bytes: &[u8]) -> Result<(), GoldenError> 
         .map_err(io_err(path))
 }
 
+/// Removes a file; a missing file is not an error.
+pub(crate) fn remove_file_if_exists(path: &Path) -> Result<(), GoldenError> {
+    match std::fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(io_err(path)(e)),
+        _ => Ok(()),
+    }
+}
+
 /// Sorted subdirectories of `path`; empty when `path` does not exist.
 pub(crate) fn subdirs(path: &Path) -> Result<Vec<PathBuf>, GoldenError> {
     if !path.is_dir() {

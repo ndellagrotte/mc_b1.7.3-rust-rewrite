@@ -141,6 +141,9 @@ pub fn parse_jsonl(text: &str) -> Result<Vec<TraceLine>, TraceParseError> {
 #[derive(Clone, Debug, Default)]
 pub struct TraceWriter {
     lines: Vec<TraceLine>,
+    /// The simulation's gap counters, set by drivers that build a world
+    /// ([`TraceWriter::set_gaps`]); never part of the trace.
+    gaps: Option<crate::gaps::Gaps>,
 }
 
 impl TraceWriter {
@@ -157,6 +160,18 @@ impl TraceWriter {
     /// The lines so far.
     pub fn lines(&self) -> &[TraceLine] {
         &self.lines
+    }
+
+    /// Records the gap counters of the world the drive ran (written to
+    /// `gaps.json` by [`crate::run`]; module docs of [`crate::gaps`]). A
+    /// later call replaces an earlier one.
+    pub fn set_gaps(&mut self, gaps: crate::gaps::Gaps) {
+        self.gaps = Some(gaps);
+    }
+
+    /// The gap counters a driver recorded, if any.
+    pub fn gaps(&self) -> Option<&crate::gaps::Gaps> {
+        self.gaps.as_ref()
     }
 
     /// The trace as `.jsonl`: one compact object per line, `\n`-terminated.

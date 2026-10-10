@@ -178,7 +178,7 @@ pub fn drive_in(
         };
         let store = harness_store(load_save_dir(&fixture, dir)?);
         let mut world = open_world(&store)?;
-        emit_tier_s(
+        let emitted = emit_tier_s(
             0,
             &store,
             WORLD_DIR,
@@ -186,7 +186,10 @@ pub fn drive_in(
             false,
             &mut world,
             w,
-        )
+        );
+        // The gaps the load reached (crate::gaps).
+        w.set_gaps(crate::Gaps::of(&world));
+        emitted
     }
 }
 

@@ -191,7 +191,22 @@ fn drive_with(
         dig_this_tick: false,
     };
 
-    implicit_preload(&mut world, &sc.ops, w);
+    let driven = run_ticks(sc, &mut world, &mut h, w);
+    // The gaps the scenario reached, also when it failed part-way
+    // (crate::gaps; `reload` carries the counters over to the new world).
+    w.set_gaps(crate::Gaps::of(&world));
+    driven
+}
+
+/// The implicit preload, then every tick with its ops and dumps (the body of
+/// [`drive_with`] once the world exists).
+fn run_ticks(
+    sc: &TickScenario,
+    world: &mut World,
+    h: &mut Harness,
+    w: &mut TraceWriter,
+) -> Result<(), GoldenError> {
+    implicit_preload(world, &sc.ops, w);
 
     // Ops grouped by t, file order within a tick (TickScenario.java: a stable
     // sort by t, then consumed in order).
@@ -203,16 +218,16 @@ fn drive_with(
         // and Vec3D.initialize() reset object pools, which the port does not have.
         h.dig_this_tick = false;
         while next < ops.len() && ops[next].t == t {
-            apply(&mut world, &mut h, ops[next], w)?;
+            apply(world, h, ops[next], w)?;
             next += 1;
         }
-        release_button(&mut h);
-        run_tick(&mut world, &mut h);
+        release_button(h);
+        run_tick(world, h);
         // Once per frame after the tick, Minecraft.java:553 (at most 500 updates).
         world.updating_lighting();
         for d in &sc.dumps {
             if d.due_at(t) {
-                dump(&mut world, &h, d, t, w)?;
+                dump(world, h, d, t, w)?;
             }
         }
     }

@@ -99,3 +99,57 @@ fn drive_error_and_missing_fixture() {
     .unwrap_err();
     assert!(err.to_string().contains("scenario.json"), "{err}");
 }
+
+/// `gaps.json` (Gate 2 R7): written next to `actual.jsonl` when the driver
+/// records the gap counters, also when the drive fails; removed again by a
+/// run whose driver records none; never compared.
+#[test]
+fn gaps_file_follows_the_driver() {
+    let dir = fixture("gaps");
+    let gaps = mc_golden::actual_dir_of(&dir).join(mc_golden::GAPS_FILE);
+    assert!(
+        gaps.ends_with("golden/selftest/gaps/gaps.json"),
+        "{}",
+        gaps.display()
+    );
+    let mut g = mc_golden::Gaps::default();
+    g.unimplemented_hits.insert("Some.record".into(), 3);
+    let set = g.clone();
+    let err = run(&dir, move |_, out| {
+        out.set_gaps(set);
+        Err(GoldenError::other("stopped"))
+    })
+    .unwrap_err();
+    assert_eq!(err.to_string(), "stopped");
+    #[allow(clippy::disallowed_methods)]
+    let text = std::fs::read_to_string(&gaps).unwrap();
+    assert_eq!(text, g.to_file_text());
+    assert!(text.contains("\"Some.record\": 3"), "{text}");
+    // A run that records nothing leaves no stale file behind.
+    run(&dir, drive(false)).unwrap();
+    assert!(!gaps.exists());
+}
+
+/// The tick driver records the world's counters: a one-tick scenario with no
+/// ops or dumps (its trace is the implicit preload line) writes a
+/// `gaps.json` with both maps.
+#[test]
+fn tick_driver_writes_gaps() {
+    let dir = target_dir().join("golden-selftest/selftest/tick-gaps");
+    write(
+        &dir.join("scenario.json"),
+        r#"{"name":"tick-gaps","tier":"B","kind":"tick","seed":1,"dimension":"overworld","world":"empty",
+            "ticks":1,"mob_spawning":"none","ops":[],"dumps":[]}"#,
+    );
+    write(
+        &dir.join("expected.jsonl"),
+        "{\"t\":0,\"e\":\"preload\",\"implicit\":true,\"loaded\":0}\n",
+    );
+    run(&dir, mc_golden::tick_driver::drive).unwrap();
+    let gaps = mc_golden::actual_dir_of(&dir).join(mc_golden::GAPS_FILE);
+    #[allow(clippy::disallowed_methods)]
+    let v: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&gaps).unwrap()).unwrap();
+    assert!(v["skipped_systems"].is_object(), "{v}");
+    assert!(v["unimplemented_hits"].is_object(), "{v}");
+}

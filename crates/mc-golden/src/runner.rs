@@ -98,6 +98,13 @@ where
 
     let actual_path = actual_dir(&dir).join("actual.jsonl");
     io::write_bytes(&actual_path, out.to_jsonl().as_bytes())?;
+    // The gaps the drive reached (crate::gaps), next to actual.jsonl; a
+    // stale file from an earlier run of a driver that records none goes.
+    let gaps_path = actual_dir(&dir).join(GAPS_FILE);
+    match out.gaps() {
+        Some(g) => io::write_bytes(&gaps_path, g.to_file_text().as_bytes())?,
+        None => io::remove_file_if_exists(&gaps_path)?,
+    }
     driven?;
 
     compare(&expected, out.lines()).map_err(|mismatch| GoldenError::Mismatch {
@@ -105,6 +112,16 @@ where
         expected: expected_path,
         actual: actual_path,
     })
+}
+
+/// The name of the per-fixture gaps file next to `actual.jsonl`
+/// ([`crate::gaps`]).
+pub const GAPS_FILE: &str = "gaps.json";
+
+/// `<target>/golden/<area>/<name>`: where [`run`] writes `actual.jsonl` and
+/// [`GAPS_FILE`] for the fixture directory `fixture`.
+pub fn actual_dir_of(fixture: impl AsRef<Path>) -> PathBuf {
+    actual_dir(&resolve(fixture.as_ref()))
 }
 
 /// `<target>/golden/<area>/<name>`.
