@@ -855,7 +855,8 @@ pub fn close_screen(e: &mut Entity, world: &mut World) {
 /// update (EntityPlayer.java:82): for the client's `EntityPlayerSP`,
 /// `mc.displayGuiScreen(null)` runs the screen's `onGuiClosed` at once,
 /// whose `onCraftGuiClosed` drops the stack on the cursor and the crafting
-/// grid (`PlayerController.func_20086_a` on `craftingInventory`, now the
+/// grid (`PlayerController.onCraftGuiClosed` on `craftingInventory`,
+/// PlayerController.java:100-103, now the
 /// `ContainerPlayer`, then `GuiCrafting`'s own call on the
 /// `ContainerWorkbench`, GuiContainer.java:162-166, GuiCrafting.java:10-13:
 /// one call on `c` makes the same drops in the same order, see the
@@ -1332,8 +1333,9 @@ fn update_all_players_sleeping_flag(world: &mut World, e: &Entity) {
         let sleeping = if pid == e.base.entity_id {
             Some(player(e).is_player_sleeping())
         } else {
+            // A dead player kept in playerEntities is read too (World.java:934-945).
             world
-                .entity(pid)
+                .entity_object(pid)
                 .and_then(|o| o.kind.player())
                 .map(|p| p.is_player_sleeping())
         };

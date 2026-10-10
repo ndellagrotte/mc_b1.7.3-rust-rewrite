@@ -1209,7 +1209,12 @@ are drawn.
   `level.dat` (PARITY_CHECKLIST P4), so the world reopens on the
   game-over screen (the loaded player has `Health` <= 0, `DeathTime` 21)
   and Respawn works there; `respawn` takes it out of `playerEntities`
-  (`World::with_entity_object_mut` + `set_entity_dead`).
+  (`World::with_entity_object_mut` + `set_entity_dead`). The new player
+  takes the dead player's id (Minecraft.java:1451, :1468); the fields that
+  named the dead player (a mob's `currentTarget`, `playerToAttack`, a
+  ghast's `targetedEntity`, an arrow's `owner`, a bobber's `angler`) keep
+  naming the dead object, as Java's fields do: `respawn` moves it and them
+  to a fresh negative id (`World::move_removed_entity_to_fresh_id`).
 
 ## Scripted-input dev mode
 

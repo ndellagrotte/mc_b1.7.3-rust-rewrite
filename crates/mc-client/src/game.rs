@@ -1934,6 +1934,12 @@ impl Game {
             // updateEntities), so the new player can take its id without two
             // slots sharing it.
             world.update_entity_list();
+            // Java's fields that name the dead player keep the dead object
+            // after the new player takes its id; the port's fields hold ids,
+            // so the dead object (if anything names it) and those fields move
+            // to an id nobody uses, and a mob targeting it still faces it once
+            // and drops it (EntityLiving.java:704-711).
+            world.move_removed_entity_to_fresh_id(pid);
         }
         // The stats writer moves to the new player.
         let stats = match &old {
@@ -2929,6 +2935,55 @@ mod tests {
             1
         );
         assert_eq!(g.player().unwrap().kind.living().unwrap().health, 20);
+    }
+
+    /// Respawn clicked while the dead player is still in the list
+    /// (deathTime < 20, GuiGameOver has no delay): the new player takes the
+    /// dead player's id (Minecraft.java:1451, :1468), but a pig's
+    /// `currentTarget` keeps the dead object, as Java's field does, so it
+    /// does not follow the respawned player (EntityLiving.java:704-711).
+    #[test]
+    fn respawn_leaves_a_target_on_the_dead_player() {
+        let dir = TempDir::new("respawn_target");
+        let mut g = game(&dir);
+        g.open_world("RT", Some("23")).unwrap();
+        g.run_pending_to_completion();
+        let pid = g.the_player.unwrap();
+        if let Some(l) = g.player_in_world_mut().and_then(|e| e.kind.living_mut()) {
+            l.health = 0;
+        }
+        for _ in 0..5 {
+            tick(&mut g);
+        }
+        let w = g.the_world.as_mut().unwrap();
+        assert!(w.entity(pid).is_some());
+        let (x, y, z) = {
+            let b = &w.entity(pid).unwrap().base;
+            (b.pos_x, b.pos_y, b.pos_z)
+        };
+        let mut pig = mc_sim::entity::pig::new_entity_pig(w);
+        pig.base.set_location_and_angles(x + 3.0, y, z, 0.0, 0.0);
+        pig.kind.living_mut().unwrap().current_target = Some(pid);
+        let pig_id = pig.base.entity_id;
+        assert!(w.spawn_entity_in_world(pig));
+
+        g.respawn(false, 0);
+        g.run_pending_to_completion();
+        assert_eq!(g.the_player, Some(pid));
+        let w = g.the_world.as_ref().unwrap();
+        let target = w
+            .entity(pig_id)
+            .unwrap()
+            .kind
+            .living()
+            .unwrap()
+            .current_target
+            .unwrap();
+        assert_ne!(target, pid);
+        let dead = w.removed_entity(target).expect("the dead object");
+        assert!(dead.base.is_dead);
+        assert_eq!(dead.base.pos_x, x);
+        assert!(!w.entity(pid).unwrap().base.is_dead);
     }
 
     /// `statFileWriter.func_27178_d()` every `runTick` (Minecraft.java:949):

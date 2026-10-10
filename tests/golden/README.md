@@ -1709,8 +1709,11 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   world keeps reading it: the random-tick chunks around it (`rng_state` `lcg`), the closest
   player for six pigs' `currentTarget`, a slime's `faceEntity` every tick and a zombie's
   `findPlayerToAttack`, the despawn distance of the slime moved to y = −80 at t = 95 (more
-  than 128 blocks from the dead player: despawned), and `joinEntityInSurroundings` every
-  30 ticks. `player_state` (t = 60, 99) and `inventory` (t = 99) read the removed
+  than 128 blocks from the dead player: despawned). `joinEntityInSurroundings` appends the
+  removed player again every 30 ticks (World.java:2294-2309), but the next `updateEntities`
+  removes it before any dump, so the trace does not see it; the unit test
+  `the_dead_player_stays_in_player_entities` (crates/mc-sim/tests/parity_remainder.rs)
+  covers it. `player_state` (t = 60, 99) and `inventory` (t = 99) read the removed
   `HarnessPlayer`. At t = 100 a `save` (`level.dat`'s `Data.Player`: `Health` −15,
   `DeathTime` 21, an empty `Inventory`; `"chunks": []`, no chunk lines) and the `reload`:
   the new player (id 23) reads that compound back, its first update counts `DeathTime` to 22

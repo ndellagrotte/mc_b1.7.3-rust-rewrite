@@ -2098,6 +2098,40 @@ impl World {
         Some(r)
     }
 
+    /// Gives the removed object kept as entity `id` (and every entity field
+    /// of a loaded entity that names it) a fresh id the world does not use,
+    /// and returns that id; `None` (nothing changed) if the world keeps no
+    /// removed object under `id`. Not Java: Java's fields hold the object
+    /// itself, so a new entity that takes the old one's `entityId` does not
+    /// replace it. `Minecraft.respawn` gives the new player the dead
+    /// player's id (Minecraft.java:1451, :1468); without this, a pig's
+    /// `currentTarget`, a creature's `playerToAttack`, a ghast's
+    /// `targetedEntity`, an arrow's `owner` or a bobber's `angler` naming the
+    /// dead player would resolve to the live, respawned one. With it they
+    /// keep reading the dead object (`isDead`, its last position) and drop
+    /// it on their next update as vanilla does (EntityLiving.java:704-711,
+    /// EntityCreature.java:20-32, EntityFish.java:146). The fresh id is
+    /// negative (Java's `Entity.nextEntityID` counts up from 0, so a new
+    /// entity never takes it) and the id counter is not touched.
+    pub fn move_removed_entity_to_fresh_id(&mut self, id: i32) -> Option<i32> {
+        let mut e = self.removed_entities.remove(&id)?;
+        let mut ghost = -1i32;
+        while self.entity_index(ghost).is_some() || self.removed_entities.contains_key(&ghost) {
+            ghost -= 1;
+        }
+        e.base.entity_id = ghost;
+        self.removed_entities.insert(ghost, e);
+        for slot in &mut self.loaded_entity_list {
+            if let Some(o) = slot.entity.as_deref_mut() {
+                rename_entity_refs(o, id, ghost);
+            }
+        }
+        for o in self.removed_entities.values_mut() {
+            rename_entity_refs(o, id, ghost);
+        }
+        Some(ghost)
+    }
+
     /// `quickSaveWorld(i)`: the level (when `i == 0`) and up to 24 chunks.
     /// A session-lock failure returns false (an exception in Java) and is
     /// kept in [`World::session_lock_error`].
@@ -2169,5 +2203,43 @@ impl std::fmt::Debug for World {
             .field("loaded_chunks", &self.chunk_provider.chunk_map.len())
             .field("loaded_entities", &self.loaded_entity_list.len())
             .finish_non_exhaustive()
+    }
+}
+
+/// Rewrites every entity field of `e` that names entity `from` to name `to`:
+/// the fields `world/entities.rs`'s `referenced_entity_ids` walks
+/// (`ridingEntity`, `riddenByEntity`, `currentTarget`, `playerToAttack`,
+/// `targetedEntity`, `fishEntity`, `owner`, `thrower`, `shootingEntity`,
+/// `angler`, `bobber`).
+// src: Entity.java:11-12, EntityLiving.java:57, EntityCreature.java:5,
+// EntityGhast.java:8, EntityPlayer.java:38, EntityArrow.java:14,
+// EntitySnowball.java:12, EntityEgg.java:12, EntityFireball.java:12,
+// EntityFish.java:12, :16
+fn rename_entity_refs(e: &mut Entity, from: i32, to: i32) {
+    use crate::entity::EntityKindData as K;
+    fn swap(f: &mut Option<i32>, from: i32, to: i32) {
+        if *f == Some(from) {
+            *f = Some(to);
+        }
+    }
+    swap(&mut e.base.riding_entity, from, to);
+    swap(&mut e.base.ridden_by_entity, from, to);
+    if let Some(l) = e.kind.living_mut() {
+        swap(&mut l.current_target, from, to);
+    }
+    if let Some(c) = crate::entity::creature::creature_mut(&mut e.kind) {
+        swap(&mut c.player_to_attack, from, to);
+    }
+    match &mut e.kind {
+        K::Arrow(d) => swap(&mut d.owner, from, to),
+        K::Snowball(d) | K::Egg(d) => swap(&mut d.thrower, from, to),
+        K::Fireball(d) => swap(&mut d.shooting_entity, from, to),
+        K::Fish(d) => {
+            swap(&mut d.angler, from, to);
+            swap(&mut d.bobber, from, to);
+        }
+        K::Ghast(_, _, g) => swap(&mut g.targeted_entity, from, to),
+        K::PlayerSp(_, p, _) => swap(&mut p.fish_entity, from, to),
+        _ => {}
     }
 }

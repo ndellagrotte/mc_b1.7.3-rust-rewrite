@@ -486,7 +486,7 @@ impl StatFileWriter {
     /// `func_27425_c`. A failed write is returned after the countdowns
     /// have run (the thread prints its exception and frees the syncher).
     // src: StatFileWriter.java:194-200, StatsSyncher.java:129-137,
-    // ThreadStatSyncherSend.java:12-21
+    // ThreadStatSyncherSend.java:16-25
     pub fn func_27178_d(
         &mut self,
         storage: &mut dyn Storage,

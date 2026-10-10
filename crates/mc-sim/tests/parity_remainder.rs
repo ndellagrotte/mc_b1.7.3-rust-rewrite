@@ -327,6 +327,73 @@ fn the_dead_player_stays_in_player_entities() {
     assert!(w.entity_object(pid).is_none());
 }
 
+/// Minecraft.java:1446-1468: `respawn` gives the new player the dead
+/// player's `entityId`, but a pig's `currentTarget` still holds the dead
+/// object, so its next `updatePlayerActionState` faces the dead player's
+/// position and drops it (`isDead`, EntityLiving.java:704-711), not the
+/// respawned player's. The port's fields hold ids: respawn moves the dead
+/// object, and the fields naming it, to a fresh id
+/// (`World::move_removed_entity_to_fresh_id`). Respawn here is clicked at
+/// deathTime 5, while the dead player is still in `loadedEntityList`.
+#[test]
+fn a_target_of_the_dead_player_does_not_follow_the_respawned_one() {
+    let mut w = world();
+    let pid = join_player(&mut w, 0.5, 0.5, true);
+    let mut pig = new_entity_pig(&mut w);
+    pig.base.set_location_and_angles(4.5, 61.0, 0.5, 0.0, 0.0);
+    let pig_id = pig.base.entity_id;
+    assert!(w.spawn_entity_in_world(pig));
+    w.entity_mut(pid).unwrap().kind.living_mut().unwrap().health = 0;
+    for _ in 0..5 {
+        w.update_entities();
+    }
+    assert!(w.entity_index(pid).is_some());
+    {
+        let l = w.entity_mut(pig_id).unwrap().kind.living_mut().unwrap();
+        l.current_target = Some(pid);
+        l.num_ticks_to_chase_target = 20;
+    }
+    w.entity_mut(pig_id).unwrap().base.rotation_yaw = 0.0;
+
+    // Minecraft.respawn: setEntityDead(thePlayer), then the new player with
+    // the old id, away from the pig (out of its 8-block look range).
+    w.update_entity_list();
+    w.with_entity_object_mut(pid, |w, p| w.set_entity_dead(p))
+        .unwrap();
+    w.update_entity_list();
+    let ghost = w
+        .move_removed_entity_to_fresh_id(pid)
+        .expect("the pig names it");
+    assert!(ghost < 0);
+    let mut p = new_entity_player_sp(&mut w);
+    p.base.set_location_and_angles(20.5, 61.0, 0.5, 0.0, 0.0);
+    p.base.entity_id = pid;
+    assert!(w.spawn_entity_in_world(p));
+    assert_eq!(w.player_entities, vec![pid]);
+
+    let pig = w.entity(pig_id).unwrap();
+    assert_eq!(pig.kind.living().unwrap().current_target, Some(ghost));
+    let v = EntityView::of(&w, ghost).expect("the dead object");
+    assert!(v.is_dead);
+    assert_eq!(v.pos_x, 0.5);
+    assert!(!w.entity(pid).unwrap().base.is_dead);
+
+    // EntityLiving.updatePlayerActionState: faceEntity toward the dead
+    // player (yaw 90 from the pig's 0, limited to 10 a tick; the respawned
+    // player would give -10), then the isDead test drops the target.
+    w.with_entity_mut(pig_id, |w, e| {
+        mc_sim::entity::living::update_player_action_state(e, w)
+    })
+    .unwrap();
+    let pig = w.entity(pig_id).unwrap();
+    assert_eq!(pig.kind.living().unwrap().current_target, None);
+    assert_eq!(pig.base.rotation_yaw, 10.0);
+    // Nothing names the dead object any more: dropped at the next prune.
+    w.update_entities();
+    assert!(w.removed_entity(ghost).is_none());
+    assert!(w.unimplemented_hits.borrow().is_empty());
+}
+
 /// EntityLiving.java:704-711: `faceEntity(currentTarget)` runs before the
 /// `isDead` test, so a removed target is still a view (its last position,
 /// `isDead`), not a recorded gap.
