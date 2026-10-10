@@ -456,12 +456,15 @@ exercised, N = documentation nit.
   `46cfe53`, `a0a010b` (→ `75aac07`, `0c321b9`, `46f6fdc`, `66a855a`),
   `0518d31` (the pre-rebase review fixes) and `6461094` (→ `30f897b`). The
   objects still exist (dangling, until `git gc`).
+  Closed after the review by the Phase 4 docs commit (see git log).
 - **N2. PARITY_CHECKLIST does not record P4's closure.** §2 P4 says "the fix
   is in `mc-sim`"; §13.1's P4 row says "not this WP". WP-4.7 closed it
   (README "Stats autosave and the dead player", §2.2 here).
+  Closed after the review by the Phase 4 docs commit (see git log).
 - **N3. DEFERRED_REVIEW §4 and §3.6 are as of wave E**: the wave E rows say
   "in progress", WP-4.7 "not scheduled", the Gate 4 row "after wave F".
   §3.2's container close-timing row is closed by WP-4.7.
+  Closed after the review by the Phase 4 docs commit (see git log).
 - **N4. The handoff's "47 `deferred` tags"** (HANDOFF_PHASE4_REST.md §1,
   untracked) matches neither grep of §7; use §7's commands.
 

@@ -18,7 +18,7 @@ call sites remain (there were 97 at `70cdb29`; the brief's grep also counts
 the definition). One of the 96 marks a vanilla path that singleplayer can
 reach and that the simulation now runs, but the client cannot yet show
 (§2, §3). None of the others is a known vanilla behaviour that singleplayer
-can reach.
+can reach. **Since closed by WP-4.7** (`9f2708b`, `260e9a8`; §2).
 
 ## 1. What was closed
 
@@ -104,7 +104,10 @@ mob after the player has died and the world has dropped it (on the
 game-over screen, before respawning). The simulation applies Java's
 `addToPlayerScore` / `onKillEntity` to the removed player object, but the
 client shows and keeps the dead player through its own copy
-(`Game::detached_player`), which misses the hook (§3). The other 95 sites
+(`Game::detached_player`), which misses the hook (§3). **Closed by WP-4.7**
+(`9f2708b`: the hook on a removed player is no longer recorded; `260e9a8`:
+`Game::player`, `render_view` and `stats_mut` read the dead player the world
+keeps, so the hook reaches the player the client shows). The other 95 sites
 fall into these groups:
 
 | Class | Sites | Why it stays |
@@ -125,7 +128,9 @@ fall into these groups:
 - **Client-side deviations, out of this WP's scope.** Gate 3 recorded two
   deviations in the `mc-client` README: the container close timing and
   screens opened by a click. Neither needs a simulation accessor that is
-  missing, so neither was changed here.
+  missing, so neither was changed here. WP-4.7 closed the close timing
+  (`9f2708b`, `260e9a8`); the screen opened by a click is still open
+  (GATE4_REVIEW §8 D1).
 - **The kill hooks have no oracle fixture.** The oracle cannot observe them.
   Unit tests cover them.
 - **A kill by a dead player's arrow does not reach the client (the one
@@ -140,7 +145,10 @@ fall into these groups:
   player takes the old player's id. Its kill hooks then go to the new
   player's statistics writer, which is the same `Minecraft.statFileWriter`
   Java uses. The score goes to the new player instead of the dead one, and
-  is 0 either way.
+  is 0 either way. **Closed by WP-4.7** (`9f2708b`, `260e9a8`): the client
+  reads the dead player the world keeps, so the kill reaches it. Since
+  WP-4.7's review fix (`2f19710`) a respawn moves the dead player to a
+  fresh id, so the arrow keeps naming the dead object, as in Java.
 
 ## 4. Checks
 

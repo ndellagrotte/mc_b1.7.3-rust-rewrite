@@ -9,10 +9,10 @@ Branch `wp-4.3`, forked from `phase-4` at `70cdb29` (WP-4.2 step 5). Commits:
 
 | Step | Commit | What |
 |---|---|---|
-| 1 | `1fbbd8f` | Simulation hot spots in `mc-sim`, fixture-neutral |
-| 2 | `5318c27` | Client measurement (`perf`), `--vsync off`, write-behind saves with incremental region writes |
-| 3 | `46cfe53` | `flate2` on the `zlib-rs` backend |
-| 4 | `a0a010b` | Packaging: default paths, `docs/RUNNING.md`, release workflow |
+| 1 | `75aac07` | Simulation hot spots in `mc-sim`, fixture-neutral |
+| 2 | `0c321b9` | Client measurement (`perf`), `--vsync off`, write-behind saves with incremental region writes |
+| 3 | `46f6fdc` | `flate2` on the `zlib-rs` backend |
+| 4 | `66a855a` | Packaging: default paths, `docs/RUNNING.md`, release workflow |
 | 5 | (this file) | This report |
 
 (The table's step 5 is the commit that adds this file.)
@@ -411,7 +411,7 @@ waits for synced region writes. The terrain preload's per-frame budget
 - **Proof:**
   - `cargo build --profile dist -p mc-app` succeeds (7 min 10 s from the dev
     build's cache). The binary is 75 MB, stripped.
-  - The proof below was re-run on the dist build of `0518d31` (the review
+  - The proof below was re-run on the dist build of `effbb31` (the review
     fixes; the first run, at 15:52, used a binary built before the step-4
     commit, so it did not prove the committed tree).
   - The Linux bundle was packed as the workflow packs it: `mc_b173`,
@@ -457,7 +457,7 @@ waits for synced region writes. The terrain preload's per-frame budget
     process exit.
   - The save is written before it happens.
   - It was not seen with later quits.
-  - **Fixed by WP-4.9** (`6461094`, `RenderPlugin::synchronous_pipeline_compilation`
+  - **Fixed by WP-4.9** (`30f897b`, `RenderPlugin::synchronous_pipeline_compilation`
     in `mc-app`): reproduced 8 of 8 times with asynchronous compilation
     (`testWorld` imported, `quit` as soon as the world is in, nested Xwayland;
     the core's crashing thread is in `wgpu_hal::vulkan::Device::create_render_pipeline`

@@ -17,6 +17,12 @@ call sites (96 at `d222a15`); a fixture's reached gaps are in
 `gaps`; the trace found five reachable divergences: four are fixed with
 new oracle fixtures, one (the reused player id) has a proposal (§3.1 E).
 
+**Wave F update (after Gate 4, 2026-10-10).** WP-4.7 (`9f2708b..ff43be6`),
+WP-4.8 (`42acc5d..07c3cd0`) and WP-4.9 (`0695eaa..a2e73c3`) are on
+`phase-4`, and Gate 4 passed (`c521317`). The status of §2.3, §3.1 A and E,
+§3.2, §3.6 and §4 is updated in place with the closing commits; the
+analyses are as written.
+
 Reviewed tree: branch `wp-4.4` at `d52ac6b` (the Gate 3 commit). The
 `phase-4` tip `70cdb29` adds only WP-4.2 (the soak fixtures, the `SOAK`
 modes of the oracle scripts and `golden_soak.rs`). It adds no `deferred`
@@ -263,6 +269,10 @@ accurate.
      from the shell's tick, before `IngameGuiUpdateTick`.
    - **Proposed:** WP-4.7 (§3.6). Mc-sim's stats module is fixture-neutral:
      the oracle's `HarnessPlayer` counts no stats.
+     **Done (WP-4.7, `9f2708b`, `260e9a8`):** `StatFileWriter::func_27178_d` /
+     `func_27425_c` / `func_27420_b` with the 100-tick countdown, the send run
+     synchronously, called every tick from `Game::run_tick_begin`
+     (Minecraft.java:949).
    - **The label comes from D2 itself.** PLAN_v4.md:100 names "stats sync"
      among the defunct online services that are out of scope. In b1.7.3
      there is no server side to it: every "sync" is a local file. So D2's
@@ -285,10 +295,14 @@ accurate.
      screen read (StatFileWriter.java:174-185). The port relocates the file
      (stats/file_writer.rs:486-500) but does not merge it. Either add the
      merge as optional WP-4.7 item (6) or record it as an accepted
-     divergence (Q34).
+     divergence (Q34). **Done (WP-4.7, `9f2708b`):** the received
+     `stats_<user>.dat` is read at open and merged on the first tick.
    - Relabel when that WP lands: game.rs:16, :1021-1022, gui/menu/mod.rs:42,
      stats/mod.rs:18-19, stats/file_writer.rs:29, :398, PLAN_v5's WP-2.7
-     row, and PLAN_v5's D2 text (PLAN_v4.md:100).
+     row, and PLAN_v5's D2 text (PLAN_v4.md:100). **Done in the code
+     (WP-4.7, `9f2708b`, `260e9a8`):** the stats tags no longer say
+     "deferred, D2" and the menu docs no longer call `StatsSyncher` an
+     upload; the two PLAN_v5 entries are for PLAN_v5.
 2. **The sky dimension is unreachable in vanilla singleplayer.** The
    loading constructor picks `getProviderForDimension(-1)` for a saved
    dimension of −1 and the surface for anything else (World.java:184-190).
@@ -353,15 +367,15 @@ current fixture.
 
 | Java | Site | Effect in play | Owner |
 |---|---|---|---|
-| `BlockCake.blockActivated` → `EntityLiving.heal`'s `heartsLife = heartsHalvesLife / 2` (EntityLiving.java:303) | block/cake.rs:129 | After a hit, `heartsLife` is 11–20 for about 10 ticks. Vanilla's heal drops it to 10, so the next hit takes the full branch of `attackEntityFrom` (EntityLiving.java:317-331); the port keeps the reduced branch. The HUD's heart blink (`heartsLife / 3 % 2`, off below 10, GuiIngame.java:59-60) differs. Gate 2 §4.2 called this "probably unobservable"; it is observable | WP-4.6 (R2) |
-| `EntityLiving.onDeath` → `EntityPlayer.addToPlayerScore` | entity/living.rs:772 | `mobKillsStat` / `playerKillsStat` never counted (EntityPlayer.java:239-247); `score` stays 0, as it would anyway (every `scoreValue` is 0) | WP-4.6 (R2) |
-| `EntityLiving.onDeath` → `EntityPlayer.onKillEntity` | entity/living.rs:778 | **The `killEnemy` achievement ("Monster Hunter") can never be earned** (EntityPlayer.java:795-799). Visible since WP-2.7 counts stats. docs/mappings.md:345 still says "the gap changes no state"; that was true before WP-2.7 | WP-4.6 (R2) |
-| `EntityPig.onStruckByLightning` | entity/pig.rs:102 | A struck pig dies; no zombie pigman joins, so the entity id stream shifts | WP-4.6 (R2) |
-| `EntityPlayer.alertWolves`: the tamed branch | entity/player.rs:836, :853 | Tamed wolves never defend their owner (EntityPlayer.java:402-437) | WP-4.6 |
-| `EntityFireball.getCollisionBorderSize` (1.0F, EntityFireball.java:198-200) | entity/dispatch.rs:795 | **New.** The client's `getMouseOver` calls the sim dispatch (camera.rs:567), which records the gap and returns the base 0.1. A ghast fireball is therefore picked through a box expanded by 0.1 instead of 1.0, so punching it back (`attackEntityFrom` sends it along the look) is much harder than in vanilla. Gate 2 gave this method to WP-3.1; it was not done there, and fireball.rs:10-12 still calls it "client". One match arm | **add to WP-4.6** |
-| A projectile's shooter that has left `loadedEntityList`: `attackEntityFrom(this.owner, 4)` (EntityArrow.java:163; the fireball's `shootingEntity` likewise, EntityFireball.java:124) | entity/arrow.rs:312 (`attack_entity_by_id`, shared by all five projectiles) | **New; moved here from the defensive guards.** Java still holds the shooter object; the port passes no attacker. **Repro:** switch to Peaceful while a skeleton's arrow is in flight. Vanilla removes the skeleton (EntityMob.java:20-24), the arrow still passes it, `EntityPlayer.attackEntityFrom` sees an `EntityMob`, scales the damage to 0 and returns false (EntityPlayer.java:366-381), and the arrow bounces back (EntityArrow.java:166-173). The port skips the scaling (player.rs:767-778), deals 4 damage and kills the arrow with `random.drr`. On Easy the port deals 4 where vanilla deals 2; on Hard, 4 where vanilla deals 6 (Normal agrees). With no attacker, `EntityLiving.attackEntityFrom` also skips the knockback and draws `Math.random` once for `attackedAtYaw` instead of the `atan2` path (EntityLiving.java:337-349, `knockBack` at :346), which shifts the shared `Math.random` stream, and `alertWolves` is not called. The same happens when the skeleton is killed (removed at `deathTime > 20`, EntityLiving.java:157-159) or despawns while the arrow flies, and when a ghast is removed under its fireball (EntityGhast.java:32, damage 0: only knockback and the `Math.random` draw differ) | **proposed WP-4.7** item (5) (mc-sim behaviour; the snapshot of WP-4.8 item 2 is the general remedy) |
-| `EntityLiving.updatePlayerActionState`: `faceEntity(currentTarget)` before the `isDead` check (EntityLiving.java:706-710) | entity/living.rs:324 (`EntityView::of`, via living.rs:1096) | **New; moved here from the defensive guards.** An idle mob looking at the player (`currentTarget`, set at EntityLiving.java:697-700) when the dead player leaves the list 20 ticks after death (EntityLiving.java:157-159): vanilla turns the mob toward the removed player's last position once more, then drops it as `isDead`; the port finds no view, skips the turn and drops it. One tick of the mob's yaw and pitch differs, and its walk direction follows from them. Rare and invisible behind the death screen, but a simulation divergence | **proposed WP-4.7** item (5), with the projectile shooter |
-| `Container.slotClick` over a tile entity that has left the world (TileEntityChest/Furnace/Dispenser) | inventory/container/mod.rs:115 (`te_gone`, called from :144, :170, :211, :253, :366) | **New; moved here from the defensive guards.** **Repro:** an explosion destroys a chest, furnace or dispenser whose window is open. The port closes the window in tick N+1's screen hook, *after* `handle_input` (gui/mod.rs:344-351; the README's close-timing deviation, §3.2), so clicks queued since tick N still reach `slot_click`, which records `te_gone` and does nothing. Vanilla depends on the order within tick N's `updateEntities`: if the explosion came before the player's update, `isUsableByPlayer` failed and the window closed in tick N (EntityPlayer.java:80-84), so tick N+1's input goes to the game; if it came after, tick N+1's `handleInput` (Minecraft.java:987-991, before `updateEntities` at :1160) clicks the orphaned `TileEntityChest`, whose stacks `onBlockRemoval` left at `stackSize` 0 (BlockChest.java:155-182), before the player's update closes the window. The site's own comment (container/mod.rs:111-113, "unreachable from the client, which closes the window") is wrong | **proposed WP-4.7** item (2) (fixing the close timing removes the first case); the comment is WP-4.6's (§3.4) |
+| `BlockCake.blockActivated` → `EntityLiving.heal`'s `heartsLife = heartsHalvesLife / 2` (EntityLiving.java:303) | block/cake.rs:129 | After a hit, `heartsLife` is 11–20 for about 10 ticks. Vanilla's heal drops it to 10, so the next hit takes the full branch of `attackEntityFrom` (EntityLiving.java:317-331); the port keeps the reduced branch. The HUD's heart blink (`heartsLife / 3 % 2`, off below 10, GuiIngame.java:59-60) differs. Gate 2 §4.2 called this "probably unobservable"; it is observable | WP-4.6 (R2); **done (`3a6d370`)** |
+| `EntityLiving.onDeath` → `EntityPlayer.addToPlayerScore` | entity/living.rs:772 | `mobKillsStat` / `playerKillsStat` never counted (EntityPlayer.java:239-247); `score` stays 0, as it would anyway (every `scoreValue` is 0) | WP-4.6 (R2); **done (`3a6d370`)** |
+| `EntityLiving.onDeath` → `EntityPlayer.onKillEntity` | entity/living.rs:778 | **The `killEnemy` achievement ("Monster Hunter") can never be earned** (EntityPlayer.java:795-799). Visible since WP-2.7 counts stats. docs/mappings.md:345 still says "the gap changes no state"; that was true before WP-2.7 | WP-4.6 (R2); **done (`3a6d370`)** |
+| `EntityPig.onStruckByLightning` | entity/pig.rs:102 | A struck pig dies; no zombie pigman joins, so the entity id stream shifts | WP-4.6 (R2); **done (`3a6d370`)** |
+| `EntityPlayer.alertWolves`: the tamed branch | entity/player.rs:836, :853 | Tamed wolves never defend their owner (EntityPlayer.java:402-437) | WP-4.6; **done (`3a6d370`)** |
+| `EntityFireball.getCollisionBorderSize` (1.0F, EntityFireball.java:198-200) | entity/dispatch.rs:795 | **New.** The client's `getMouseOver` calls the sim dispatch (camera.rs:567), which records the gap and returns the base 0.1. A ghast fireball is therefore picked through a box expanded by 0.1 instead of 1.0, so punching it back (`attackEntityFrom` sends it along the look) is much harder than in vanilla. Gate 2 gave this method to WP-3.1; it was not done there, and fireball.rs:10-12 still calls it "client". One match arm | **add to WP-4.6**; **done (WP-4.7, `9f2708b`)**: `getCollisionBorderSize` = 1 |
+| A projectile's shooter that has left `loadedEntityList`: `attackEntityFrom(this.owner, 4)` (EntityArrow.java:163; the fireball's `shootingEntity` likewise, EntityFireball.java:124) | entity/arrow.rs:312 (`attack_entity_by_id`, shared by all five projectiles) | **New; moved here from the defensive guards.** Java still holds the shooter object; the port passes no attacker. **Repro:** switch to Peaceful while a skeleton's arrow is in flight. Vanilla removes the skeleton (EntityMob.java:20-24), the arrow still passes it, `EntityPlayer.attackEntityFrom` sees an `EntityMob`, scales the damage to 0 and returns false (EntityPlayer.java:366-381), and the arrow bounces back (EntityArrow.java:166-173). The port skips the scaling (player.rs:767-778), deals 4 damage and kills the arrow with `random.drr`. On Easy the port deals 4 where vanilla deals 2; on Hard, 4 where vanilla deals 6 (Normal agrees). With no attacker, `EntityLiving.attackEntityFrom` also skips the knockback and draws `Math.random` once for `attackedAtYaw` instead of the `atan2` path (EntityLiving.java:337-349, `knockBack` at :346), which shifts the shared `Math.random` stream, and `alertWolves` is not called. The same happens when the skeleton is killed (removed at `deathTime > 20`, EntityLiving.java:157-159) or despawns while the arrow flies, and when a ghast is removed under its fireball (EntityGhast.java:32, damage 0: only knockback and the `Math.random` draw differ) | **proposed WP-4.7** item (5) (mc-sim behaviour; the snapshot of WP-4.8 item 2 is the general remedy); **done (WP-4.6 review, `c49549f`)**: `World::removed_entities` keeps the removed shooter and the projectile passes it as the attacker (`entity/skeleton-arrow-after-death`); WP-4.8 traced the rest of the family (§3.1 E update) |
+| `EntityLiving.updatePlayerActionState`: `faceEntity(currentTarget)` before the `isDead` check (EntityLiving.java:706-710) | entity/living.rs:324 (`EntityView::of`, via living.rs:1096) | **New; moved here from the defensive guards.** An idle mob looking at the player (`currentTarget`, set at EntityLiving.java:697-700) when the dead player leaves the list 20 ticks after death (EntityLiving.java:157-159): vanilla turns the mob toward the removed player's last position once more, then drops it as `isDead`; the port finds no view, skips the turn and drops it. One tick of the mob's yaw and pitch differs, and its walk direction follows from them. Rare and invisible behind the death screen, but a simulation divergence | **proposed WP-4.7** item (5), with the projectile shooter; **done (WP-4.7, `9f2708b`)**: `EntityView::of` reads the removed object; a respawn moves the dead player to a fresh id (`2f19710`) |
+| `Container.slotClick` over a tile entity that has left the world (TileEntityChest/Furnace/Dispenser) | inventory/container/mod.rs:115 (`te_gone`, called from :144, :170, :211, :253, :366) | **New; moved here from the defensive guards.** **Repro:** an explosion destroys a chest, furnace or dispenser whose window is open. The port closes the window in tick N+1's screen hook, *after* `handle_input` (gui/mod.rs:344-351; the README's close-timing deviation, §3.2), so clicks queued since tick N still reach `slot_click`, which records `te_gone` and does nothing. Vanilla depends on the order within tick N's `updateEntities`: if the explosion came before the player's update, `isUsableByPlayer` failed and the window closed in tick N (EntityPlayer.java:80-84), so tick N+1's input goes to the game; if it came after, tick N+1's `handleInput` (Minecraft.java:987-991, before `updateEntities` at :1160) clicks the orphaned `TileEntityChest`, whose stacks `onBlockRemoval` left at `stackSize` 0 (BlockChest.java:155-182), before the player's update closes the window. The site's own comment (container/mod.rs:111-113, "unreachable from the client, which closes the window") is wrong | **proposed WP-4.7** item (2) (fixing the close timing removes the first case); the comment is WP-4.6's (§3.4); **done (WP-4.7, `9f2708b`, `260e9a8`)**: the window closes inside the player's update in tick N (EntityPlayer.java:80-84), and the stale comment is fixed |
 
 **B. Client-only, dead in the shipping game (14 sites).** The client
 implements these itself and never calls the sim's versions.
@@ -618,7 +632,9 @@ Found and **not** changed (proposals):
    the fields that named it (`referenced_entity_ids`' fields) to the ghost
    id, so they keep pointing at the dead object. It touches the respawn
    path WP-4.7 is changing (P4), so it is left to a follow-up after WP-4.7
-   merges.
+   merges. **Done (WP-4.7, `2f19710`):**
+   `World::move_removed_entity_to_fresh_id`; unit-tested only, the oracle
+   has no respawn op (GATE4_REVIEW §8 O4).
 2. **The bobber hooking its own angler** (fish.rs:503, above): one `if`
    once a scenario reproduces it.
 
@@ -636,26 +652,26 @@ The random-tick pass keeps the 19 × 19 chunks around each player loaded
 
 | Gap | Source | Reachable | Status / owner |
 |---|---|---|---|
-| D1 third-person held items not drawn (`render::held_item::HeldItemHook` never inserted; `ItemRenderer::player_model_drawn` not called from the third-person draw) | Gate 3 §3; README "Integration status" | yes | scheduled **WP-3.9** |
-| D2 achievement/statistics block icons drawn flat | Gate 3 §3; README "Item icons" | yes | scheduled **WP-3.9** |
-| Container close timing: `isUsableByPlayer` close runs at the start of tick N+1 (EntityPlayer.java:80-84) | README "Known deviations" | yes. (a) Walk away from an open chest: the dropped cursor stack gets one `EntityItem` update fewer, and its id comes after tick N's spawns. (b) **A whole tick of input still reaches a container vanilla has already closed.** The port closes in `update_screen`, which runs after `handle_input` in tick N+1's screen hook (gui/mod.rs:344-351). Vanilla closed the window inside tick N's `updateEntities` and routes tick N+1's `handleInput` (Minecraft.java:987-991) to the game. So chest clicks in the tick after walking out of range still move items between the chest and the inventory, which vanilla never allows, and that tick's key and mouse events (a number key, Q, a click) miss the game. (c) A container whose tile entity an explosion removed (§3.1 A, container/mod.rs:115) | **unowned**. Needs `craftingInventory` in mc-sim's player or a shell hook after the player's update; proposed **WP-4.7** with WP-4.6 for the mc-sim side |
-| A screen opened by a click opens at the next tick hook; the rest of that tick's input goes to the game (Minecraft.java:995-1126) | README | yes (a number key or Q in the same tick as the right click on a chest) | **unowned**; proposed **WP-4.7** (`Game::process_input` sets `current_screen` after each controller call that raises a GUI) |
+| D1 third-person held items not drawn (`render::held_item::HeldItemHook` never inserted; `ItemRenderer::player_model_drawn` not called from the third-person draw) | Gate 3 §3; README "Integration status" | yes | scheduled **WP-3.9**; **done (`3063b99`)** |
+| D2 achievement/statistics block icons drawn flat | Gate 3 §3; README "Item icons" | yes | scheduled **WP-3.9**; **done (`be188ed`)** |
+| Container close timing: `isUsableByPlayer` close runs at the start of tick N+1 (EntityPlayer.java:80-84) | README "Known deviations" | yes. (a) Walk away from an open chest: the dropped cursor stack gets one `EntityItem` update fewer, and its id comes after tick N's spawns. (b) **A whole tick of input still reaches a container vanilla has already closed.** The port closes in `update_screen`, which runs after `handle_input` in tick N+1's screen hook (gui/mod.rs:344-351). Vanilla closed the window inside tick N's `updateEntities` and routes tick N+1's `handleInput` (Minecraft.java:987-991) to the game. So chest clicks in the tick after walking out of range still move items between the chest and the inventory, which vanilla never allows, and that tick's key and mouse events (a number key, Q, a click) miss the game. (c) A container whose tile entity an explosion removed (§3.1 A, container/mod.rs:115) | **unowned**. Needs `craftingInventory` in mc-sim's player or a shell hook after the player's update; proposed **WP-4.7** with WP-4.6 for the mc-sim side; **closed (WP-4.7, `9f2708b`, `260e9a8`)**: `PlayerSpData::crafting_inventory`, the close inside `EntityPlayer.onUpdate`; the README deviation is removed |
+| A screen opened by a click opens at the next tick hook; the rest of that tick's input goes to the game (Minecraft.java:995-1126) | README | yes (a number key or Q in the same tick as the right click on a chest) | **unowned**; proposed **WP-4.7** (`Game::process_input` sets `current_screen` after each controller call that raises a GUI); WP-4.7 did not take it: open (GATE4_REVIEW §8 D1) |
 | Portal with a workbench open: vanilla drops the 3 × 3 grid twice (EntityPlayerSP.java:45-47 skips `closeScreen`; the second `EntityItem`s share the first ones' `ItemStack`s); the port drops once | README | yes (rare) | **accepted divergence** of value-typed stacks unless the owner wants it emulated (Q31) |
-| Chest minecart cannot be opened (`InventoryRef` has no entity variant) | README; Gate 3 §4 | yes | scheduled **WP-4.6** |
-| Inventory preview: no hurt overlay, shadow or fire; duplicates `RenderPlayer` code that WP-3.5b has | README; Gate 3 §4 | yes (cosmetic) | **unowned**; candidate for WP-3.9 or wave F (WP-4.1 will list it) |
+| Chest minecart cannot be opened (`InventoryRef` has no entity variant) | README; Gate 3 §4 | yes | scheduled **WP-4.6**; **done (`65c9b52`)** |
+| Inventory preview: no hurt overlay, shadow or fire; duplicates `RenderPlayer` code that WP-3.5b has | README; Gate 3 §4 | yes (cosmetic) | **unowned**; candidate for WP-3.9 or wave F (WP-4.1 will list it); **done (WP-4.9, `3abba70`, `762b05c`)** |
 | No occlusion queries (F3 `O: 0`) | Gate 3 §4 | always | accepted (wgpu has none); a performance item at most, WP-4.3 |
-| `f32` world-space transforms: jitter far from the origin, no floating origin | Gate 3 §4 | far from 0,0 (e.g. the soak site at 20008, −15000) | **unowned**. WP-4.1 should look at a far coordinate; a fix is a client rendering WP |
-| Pass-1 (translucent) sections sorted by Bevy, not nearest first | Gate 3 §4 | fast graphics only | **unowned**, low |
+| `f32` world-space transforms: jitter far from the origin, no floating origin | Gate 3 §4 | far from 0,0 (e.g. the soak site at 20008, −15000) | **unowned**. WP-4.1 should look at a far coordinate; a fix is a client rendering WP; WP-4.9: designed, not built (PERF.md §7; GATE4_REVIEW §8 O1) |
+| Pass-1 (translucent) sections sorted by Bevy, not nearest first | Gate 3 §4 | fast graphics only | **unowned**, low; **done (WP-4.9, `48039fa`)** |
 | `isChunkLit` scoped to the mesher's snapshot | Gate 3 §4 | edge of the snapshot | **unowned**, low |
-| Anaglyph 3D draws one eye | Gate 3 §4; README | anaglyph option | **unowned**, low |
+| Anaglyph 3D draws one eye | Gate 3 §4; README | anaglyph option | **unowned**, low; accepted by WP-4.9 (PERF.md §7; GATE4_REVIEW §8 D3) |
 | `cameraZoom` ignored | Gate 3 §4 | never: b1.7.3 never assigns it | nothing to do (§2.4) |
 | Audio: `ClientEvent`, `ClientSound` and simulation sounds are three streams per frame, not interleaved in call order; `playSound`'s range check uses the view entity's end-of-frame position | README "Audio"; Gate 3 §4 | frames that run more than one tick | accepted (README explains; can change a clock-seeded variant pick or a sound at exactly 16 blocks) |
 | Panning approximates OpenAL's | README "Audio" | always | accepted; WP-4.1 to listen |
 | Audio output not checked at Gate 3 | Gate 3 §4 | — | **WP-4.1** |
 | Import is a typed path field | Gate 3 §4, Q6 | — | owner Q22 |
-| Walking into a real nether portal not exercised | Gate 3 §4, O2 | — | scheduled **WP-3.9** |
-| `click_slot` dev action (O1), `give`/`give_item` merge (N3), README stale note (N1), `mappings.md` duplicates (N2) | Gate 3 §3 | — | scheduled **WP-3.9** |
-| Import refusal log line names the staging path (O4) | Gate 3 §3 | — | **unowned**, cosmetic |
+| Walking into a real nether portal not exercised | Gate 3 §4, O2 | — | scheduled **WP-3.9**; walked at Gate 4 (GATE4_REVIEW §2.3) |
+| `click_slot` dev action (O1), `give`/`give_item` merge (N3), README stale note (N1), `mappings.md` duplicates (N2) | Gate 3 §3 | — | scheduled **WP-3.9**; **done (`b1e1fb2`, `7c50e28`)** |
+| Import refusal log line names the staging path (O4) | Gate 3 §3 | — | **unowned**, cosmetic; **done (WP-3.9, `0bb078f`, `3250228`)** |
 
 ### 3.3 Gate 0–2 divergence and reviewer lists: current status
 
@@ -721,13 +737,16 @@ chest-minecart `InventoryRef`. This review adds:
   is a dev-tool path, equivalent to vanilla. The real walk-in is WP-3.9.
 - **Audio output:** not checked at Gate 3 (WP-4.1).
 
-### 3.6 Proposed follow-up WPs (not scheduled; for the orchestrator and owner)
+### 3.6 Proposed follow-up WPs (for the orchestrator and owner; all three ran in wave F)
+
+Each row ends with what was done.
+
 
 | Proposed | Content | Crates | Size |
 |---|---|---|---|
-| **WP-4.7 Small parity remainder** | (1) Stats autosave: `func_27178_d` / `func_27425_c` / `func_27420_b` on `StatFileWriter`, the send run synchronously from the shell's tick, and the tags relabelled (§2.3). (2) Container close timing (README): close in tick N after the player's update, so tick N+1's input goes to the game as in vanilla (§3.2 b), and the te_gone case of §3.1 A shrinks to an explosion after the player's update. (3) The screen-opened-by-click input routing (README). (4) Q33's two buttons if the owner wants them enabled (and doing nothing). (5) Removed references with a parity effect (§3.1 A): the projectile's shooter (arrow.rs:312: Peaceful bounce, difficulty scaling, knockback, `alertWolves`, the extra `Math.random` draw) and the mob's look target (living.rs:324); a copy of the removed entity's class and position held by the referrer is enough. (6) Optional: merge an existing `stats_<user>.dat` at start-up (`func_27180_b`, §2.3) | mc-sim `stats/` (fixture-neutral), mc-sim `entity/` for (5) (with WP-4.6 or after it), mc-client `game.rs`, `gui/` | small to medium |
-| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): trace the multi-site files of family 2 site by site, then keep a snapshot of taken-out or removed entities for queries and references (the general form of WP-4.7 item 5). (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4. **Done (WP-4.8)**: (1), (3), (4), (5) in full; (2) traced, its neutral half done, four reachable gaps fixed with fixtures, one proposal left (§3.1 E update) | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
-| Rendering follow-up (or wave F) | The `f32` far-origin jitter, the pass-1 sort, the inventory preview's overlay/shadow/fire, anaglyph's second eye | mc-client | by WP-4.1's findings |
+| **WP-4.7 Small parity remainder** | (1) Stats autosave: `func_27178_d` / `func_27425_c` / `func_27420_b` on `StatFileWriter`, the send run synchronously from the shell's tick, and the tags relabelled (§2.3). (2) Container close timing (README): close in tick N after the player's update, so tick N+1's input goes to the game as in vanilla (§3.2 b), and the te_gone case of §3.1 A shrinks to an explosion after the player's update. (3) The screen-opened-by-click input routing (README). (4) Q33's two buttons if the owner wants them enabled (and doing nothing). (5) Removed references with a parity effect (§3.1 A): the projectile's shooter (arrow.rs:312: Peaceful bounce, difficulty scaling, knockback, `alertWolves`, the extra `Math.random` draw) and the mob's look target (living.rs:324); a copy of the removed entity's class and position held by the referrer is enough. (6) Optional: merge an existing `stats_<user>.dat` at start-up (`func_27180_b`, §2.3). **Done (WP-4.7, `9f2708b..ff43be6`)**: (1) and (6) (`9f2708b`, `260e9a8`); (2) (`9f2708b`, `260e9a8`); (5) the look target (`9f2708b`; the shooter was closed by WP-4.6's review, `c49549f`); also P4 (PARITY_CHECKLIST §2), `getCollisionBorderSize` (§3.1 A) and §3.1 E's reused-id proposal (`2f19710`). Not taken: (3) (GATE4_REVIEW §8 D1) and (4) (Q33 open) | mc-sim `stats/` (fixture-neutral), mc-sim `entity/` for (5) (with WP-4.6 or after it), mc-client `game.rs`, `gui/` | small to medium |
+| **WP-4.8 Gap hygiene** | (1) Surface `unimplemented_hits` / `skipped_systems` (a `dump_debug` field in the client, and a per-fixture `gaps` file next to `actual.jsonl`: R7/N7). (2) R5 and the removed-entity family (§3.1 E): trace the multi-site files of family 2 site by site, then keep a snapshot of taken-out or removed entities for queries and references (the general form of WP-4.7 item 5). (3) The coverage checks (N1/R6) and the cross-read `#[ignore]` (N6). (4) Remove the dead code (§3.1 D) and the sim's render-only arms (§3.1 B); fix the stale docs not taken by WP-4.6. (5) The citation nits of §2.4. **Done (WP-4.8, `42acc5d..07c3cd0`)**: (1), (3), (4), (5) in full; (2) traced, its neutral half done, four reachable gaps fixed with fixtures, one proposal left (§3.1 E update) | mc-sim (behaviour-neutral except (2)), mc-golden, mc-client | medium |
+| Rendering follow-up (or wave F) | The `f32` far-origin jitter, the pass-1 sort, the inventory preview's overlay/shadow/fire, anaglyph's second eye. **Done (WP-4.9, `0695eaa..a2e73c3`)**: the pass-1 sort (`48039fa`), the preview's overlay, shadow and fire (`3abba70`, `762b05c`); anaglyph's second eye accepted and the far-origin jitter designed, not built (PERF.md §7; GATE4_REVIEW §8 D3, O1); the rest of wave F is PARITY_CHECKLIST §13 | mc-client | by WP-4.1's findings |
 
 ## 4. PLAN_v4 §5 reconciled with what was delivered (for PLAN_v5)
 
@@ -790,23 +809,23 @@ the WP; PLAN_v4 does not list it. Every per-WP branch still exists
 | 3.7a | Particles | split of 3.7 | 3 | `ad7322c..eac8e64` | done |
 | 3.7b | Hand, item renderer, sRGB compositing | split | 6 | `cd8deb0..6a72090` | done |
 | 3.8 | Audio | plan | 4 | `4f2963f..708d3a6` | done (Gate 3 `d52ac6b`) |
-| 3.9 | Gate 3 defects D1/D2, nits N1–N3, `click_slot` (O1), a real nether-portal walk | **added** | 0 | branch `wp-3.9` | in progress (wave E) |
-| 4.1 | Side-by-side parity checklist → `docs/PARITY_CHECKLIST.md` | plan | 0 | branch `wp-4.1` | in progress (wave E) |
+| 3.9 | Gate 3 defects D1/D2, nits N1–N3, `click_slot` (O1), a real nether-portal walk | **added** | 6 | `3063b99..3250228` | done (wave E) |
+| 4.1 | Side-by-side parity checklist → `docs/PARITY_CHECKLIST.md` | plan | 4 | `0d8c05e..d222a15` | done (wave E) |
 | 4.2 | Long-run soak (5 fixtures, `SOAK` modes) | plan | 5 | `a62b460..70cdb29` | done, on `phase-4` |
-| 4.3 | Performance and packaging → `docs/PERF.md`, `docs/RUNNING.md` | plan | 0 | branch `wp-4.3` | in progress (wave E) |
-| 4.4 | Deferred-tag review → this document | plan (widened) | — | branch `wp-4.4` | this commit |
-| 4.5 | World export → `docs/EXPORT.md` | plan | 0 | branch `wp-4.5` | in progress (wave E) |
-| 4.6 | Sim parity gaps: R2 sites, `alertWolves` tamed branch, chest-minecart `InventoryRef` | **added** | 0 | branch `wp-4.6` | in progress (wave E) |
-| 4.7 | Small parity remainder (§3.6) | **proposed here** | — | — | not scheduled |
-| 4.8 | Gap hygiene (§3.6) | **proposed here** | — | — | not scheduled |
-| wave F | Parity fixes from `PARITY_CHECKLIST.md` | planned by the orchestrator | — | — | after wave E |
-| Gate 4 | Review → `docs/GATE4_REVIEW.md` | plan | — | — | after wave F |
+| 4.3 | Performance and packaging → `docs/PERF.md`, `docs/RUNNING.md` | plan | 8 | `75aac07..177d207` | done (wave E) |
+| 4.4 | Deferred-tag review → this document | plan (widened) | 3 | `27add9b..431a560` | done (wave E) |
+| 4.5 | World export → `docs/EXPORT.md` | plan | 5 | `637fe24..36fcb1e` | done (wave E) |
+| 4.6 | Sim parity gaps: R2 sites, `alertWolves` tamed branch, chest-minecart `InventoryRef` | **added** | 5 | `3a6d370..c49549f` | done (wave E) → `docs/WP4.6_SIM_GAPS.md` |
+| 4.7 | Small parity remainder (§3.6) | **proposed here** | 4 | `9f2708b..ff43be6` | done (wave F) |
+| 4.8 | Gap hygiene (§3.6) | **proposed here** | 10 | `42acc5d..07c3cd0` | done (wave F) |
+| wave F | Parity fixes from `PARITY_CHECKLIST.md` (WP-4.9) | planned by the orchestrator | 13 | `0695eaa..a2e73c3` | done → PARITY_CHECKLIST §13 |
+| Gate 4 | Review → `docs/GATE4_REVIEW.md` | plan | 1 | `c521317` | done; Gate 4 passes |
 | Phase 5 | Browser build: Trunk, browser `Storage`, the user's jar/`resources/` by file picker, audio on first gesture | plan | — | — | not started. The import path box (Q22) needs its browser counterpart there |
 | Phase 6 | Multiplayer, texture packs, sky dimension, pre-McRegion conversion | plan | — | — | owner decisions (Q32) |
 
 Gate documents: `docs/GATE0_REVIEW.md` (added in `a094a54`, WP-0.5's last
 commit), `66c6d09` (Gate 1), `e969e7b` (Gate 2, updated by WP-2.H),
-`d52ac6b` (Gate 3). Other commits outside a WP: `9b47aec` (template
+`d52ac6b` (Gate 3), `c521317` (Gate 4). Other commits outside a WP: `9b47aec` (template
 initial commit) and `a165739` (PLAN_v4 §3.1 `worldgen`).
 
 ## 5. Owner-question backlog (deduplicated)
