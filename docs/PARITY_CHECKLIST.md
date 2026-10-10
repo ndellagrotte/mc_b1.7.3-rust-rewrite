@@ -755,3 +755,111 @@ against the Java before it was applied.
 | Coverage: mob variants | Applied: all 16 sheep colours, `Monster`, an angry pigman, a swelling creeper (§4). A spider jockey cannot be saved in b1.7.3 and a wet wolf was not set up: §10 |
 | Coverage: sound call sites | Applied: 8 new stations (§6) cover `mob.slimeattack`, `zpigangry`, `zpigdeath`, `mob.pigdeath`, the thrown-item and fishing-rod `random.bow`, `random.fizz` twice, `liquid.water`, thunder and lightning. Rejected in part: `random.pop` from snowballs and eggs cannot fire in b1.7.3 (§10). `mob.chickenplop`, `mob.wolf.shake` and a bobber's `random.splash` are in §10 |
 | Coverage: dev profile only | Applied in part: release runs of `g15`, `g05` and F3 (§8.3) |
+
+---
+
+## 13. Wave F results (WP-4.9)
+
+Written 2026-10-10 by the WP-4.9 transcriber (branch `wp-4.9`, off
+`phase-4` at `d222a15`). Each client-side defect of §2 was fixed or
+confirmed against the original client, driven as in §1.1 with a rebuilt
+harness (§13.3; `build/screens/wp49/`, git-ignored, paths below relative to
+it). Rust runs are the dev profile unless marked release; "Wayland" runs
+are straight on the desktop (uncapped), the others on the nested Xwayland
+`:48`, which presents the Vulkan surface at 60 Hz whatever the present mode
+(the vanilla GL window on `:47` is not paced).
+
+### 13.1 Defects
+
+| Defect | Fix | Vanilla re-check evidence |
+|---|---|---|
+| P1, P2 | closed by WP-3.9 (before this WP) | — |
+| **P3** dead player's view | `f934b92`: `render::render_entities` (the early return and the `cacheActiveRenderInfo` fills) and `item_renderer::compute_hand` resolve the view entity / `thePlayer` as `Game::render_view` does (the world's entity, else the detached copy) | `vanilla/death.png` vs `rust/death.png` (view `death`, the Game Over screen ~1.5 s / 120 ticks after landing): both draw the arm (red under the gradient) and the dropped inventory items in front of the camera (their spread is random in both); before the fix Rust drew the terrain only |
+| P4 dead player not saved | not this WP (`mc-sim` `World::save_level`, WP-4.6/4.7 territory) | — |
+| **P5** F3 memory lines | `7611a9c`: `debug::process_memory` from `/proc` (max = `MemTotal/4`, the JVM's default `-Xmx`; total = `VmRSS`; free = `VmRSS - RssAnon`); `3a13a76`: `dump_debug` writes the right column | `rust/f3_right_cmp.png` (vanilla above): `Used memory: 2% (185MB) of 6932MB` / `Allocated memory: 5% (374MB)` against `Used memory: 7% (592MB) of 7796MB` / `Allocated memory: 11% (915MB)`: same lines, real values. Vanilla's 6932 MB is `maxMemory()`, which leaves out one survivor space of the default 7.8 GB heap |
+| **P6** frame rate | `6461094`: no vsync by default (`PresentMode::AutoNoVsync`; b1.7.3 never enables LWJGL's), `terrain::power_saver_sleep` = EntityRenderer.java:364-416's 40 fps sleep; `--vsync on` keeps WP-4.3's `AutoVsync` as the override | Rust on Wayland, `g01`, F3: Balanced 208-251 fps (release 251, dev 233), Max 375 fps, Power saver 41 fps (`rust/out/ps_*.json`). Vanilla on `:47`: 107 fps with fast graphics in this session, 242 fps in WP-4.1's |
+| **P7** `portal.travel` after the load | `b0da87b`: the tick's `UsePortal` runs after `sound::play_client_sounds_now` has started the tick's static plays on kira's audio thread | `snd_portal_walk`, walk in 0.6 s and stay. Vanilla (`ParityLaunch` log + x11grab): `portal.trigger` at +631 ms, `portal.travel` at +4618 ms, the loading screen first in the frame grabbed at about +4.6 s, the new `World` at +4887 ms. Rust (`MC_SOUND_LOG=1`, `screenshot_frames`): `portal.travel` decided 08:20:10.948, `started at once` .964, `Toggling dimension!!` .965, first loading frame 11.132 (before the fix: 2.2 s after the toggle). Trigger to travel: 3.99 s vanilla, 4.00 s Rust |
+| **P8** untextured fluids after loading | `6461094` (`synchronous_pipeline_compilation`) for the blank frames; the flat fluids are vanilla | Per frame (`rust/out/loadmenu/`, title → Singleplayer → Play): before, the two frames after the load were black and sky-only, the first terrain frame came 0.4 s later with flat fluids; now the first frame after the load draws the terrain with `terrain.png`'s still lava and water, the next ones the FX. A **fresh** vanilla process, same path (`vanilla/load_g13_fresh.mkv`, `vanilla/load_fresh_m.png`): the first world frame is sky and fog only, the next ones show flat red lava and flat blue water with the dark sky band. `TextureLavaFX`/`TextureWaterFX` start from zeroed arrays (TextureLavaFX.java:3-80, TextureWaterFX.java:3-90) and the title screen pauses the game, so no `updateDynamicTextures` runs before the first world (Minecraft.java:610, :968). WP-4.1's vanilla capture came from a process that had already run other worlds (`vanilla/load_g13.mkv` of this session shows the same textured lava). Not a Rust defect |
+| **P9** loading bar | none needed: confirmed drawn | `rust/out/loadmenu/f00065.png`: "Loading level / Building terrain" with the green bar at 62 %; the frame before has no bar (progress −1 until the first `setLoadingProgress`), as vanilla. New, fixed in `1186282`: the achievement window was drawn (empty) over a portal's loading screen (`rust/out/portal/f00373.png` before); vanilla's `updateAchievementWindow` is in the loop body that `func_6255_d` blocks (Minecraft.java:585) |
+| **P10** chunk loading | `785a158`: `renderEndNanoTime` is taken at the end of the frame (`Last`, after the Power saver sleep), so the next frame's `updateRenderers` budget (`+1/120 s` at Balanced) holds the GPU wait and the ticks as vanilla's; the choice and order of renderers (`RenderGlobalTerrain::update_renderers`: every near one nearest first, then one far one, the slot-0 bug kept) was already a transcription and is unchanged | `g05`, chunks in the save (`scripts/chunks.py`), see 13.2 |
+| Exit segfault (PERF.md §7) | `6461094` | Not vanilla. `testWorld` imported and `quit` as soon as the world is in, on `:48`: 8 of 8 SIGSEGV with asynchronous pipeline compilation (`coredumpctl`: `wgpu_hal::vulkan::Device::create_render_pipeline` in `libnvidia-glcore`, from a `PipelineCache` task), 0 of 20 with it synchronous; 0 of 20 more on Wayland (`g01`) |
+
+### 13.2 P10 measurements (`g05`, chunks / populated)
+
+| Run | 6 s | 30 s |
+|---|---|---|
+| vanilla (`:47`, uncapped GL), this session | 601 / 543, 608 / 553 | 817 / 760 |
+| vanilla, WP-4.1 | 606, 702 | 817 |
+| Rust dev, Wayland (127-129 fps while loading) | 817 / 760, 817 / 760 | 817 / 760 |
+| Rust release, Wayland (163-166 fps) | 817 / 760, 817 / 760 | 817 / 760 |
+| Rust dev / release, nested `:48` (60 Hz) | 537-540 / 480-484 (4 runs) | 553 / 502, 551 / 499 |
+| Rust, WP-4.1 (vsync, budget from `First`) | dev 539-630, release 734-737 | dev 733, release 817 |
+
+At the same frame rate the policy is vanilla's: one `updateRenderers` call
+builds every renderer within 16 blocks and at most one farther one, and calls
+repeat until `renderEndNanoTime + 1/120 s`. What still differs is a far
+rebuild's cost: vanilla meshes it inside the budget, the port copies a
+snapshot and meshes it on the task pool (the in-flight cap,
+`max_pending_jobs`, is the project's), so on an uncapped display Rust fills
+the 817-chunk area within 6 s where vanilla needs 6-30 s. On a display paced
+at 60 Hz (the nested Xwayland, or `--vsync on`) the wait for the display now
+uses up the budget, so one far renderer is rebuilt per frame: vanilla's
+behaviour with vsync forced, and slower than WP-4.3's budget taken at `First`
+(an owner decision if the pace under vsync matters more than parity; it is a
+one-line change of `mark_render_end`'s schedule). For screenshots whose
+content depends on loading progress, run the Rust side on Wayland.
+
+### 13.3 Rendering follow-ups (DEFERRED_REVIEW §3.6)
+
+| Item | Outcome | Evidence |
+|---|---|---|
+| Pass 1 nearest first (fast graphics) | **Done** (`785a158`): `RenderGlobalTerrain::render_list_order` (renderSortedRenderers' `RenderList` grouping, RenderGlobal.java:529-587) and a per-section pass-1 material whose sort bias is its place in that order | The `ice` world (two ice walls in different sections, glass behind, fast graphics; built by `rust/scripts/ice_build.json`): vanilla hides the far wall behind the near one (depth written by the nearer section first), as Rust now does; before, the far wall showed through (`rust/ice_fast_cmp3.png`: vanilla, new, old; mean difference to vanilla 1.64 new, 2.35 old) |
+| Inventory preview: hurt overlay, shadow, fire | **Done** (`7dc1954`, `d199d18`): the preview runs WP-3.5b's renderers (`render::GuiEntityRenderer`) and `gui::entity_draws::emit` puts their draws into the GUI batcher (`GuiGl` gains `glDepthFunc(GL_EQUAL)`); the batcher copy of `RenderPlayer` is gone | Unhurt (`rust/inv_preview_cmp3.png`: vanilla, new, old): the torso's mean colour (39, 111, 103) vanilla, (39, 110, 102) Rust. Hurt (`snd_fall`, inventory opened in the air; `rust/inv_hurt_cmp.png`): the red overlay in both; the torso's mean (63, 68, 63) vanilla, (79, 72, 66) Rust, the GUI's blends being the known caveat of `gui::render`. Burning (`Fire` 300 in `level.dat`, `rust/inv_fire_vs.png`): the fire around the preview in both, Rust with one-texel lines at the quads' edges where vanilla has fainter ones. The shadow (fancy graphics) is drawn but edge-on in the default pose in both |
+| Anaglyph's second eye | **Accepted** (PERF.md §7): the first eye and the anaglyph textures are drawn | — |
+| `f32` far-origin jitter | **Designed, not built** (PERF.md §7: a `RenderOrigin` on vanilla's 1024-block `posXMinus` grid subtracted before every `f32` placement) | — |
+
+Unchanged scenes (`pix/`, dev, the `d222a15` binary against this branch,
+`:48`): `g01` 1.90, `g04` 3.25, `g13` 4.20, `g22` 1.65 mean difference (two
+`d222a15` runs: 0.39 and 1.25). The differences are the horizon (how far
+chunk loading got, P10), the random-tick decay of the lone flowing lava in
+`g13` (§9.1) and a faint fog-easing ring; the near scene is identical.
+
+### 13.4 The rebuilt harness (`build/screens/wp49/scripts/`, never committed)
+
+WP-4.1's `build/screens/wp41` was gone; this is what replaced it, enough to
+rebuild it:
+
+- `nbt.py`: a gzip NBT reader/writer; `mkview.py OUT VIEW…`: copies a
+  `views.json` world and patches `level.dat` (`Player.Pos` = view y + 3.25,
+  the eye height the example's player stood at; `Rotation`, `Time`,
+  `LevelName`; `noarmor`; `MKVIEW_FIRE=n` sets `Fire`); `chunks.py SAVE…`:
+  chunks, populated chunks and entities by id from the region files;
+  `png.py`: PNG read/write, `montage`, `diff` (mean of the per-pixel max
+  channel difference, share above 24), all without PIL.
+- `xw_start.sh N`: `Xwayland :N -geometry 854x480 -decorate`.
+- `rrun.sh VIEW SCRIPT LOG` (`RBIN`, `RDATA`, `RDISPLAY=x11|wayland`,
+  `RARGS`): a fresh copy of the view in `RDATA/saves`, then the Rust client
+  with `--world VIEW --username parity --script`.
+- `java/ParityLaunch.java` (default package, compiled with `javac --release
+  8` against the unsigned jar of §11 and `lwjgl.jar`): does what
+  `startMainThread` does (`new kq(frame, canvas, null, 854, 480, false,
+  frame)`, `kq` = `MinecraftImpl`; `l` = `minecraftUri`; `k` = `new gr(user,
+  "-")`, `gr` = `Session`; `new kj(mc, thread)`, `kj` = `GameWindowListener`),
+  sets field `B` (`sndManager`) to a `yo` (`SoundManager`) subclass logging
+  `b(String,5×float)` (`playSound`), `a(String,2×float)` (`playSoundFX`) and
+  `a(String,5×float)` (`playStreaming`) with `System.currentTimeMillis()`,
+  replaces field `C` (`mouseHelper`) once set by a `vy` subclass whose `c()`
+  (`mouseXYChange`) drains `Mouse.getDX/DY` and zeroes `a`/`b`, and logs
+  `f` (`theWorld`) and `r` (`currentScreen`) changes every 2 ms (screens by
+  obfuscated class: `fu` main menu, `rq` select world, `oz` in-game menu,
+  `ch` game over). `vanilla_launch.sh VHOME`: Prism's Java 8 with
+  `-Duser.home=VHOME`, `-Djava.library.path` = the jar directory, on `:47`.
+- `vrun.py STATION VIEW` (`death`, `f3`, `portal`, `chunks`, `view`): one
+  fresh `saves/<view>_<n>` per run (§1.2), Singleplayer at (426, 236), a
+  double click on the single row at (427, 195), waits on the log, leaves
+  through Escape and "Save and quit to title" (427, 348) or the Game Over
+  screen's "Title menu" (427, 332), moves the save to `vsaved/`; screenshots
+  with `ffmpeg -f x11grab`, videos with `-framerate 30|60 -c:v ffv1`.
+- Rust scripts in `rust/scripts/`: `death.json`, `f3only.json`,
+  `portal.json`, `loadmenu.json`, `wait120/600.json`, `inv*.json`,
+  `ice_*.json`, `powersaver.json`, `quickquit*.json`, `smoke.json`.

@@ -1337,9 +1337,13 @@ original client (§13 there has the evidence):
 - **Pipelines compile in the frame that needs them (P8, the exit
   segfault).** `mc-app` sets `RenderPlugin::synchronous_pipeline_compilation`:
   the first frame after a load draws the terrain (with `terrain.png`'s
-  still fluid tiles, as vanilla's first frame), not two blank frames, and
-  no pipeline is compiling on a task-pool thread when the process exits.
-  The cost is a one-off hitch the first time a pipeline is needed.
+  still fluid tiles: the title screen pauses the game, so no
+  `updateDynamicTextures` has run yet), not two blank frames, and no
+  pipeline is compiling on a task-pool thread when the process exits. The
+  cost is a one-off hitch the first time a pipeline is needed. The flat
+  water and lava of the next frames are vanilla's too in a fresh process:
+  `TextureWaterFX` and `TextureLavaFX` start from zeroed arrays and take
+  seconds to develop (PARITY_CHECKLIST §13).
 - **The loading bar (P9)** was always drawn; `screenshot_frames` shows it.
   The achievement window is no longer drawn over the loading screen.
 - **`updateRenderers`' budget (P10)** starts at the end of the previous
