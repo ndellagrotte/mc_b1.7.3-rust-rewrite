@@ -15,8 +15,8 @@
 //! | AchievementMap.java | [`AchievementMap`] (the client passes the jar's `map.txt`) |
 //! | MD5String.java | [`file_writer::md5_string`] |
 //! | StatFileWriter.java | [`StatFileWriter`], [`file_writer::func_27177_a`], [`file_writer::func_27185_a`] |
-//! | StatsSyncher.java | the file part in [`StatFileWriter::open`] / [`StatFileWriter::sync_stats`]; the threads and the received copy deferred (D2, [`file_writer`] docs) |
-//! | ThreadStatSyncherReceive.java, ThreadStatSyncherSend.java | deferred (D2) |
+//! | StatsSyncher.java | [`file_writer::StatsSyncher`]; [`StatFileWriter::open`], [`StatFileWriter::func_27178_d`], [`StatFileWriter::sync_stats`] (local files; run synchronously, [`file_writer`] docs) |
+//! | ThreadStatSyncherReceive.java, ThreadStatSyncherSend.java | their bodies, run at once in [`StatFileWriter::open`] and [`StatFileWriter::func_27178_d`] |
 //! | StatStringFormatKeyInv.java, IStatStringFormat.java | client (the inventory key's name in `openInventory`'s description, Minecraft.java:248); not ported |
 //! | `EntityPlayerSP.addStat` (EntityPlayerSP.java:176-192) | [`StatFileWriter::entity_player_sp_add_stat`], reached from [`crate::entity::player::add_stat`] |
 //!
@@ -45,6 +45,6 @@ pub mod stat_base;
 pub mod stat_list;
 
 pub use achievement::Achievement;
-pub use file_writer::{AchievementMap, StatFileWriter};
+pub use file_writer::{AchievementMap, StatFileWriter, StatsSyncher};
 pub use stat_base::{StatBase, StatKind, StatName, StatType};
 pub use stat_list::{StatList, stat};

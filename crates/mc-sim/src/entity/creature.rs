@@ -102,9 +102,12 @@ fn target_alive(world: &World, id: i32) -> bool {
 }
 
 /// `worldObj.getPathToEntity(this, playerToAttack, range)` for a target held
-/// by id; `None` (recorded) when the target is not in its slot.
+/// by id: the loaded entity or the removed object the world keeps
+/// ([`World::entity_object`]: e.g. the dead player, still in
+/// `playerEntities`, that `findPlayerToAttack` returns); `None` (recorded)
+/// when it is taken out or the port no longer has it.
 fn path_to_target(e: &Entity, world: &mut World, target: i32, var1: f32) -> Option<PathEntity> {
-    match world.entity(target).map(|t| t.base.clone()) {
+    match world.entity_object(target).map(|t| t.base.clone()) {
         Some(tb) => world.get_path_to_entity(&e.base, &tb, var1),
         None => {
             world.note_unimplemented(

@@ -197,11 +197,17 @@ pub fn update_player_action_state(e: &mut Entity, world: &mut World) {
     }
 
     let var9 = 64.0;
+    // targetedEntity: the loaded entity, or the removed object the world
+    // keeps while the field names it (World::entity_object), e.g. the dead
+    // player still in playerEntities.
     let target = gd(e).targeted_entity.and_then(|t| {
-        world.entity(t).map(|o| (t, o.base.clone())).or_else(|| {
-            world.note_unimplemented("EntityGhast: targetedEntity not in its slot");
-            None
-        })
+        world
+            .entity_object(t)
+            .map(|o| (t, o.base.clone()))
+            .or_else(|| {
+                world.note_unimplemented("EntityGhast: targetedEntity taken out or no longer kept");
+                None
+            })
     });
     let in_range = target
         .as_ref()

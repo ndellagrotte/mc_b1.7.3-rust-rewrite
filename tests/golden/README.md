@@ -1702,6 +1702,24 @@ Reload and Gate 2's scripted session (WP-2.G; `reload` op above):
   scenario's `comment` lists the steps and ticks. It passes on all 3,237 lines since WP-2.H
   transcribed `EntityItem.onCollideWithPlayer` (it was ignored at Gate 2, first diff at line
   745, t = 78).
+- `tick/dead-player-save-reload` (Tier S, empty world, night, difficulty 1, 130 ticks, WP-4.7,
+  PARITY_CHECKLIST P4): the player falls 39 blocks and dies (health −15), drops its
+  inventory and leaves `loadedEntityList` 21 ticks later, but stays in `playerEntities`
+  (`Entity.setEntityDead`; only `World.setEntityDead` removes it, World.java:934-945). The
+  world keeps reading it: the random-tick chunks around it (`rng_state` `lcg`), the closest
+  player for six pigs' `currentTarget`, a slime's `faceEntity` every tick and a zombie's
+  `findPlayerToAttack`, the despawn distance of the slime moved to y = −80 at t = 95 (more
+  than 128 blocks from the dead player: despawned), and `joinEntityInSurroundings` every
+  30 ticks. `player_state` (t = 60, 99) and `inventory` (t = 99) read the removed
+  `HarnessPlayer`. At t = 100 a `save` (`level.dat`'s `Data.Player`: `Health` −15,
+  `DeathTime` 21, an empty `Inventory`; `"chunks": []`, no chunk lines) and the `reload`:
+  the new player (id 23) reads that compound back, its first update counts `DeathTime` to 22
+  and removes it again; the final `save` at t = 129 holds it. `entity_state` of every entity
+  and `rng_state` every tick. The port without the kept player first differs at t = 56
+  (`rng_state` `lcg`, the random-tick chunks), without `EntityView` reading the removed
+  object at t = 56 (a pig's pitch), and without `saveLevel` reading it at t = 100 (no
+  `Player` compound). The slime leaves before the save because a slime read back from a
+  chunk draws `slimeJumpDelay` from the oracle's unseeded `Random` (census §2).
 
 Vanilla behaviour these fixtures pin down:
 

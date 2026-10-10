@@ -628,14 +628,16 @@ fn run_tick(world: &mut World, h: &mut Harness) {
     world.tick(); // src: Minecraft.java:1164
     if let Some(pid) = h.player {
         // src: Minecraft.java:1167-1169
-        match world.entity(pid) {
+        // A dead player that left loadedEntityList is the object the world
+        // keeps for playerEntities (World::entity_object), as the oracle's
+        // HarnessPlayer reference (WP-4.7).
+        match world.entity_object(pid) {
             Some(p) => h.player_pos = Some((p.base.pos_x, p.base.pos_y, p.base.pos_z)),
             None => {
-                // The oracle reads the removed player's fields, which may have
-                // moved during the update that removed it; the port only has
+                // The port no longer has the player (it left playerEntities):
                 // the position from the end of the previous tick.
                 world.note_unimplemented(
-                    "HarnessWorld.runTick randomDisplayUpdates around a player no longer in loadedEntityList",
+                    "HarnessWorld.runTick randomDisplayUpdates around a player the port no longer has",
                 );
             }
         }
@@ -1674,9 +1676,11 @@ fn inventory_line(world: &World, h: &Harness, t: i64) -> Result<TraceLine, Golde
     let Some(pid) = h.player else {
         return Err(GoldenError::other("dump inventory needs a player op first"));
     };
-    let Some(p) = world.entity(pid) else {
+    // The oracle keeps using its HarnessPlayer object; the port's is in the
+    // list or kept by the world for playerEntities (World::entity_object).
+    let Some(p) = world.entity_object(pid) else {
         return Err(GoldenError::other(format!(
-            "t={t}: dump inventory: the player is no longer in loadedEntityList (the oracle keeps \
+            "t={t}: dump inventory: the port no longer has the player (the oracle keeps \
              using its HarnessPlayer object)"
         )));
     };
@@ -1910,9 +1914,11 @@ fn dump(
             let pid = h
                 .player
                 .ok_or_else(|| GoldenError::other("player_state needs a player op first"))?;
-            let e = world.entity(pid).ok_or_else(|| {
+            // In the list or kept by the world for playerEntities
+            // (World::entity_object), as the oracle's HarnessPlayer object.
+            let e = world.entity_object(pid).ok_or_else(|| {
                 GoldenError::other(format!(
-                    "t={t}: player_state: the player is not in loadedEntityList (the oracle \
+                    "t={t}: player_state: the port no longer has the player (the oracle \
                      keeps its HarnessPlayer object)"
                 ))
             })?;

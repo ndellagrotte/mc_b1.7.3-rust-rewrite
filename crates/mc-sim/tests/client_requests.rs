@@ -523,10 +523,10 @@ fn seed_clock_randoms_leaves_the_counters() {
 #[test]
 fn close_screen_asks_the_client() {
     let mut w = world();
-    let p = client_player(&mut w, 0.5, 61.0, 0.5);
-    player::close_screen(&p, &mut w);
+    let mut p = client_player(&mut w, 0.5, 61.0, 0.5);
+    player::close_screen(&mut p, &mut w);
     assert_eq!(requests(&mut w), vec![ClientRequest::CloseScreen]);
-    let h = harness_player(&mut w, 0.5, 61.0, 0.5);
-    player::close_screen(&h, &mut w);
+    let mut h = harness_player(&mut w, 0.5, 61.0, 0.5);
+    player::close_screen(&mut h, &mut w);
     assert!(requests(&mut w).is_empty());
 }

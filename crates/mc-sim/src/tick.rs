@@ -89,7 +89,7 @@ impl World {
     pub fn is_all_players_fully_asleep(&self) -> bool {
         if self.all_players_sleeping && !self.multiplayer_world {
             for &pid in &self.player_entities {
-                match self.entity(pid).and_then(|p| p.kind.player()) {
+                match self.entity_object(pid).and_then(|p| p.kind.player()) {
                     Some(p) => {
                         if !p.is_player_fully_asleep() {
                             return false;
@@ -118,7 +118,7 @@ impl World {
         let players = self.player_entities.clone();
         for pid in players {
             let sleeping = self
-                .entity(pid)
+                .entity_object(pid)
                 .and_then(|p| p.kind.player())
                 .is_some_and(|p| p.is_player_sleeping());
             if sleeping {
@@ -272,7 +272,9 @@ impl World {
         let centres: Vec<(i32, i32)> = self
             .player_entities
             .iter()
-            .filter_map(|&pid| self.entity(pid))
+            // A dead player that left loadedEntityList is still in
+            // playerEntities (World::prune_removed_entities).
+            .filter_map(|&pid| self.entity_object(pid))
             .map(|p| {
                 (
                     floor_double(p.base.pos_x / 16.0),
@@ -330,7 +332,7 @@ impl World {
                         var8 as f64 + 0.5,
                         8.0,
                     );
-                    let far = var11.and_then(|p| self.entity(p)).is_some_and(|p| {
+                    let far = var11.and_then(|p| self.entity_object(p)).is_some_and(|p| {
                         p.base.get_distance_sq(
                             var7 as f64 + 0.5,
                             var9 as f64 + 0.5,

@@ -4,7 +4,7 @@
 //! call sites (a dig through `PlayerControllerSP`, a craft through
 //! `SlotCrafting`, a kill, a jump and a fall), and `StatFileWriter`'s stats
 //! file (format, checksum, the unsent file's read and save through
-//! `Storage`).
+//! `Storage`), and `StatsSyncher`'s per-tick send and received copy (WP-4.7).
 
 use std::collections::BTreeMap;
 
@@ -352,12 +352,9 @@ fn a_kill_by_a_removed_players_arrow() {
         .unwrap();
     assert!(w.entity(zid).unwrap().kind.living().unwrap().health <= 0);
     assert_eq!(value(w.removed_entity(pid).unwrap(), sl::MOB_KILLS_STAT), 1);
-    assert_eq!(
-        w.unimplemented_hits.borrow().get(
-            "EntityLiving.onDeath: the attacker player has left loadedEntityList; the client's copy of it misses the hook"
-        ),
-        Some(&1)
-    );
+    // The world keeps the dead player for playerEntities, where the client
+    // reads it (WP-4.7): nothing is recorded.
+    assert!(w.unimplemented_hits.borrow().is_empty());
 }
 
 /// `jump` and `fall` (EntityPlayer.java:721-724, :787-793): one jump; a
@@ -537,9 +534,11 @@ fn unsent_file_save_and_open() {
     assert_eq!(r2.field_25101_b, w.field_25101_b);
     assert!(st2.read("mc/options.txt").unwrap().is_some());
 
-    // No file: empty.
+    // No file: empty, with func_27418_a's countdown (StatsSyncher.java:123).
     let r3 = StatFileWriter::open(&mut MemoryStorage::default(), "", "Player", &g).unwrap();
-    assert_eq!(r3, StatFileWriter::default());
+    let mut empty = StatFileWriter::default();
+    empty.stats_syncher.field_27427_l = 100;
+    assert_eq!(r3, empty);
 
     // A failed `renameTo` is ignored (its result is never read): a
     // directory named like a stats file (which `MemoryStorage` cannot
@@ -549,4 +548,123 @@ fn unsent_file_save_and_open() {
     st4.write(dat, &st.read(dat).unwrap().unwrap()).unwrap();
     let r4 = StatFileWriter::open(&mut st4, "mc", "Player", &g).unwrap();
     assert_eq!(r4.field_25101_b, w.field_25101_b);
+}
+
+// ---- StatsSyncher: the per-tick send and the received copy (WP-4.7) -------------------
+
+/// `func_27178_d` (StatFileWriter.java:194-200, StatsSyncher.java:129-190):
+/// nothing is written while the writer is clean; once dirty, the first send
+/// waits for the constructor's 100-tick countdown; each send sets it to 100
+/// again; the dirty flag is never cleared (vanilla bug), so the file is
+/// rewritten every 100 ticks; the countdown stops at 0.
+#[test]
+fn stats_autosave_every_100_ticks() {
+    let g = guids();
+    let mut st = MemoryStorage::default();
+    let dat = "stats/stats_player_unsent.dat";
+    let mut w = StatFileWriter::open(&mut st, "", "Player", &g).unwrap();
+    assert_eq!(w.stats_syncher.field_27427_l, 100);
+    // Clean: the countdown runs out, nothing is sent.
+    for _ in 0..150 {
+        w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    }
+    assert_eq!(w.stats_syncher.field_27427_l, 0);
+    assert_eq!(st.read(dat).unwrap(), None);
+    // Dirty: sent at the next tick, then every 100 ticks.
+    w.entity_player_sp_add_stat(stat(sl::JUMP_STAT), 1);
+    w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    let first = st.read(dat).unwrap().expect("sent");
+    assert_eq!(w.stats_syncher.field_27427_l, 99);
+    let sent = mc_sim::stats::file_writer::func_27408_a(&first, &g).unwrap();
+    assert_eq!(sent.get(&sl::JUMP_STAT), Some(&1));
+    w.entity_player_sp_add_stat(stat(sl::JUMP_STAT), 1);
+    for _ in 0..99 {
+        w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    }
+    // 99 ticks later the countdown is 0 but the send happens at the start of
+    // the next call (the check precedes func_27425_c).
+    assert_eq!(w.stats_syncher.field_27427_l, 0);
+    assert_eq!(st.read(dat).unwrap(), Some(first.clone()));
+    w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    let second = st.read(dat).unwrap().unwrap();
+    assert_ne!(second, first);
+    assert_eq!(
+        st.read("stats/stats_player_unsent.old").unwrap(),
+        Some(first)
+    );
+    assert!(w.field_27189_c);
+    // sync_stats writes without touching the countdown.
+    w.sync_stats(&mut st, "", "Player", &g).unwrap();
+    assert_eq!(w.stats_syncher.field_27427_l, 99);
+}
+
+/// `ThreadStatSyncherReceive` (ThreadStatSyncherReceive.java:15-16) reads
+/// `stats_<user>.dat` at start-up; the first `func_27425_c` merges it into
+/// the totals only (`func_27180_b`, StatFileWriter.java:69-81: received +
+/// unsent), once; the dirty flag and the unsent map are untouched.
+#[test]
+fn a_received_stats_file_is_merged_into_the_totals() {
+    let g = guids();
+    let mut st = MemoryStorage::default();
+    let mut recv = BTreeMap::new();
+    recv.insert(sl::JUMP_STAT, 40);
+    recv.insert(al::OPEN_INVENTORY, 1);
+    st.write(
+        "stats/stats_player.dat",
+        func_27185_a(Some("Player"), Some("local"), &recv, &g).as_bytes(),
+    )
+    .unwrap();
+    let mut unsent = BTreeMap::new();
+    unsent.insert(sl::JUMP_STAT, 2);
+    st.write(
+        "stats/stats_player_unsent.dat",
+        func_27185_a(Some("Player"), Some("local"), &unsent, &g).as_bytes(),
+    )
+    .unwrap();
+    let mut w = StatFileWriter::open(&mut st, "", "Player", &g).unwrap();
+    assert_eq!(w.stats_syncher.field_27437_b.as_ref(), Some(&recv));
+    // Before the merge only the unsent file counts.
+    assert_eq!(w.write_stat(stat(sl::JUMP_STAT).unwrap()), 2);
+    w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    assert_eq!(w.stats_syncher.field_27437_b, None);
+    assert_eq!(w.write_stat(stat(sl::JUMP_STAT).unwrap()), 42);
+    assert!(w.has_achievement_unlocked(stat(al::OPEN_INVENTORY).unwrap()));
+    assert_eq!(w.field_25101_b, unsent);
+    // Merged once: a later stat adds to the merged total.
+    w.entity_player_sp_add_stat(stat(sl::JUMP_STAT), 1);
+    w.func_27178_d(&mut st, "", "Player", &g).unwrap();
+    assert_eq!(w.write_stat(stat(sl::JUMP_STAT).unwrap()), 43);
+    // A received file with a bad checksum gives null: nothing merged.
+    let mut st2 = MemoryStorage::default();
+    st2.write(
+        "stats/stats_player.dat",
+        b"{\"stats-change\":[{\"2010\":5}],\"checksum\":\"0\"}",
+    )
+    .unwrap();
+    let mut w2 = StatFileWriter::open(&mut st2, "", "Player", &g).unwrap();
+    assert_eq!(w2.stats_syncher.field_27437_b, None);
+    w2.func_27178_d(&mut st2, "", "Player", &g).unwrap();
+    assert!(w2.field_25102_a.is_empty());
+}
+
+/// `func_27187_c` (StatFileWriter.java:83-94) adds to the unsent map only
+/// and marks the writer dirty; `func_27420_b` (StatsSyncher.java:167-169)
+/// is false while `field_27436_c` holds a map.
+#[test]
+fn func_27187_c_and_the_idle_test() {
+    let mut w = StatFileWriter::default();
+    let mut m = BTreeMap::new();
+    m.insert(sl::JUMP_STAT, 3);
+    w.func_27187_c(Some(&m));
+    assert!(w.field_27189_c);
+    assert_eq!(w.field_25101_b.get(&sl::JUMP_STAT), Some(&3));
+    assert!(w.field_25102_a.is_empty());
+    assert!(w.stats_syncher.func_27420_b());
+    w.stats_syncher.field_27436_c = Some(m);
+    assert!(!w.stats_syncher.func_27420_b());
+    w.func_27425_c();
+    assert_eq!(w.field_25101_b.get(&sl::JUMP_STAT), Some(&6));
+    assert!(w.stats_syncher.func_27420_b());
+    w.stats_syncher.field_27427_l = 1;
+    assert!(!w.stats_syncher.func_27420_b());
 }

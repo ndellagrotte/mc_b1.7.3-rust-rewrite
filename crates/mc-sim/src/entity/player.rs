@@ -65,7 +65,11 @@
 //! `closeScreen`'s `mc.displayGuiScreen(null)` (EntityPlayerSP.java:108-111)
 //! is [`close_screen`] ([`ClientRequest::CloseScreen`]); its caller,
 //! `EntityPlayer.onUpdate`'s `craftingInventory.isUsableByPlayer` check
-//! (EntityPlayer.java:81-84), needs the GUI containers (WP-3.6).
+//! (EntityPlayer.java:81-84), runs in [`on_update`] on the open GUI's
+//! container, which the client's `GuiContainer.initGui` hands to the player
+//! ([`PlayerSpData::crafting_inventory`]); the screen's `onGuiClosed`
+//! drops that `mc.displayGuiScreen(null)` runs at once happen there too
+//! ([`close_screen_dropping`], WP-4.7).
 //!
 //! Out of scope, client: `setHealth` (multiplayer packets), the
 //! `MouseFilter`s.
@@ -74,10 +78,10 @@
 //!
 //! | EntityPlayer.java | Method | Port |
 //! |---|---|---|
-//! | 7-38 | fields | [`PlayerData`] (not `inventorySlots`/`craftingInventory`: the `ContainerPlayer`, WP-2.5b; not `playerCloakUrl`, D2) |
+//! | 7-38 | fields | [`PlayerData`] (not `inventorySlots`: no persistent `ContainerPlayer`, WP-2.5b; `craftingInventory` is [`PlayerSpData::crafting_inventory`], WP-4.7; not `playerCloakUrl`, D2) |
 //! | 40-57 | constructor, `entityInit` | [`new_entity_player_sp`] |
 //! | 59-125 | `onUpdate` | [`on_update`] |
-//! | 127-133 | `isMovementBlocked`, `closeScreen` | [`is_movement_blocked`]; `closeScreen` only resets `craftingInventory` (WP-2.5b) |
+//! | 127-133 | `isMovementBlocked`, `closeScreen` | [`is_movement_blocked`]; [`close_screen`] (with `EntityPlayerSP`'s, EntityPlayerSP.java:108-111) |
 //! | 135-138 | `updateCloak` | online cloak URL (D2), not ported |
 //! | 140-156 | `updateRidden`, `preparePlayerToSpawn` | [`update_ridden`], [`prepare_player_to_spawn`] |
 //! | 158-212 | `updatePlayerActionState`, `onLivingUpdate`, `collideWithPlayer` | [`update_player_action_state`], [`on_living_update`] |
@@ -209,11 +213,25 @@ impl MovementInput {
 }
 
 /// `EntityPlayerSP` (EntityPlayerSP.java:6-10): `movementInput`. Not here:
-/// `mc` and the three `MouseFilter`s (client).
+/// `mc` and the three `MouseFilter`s (client). Also `EntityPlayer`'s
+/// `craftingInventory` while a GUI has replaced it
+/// ([`PlayerSpData::crafting_inventory`]; the port's only player kind is
+/// this one).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PlayerSpData {
     /// `movementInput` (EntityPlayerSP.java:6).
     pub movement_input: MovementInput,
+    /// `EntityPlayer.craftingInventory` (EntityPlayer.java:9) when it is
+    /// not `inventorySlots`: the container of the open `GuiContainer`, which
+    /// `GuiContainer.initGui` puts here (GuiContainer.java:16-19) and the
+    /// screen works on from then on, as Java's screen and player share the
+    /// object. `None` is `inventorySlots` (the `ContainerPlayer`, always
+    /// usable, ContainerPlayer.java:61-63; the port keeps no persistent
+    /// one, WP-2.5b), which `closeScreen` restores (EntityPlayer.java:131-133).
+    /// [`on_update`] closes the window when it is no longer usable
+    /// (EntityPlayer.java:81-84). The oracle's `HarnessPlayer` never opens a
+    /// GUI, so it stays `None` there. Not saved (Java does not save it).
+    pub crafting_inventory: Option<crate::inventory::container::Container>,
     /// Whether `EntityPlayerSP.onLivingUpdate`'s own body runs (module docs):
     /// true in the client, false for the golden harness (`HarnessPlayer`).
     pub client_additions: bool,
@@ -303,7 +321,8 @@ pub fn new_entity_player_sp(world: &mut World) -> Entity {
     // EntityPlayer field initialisers (EntityPlayer.java:7-38).
     let mut p = PlayerData::default();
     // Constructor body (EntityPlayer.java:41-51).
-    // inventorySlots / craftingInventory: ContainerPlayer, WP-2.5b.
+    // inventorySlots / craftingInventory: the ContainerPlayer (none kept,
+    // WP-2.5b; PlayerSpData::crafting_inventory None).
     b.y_offset = 1.62;
     let var2 = world.get_spawn_point();
     b.set_location_and_angles(
@@ -354,10 +373,19 @@ pub fn on_update(e: &mut Entity, world: &mut World) {
     }
 
     living::on_update(e, world);
-    // src: EntityPlayer.java:81-84: `craftingInventory.isUsableByPlayer(this)`
-    // is ContainerPlayer's `true` (ContainerPlayer.java:61-63) while no GUI
-    // replaced it (WP-2.5b), so closeScreen ([`close_screen`]) never runs
-    // here until the GUI containers exist (WP-3.6).
+    // src: EntityPlayer.java:81-84. Without a GUI, craftingInventory is the
+    // ContainerPlayer, always usable (PlayerSpData::crafting_inventory).
+    if !world.multiplayer_world
+        && let Some(c) = sp_mut(e).crafting_inventory.take()
+    {
+        if c.is_usable_by_player(world, e) {
+            sp_mut(e).crafting_inventory = Some(c);
+        } else {
+            // this.closeScreen(); this.craftingInventory = this.inventorySlots
+            // (the container stays taken out: None is inventorySlots).
+            close_screen_dropping(e, world, c);
+        }
+    }
 
     let (px, py, pz) = (e.base.pos_x, e.base.pos_y, e.base.pos_z);
     let p = player_mut(e);
@@ -611,11 +639,10 @@ impl KillHook {
 /// player back in its slot). Nothing else reads the score or the
 /// statistics in between. A player that has left `loadedEntityList` (dead
 /// for 20 ticks, its arrow still in flight) gets the hook on the removed
-/// object the world keeps while the arrow names it
-/// ([`World::removed_entity`]), as Java updates the orphaned object. That
-/// case is also recorded: the client shows and keeps the dead player from
-/// its own copy (the game-over score, `Minecraft.statFileWriter`), which
-/// does not see the hook.
+/// object the world keeps for `playerEntities`
+/// ([`World::removed_entity`]), as Java updates the orphaned object; the
+/// client reads the dead player and its `Minecraft.statFileWriter` from
+/// there (WP-4.7).
 // src: EntityLiving.java:408-414
 pub fn kill_hooks(world: &mut World, attacker: &Entity, victim: &Entity, score: Option<i32>) {
     if !attacker.kind.is_player() {
@@ -638,9 +665,6 @@ pub fn kill_hooks(world: &mut World, attacker: &Entity, victim: &Entity, score: 
         world.pending_kill_hooks.push(h);
     } else if let Some(p) = world.removed_entity_mut(h.attacker) {
         h.apply(p);
-        world.note_unimplemented(
-            "EntityLiving.onDeath: the attacker player has left loadedEntityList; the client's copy of it misses the hook",
-        );
     } else {
         world.note_unimplemented(
             "EntityLiving.onDeath: the attacker is no longer in loadedEntityList (Java still holds it)",
@@ -812,14 +836,64 @@ pub fn display_gui(e: &Entity, world: &mut World, gui: PlayerGui) {
 }
 
 /// `closeScreen()`: `EntityPlayer`'s resets `craftingInventory` to
-/// `inventorySlots` (EntityPlayer.java:131-133; not modelled, WP-2.5b);
-/// `EntityPlayerSP`'s then closes the screen (`mc.displayGuiScreen(null)`),
-/// here [`ClientRequest::CloseScreen`].
-// src: EntityPlayerSP.java:108-111
-pub fn close_screen(e: &Entity, world: &mut World) {
+/// `inventorySlots` (EntityPlayer.java:131-133:
+/// [`PlayerSpData::crafting_inventory`] to `None`); `EntityPlayerSP`'s then
+/// closes the screen (`mc.displayGuiScreen(null)`), here
+/// [`ClientRequest::CloseScreen`]. A container still open is closed without
+/// its drops (the client's screen makes them, [`close_screen_dropping`] for
+/// the simulation's own close).
+// src: EntityPlayer.java:131-133, EntityPlayerSP.java:108-111
+pub fn close_screen(e: &mut Entity, world: &mut World) {
+    sp_mut(e).crafting_inventory = None;
     if is_client_player(e) {
         world.client_requests.push(ClientRequest::CloseScreen);
     }
+}
+
+/// [`close_screen`] on the container `c` the player had open (already taken
+/// out of [`PlayerSpData::crafting_inventory`]), from inside the player's
+/// update (EntityPlayer.java:82): for the client's `EntityPlayerSP`,
+/// `mc.displayGuiScreen(null)` runs the screen's `onGuiClosed` at once,
+/// whose `onCraftGuiClosed` drops the stack on the cursor and the crafting
+/// grid (`PlayerController.func_20086_a` on `craftingInventory`, now the
+/// `ContainerPlayer`, then `GuiCrafting`'s own call on the
+/// `ContainerWorkbench`, GuiContainer.java:162-166, GuiCrafting.java:10-13:
+/// one call on `c` makes the same drops in the same order, see the
+/// client's `GuiContainer::on_gui_closed`). So the dropped items join the
+/// world during the player's update and are updated later in the same
+/// `updateEntities`, as in vanilla; the client's screen then closes with
+/// nothing left to drop. `EntityPlayer`'s `closeScreen` (the oracle's
+/// `HarnessPlayer`) only resets `craftingInventory`: nothing is dropped.
+// src: EntityPlayer.java:81-84, :131-133; EntityPlayerSP.java:108-111
+pub fn close_screen_dropping(
+    e: &mut Entity,
+    world: &mut World,
+    mut c: crate::inventory::container::Container,
+) {
+    if is_client_player(e) {
+        c.on_craft_gui_closed(world, e);
+    }
+    close_screen(e, world);
+}
+
+/// [`PlayerSpData::crafting_inventory`]: the open GUI's container, `None`
+/// for `inventorySlots`.
+pub fn crafting_inventory(e: &Entity) -> Option<&crate::inventory::container::Container> {
+    match &e.kind {
+        EntityKindData::PlayerSp(_, _, s) => s.crafting_inventory.as_ref(),
+        _ => None,
+    }
+}
+
+/// `player.craftingInventory = container` (`GuiContainer.initGui`,
+/// GuiContainer.java:16-19); `None` restores `inventorySlots`. Returns the
+/// container it replaces.
+// src: GuiContainer.java:16-19, EntityPlayer.java:9
+pub fn set_crafting_inventory(
+    e: &mut Entity,
+    c: Option<crate::inventory::container::Container>,
+) -> Option<crate::inventory::container::Container> {
+    std::mem::replace(&mut sp_mut(e).crafting_inventory, c)
 }
 
 /// `addChatMessage(key)`: empty in `EntityPlayer` (EntityPlayer.java:698-699);
@@ -1119,19 +1193,32 @@ fn current_item_slot(e: &Entity) -> Option<usize> {
 
 /// `EntityPlayer.setEntityDead()`: `Entity`'s, then
 /// `inventorySlots.onCraftGuiClosed(this)` and the same for
-/// `craftingInventory` (the same `ContainerPlayer` without a GUI, so twice):
-/// `Container.onCraftGuiClosed` drops the stack held by the cursor
-/// (`inventory.itemStack`). `ContainerPlayer`'s crafting grid (dropped too,
-/// ContainerPlayer.java:48-59) is WP-2.5b; it is empty without a GUI.
+/// `craftingInventory`: `Container.onCraftGuiClosed` drops the stack held
+/// by the cursor (`inventory.itemStack`). Without a GUI `craftingInventory`
+/// is the same `ContainerPlayer`, so its part runs twice; its crafting grid
+/// (dropped too, ContainerPlayer.java:48-59) is empty without a GUI (the
+/// port keeps no persistent one, WP-2.5b). With a GUI's container open
+/// ([`PlayerSpData::crafting_inventory`]) that container's
+/// `onCraftGuiClosed` runs instead (its grid's drops too); it stays the
+/// player's `craftingInventory`, as in Java.
 // src: EntityPlayer.java:524-531, Container.java:152-159
 pub fn set_entity_dead(e: &mut Entity, world: &mut World) {
     e.base.set_entity_dead();
-    for _ in 0..2 {
+    let drop_cursor = |e: &mut Entity, world: &mut World| {
         if let Some(s) = player(e).inventory.item_stack {
             drop_player_item(e, world, Some(s));
             // setItemStack(null): onItemStackChanged is empty (EntityPlayer.java:521-522)
             player_mut(e).inventory.item_stack = None;
         }
+    };
+    // src: EntityPlayer.java:526 (inventorySlots)
+    drop_cursor(e, world);
+    // src: EntityPlayer.java:527-529 (craftingInventory, never null)
+    if let Some(mut c) = sp_mut(e).crafting_inventory.take() {
+        c.on_craft_gui_closed(world, e);
+        sp_mut(e).crafting_inventory = Some(c);
+    } else {
+        drop_cursor(e, world);
     }
 }
 

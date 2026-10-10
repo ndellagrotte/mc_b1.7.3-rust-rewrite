@@ -22,18 +22,35 @@
 //!
 //! # Scope
 //!
-//! `StatsSyncher`'s file handling that singleplayer uses is here, run
-//! synchronously through [`Storage`] (D9): the start-up relocation and
-//! renames and the unsent file's read ([`StatFileWriter::open`]), and the
-//! save with its `.tmp`/`.old` rotation ([`StatFileWriter::sync_stats`]).
-//! Deferred (D2, stats sync): the background threads
-//! (`ThreadStatSyncherReceive`/`Send`, `func_27418_a`, `func_27424_a`), the
-//! received copy `stats_<user>.dat` they read and merge (`func_27180_b`,
-//! `func_27187_c` through `func_27425_c`), and the per-tick
-//! `func_27178_d` (Minecraft.java:949) that schedules them; in
-//! singleplayer nothing ever writes `stats_<user>.dat`. When the client
-//! calls [`StatFileWriter::sync_stats`] (Minecraft.java:420, :460, :1270:
-//! world change and shutdown) is the client's.
+//! `StatsSyncher` (StatsSyncher.java) is local file I/O, nothing online:
+//! b1.7.3's "sync" writes and reads files under `stats/`. Here it runs
+//! synchronously through [`Storage`] (D9), where Java starts a thread:
+//!
+//! - start-up ([`StatFileWriter::open`]): the relocation and renames, the
+//!   unsent file's read, and `func_27418_a`'s countdown and receive thread
+//!   (`ThreadStatSyncherReceive`: the received copy `stats_<user>.dat`,
+//!   kept in [`StatsSyncher::field_27437_b`] for the first tick to merge);
+//! - every tick (`Minecraft.runTick` calls `func_27178_d` first,
+//!   Minecraft.java:949; [`StatFileWriter::func_27178_d`]): once the
+//!   writer is dirty and the 100-tick countdown has run out, the send
+//!   (`func_27424_a`, `ThreadStatSyncherSend`: the unsent map written to
+//!   `stats_<user>_unsent.dat` through `.tmp` and `.old`), then
+//!   `func_27425_c` (the countdowns, and the received map merged into the
+//!   totals by `func_27180_b`);
+//! - [`StatFileWriter::sync_stats`] (Minecraft.java:420, :460, :1270: a
+//!   screen change, a world change and shutdown) writes the same file at
+//!   once.
+//!
+//! The busy flag `field_27438_a` only guards the threads: a synchronous
+//! send or receive has finished before anything reads it, so it is false
+//! whenever [`StatsSyncher::func_27420_b`] runs. Vanilla bug (transcribed):
+//! nothing clears the dirty flag `field_27189_c`, so from the first counted
+//! stat on the file is written every 100 ticks, on the title screen too.
+//! In singleplayer nothing writes `stats_<user>.dat` (the receive thread
+//! writes it only from a map the receive itself sets, and it runs once,
+//! before that map exists), but a file can be there: the constructor moves
+//! any `stats_*.dat` from the data directory into `stats/`, or one is
+//! copied in from another `.minecraft`; it is merged as in vanilla.
 
 use std::collections::BTreeMap;
 
@@ -395,8 +412,11 @@ pub struct StatFileWriter {
     /// `func_27176_a` copies for the stats file.
     pub field_25101_b: BTreeMap<i32, i32>,
     /// `field_27189_c` (private): set when a stat is added or a file is
-    /// merged; only the deferred `func_27178_d` reads it.
+    /// merged, never cleared (module docs); [`StatFileWriter::func_27178_d`]
+    /// sends only once it is set.
     pub field_27189_c: bool,
+    /// `statsSyncher` (private): the file side (module docs).
+    pub stats_syncher: StatsSyncher,
     /// The achievements `EntityPlayerSP.addStat` passed to
     /// `mc.guiAchievement.queueTakenAchievement` (the client's toast),
     /// as `statId`s in order; the client drains it.
@@ -429,6 +449,89 @@ impl StatFileWriter {
                 write_stat_to_map(&mut self.field_25101_b, var3, v);
                 write_stat_to_map(&mut self.field_25102_a, var3, v);
             }
+        }
+    }
+
+    /// `func_27180_b(map)`: the received copy merged into the totals: each
+    /// stat's total becomes the received value plus the unsent change
+    /// (null: nothing). The dirty flag is not touched.
+    // src: StatFileWriter.java:69-81
+    pub fn func_27180_b(&mut self, var1: Option<&BTreeMap<i32, i32>>) {
+        if let Some(var1) = var1 {
+            for (&var3, &v) in var1 {
+                let var5 = self.field_25101_b.get(&var3).copied().unwrap_or(0);
+                self.field_25102_a.insert(var3, v.wrapping_add(var5));
+            }
+        }
+    }
+
+    /// `func_27187_c(map)`: a map added to the unsent changes only (null:
+    /// nothing); marks the writer dirty. Its one caller,
+    /// [`StatsSyncher::func_27425_c`], passes `field_27436_c`, which nothing
+    /// in the client tree sets.
+    // src: StatFileWriter.java:83-94
+    pub fn func_27187_c(&mut self, var1: Option<&BTreeMap<i32, i32>>) {
+        if let Some(var1) = var1 {
+            self.field_27189_c = true;
+            for (&var3, &v) in var1 {
+                write_stat_to_map(&mut self.field_25101_b, var3, v);
+            }
+        }
+    }
+
+    /// `func_27178_d()`, once per `runTick` (Minecraft.java:949): when the
+    /// writer is dirty and the syncher idle (the countdown run out),
+    /// `func_27424_a(func_27176_a())` (the countdown back to 100, then the
+    /// send thread's write of the unsent file, here at once); then
+    /// `func_27425_c`. A failed write is returned after the countdowns
+    /// have run (the thread prints its exception and frees the syncher).
+    // src: StatFileWriter.java:194-200, StatsSyncher.java:129-137,
+    // ThreadStatSyncherSend.java:12-21
+    pub fn func_27178_d(
+        &mut self,
+        storage: &mut dyn Storage,
+        mc_data_dir: &str,
+        username: &str,
+        guids: &AchievementMap,
+    ) -> Result<(), StorageError> {
+        let mut sent = Ok(());
+        if self.field_27189_c && self.stats_syncher.func_27420_b() {
+            // func_27424_a: the busy flag is never set here (module docs).
+            self.stats_syncher.field_27427_l = 100;
+            let map = self.func_27176_a();
+            let files = StatsFiles::new(&join(mc_data_dir, "stats"), username);
+            sent = func_27410_a(
+                storage,
+                username,
+                &map,
+                &files.unsent_dat,
+                &files.unsent_tmp,
+                &files.unsent_old,
+                guids,
+            );
+        }
+        self.func_27425_c();
+        sent
+    }
+
+    /// `statsSyncher.func_27425_c()` (it calls back into this writer):
+    /// counts both countdowns down to 0, and merges a map the threads left
+    /// (`field_27436_c` into the unsent changes, `field_27437_b`, the
+    /// received copy, into the totals), each once.
+    // src: StatsSyncher.java:171-190
+    pub fn func_27425_c(&mut self) {
+        let s = &mut self.stats_syncher;
+        if s.field_27427_l > 0 {
+            s.field_27427_l -= 1;
+        }
+        if s.field_27426_m > 0 {
+            s.field_27426_m -= 1;
+        }
+        if let Some(m) = self.stats_syncher.field_27436_c.take() {
+            self.func_27187_c(Some(&m));
+        }
+        if let Some(m) = self.stats_syncher.field_27437_b.take() {
+            self.func_27180_b(Some(&m));
         }
     }
 
@@ -478,14 +581,16 @@ impl StatFileWriter {
         }
     }
 
-    /// `new StatFileWriter(session, mcDataDir)` with the local part of
+    /// `new StatFileWriter(session, mcDataDir)` with
     /// `new StatsSyncher(...)`: moves `stats_*.dat` files from the data
     /// directory into `stats/` (unless already there), renames
     /// mixed-case `stats_<username>*` files to the lower-case names, then
-    /// merges the unsent file if it exists. `mc_data_dir` is a [`Storage`]
-    /// path ("" for the storage root). The receive thread is deferred
-    /// (module docs).
-    // src: StatFileWriter.java:16-37, StatsSyncher.java:26-49
+    /// merges the unsent file if it exists, and runs `func_27418_a`: the
+    /// countdown set to 100 and the receive thread, here at once
+    /// (module docs). `mc_data_dir` is a [`Storage`] path ("" for the
+    /// storage root).
+    // src: StatFileWriter.java:16-37, StatsSyncher.java:26-49, :119-127,
+    // ThreadStatSyncherReceive.java:11-24
     pub fn open(
         storage: &mut dyn Storage,
         mc_data_dir: &str,
@@ -527,14 +632,23 @@ impl StatFileWriter {
             )?;
             w.func_27179_a(m.as_ref());
         }
+        // src: StatsSyncher.java:48 (func_27418_a): the countdown, then the
+        // receive thread. Its first branch (a received map to write back,
+        // ThreadStatSyncherReceive.java:13-14) needs field_27437_b, which
+        // is null here; the second reads stats_<user>.dat (:15-16).
+        w.stats_syncher.field_27427_l = 100;
+        if storage.read(&files.dat)?.is_some() {
+            w.stats_syncher.field_27437_b =
+                func_27415_a(storage, &files.dat, &files.tmp, &files.old, guids)?;
+        }
         Ok(w)
     }
 
     /// `syncStats()`: `StatsSyncher.syncStatsFileWithMap(func_27176_a())`
-    /// without the busy-wait for the (deferred) threads: writes the unsent
-    /// map to `stats_<user>_unsent.tmp`, deletes `_unsent.old`, renames the
-    /// current `_unsent.dat` to `_unsent.old` and the `.tmp` to
-    /// `_unsent.dat`.
+    /// without the busy-wait for the threads (none is ever running, module
+    /// docs): writes the unsent map to `stats_<user>_unsent.tmp`, deletes
+    /// `_unsent.old`, renames the current `_unsent.dat` to `_unsent.old`
+    /// and the `.tmp` to `_unsent.dat`. The countdown is not touched.
     // src: StatFileWriter.java:190-192, StatsSyncher.java:99-117, :139-165
     pub fn sync_stats(
         &self,
@@ -544,21 +658,73 @@ impl StatFileWriter {
         guids: &AchievementMap,
     ) -> Result<(), StorageError> {
         let files = StatsFiles::new(&join(mc_data_dir, "stats"), username);
-        let text = func_27185_a(Some(username), Some("local"), &self.func_27176_a(), guids);
-        // func_27410_a(map, unsent.dat, unsent.tmp, unsent.old)
-        storage.write(&files.unsent_tmp, text.as_bytes())?;
-        // `File.delete` and `File.renameTo` report failure by returning
-        // false, which vanilla ignores: a failed step does not stop the
-        // next one (StatsSyncher.java:108-116).
-        if storage.read(&files.unsent_old)?.is_some() {
-            let _ = storage.delete(&files.unsent_old);
-        }
-        if storage.read(&files.unsent_dat)?.is_some() {
-            let _ = storage.rename(&files.unsent_dat, &files.unsent_old);
-        }
-        let _ = storage.rename(&files.unsent_tmp, &files.unsent_dat);
-        Ok(())
+        func_27410_a(
+            storage,
+            username,
+            &self.func_27176_a(),
+            &files.unsent_dat,
+            &files.unsent_tmp,
+            &files.unsent_old,
+            guids,
+        )
     }
+}
+
+/// `StatsSyncher`'s state (StatsSyncher.java:12-24) without the files
+/// (named from the username by [`StatsFiles`]) and the back references.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StatsSyncher {
+    /// `field_27438_a` (private, volatile): a thread is running. Always
+    /// false between calls here (module docs).
+    pub field_27438_a: bool,
+    /// `field_27437_b` (private, volatile): the received copy
+    /// (`stats_<user>.dat`) waiting for `func_27425_c` to merge it.
+    pub field_27437_b: Option<BTreeMap<i32, i32>>,
+    /// `field_27436_c` (private, volatile): read and cleared by
+    /// `func_27425_c`, never set in the client tree.
+    pub field_27436_c: Option<BTreeMap<i32, i32>>,
+    /// `field_27427_l` (private): ticks until the next send may start
+    /// (100 after the constructor and after each send).
+    pub field_27427_l: i32,
+    /// `field_27426_m` (private): counted down, never set (0).
+    pub field_27426_m: i32,
+}
+
+impl StatsSyncher {
+    /// `func_27420_b()`: the countdown has run out, no thread is running and
+    /// nothing waits in `field_27436_c`.
+    // src: StatsSyncher.java:167-169
+    pub fn func_27420_b(&self) -> bool {
+        self.field_27427_l <= 0 && !self.field_27438_a && self.field_27436_c.is_none()
+    }
+}
+
+/// `StatsSyncher.func_27410_a(map, file, tmp, old)` (private): the map in
+/// `func_27185_a`'s format (`username`, salt `"local"`) written to `tmp`,
+/// `old` deleted, `file` renamed to `old`, `tmp` to `file`.
+// src: StatsSyncher.java:99-117
+fn func_27410_a(
+    storage: &mut dyn Storage,
+    username: &str,
+    var1: &BTreeMap<i32, i32>,
+    var2: &str,
+    var3: &str,
+    var4: &str,
+    guids: &AchievementMap,
+) -> Result<(), StorageError> {
+    let text = func_27185_a(Some(username), Some("local"), var1, guids);
+    storage.write(var3, text.as_bytes())?;
+    // `File.delete` and `File.renameTo` report failure by returning
+    // false, which vanilla ignores: a failed step does not stop the
+    // next one (StatsSyncher.java:108-116).
+    if storage.read(var4)?.is_some() {
+        let _ = storage.delete(var4);
+    }
+    if storage.read(var2)?.is_some() {
+        let _ = storage.rename(var2, var4);
+    }
+    let _ = storage.rename(var3, var2);
+    Ok(())
 }
 
 /// `writeStatToMap(map, stat, n)` (private): adds `n` (Java `int`,
@@ -585,7 +751,7 @@ fn join(a: &str, b: &str) -> String {
 pub struct StatsFiles {
     /// `field_27434_e`: `stats_<user>_unsent.dat`, the singleplayer stats.
     pub unsent_dat: String,
-    /// `field_27433_f`: `stats_<user>.dat`, the received copy (deferred).
+    /// `field_27433_f`: `stats_<user>.dat`, the received copy.
     pub dat: String,
     /// `field_27430_i`: `stats_<user>_unsent.old`.
     pub unsent_old: String,

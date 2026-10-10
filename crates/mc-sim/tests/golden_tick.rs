@@ -276,6 +276,10 @@ fixtures! {
     // Gate 2's scripted session (passes since WP-2.H's EntityItem pickup); the
     // reload part alone is also in tick/reload-generated.
     tick_gate2_session => "tick" / "gate2-session";
+    // WP-4.7: a dead player stays in playerEntities after it leaves
+    // loadedEntityList; level.dat saves it and the reload reads it back
+    // (PARITY_CHECKLIST P4).
+    tick_dead_player_save_reload => "tick" / "dead-player-save-reload";
 }
 
 /// Every `tests/golden/{tick,entity,light}/<name>` with a `scenario.json` has a test

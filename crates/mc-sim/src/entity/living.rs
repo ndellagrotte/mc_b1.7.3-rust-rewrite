@@ -305,11 +305,18 @@ pub struct EntityView {
 }
 
 impl EntityView {
-    /// The view of a loaded entity; `None` (recorded) when it is not in
-    /// `loadedEntityList` or is taken out, where Java would still hold the
-    /// object.
+    /// The view of the object a field names as entity `id`
+    /// ([`World::entity_object`]): the loaded entity, or the removed one the
+    /// world keeps while a field names it (Java's field still holds the
+    /// object, unchanged since it left `loadedEntityList`). So
+    /// `updatePlayerActionState`'s `faceEntity(currentTarget)` turns an idle
+    /// mob toward the position of a target that has just been removed (the
+    /// dead player 21 ticks after its death) once more before the `isDead`
+    /// test drops it (EntityLiving.java:704-711), as in Java. `None`
+    /// (recorded) when it is taken out further up the stack or the port no
+    /// longer has it.
     pub fn of(world: &World, id: i32) -> Option<EntityView> {
-        match world.entity(id) {
+        match world.entity_object(id) {
             Some(t) => Some(EntityView {
                 id,
                 pos_x: t.base.pos_x,
@@ -322,7 +329,7 @@ impl EntityView {
             }),
             None => {
                 world.note_unimplemented(
-                    "EntityLiving: a referenced entity is not in its slot (Java still holds it)",
+                    "EntityLiving: a referenced entity is taken out or no longer kept (Java still holds it)",
                 );
                 None
             }
@@ -1035,9 +1042,11 @@ pub fn jump(e: &mut Entity) {
 // src: EntityLiving.java:667-687
 pub fn despawn_entity(e: &mut Entity, world: &mut World) {
     let var1 = world.get_closest_player_to_entity(&e.base, -1.0);
+    // The closest player may be the dead one the world keeps for
+    // playerEntities (World::entity_object).
     if dispatch::can_despawn(e, world)
         && let Some(pid) = var1
-        && let Some(p) = world.entity(pid)
+        && let Some(p) = world.entity_object(pid)
     {
         let var2 = p.base.pos_x - e.base.pos_x;
         let var4 = p.base.pos_y - e.base.pos_y;

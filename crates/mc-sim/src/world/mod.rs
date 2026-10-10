@@ -2036,12 +2036,21 @@ impl World {
     /// first player's `writeToNBT`, WorldInfo.java:72-87; failures are
     /// printed in Java, ignored here), then the dirty map data
     /// (`MapStorage.saveAllData`).
+    ///
+    /// The first player is read from `loadedEntityList` or, once it has
+    /// left it, from the object the world keeps for `playerEntities`
+    /// ([`World::entity_object`], `World::prune_removed_entities`): a player
+    /// that died and was dropped 21 ticks later is still in
+    /// `playerEntities` (`Entity.setEntityDead`; only `World.setEntityDead`
+    /// removes it, World.java:934-945), so `level.dat` holds the dead player
+    /// (`Health` <= 0, `DeathTime` 21, the inventory it dropped empty) and
+    /// the world reopens on the game-over screen (PARITY_CHECKLIST P4).
     // src: World.java:293-297
     fn save_level(&mut self) -> Result<(), SaveError> {
         self.check_session_lock()?;
         let player = match self.player_entities.first() {
             None => None,
-            Some(&pid) => match self.entity(pid) {
+            Some(&pid) => match self.entity_object(pid) {
                 Some(p) => Some(mc_nbt::Tag::Compound(crate::entity::nbt::write_to_nbt(
                     p, self,
                 ))),
@@ -2062,6 +2071,33 @@ impl World {
 }
 
 impl World {
+    /// Runs `f` on the object a Java field (or `playerEntities`) names as
+    /// entity `id`: the loaded entity taken out of its slot
+    /// ([`World::with_entity_mut`]), else the removed object the world keeps
+    /// ([`World::removed_entity`]), taken out of the keep for the call and
+    /// put back (dropped at the next prune if nothing names it any more).
+    /// `None` if it is taken out further up the stack or the port no longer
+    /// has it. E.g. `Minecraft.respawn`'s `theWorld.setEntityDead(thePlayer)`
+    /// on the dead player the world has dropped (Minecraft.java:1449),
+    /// which takes it out of `playerEntities`.
+    pub fn with_entity_object_mut<R>(
+        &mut self,
+        id: i32,
+        f: impl FnOnce(&mut World, &mut Entity) -> R,
+    ) -> Option<R> {
+        if self.entity_index(id).is_some() {
+            return self.with_entity_mut(id, f);
+        }
+        let mut e = self.removed_entities.remove(&id)?;
+        let r = f(self, &mut e);
+        // `f` may have let a new entity join with this id (it replaces the
+        // removed one, World::spawn_entity_in_world); keep that one.
+        if self.entity_index(id).is_none() {
+            self.removed_entities.entry(id).or_insert(e);
+        }
+        Some(r)
+    }
+
     /// `quickSaveWorld(i)`: the level (when `i == 0`) and up to 24 chunks.
     /// A session-lock failure returns false (an exception in Java) and is
     /// kept in [`World::session_lock_error`].

@@ -23,13 +23,14 @@
 //!
 //! # Recorded gaps
 //!
-//! - A mob whose constructor the port does not have yet:
-//!   [`entity_list::new_instance`] makes the constructor's world side
-//!   effects (the entity id, `EntityLiving`'s four `Math.random()` draws)
-//!   and records it; the port then draws the yaw of `setLocationAndAngles`
-//!   and continues as if `getCanSpawnHere()` were false, so nothing joins.
-//!   **Known divergence** from that point when the oracle's mob would have
-//!   joined (its `creatureSpecificInit` and the pack count).
+//! Every class `SpawnerAnimals` can pick (the biomes' spawn lists and
+//! `nightSpawnEntities`) has its constructor in
+//! [`entity_list::CONSTRUCTORS`] since WP-2.3c. The fallback for a class
+//! without one (it makes the constructor's world side effects, records the
+//! gap and continues as if `getCanSpawnHere()` were false) is unreachable;
+//! it stays as a guard. The recorded "taken-out player" cases are the slot
+//! model's guards (the dead player that left `loadedEntityList` is read
+//! from the object the world keeps for `playerEntities`, WP-4.7).
 //!
 //! [`World::unimplemented_hits`]: crate::world::World::unimplemented_hits
 
@@ -123,7 +124,9 @@ pub fn perform_spawning(world: &mut World, var1: bool, var2: bool) -> i32 {
     // src: SpawnerAnimals.java:27-38
     let players = world.player_entities.clone();
     for pid in players {
-        let Some(p) = world.entity(pid) else {
+        // A dead player that left loadedEntityList is still in
+        // playerEntities (World::prune_removed_entities).
+        let Some(p) = world.entity_object(pid) else {
             world.note_unimplemented("SpawnerAnimals.performSpawning over a taken-out player");
             continue;
         };

@@ -607,14 +607,21 @@ impl World {
     }
 
     /// Drops every removed entity that no loaded entity names any more in
-    /// an entity field ([`referenced_entity_ids`]): Java's object is then
-    /// unreachable. Runs after each removal pass, when every loaded entity
-    /// is in its slot.
+    /// an entity field ([`referenced_entity_ids`]) and that is not in
+    /// `playerEntities`: Java's object is then unreachable from the world.
+    /// A player stays in `playerEntities` when it dies (only
+    /// `World.setEntityDead` takes it out, World.java:934-945; the death
+    /// runs `Entity.setEntityDead`), so the world keeps the dead player as
+    /// vanilla's list does: `saveLevel` writes it to `level.dat`
+    /// (World.java:295), `getClosestPlayer`, the random-tick chunks and the
+    /// spawn chunks go on reading its position (World.java:1875-1886,
+    /// :2196-2210; SpawnerAnimals.java:27-38). Runs after each removal
+    /// pass, when every loaded entity is in its slot.
     fn prune_removed_entities(&mut self) {
         if self.removed_entities.is_empty() {
             return;
         }
-        let mut refs = Vec::new();
+        let mut refs = self.player_entities.clone();
         for slot in &self.loaded_entity_list {
             if let Some(e) = slot.entity.as_deref() {
                 referenced_entity_ids(e, &mut refs);
@@ -733,7 +740,11 @@ impl World {
         let mut var9 = -1.0;
         let mut var11 = None;
         for &pid in &self.player_entities {
-            let Some(p) = self.entity(pid) else { continue };
+            // A dead player that left `loadedEntityList` is still in
+            // `playerEntities` (World::prune_removed_entities).
+            let Some(p) = self.entity_object(pid) else {
+                continue;
+            };
             let var14 = p.base.get_distance_sq(x, y, z);
             if (max < 0.0 || var14 < max * max) && (var9 == -1.0 || var14 < var9) {
                 var9 = var14;
@@ -754,7 +765,7 @@ impl World {
     // src: World.java:2212-2220
     pub fn get_player_entity_by_name(&self, name: &str) -> Option<i32> {
         self.player_entities.iter().copied().find(|&pid| {
-            self.entity(pid)
+            self.entity_object(pid)
                 .and_then(|p| p.kind.player())
                 .and_then(|p| p.username.as_deref())
                 == Some(name)
@@ -852,13 +863,20 @@ impl World {
     /// The client calls it for the player every 30 ticks
     /// (Minecraft.java:1134-1139).
     ///
-    /// The entity is named by id and must be in the list (the port cannot
-    /// append an entity it does not own); re-adding one that left is recorded
-    /// as a gap.
+    /// The entity is named by id: the one in the list, or the removed object
+    /// the world still holds ([`World::removed_entity`]), which is how the
+    /// client's dead player comes back: it left the list 21 ticks after its
+    /// death (EntityLiving.java:154-158, `Entity.setEntityDead`, so it stays
+    /// in `playerEntities`), and Java's `thePlayer` is appended again, as
+    /// it is (dead, `isDead`, not filed in a chunk, no
+    /// `obtainEntitySkin`), and leaves again in the next `updateEntities`
+    /// (World.java:1222-1232). An id the port no longer has is recorded.
     // src: World.java:2294-2309
     pub fn join_entity_in_surroundings(&mut self, id: i32) {
-        let Some(e) = self.entity(id) else {
-            self.note_unimplemented("World.joinEntityInSurroundings of an entity not in the list");
+        let Some(e) = self.entity_object(id) else {
+            self.note_unimplemented(
+                "World.joinEntityInSurroundings of an entity the port no longer has",
+            );
             return;
         };
         let var2 = floor_double(e.base.pos_x / 16.0);
@@ -869,8 +887,15 @@ impl World {
                 self.get_chunk_from_chunk_coords(var5, var6);
             }
         }
-        // `if (!loadedEntityList.contains(var1)) loadedEntityList.add(var1)`:
-        // it is in the list (checked above).
+        // src: World.java:2305-2307 (`List.contains` by `Entity.equals`: the id)
+        if self.entity_index(id).is_none()
+            && let Some(e) = self.removed_entities.remove(&id)
+        {
+            self.loaded_entity_list.push(EntitySlot {
+                entity_id: id,
+                entity: Some(e),
+            });
+        }
     }
 
     /// `spawnPlayerWithLoadedChunks(player)`: applies the player NBT saved in
@@ -897,7 +922,7 @@ impl World {
     pub fn update_all_players_sleeping_flag(&mut self) {
         let mut flag = !self.player_entities.is_empty();
         for &pid in &self.player_entities {
-            match self.entity(pid).and_then(|p| p.kind.player()) {
+            match self.entity_object(pid).and_then(|p| p.kind.player()) {
                 Some(p) => {
                     if !p.is_player_sleeping() {
                         flag = false;

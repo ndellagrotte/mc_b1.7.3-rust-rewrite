@@ -81,10 +81,16 @@ pub const TRANSCRIBED: &[(&str, &[&str])] = &[
         "EntityFallingSand",
         &["canBeCollidedWith", "canTriggerWalking", "onUpdate"],
     ),
-    // src: EntityFireball.java:61-174, :194-196, :202-219 (super::fireball)
+    // src: EntityFireball.java:61-174, :194-196, :198-200, :202-219
+    // (super::fireball; getCollisionBorderSize here, WP-4.7)
     (
         "EntityFireball",
-        &["attackEntityFrom", "canBeCollidedWith", "onUpdate"],
+        &[
+            "attackEntityFrom",
+            "canBeCollidedWith",
+            "getCollisionBorderSize",
+            "onUpdate",
+        ],
     ),
     // src: EntityFish.java:123-322 (super::fish)
     ("EntityFish", &["onUpdate"]),
@@ -760,10 +766,14 @@ pub fn set_position_and_rotation2(
     base::set_position_and_rotation2(e, world, x, y, z, yaw, pitch, increments);
 }
 
-/// `getCollisionBorderSize()`.
-pub fn get_collision_border_size(e: &Entity, world: &World) -> f32 {
+/// `getCollisionBorderSize()`: 1 for a fireball (the player's pick box
+/// around it is 1 block wider each way, so it can be hit back), else
+/// `Entity`'s 0.1. Read by the client's `EntityRenderer.getMouseOver`
+/// (EntityRenderer.java:111).
+pub fn get_collision_border_size(e: &Entity, _world: &World) -> f32 {
     if let K::Fireball(..) = e.kind {
-        world.note_unimplemented("EntityFireball.getCollisionBorderSize");
+        // src: EntityFireball.java:198-200
+        return 1.0;
     }
     // src: Entity.java:1030-1032
     base::get_collision_border_size()

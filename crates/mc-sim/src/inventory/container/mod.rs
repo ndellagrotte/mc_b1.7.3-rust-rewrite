@@ -109,17 +109,23 @@ fn te_slots_mut(kind: &mut TileEntityKindData) -> Option<&mut [Option<ItemStack>
     }
 }
 
-/// A container's tile entity that is no longer in the world's store
-/// (Java would keep using the orphaned object; unreachable from the client,
-/// which closes the window when `isUsableByPlayer` fails).
+/// A container's tile entity that is no longer in the world's store: Java
+/// keeps using the orphaned object (a chest's stacks left at `stackSize` 0
+/// by `onBlockRemoval`, BlockChest.java:155-182). Reachable when an
+/// explosion removes the tile entity after the player's update in a tick:
+/// the window closes in the player's next update (EntityPlayer.java:80-84,
+/// `entity::player::on_update`), and that next tick's input reaches the
+/// window first (Minecraft.java:987-991). An explosion before the player's
+/// update closes the window in the same tick.
 fn te_gone(world: &World) {
     world.note_unimplemented("Container over a tile entity no longer in the world");
 }
 
 /// The chest minecart behind [`InventoryRef::Entity`] `id`, or `None` (and
 /// recorded) when it is no longer in the world or out of its slot: Java
-/// would keep using the orphaned object; the client closes the window when
-/// `isUsableByPlayer` fails (a dead cart, EntityMinecart.java:811-817).
+/// would keep using the orphaned object; the player's update closes the
+/// window when `isUsableByPlayer` fails (a dead cart,
+/// EntityMinecart.java:811-817; EntityPlayer.java:80-84).
 /// Panics where Java's `(IInventory)` reference would not be a minecart
 /// (never: only `EntityMinecart.interact` opens one).
 fn cart(world: &World, id: i32) -> Option<&MinecartData> {
@@ -393,7 +399,7 @@ impl Container {
             // World.java:1222-1230; single player never unloads chunks), so a
             // cart no longer in the world is Java's dead cart: `isDead`,
             // false. The ordinary case: a chest cart broken while its
-            // GuiChest is open, the client's check in the next tick.
+            // GuiChest is open, the player's check in its next update.
             InventoryRef::Entity(id) => match world.entity(*id) {
                 Some(c) => crate::entity::minecart::can_interact_with(c, player),
                 None => false,

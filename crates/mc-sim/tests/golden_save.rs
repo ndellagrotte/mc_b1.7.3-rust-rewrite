@@ -96,6 +96,7 @@ const COVERED_IN_GOLDEN_TICK: &[(&str, &str)] = &[
     ("tick", "furnace-dispenser-clicks"),
     ("tick", "reload-roundtrip"),
     ("tick", "gate2-session"),
+    ("tick", "dead-player-save-reload"),
 ];
 
 #[test]
