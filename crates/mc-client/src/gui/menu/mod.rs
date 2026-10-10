@@ -39,8 +39,9 @@
 //! button stays disabled), texture packs beyond the default one
 //! (`TexturePackList`, `TexturePackCustom`; the "Open texture pack folder"
 //! button is disabled), pre-McRegion conversion (the world list's
-//! "conversion" note is drawn, but the shell refuses to open such a world),
-//! the stats upload (`StatsSyncher`).
+//! "conversion" note is drawn, but the shell refuses to open such a world).
+//! (`StatsSyncher` is local file I/O, not an upload: the shell runs it,
+//! `crate::game` and `mc_sim::stats::file_writer`.)
 //!
 //! [`ScreenCtx::display_wrapping_this`]: super::screen::ScreenCtx::display_wrapping_this
 

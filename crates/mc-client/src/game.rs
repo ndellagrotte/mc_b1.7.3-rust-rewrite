@@ -13,7 +13,8 @@
 //!
 //! | Java | Here |
 //! |---|---|
-//! | `func_28001_B` (the has-paid check at tick 6000), `statFileWriter.func_27178_d` | deferred (D2: online services, stats sync) |
+//! | `func_28001_B` (the has-paid check at tick 6000) | deferred (D2: online services) |
+//! | `statFileWriter.func_27178_d` | [`Game::run_tick_begin`]: the stats file every 100 ticks once a stat changed (local files, [`mc_sim::stats::file_writer`] docs) |
 //! | `ingameGUI.updateTick()` | [`RunTickHook::IngameGuiUpdateTick`] (WP-3.6) |
 //! | `entityRenderer.getMouseOver(1.0F)` | [`crate::camera::get_mouse_over`] |
 //! | `ChunkProviderLoadOrGenerate.setCurrentChunkOver` | never runs: no world builds that provider (`World.getChunkProvider`, World.java:210-213) |
@@ -76,18 +77,24 @@
 //! # The player
 //!
 //! `thePlayer` is the entity id [`Game::the_player`] in the world's list.
-//! Vanilla keeps the object after the world drops a dead player (the
-//! game-over screen, `respawn`); the port keeps a copy taken before the
-//! last dying tick ([`Game::detached_player`]). The stats writer
-//! (`Minecraft.statFileWriter`) travels with the player
-//! ([`mc_sim::entity::PlayerData::stat_file_writer`]) and is held by the
-//! game while there is none.
+//! A dead player leaves `loadedEntityList` 21 ticks after its death but
+//! stays in `playerEntities`, and the world keeps that object
+//! ([`World::entity_object`]): it is saved to `level.dat` (so the world
+//! reopens on the game-over screen), re-added every 30 ticks by
+//! `joinEntityInSurroundings`, and takes a kill by its last arrow.
+//! [`Game::player`], [`Game::render_view`] and [`Game::stats_mut`] read it
+//! there. [`Game::detached_player`] is a copy of it, refreshed after every
+//! `updateEntities`, for the places that need the player when no world
+//! holds it (`respawn`'s portal from the nether, the camera's mutable
+//! update). The stats writer (`Minecraft.statFileWriter`) travels with the
+//! player ([`mc_sim::entity::PlayerData::stat_file_writer`]) and is held by
+//! the game while there is none.
 //!
 //! # Out of scope here
 //!
-//! Applet, multiplayer, the has-paid check, resource downloads and stats sync
+//! Applet, multiplayer, the has-paid check and resource downloads
 //! (deferred, D2/D3: the `mcApplet`, `serverName`/`GuiConnecting`,
-//! `ThreadCheckHasPaid`, `ThreadDownloadResources`, `func_27178_d`), texture packs
+//! `ThreadCheckHasPaid`, `ThreadDownloadResources`), texture packs
 //! (`TexturePackList`, D3), `OpenGlCapsChecker`, `checkGLError`, the
 //! out-of-memory handler `func_28002_e` (no reserve buffer `field_28006_b`
 //! to free), `Controllers`, the AWT canvas and `loadScreen`'s Mojang logo
@@ -551,12 +558,13 @@ impl Game {
         self.game_settings.show_debug_info
     }
 
-    /// `thePlayer`: in the world, else the detached copy.
+    /// `thePlayer`: in the world's list, else the dead player the world
+    /// keeps for `playerEntities`, else the detached copy (module docs).
     pub fn player(&self) -> Option<&Entity> {
         let pid = self.the_player?;
         self.the_world
             .as_ref()
-            .and_then(|w| w.entity(pid))
+            .and_then(|w| w.entity_object(pid))
             .or(self.detached_player.as_deref())
     }
 
@@ -566,12 +574,13 @@ impl Game {
         self.the_world.as_mut()?.entity_mut(pid)
     }
 
-    /// `renderViewEntity`: in the world, else the detached player.
+    /// `renderViewEntity`: in the world (or kept by it, [`Game::player`]),
+    /// else the detached player.
     pub fn render_view(&self) -> Option<&Entity> {
         let id = self.render_view_entity?;
         self.the_world
             .as_ref()
-            .and_then(|w| w.entity(id))
+            .and_then(|w| w.entity_object(id))
             .or_else(|| {
                 self.detached_player
                     .as_deref()
@@ -597,6 +606,21 @@ impl Game {
                 .expect("checked");
             return &mut p.stat_file_writer;
         }
+        let kept = self
+            .the_world
+            .as_ref()
+            .is_some_and(|w| w.removed_entity(pid).is_some());
+        if kept {
+            // The dead player the world keeps (module docs): a kill by its
+            // last arrow counts there too (EntityPlayer.java:239-247).
+            let p = self
+                .the_world
+                .as_mut()
+                .and_then(|w| w.removed_entity_mut(pid))
+                .and_then(|e| e.kind.player_mut())
+                .expect("checked");
+            return &mut p.stat_file_writer;
+        }
         if let Some(p) = self
             .detached_player
             .as_deref_mut()
@@ -605,6 +629,21 @@ impl Game {
             return &mut p.stat_file_writer;
         }
         &mut self.stat_file_writer
+    }
+
+    /// `statFileWriter.func_27178_d()`: the countdown, the received copy's
+    /// merge and, every 100 ticks once a stat changed, the unsent stats
+    /// file (StatsSyncher, run at once: `mc_sim::stats::file_writer` docs).
+    // src: Minecraft.java:949, StatFileWriter.java:194-200
+    fn stats_tick(&mut self) {
+        let username = self.session.username.clone();
+        let map = self.achievement_map.clone();
+        let store = self.store.clone();
+        let w = self.stats_mut();
+        let mut s = store.borrow_mut();
+        if let Err(e) = w.func_27178_d(s.storage.as_mut(), "", &username, &map) {
+            warn!("cannot save the stats: {e}");
+        }
     }
 
     /// Takes the stats writer back from the player that is about to go.
@@ -1021,8 +1060,9 @@ impl Game {
     // src: Minecraft.java:944-993
     fn run_tick_begin(&mut self) {
         // src: Minecraft.java:945-947 (func_28001_B: ThreadCheckHasPaid,
-        // online, deferred D2); :949 (statFileWriter.func_27178_d: stats
-        // sync, deferred D2); :950 is the IngameGuiUpdateTick hook.
+        // online, deferred D2); :950 is the IngameGuiUpdateTick hook.
+        // src: Minecraft.java:949
+        self.stats_tick();
     }
 
     /// `entityRenderer.getMouseOver(partial)`.
@@ -1312,8 +1352,9 @@ impl Game {
                     self.join_player_counter += 1;
                     if self.join_player_counter == 30 {
                         self.join_player_counter = 0;
-                        // A dead player the world dropped would be added back
-                        // in vanilla; the simulation records that as a gap.
+                        // A dead player the world dropped is appended again
+                        // (and leaves in the next updateEntities), as in
+                        // vanilla (World::join_entity_in_surroundings).
                         world.join_entity_in_surroundings(pid);
                     }
                 }
@@ -1383,10 +1424,13 @@ impl Game {
                     }
                     self.portal_requested = None;
                     world.update_entities();
-                    if let Some(pid) = self.the_player
-                        && world.entity(pid).is_some()
-                    {
-                        self.detached_player = None;
+                    if let Some(pid) = self.the_player {
+                        if world.entity(pid).is_some() {
+                            self.detached_player = None;
+                        } else if let Some(o) = world.removed_entity(pid) {
+                            // The dead player the world keeps (module docs).
+                            self.detached_player = Some(Box::new(o.clone()));
+                        }
                     }
                     self.collect_world_events();
                     if let Some(head) = self.portal_requested.take() {
@@ -1710,6 +1754,11 @@ impl Game {
                 .with_entity_mut(pid, |w, p| player_fns::use_portal_head(p, w))
                 .expect("in its slot"),
             None => {
+                // The copy as the world keeps it now (its stats writer may
+                // have moved on since the last updateEntities).
+                if let Some(o) = world.removed_entity(pid) {
+                    self.detached_player = Some(Box::new(o.clone()));
+                }
                 let Some(p) = self.detached_player.as_deref_mut() else {
                     return;
                 };
@@ -1841,7 +1890,7 @@ impl Game {
         };
         let old = self.the_player.and_then(|pid| {
             world
-                .entity(pid)
+                .entity_object(pid)
                 .cloned()
                 .or_else(|| self.detached_player.as_deref().cloned())
         });
@@ -1878,7 +1927,9 @@ impl Game {
         let mut var8 = 0;
         if let Some(pid) = self.the_player {
             var8 = pid;
-            world.with_entity_mut(pid, |w, p| w.set_entity_dead(p));
+            // Also the dead player the world dropped from its list but keeps
+            // in playerEntities (World.java:944-946 takes it out there).
+            world.with_entity_object_mut(pid, |w, p| w.set_entity_dead(p));
             // The dead player leaves the list at once (vanilla: at the next
             // updateEntities), so the new player can take its id without two
             // slots sharing it.
@@ -2815,6 +2866,90 @@ mod tests {
         assert_eq!(d.time_until_portal, 10);
         assert!(!d.in_portal);
         assert_eq!(d.time_in_portal, 1.0);
+    }
+
+    /// PARITY_CHECKLIST P4 (WP-4.7): the dead player the world dropped from
+    /// its list is still in `playerEntities`, so leaving the world saves it
+    /// to `level.dat` (World.java:295); reopening reads it back (`Health`
+    /// <= 0, `DeathTime` 21), the first tick shows the game-over screen
+    /// (Minecraft.java:972-976) and respawn leaves one player.
+    #[test]
+    fn a_dead_player_is_saved_and_the_world_reopens_on_game_over() {
+        let dir = TempDir::new("dead_reopen");
+        let mut g = game(&dir);
+        g.open_world("DP", Some("21")).unwrap();
+        g.run_pending_to_completion();
+        let pid = g.the_player.unwrap();
+        if let Some(l) = g.player_in_world_mut().and_then(|e| e.kind.living_mut()) {
+            l.health = -3;
+        }
+        for _ in 0..30 {
+            tick(&mut g);
+        }
+        let w = g.the_world.as_ref().unwrap();
+        assert!(w.entity(pid).is_none());
+        assert_eq!(w.player_entities, vec![pid]);
+        // Game::player reads the world's object (deathTime 21), not a copy
+        // from before the last dying tick.
+        assert_eq!(g.player().unwrap().kind.living().unwrap().death_time, 21);
+        assert_eq!(
+            g.current_screen.as_ref().map(|s| s.kind.clone()),
+            Some(ScreenKind::GameOver)
+        );
+        g.change_world1(None);
+        crate::storage::flush_writes().unwrap();
+        assert!(g.the_world.is_none());
+
+        g.open_world("DP", None).unwrap();
+        g.run_pending_to_completion();
+        let pid = g.the_player.unwrap();
+        let p = g.player().unwrap();
+        assert_eq!(p.kind.living().unwrap().health, -3);
+        assert_eq!(p.kind.living().unwrap().death_time, 21);
+        tick(&mut g);
+        assert_eq!(
+            g.current_screen.as_ref().map(|s| s.kind.clone()),
+            Some(ScreenKind::GameOver)
+        );
+        // Its first update counted deathTime to 22 and removed it again.
+        let w = g.the_world.as_ref().unwrap();
+        assert!(w.entity(pid).is_none());
+        assert_eq!(g.player().unwrap().kind.living().unwrap().death_time, 22);
+
+        g.respawn(false, 0);
+        g.run_pending_to_completion();
+        assert!(g.current_screen.is_none());
+        let w = g.the_world.as_ref().unwrap();
+        assert_eq!(w.player_entities, vec![pid]);
+        assert_eq!(
+            w.loaded_entity_list
+                .iter()
+                .filter(|s| s.entity_id == pid)
+                .count(),
+            1
+        );
+        assert_eq!(g.player().unwrap().kind.living().unwrap().health, 20);
+    }
+
+    /// `statFileWriter.func_27178_d()` every `runTick` (Minecraft.java:949):
+    /// once a stat changed, the unsent stats file is written when the
+    /// constructor's 100-tick countdown has run out, on the title screen too.
+    #[test]
+    fn stats_are_saved_by_the_tick_schedule() {
+        let dir = TempDir::new("stats_tick");
+        let mut g = game(&dir);
+        let file = dir.0.join("stats/stats_tester_unsent.dat");
+        for _ in 0..99 {
+            g.run_tick_begin();
+        }
+        g.read_stat(stat_list::LEAVE_GAME_STAT);
+        g.run_tick_begin();
+        crate::storage::flush_writes().unwrap();
+        assert!(!file.exists());
+        g.run_tick_begin();
+        crate::storage::flush_writes().unwrap();
+        assert!(file.exists());
+        assert_eq!(g.stat_file_writer.stats_syncher.field_27427_l, 99);
     }
 
     #[test]

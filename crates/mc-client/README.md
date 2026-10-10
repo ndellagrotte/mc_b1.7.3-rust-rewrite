@@ -134,7 +134,9 @@ nether travel.
   EntityPlayerSP.java:108-111) closes the screen
   (`Game::display_gui_screen(None)`); its simulation caller, the
   `craftingInventory.isUsableByPlayer` check of `EntityPlayer.onUpdate`,
-  waits for the GUI containers (3.6). `usePortal` is split: its head (the
+  waits for the GUI containers (3.6); *WP-4.7:* it runs in the
+  simulation's player update (`entity::player::on_update`, with the
+  drops), see "In-game GUI". `usePortal` is split: its head (the
   dimension toggle, `setEntityDead`, x and z scaled by 8) runs inside the
   player's update (`player::use_portal_head`), so the rest of the old
   world's `updateEntities` no longer sees the player there, as in vanilla;
@@ -745,6 +747,17 @@ destination alpha anyway.
   builds `chest::new_gui_chest` over `InventoryRef::Entity(entity_id)`
   (`mc_sim`'s `ContainerChest` over the cart's `cargoItems`), titled
   `"Minecart"` (`inv_name`, EntityMinecart.java:752-754).
+  *WP-4.7:* `initGui` hands the screen's container to the player
+  (`craftingInventory`, `mc_sim::entity::player::set_crafting_inventory`,
+  GuiContainer.java:16-19) and the screen works on it there
+  (`GuiContainer::with_container`; `GuiContainer::slots` keeps the slot
+  layout for hit-testing and drawing). The `isUsableByPlayer` close runs
+  inside the player's update in the simulation (EntityPlayer.java:80-84):
+  the cursor stack and the grid drop there, the container leaves the
+  player and `ClientRequest::CloseScreen` closes the screen after
+  `updateEntities`, so the next tick's input goes to the game, as in
+  vanilla; `on_gui_closed` then finds nothing to drop. `updateScreen`
+  keeps only GuiContainer.java's own dead-player test.
 - **Previews drawn through the batcher:** the inventory's player
   (`container::inventory::render_player_preview`: `RenderPlayer` /
   `RenderLiving` matrices, `ModelBiped`, the armour passes and
@@ -759,15 +772,6 @@ destination alpha anyway.
   the depth test off, went under the 3D block icons.
 - **Clipboard:** the workspace enables Bevy's `system_clipboard` (`arboard`).
 - **Known deviations** (each needs a change outside WP-3.6b's files):
-  - *Container close timing.* `EntityPlayer.onUpdate`'s
-    `craftingInventory.isUsableByPlayer` close (EntityPlayer.java:80-84)
-    runs in `GuiContainer::update_screen` at the start of tick N+1, not
-    right after the player's `super.onUpdate()` inside tick N's
-    `updateEntities`. The dropped cursor stack and workbench grid get one
-    `EntityItem` update fewer and their entity ids come after the rest of
-    tick N's spawns. Needs `craftingInventory` in `mc-sim`'s player (then
-    `entity::player::on_update` can call `close_screen`) or a shell hook
-    after the player's update.
   - *Screens opened by a click.* `ClientEvent::DisplayGui` opens its screen
     at the next tick hook, so the rest of that tick's input events still
     reach the game (a number key, Q, a second right-click), where vanilla
@@ -1188,6 +1192,24 @@ are drawn.
   `flush_writes()` / `FsStorage::flush_writes()`. If the writer thread
   cannot start, operations run at once on the calling thread. Not for
   wasm32 (no threads).
+
+## Stats autosave and the dead player (WP-4.7)
+
+- `Game::run_tick_begin` calls `StatFileWriter::func_27178_d` every
+  `runTick` (Minecraft.java:949), on the title screen too: once a stat has
+  changed, `stats/stats_<user>_unsent.dat` is rewritten every 100 ticks
+  (StatsSyncher's send, run at once; local files, nothing online). At
+  start-up an existing `stats/stats_<user>.dat` (the "received" copy) is
+  read and merged into the totals on the first tick (`func_27180_b`).
+- A dead player leaves `loadedEntityList` 21 ticks after its death but
+  stays in `playerEntities`; `mc_sim::world::World` keeps that object
+  (`World::entity_object`). `Game::player`, `Game::render_view` and
+  `Game::stats_mut` read it there; `Game::detached_player` is a copy of it
+  refreshed after every `updateEntities`. Leaving the world saves it to
+  `level.dat` (PARITY_CHECKLIST P4), so the world reopens on the
+  game-over screen (the loaded player has `Health` <= 0, `DeathTime` 21)
+  and Respawn works there; `respawn` takes it out of `playerEntities`
+  (`World::with_entity_object_mut` + `set_entity_dead`).
 
 ## Scripted-input dev mode
 
