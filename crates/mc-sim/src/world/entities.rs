@@ -77,6 +77,17 @@ impl World {
         self.removed_entities.get_mut(&id).map(|b| &mut **b)
     }
 
+    /// `entity.riddenByEntity = null` on the object a field naming `id`
+    /// refers to ([`World::entity_object`]): the loaded entity, else the
+    /// removed one.
+    fn clear_ridden_by(&mut self, id: i32) {
+        if let Some(m) = self.entity_mut(id) {
+            m.base.ridden_by_entity = None;
+        } else if let Some(m) = self.removed_entity_mut(id) {
+            m.base.ridden_by_entity = None;
+        }
+    }
+
     /// The object a Java field naming entity `id` refers to: the loaded
     /// entity in its slot, else the removed one ([`World::removed_entity`]).
     /// `None` if it is taken out (being updated further up the stack) or the
@@ -136,10 +147,7 @@ impl World {
         }
         self.get_chunk_from_chunk_coords(var2, var3)
             .add_entity(&mut e.base);
-        self.loaded_entity_list.push(EntitySlot {
-            entity_id: id,
-            entity: Some(Box::new(e)),
-        });
+        self.loaded_entity_list.push(EntitySlot::new(e));
         if var4 {
             // src: World.java:910. Run after the list append (Java runs it
             // before) so the scan finds the new player in its slot; the scan
@@ -173,10 +181,7 @@ impl World {
     /// `addWeatherEffect(entity)`.
     // src: World.java:891-894
     pub fn add_weather_effect(&mut self, e: Entity) -> bool {
-        self.weather_effects.push(EntitySlot {
-            entity_id: e.base.entity_id,
-            entity: Some(Box::new(e)),
-        });
+        self.weather_effects.push(EntitySlot::new(e));
         true
     }
 
@@ -211,9 +216,13 @@ impl World {
         }
     }
 
-    /// `addLoadedEntities(list)`: entities of a chunk being loaded (their data
-    /// arrives with the chunk loader, WP-1.9; ids already present are
-    /// ignored until then).
+    /// `addLoadedEntities(list)`: the `obtainEntitySkin` half for the
+    /// entities of a chunk being loaded. Their `loadedEntityList.addAll`
+    /// half has already run: since WP-1.9b the chunk provider files the
+    /// loaded entities in the list first (`World::prepare_chunk`, the
+    /// comment there), so every id is present, and the `skip` record below
+    /// is an invariant check that no fixture or game path reaches (Gate 1
+    /// N4).
     // src: World.java:2077-2084
     pub fn add_loaded_entities(&mut self, ids: &[i32]) {
         for &id in ids {
@@ -314,7 +323,11 @@ impl World {
             let id = self.loaded_entity_list[i].entity_id;
             let riding = self.slot_entity(i).base.riding_entity;
             if let Some(mount) = riding {
-                let mount_ok = match self.entity(mount) {
+                // `ridingEntity` is the object Java holds: in the list, or
+                // the removed one while the rider names it
+                // (World::removed_entities; a mount that died earlier in
+                // this pass or the last one).
+                let mount_ok = match self.entity_object(mount) {
                     Some(m) => !m.base.is_dead && m.base.ridden_by_entity == Some(id),
                     None => {
                         if self.entity_index(mount).is_none() {
@@ -329,9 +342,7 @@ impl World {
                     i += 1;
                     continue;
                 }
-                if let Some(m) = self.entity_mut(mount) {
-                    m.base.ridden_by_entity = None;
-                }
+                self.clear_ridden_by(mount);
                 self.slot_entity_mut(i).base.riding_entity = None;
             }
 
@@ -541,7 +552,11 @@ impl World {
         while i < self.loaded_entity_list.len() {
             let id = self.loaded_entity_list[i].entity_id;
             if let Some(mount) = self.slot_entity(i).base.riding_entity {
-                let mount_ok = match self.entity(mount) {
+                // `ridingEntity` is the object Java holds: in the list, or
+                // the removed one while the rider names it
+                // (World::removed_entities; a mount that died earlier in
+                // this pass or the last one).
+                let mount_ok = match self.entity_object(mount) {
                     Some(m) => !m.base.is_dead && m.base.ridden_by_entity == Some(id),
                     None => {
                         if self.entity_index(mount).is_none() {
@@ -556,9 +571,7 @@ impl World {
                     i += 1;
                     continue;
                 }
-                if let Some(m) = self.entity_mut(mount) {
-                    m.base.ridden_by_entity = None;
-                }
+                self.clear_ridden_by(mount);
                 self.slot_entity_mut(i).base.riding_entity = None;
             }
             let e = self.slot_entity(i);
@@ -760,8 +773,11 @@ impl World {
     /// The caller passes the entity it holds out of its slot as `in_hand`;
     /// when the scan reaches that id in a chunk section it tests `in_hand`
     /// there, keeping Java's chunk/section/list order. Any other taken-out
-    /// entity the scan meets is recorded (it would be an entity further up the
-    /// stack that the caller cannot reach).
+    /// entity the scan meets is skipped: silently when its class is not
+    /// `class` (Java skips it on the class test,
+    /// [`crate::entity::EntitySlot::class_chain`]), else recorded (Java would
+    /// test its box; it is an entity further up the stack that the caller
+    /// cannot reach).
     // src: World.java:2031-2047, Chunk.java:512-534
     pub fn get_entities_within_aabb(
         &self,
@@ -782,7 +798,8 @@ impl World {
                 for section in c.entity_sections(bb.min_y, bb.max_y) {
                     for &id in &c.entities[section] {
                         let held = in_hand.filter(|h| h.base.entity_id == id);
-                        match held.or_else(|| self.entity(id)) {
+                        let slot = self.loaded_entity_list.iter().find(|s| s.entity_id == id);
+                        match held.or_else(|| slot.and_then(|s| s.entity.as_deref())) {
                             Some(o) => {
                                 if is_instance_of(&o.kind, class)
                                     && o.base.bounding_box.intersects_with(bb)
@@ -790,17 +807,19 @@ impl World {
                                     var7.push(id);
                                 }
                             }
-                            None => {
-                                if self.entity_index(id).is_none() {
-                                    self.note_unimplemented(
-                                        "Chunk entity list holds an entity not in loadedEntityList",
-                                    );
-                                } else {
-                                    self.note_unimplemented(
-                                        "World.getEntitiesWithinAABB over a taken-out entity",
-                                    );
-                                }
-                            }
+                            None => match slot {
+                                None => self.note_unimplemented(
+                                    "Chunk entity list holds an entity not in loadedEntityList",
+                                ),
+                                // Taken out further up the stack, of another
+                                // class: Java's `isAssignableFrom` is false
+                                // before the box is read, so it is skipped
+                                // as Java skips it (EntitySlot::class_chain).
+                                Some(s) if !s.class_chain.contains(&class) => {}
+                                Some(_) => self.note_unimplemented(
+                                    "World.getEntitiesWithinAABB over a taken-out entity",
+                                ),
+                            },
                         }
                     }
                 }

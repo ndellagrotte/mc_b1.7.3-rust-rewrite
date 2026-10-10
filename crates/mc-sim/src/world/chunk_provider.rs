@@ -333,10 +333,7 @@ impl World {
         // `add_loaded_entities` (the `obtainEntitySkin` half) sees their ids.
         // The two lists are separate, so doing it first is not observable.
         for e in loaded_entities {
-            self.loaded_entity_list.push(EntitySlot {
-                entity_id: e.base.entity_id,
-                entity: Some(Box::new(e)),
-            });
+            self.loaded_entity_list.push(EntitySlot::new(e));
         }
         chunk::on_chunk_load(self, x, z);
 

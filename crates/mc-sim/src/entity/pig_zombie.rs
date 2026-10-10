@@ -140,8 +140,14 @@ pub fn attack_entity_from(
     if let Some(a) = var1.filter(|a| a.kind.is_player()) {
         let aid = a.base.entity_id;
         let bb = e.base.bounding_box.expand(32.0, 32.0, 32.0);
-        let var3 = world.get_entities_within_aabb_excluding_entity(Some(e.base.entity_id), &bb);
-        for var5 in var3 {
+        // `getEntitiesWithinAABBExcludingEntity(this, box)`, then `instanceof
+        // EntityPigZombie`: the class query gives the same ids in the same
+        // chunk/section/list order, and tests the class of an entity taken
+        // out further up the stack (the attacking player, a fishing bobber)
+        // as the Java does instead of recording it (WP-4.8).
+        let me = e.base.entity_id;
+        let var3 = world.get_entities_within_aabb("EntityPigZombie", &bb, Some(&*e));
+        for var5 in var3.into_iter().filter(|&id| id != me) {
             world.with_entity_mut(var5, |_, o| {
                 if let EntityKindData::PigZombie(..) = o.kind {
                     become_angry_at(o, aid);

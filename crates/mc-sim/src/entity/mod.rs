@@ -155,14 +155,33 @@ impl Entity {
     }
 }
 
-/// A loaded-entity list slot: the entity id (always readable) and the entity
-/// itself (`None` while taken out for an update).
+/// A loaded-entity list slot: the entity id and its class chain (always
+/// readable) and the entity itself (`None` while taken out for an update).
+/// Build one with [`EntitySlot::new`].
 #[derive(Clone, Debug)]
 pub struct EntitySlot {
     /// `entity.entityId`.
     pub entity_id: i32,
+    /// The entity's Java class chain ([`crate::world::java_class_chain`]),
+    /// readable while it is taken out: a Java class query
+    /// (`getEntitiesWithinAABB(class, box)`) tests `class.isAssignableFrom`
+    /// on every listed entity, and an entity's class never changes, so a
+    /// taken-out entity of another class is skipped exactly as Java skips
+    /// it (WP-4.8, Gate 2 R5).
+    pub class_chain: &'static [&'static str],
     /// The entity, unless it is currently taken out.
     pub entity: Option<Box<Entity>>,
+}
+
+impl EntitySlot {
+    /// The slot of `e` (in its slot).
+    pub fn new(e: Entity) -> Self {
+        EntitySlot {
+            entity_id: e.base.entity_id,
+            class_chain: crate::world::java_class_chain(&e.kind),
+            entity: Some(Box::new(e)),
+        }
+    }
 }
 
 macro_rules! empty_level {
