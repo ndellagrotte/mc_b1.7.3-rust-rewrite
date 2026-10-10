@@ -562,8 +562,16 @@ pub fn compute_hand(
     let Some(world) = g.the_world.as_mut() else {
         return;
     };
-    let Some(mut f) = world.with_entity_mut(pid, |w, p| {
+    // `thePlayer`: the world's entity, else (dead, dropped from the world,
+    // the Game Over screen) the shell's detached copy, which vanilla's
+    // `mc.thePlayer` still is (EntityRenderer.java:572-574 → renderHand).
+    let in_world = world.with_entity_mut(pid, |w, p| {
         render_hand(&mut ir, w, p, third, hide, bob, partial)
+    });
+    let Some(mut f) = in_world.or_else(|| {
+        let mut p = g.detached_player.as_deref()?.clone();
+        (p.base.entity_id == pid)
+            .then(|| render_hand(&mut ir, world, &mut p, third, hide, bob, partial))
     }) else {
         return;
     };

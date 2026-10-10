@@ -698,9 +698,18 @@ pub fn render_entities(
     for p in &tile_entities.tile_entities {
         frame.live.insert(VisualKey::TileEntity(*p));
     }
-    // The view entity, as the pass reads it (out of the world only between
-    // a portal's two halves: nothing is drawn then).
-    let Some((render_pos, var1, view_sleeping)) = world.entity(view_id).map(|view| {
+    // The view entity, as the pass reads it: `mc.renderViewEntity`, which
+    // vanilla keeps after the world dropped it (a dead player once
+    // `deathTime` reached 20: the Game Over screen still shows the world's
+    // entities and tile entities, RenderGlobal.java:253-266,
+    // EntityRenderer.java:501). Here that is the world's entity, else the
+    // shell's detached copy (`Game::render_view`). Neither exists only
+    // between a portal's two halves: nothing is drawn then.
+    let detached = g
+        .detached_player
+        .as_deref()
+        .filter(|p| p.base.entity_id == view_id);
+    let Some((render_pos, var1, view_sleeping)) = world.entity(view_id).or(detached).map(|view| {
         let vb = &view.base;
         let p = partial as f64;
         let render_pos = DVec3::new(
@@ -735,10 +744,17 @@ pub fn render_entities(
     }
     // TileEntityRenderer.cacheActiveRenderInfo, RenderManager.cacheActiveRenderInfo
     // src: RenderGlobal.java:258-259
-    world.with_entity_mut(view_id, |w, view| {
+    let cached = world.with_entity_mut(view_id, |w, view| {
         rm.tile_entities.cache_active_render_info(w, view, partial);
         cache_active_render_info(&mut rm.info, w, view, partial);
     });
+    if cached.is_none()
+        && let Some(view) = detached
+    {
+        rm.tile_entities
+            .cache_active_render_info(world, view, partial);
+        cache_active_render_info(&mut rm.info, world, view, partial);
+    }
     rm.info.render_pos = render_pos;
     rm.info.fancy_graphics = settings.fancy_graphics;
     rm.info.third_person_view = settings.third_person_view;
