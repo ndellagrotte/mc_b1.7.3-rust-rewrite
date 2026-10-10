@@ -893,6 +893,7 @@ impl World {
         {
             self.loaded_entity_list.push(EntitySlot {
                 entity_id: id,
+                class_chain: java_class_chain(&e.kind),
                 entity: Some(e),
             });
         }
