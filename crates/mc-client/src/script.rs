@@ -368,6 +368,79 @@ pub enum Action {
         #[serde(default)]
         report: Option<PathBuf>,
     },
+    /// Dev (WP-4.9): captures each of the next `frames` frames into
+    /// `dir/fNNNNN.png` (the script's frame number) without waiting for the
+    /// files, and appends one line per frame to `dir/frames.jsonl` (the
+    /// app state, `ticksRan`, the loading screen's lines and progress):
+    /// what a world load looks like frame by frame.
+    ScreenshotFrames {
+        /// The directory.
+        dir: PathBuf,
+        /// How many frames.
+        frames: u32,
+    },
+}
+
+/// The `screenshot_frames` action's capture in progress.
+#[derive(Resource, Clone, Debug)]
+pub struct FrameCapture {
+    /// The directory.
+    pub dir: PathBuf,
+    /// Frames left.
+    pub remaining: u32,
+}
+
+/// Captures this frame for `screenshot_frames` (after the game frame, so
+/// the line describes what the frame draws).
+pub fn capture_frames(
+    mut commands: Commands,
+    capture: Option<ResMut<FrameCapture>>,
+    runner: Option<Res<ScriptRunner>>,
+    game: NonSend<Game>,
+    state: Res<State<crate::app::AppState>>,
+) {
+    use std::io::Write;
+    let Some(mut c) = capture else {
+        return;
+    };
+    if c.remaining == 0 {
+        commands.remove_resource::<FrameCapture>();
+        return;
+    }
+    c.remaining -= 1;
+    let n = runner.map_or(0, |r| r.frames);
+    let path = c.dir.join(format!("f{n:05}.png"));
+    commands
+        .spawn(bevy::render::view::screenshot::Screenshot::primary_window())
+        .observe(
+            move |captured: On<bevy::render::view::screenshot::ScreenshotCaptured>| {
+                // TYPE_INT_RGB, as the screenshot action's files.
+                if let Ok(d) = captured.image.clone().try_into_dynamic()
+                    && let Err(e) = d.to_rgb8().save_with_format(&path, image::ImageFormat::Png)
+                {
+                    error!("script: {}: {e}", path.display());
+                }
+            },
+        );
+    let l = &game.loading_screen;
+    let line = serde_json::json!({
+        "frame": n,
+        "nanos": crate::clock::nano_time(),
+        "state": format!("{:?}", state.get()),
+        "ticks_ran": game.ticks_ran,
+        "loading": game.pending.is_some(),
+        "title": l.currently_displayed_text,
+        "message": l.field_1004_a,
+        "progress": l.progress,
+        "world": game.the_world.is_some(),
+    });
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(c.dir.join("frames.jsonl"));
+    if let Ok(mut f) = file {
+        let _ = writeln!(f, "{line}");
+    }
 }
 
 /// The centre of row `index` of `slot` (a list of `size` rows) in scaled
@@ -1054,6 +1127,13 @@ pub fn run_script(
                     }
                 }
             }
+            Action::ScreenshotFrames { dir, frames } => {
+                let _ = std::fs::create_dir_all(&dir);
+                commands.insert_resource(FrameCapture {
+                    dir,
+                    remaining: frames,
+                });
+            }
             Action::DumpInventory { path } => {
                 let v = inventory_json(&game);
                 if let Some(d) = path.parent() {
@@ -1089,7 +1169,8 @@ pub fn inventory_json(g: &Game) -> serde_json::Value {
 /// Inserts the runner and turns real devices off.
 pub fn install(app: &mut App, script: Script) {
     app.insert_resource(ScriptRunner::new(script))
-        .insert_resource(DeviceInput(false));
+        .insert_resource(DeviceInput(false))
+        .add_systems(Update, capture_frames.after(crate::GameFrameSet));
 }
 
 /// The `gaps` object of `dump_debug` (WP-4.8; Gate 2 R7's counters, seen
