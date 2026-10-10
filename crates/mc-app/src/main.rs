@@ -20,6 +20,7 @@ use bevy::DefaultPlugins;
 use bevy::asset::AssetMetaCheck;
 use bevy::ecs::system::NonSendMarker;
 use bevy::prelude::*;
+use bevy::render::RenderPlugin;
 use bevy::window::{PresentMode, PrimaryWindow};
 use bevy::winit::WINIT_WINDOWS;
 use mc_client::paths::ClientPaths;
@@ -37,8 +38,9 @@ struct Args {
     seed: Option<String>,
     import: Option<PathBuf>,
     script: Option<PathBuf>,
-    /// `--vsync off`: present without waiting for the display (WP-4.3).
-    no_vsync: bool,
+    /// `--vsync on`: wait for the display's refresh (WP-4.3's flag; since
+    /// WP-4.9 the default is off, as vanilla's, PARITY_CHECKLIST P6).
+    vsync: bool,
 }
 
 const USAGE: &str =
@@ -54,8 +56,8 @@ const USAGE: &str =
   --seed SEED       the new world's seed, as the Create World screen reads it
   --import DIR      import a vanilla save folder into saves/, then open it
   --script FILE     scripted-input dev mode (crates/mc-client/README.md)
-  --vsync on|off    wait for the display's refresh (default on); off measures the real
-                    frame time (F3 and dump_debug show it)";
+  --vsync on|off    wait for the display's refresh (default off: as vanilla, the frame rate is
+                    uncapped at Performance Balanced/Max and 40 fps at Power saver)";
 
 fn parse_args() -> Result<Args, String> {
     let mut a = Args::default();
@@ -72,9 +74,9 @@ fn parse_args() -> Result<Args, String> {
             "--import" => a.import = Some(value("--import")?.into()),
             "--script" => a.script = Some(value("--script")?.into()),
             "--vsync" => {
-                a.no_vsync = match value("--vsync")?.as_str() {
-                    "on" => false,
-                    "off" => true,
+                a.vsync = match value("--vsync")?.as_str() {
+                    "on" => true,
+                    "off" => false,
                     v => return Err(format!("--vsync takes on or off, not {v}")),
                 }
             }
@@ -163,12 +165,15 @@ fn main() {
                         fit_canvas_to_parent: true,
                         // Tells wasm not to override default event handling, like F5 and Ctrl+R
                         prevent_default_event_handling: false,
-                        // Project addition (WP-4.3): `--vsync off` measures
-                        // the frame time uncapped.
-                        present_mode: if args.no_vsync {
-                            PresentMode::AutoNoVsync
-                        } else {
+                        // b1.7.3 never enables LWJGL's vsync: Balanced and
+                        // Max run uncapped and Power saver sleeps to 40 fps
+                        // (EntityRenderer.java:364-416,
+                        // terrain::power_saver_sleep). `--vsync on` (a
+                        // project addition, WP-4.3) waits for the display.
+                        present_mode: if args.vsync {
                             PresentMode::AutoVsync
+                        } else {
+                            PresentMode::AutoNoVsync
                         },
                         ..default()
                     }),
@@ -179,6 +184,15 @@ fn main() {
                 })
                 .set(AssetPlugin {
                     meta_check: AssetMetaCheck::Never,
+                    ..default()
+                })
+                // GL compiles what a frame draws inside that frame: no
+                // draw is skipped while its pipeline compiles on another
+                // thread (the world's first frames after a load,
+                // PARITY_CHECKLIST P8), and no compilation task is left
+                // running when the process exits (PERF.md §7's segfault).
+                .set(RenderPlugin {
+                    synchronous_pipeline_compilation: true,
                     ..default()
                 }),
         )

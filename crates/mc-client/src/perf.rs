@@ -5,8 +5,9 @@
 //!
 //! - **Frame time** is the wall time between the starts of two consecutive
 //!   app updates ([`perf_frame_start`] in `First`): with vsync off
-//!   (`mc_b173 --vsync off`, `PresentMode::AutoNoVsync`) it is the real
-//!   frame time; with vsync on it is capped at the display's refresh, and
+//!   (`PresentMode::AutoNoVsync`, the default since WP-4.9, as vanilla's)
+//!   it is the real frame time, plus the 40 fps sleep at "Power saver";
+//!   with `mc_b173 --vsync on` it is capped at the display's refresh, and
 //!   a compositor may still pace a hidden or covered window.
 //! - **Update time** is the main schedule's wall time in one frame, from
 //!   `First` to `Last` ([`perf_frame_end`]): the CPU work of a frame on the

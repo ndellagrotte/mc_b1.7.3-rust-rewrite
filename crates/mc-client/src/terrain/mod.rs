@@ -217,6 +217,7 @@ impl Plugin for TerrainPlugin {
             .init_resource::<TerrainStats>()
             .add_systems(Startup, spawn_terrain_handles)
             .add_systems(First, mark_render_end)
+            .add_systems(Last, power_saver_sleep.after(crate::perf::perf_frame_end))
             .add_systems(
                 Update,
                 (terrain_frame, draw_block_breaking, update_terrain_materials)
@@ -253,6 +254,48 @@ fn max_pending_jobs() -> usize {
 // src: EntityRenderer.java:364-391
 pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
     terrain.render_end_nano_time = clock::nano_time();
+}
+
+/// The frame-rate limit's sleep: only "Power saver" (`limitFramerate` 2,
+/// 40 fps) sleeps, until `1/40` s after the previous `renderEndNanoTime`
+/// (and 10 ms more when that time has passed and no world is open, a
+/// quirk of the menu branch), if that is between 0 and 500 ms; "Balanced"
+/// (the default) and "Max" never sleep, so vanilla runs uncapped there
+/// (the window does not wait for the display either: b1.7.3 never turns
+/// LWJGL's vsync on). Vanilla sleeps before taking `renderEndNanoTime` and
+/// drawing the GUI; here the sleep ends the frame (`Last`) and the next
+/// `First` takes the time ([`mark_render_end`]), which gives the same
+/// period. The binary's `--vsync on` additionally waits for the display.
+// src: EntityRenderer.java:364-372, :381-391, :403-416
+pub fn power_saver_sleep(game: NonSend<Game>, terrain: Res<Terrain>) {
+    let s = &game.game_settings;
+    if let Some(ms) = power_saver_sleep_ms(
+        s.limit_framerate,
+        game.the_world.is_some(),
+        terrain.render_end_nano_time,
+        clock::nano_time(),
+    ) {
+        std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+    }
+}
+
+/// [`power_saver_sleep`]'s arithmetic: the milliseconds to sleep, if any.
+// src: EntityRenderer.java:364-372, :381-391, :403-416
+pub fn power_saver_sleep_ms(
+    limit_framerate: i32,
+    world: bool,
+    render_end_nano_time: i64,
+    now: i64,
+) -> Option<i64> {
+    if limit_framerate != 2 {
+        return None;
+    }
+    let var7: i64 = 40;
+    let mut var8 = (render_end_nano_time + 1_000_000_000 / var7 - now) / 1_000_000;
+    if !world && var8 < 0 {
+        var8 += 10;
+    }
+    (var8 > 0 && var8 < 500).then_some(var8)
 }
 
 /// Creates the materials and the crack overlay's entity.
@@ -809,5 +852,27 @@ pub fn update_terrain_materials(
             m.params.textured = u32::from(tex.is_some());
             m.texture = tex.clone();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_power_saver_sleeps() {
+        let ms = 1_000_000i64;
+        // Balanced (1) and Max (0): never.
+        assert_eq!(power_saver_sleep_ms(1, true, 0, 3 * ms), None);
+        assert_eq!(power_saver_sleep_ms(0, false, 0, 3 * ms), None);
+        // Power saver: until 25 ms after the last renderEndNanoTime.
+        assert_eq!(power_saver_sleep_ms(2, true, 0, 3 * ms), Some(22));
+        assert_eq!(power_saver_sleep_ms(2, true, 0, 25 * ms), None);
+        assert_eq!(power_saver_sleep_ms(2, true, 0, 30 * ms), None);
+        // The menu branch adds 10 ms once the time has passed.
+        assert_eq!(power_saver_sleep_ms(2, false, 0, 30 * ms), Some(5));
+        assert_eq!(power_saver_sleep_ms(2, false, 0, 40 * ms), None);
+        // At most 500 ms (a clock jump).
+        assert_eq!(power_saver_sleep_ms(2, true, 600 * ms, 0), None);
     }
 }
