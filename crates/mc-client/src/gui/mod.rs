@@ -472,6 +472,7 @@ pub fn draw_current_screen(
     rm: Option<NonSendMut<crate::render::RenderManager>>,
     hook: Option<Res<crate::render::held_item::HeldItemHook>>,
     colorizers: Option<Res<crate::textures::Colorizers>>,
+    mut item_renderer: Option<ResMut<crate::item_renderer::ItemRenderer>>,
 ) {
     let _perf = crate::perf::time(crate::perf::Phase::Gui);
     let mut read = clipboard_reader(clipboard.as_deref_mut());
@@ -490,6 +491,7 @@ pub fn draw_current_screen(
             colorizers,
             font: &font,
             held_item: hook.as_deref().and_then(|h| h.0.as_deref()),
+            item_renderer: item_renderer.as_deref_mut(),
         });
     }
     ctx.sync();

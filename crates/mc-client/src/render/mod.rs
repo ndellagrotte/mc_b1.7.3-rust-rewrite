@@ -871,6 +871,10 @@ pub struct GuiEntityRenderer<'a> {
     pub font: &'a FontRenderer,
     /// `renderManager.itemRenderer`.
     pub held_item: Option<&'a dyn HeldItemRenderer>,
+    /// WP-3.7b's item renderer, told when `RenderPlayer` drew the player
+    /// (the first-person arm shares `modelBipedMain.isRiding`,
+    /// RenderLiving.java:26, GuiInventory.java:58).
+    pub item_renderer: Option<&'a mut crate::item_renderer::ItemRenderer>,
 }
 
 impl GuiEntityRenderer<'_> {
@@ -912,6 +916,11 @@ impl GuiEntityRenderer<'_> {
             0.0,
             partial,
         );
+        if RendererId::of(&e.kind) == RendererId::Player
+            && let Some(ir) = self.item_renderer.as_deref_mut()
+        {
+            ir.player_model_drawn(e.base.is_riding());
+        }
         // RenderSlime's GL_NORMALIZE stays on (gl module docs).
         self.rm.normalize_latched |= glx.state.normalize;
         glx.out
