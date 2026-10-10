@@ -6,10 +6,10 @@
 //!
 //! Resource names are the vanilla ones, absolute in the jar
 //! (`TexturePackBase.getResourceAsStream("/terrain.png")`,
-//! TexturePackBase.java:27-29: the default pack reads the client jar's own
+//! TexturePackBase.java:28-29: the default pack reads the client jar's own
 //! resources). Texture packs (`TexturePackCustom`, `TexturePackList`) are
 //! deferred (D3); the default pack's thumbnail and name are only its
-//! `/pack.png` and `"Default"` (TexturePackDefault.java:7-13).
+//! `/pack.png` and `"Default"` (TexturePackDefault.java:13-18).
 //!
 //! The jar's resources are indexed into memory once (≈1.5 MB without the
 //! classes), so readers need no file handle and the resource is `Send +
@@ -33,12 +33,12 @@ use crate::lang::{EN_US_LANG, STATS_US_LANG, StringTranslate};
 pub const TERRAIN_PNG: &str = "/terrain.png";
 /// The font (Minecraft.java:241).
 pub const FONT_DEFAULT_PNG: &str = "/font/default.png";
-/// The default texture pack's thumbnail (TexturePackDefault.java:11).
+/// The default texture pack's thumbnail (TexturePackDefault.java:18).
 pub const PACK_PNG: &str = "/pack.png";
-/// The loading screen's background (LoadingScreenRenderer.java:145,
+/// The loading screen's background (LoadingScreenRenderer.java:80,
 /// GuiScreen.java:151).
 pub const GUI_BACKGROUND_PNG: &str = "/gui/background.png";
-/// The missing-thumbnail texture (TexturePackDefault.java:28).
+/// The missing-thumbnail texture (TexturePackDefault.java:40).
 pub const GUI_UNKNOWN_PACK_PNG: &str = "/gui/unknown_pack.png";
 /// The splash logo drawn by `loadScreen` (Minecraft.java:319).
 pub const TITLE_MOJANG_PNG: &str = "/title/mojang.png";

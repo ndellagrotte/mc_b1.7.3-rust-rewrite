@@ -1,5 +1,5 @@
 //! `GuiSleepMP` (GuiSleepMP.java): the chat with a "Leave Bed" button,
-//! shown while sleeping on a multiplayer world (Minecraft.java:978-983;
+//! shown while sleeping on a multiplayer world (Minecraft.java:975-979;
 //! the shell never opens it in singleplayer, D3). Registered so the shell
 //! and the dev action can build it. Leaving the bed sends a packet only
 //! for `EntityClientPlayerMP` (deferred): in singleplayer the button and

@@ -9,19 +9,19 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Session {
     /// `username`.
-    // src: Session.java:7
+    // src: Session.java:8
     pub username: String,
     /// `sessionId` (unused offline).
-    // src: Session.java:8
+    // src: Session.java:9
     pub session_id: String,
     /// `mpPassParameter` (multiplayer, D3).
-    // src: Session.java:9
+    // src: Session.java:10
     pub mp_pass_parameter: Option<String>,
 }
 
 impl Session {
     /// `new Session(username, sessionId)`.
-    // src: Session.java:11-14
+    // src: Session.java:12-15
     pub fn new(var1: &str, var2: &str) -> Self {
         Session {
             username: var1.to_string(),
