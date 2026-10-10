@@ -317,3 +317,10 @@ fn block_table_comparison_is_sensitive() {
     actual[1] = actual[1].clone().with("tickRate", 11);
     assert!(compare(&expected, &actual).is_err());
 }
+
+/// Every `tests/golden/block` fixture has a test (Gate 1 N1): `block-table`
+/// above. A new fixture directory fails this until its test is written.
+#[test]
+fn every_block_fixture_has_a_test() {
+    assert_eq!(mc_golden::fixture_names("block").unwrap(), ["block-table"]);
+}

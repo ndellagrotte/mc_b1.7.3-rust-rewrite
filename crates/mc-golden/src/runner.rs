@@ -45,6 +45,21 @@ pub fn all_fixture_dirs() -> Result<Vec<PathBuf>, GoldenError> {
     Ok(out)
 }
 
+/// The fixture names of `tests/golden/<area>` (the directories that hold a
+/// `scenario.json`), sorted: what an area's "every fixture has a test"
+/// check compares with the names its tests run (Gate 1 N1, Gate 2 R6).
+pub fn fixture_names(area: &str) -> Result<Vec<String>, GoldenError> {
+    let mut out = Vec::new();
+    for dir in io::subdirs(&workspace_root().join("tests/golden").join(area))? {
+        if dir.join("scenario.json").is_file()
+            && let Some(name) = dir.file_name()
+        {
+            out.push(name.to_string_lossy().into_owned());
+        }
+    }
+    Ok(out)
+}
+
 /// Reads a sidecar binary named by a trace line's `"file"` field. `name` must
 /// be a plain file name inside the fixture directory.
 pub fn read_sidecar(dir: impl AsRef<Path>, name: &str) -> Result<Vec<u8>, GoldenError> {

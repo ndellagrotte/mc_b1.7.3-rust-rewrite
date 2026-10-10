@@ -153,3 +153,30 @@ fn tick_driver_writes_gaps() {
     assert!(v["skipped_systems"].is_object(), "{v}");
     assert!(v["unimplemented_hits"].is_object(), "{v}");
 }
+
+/// Every fixture area has an "every fixture has a test" check (Gate 1 N1,
+/// Gate 2 R6), so a new area directory fails here until it gets one:
+/// `block`, `item`, `recipe`, `stat` (`golden_*_table.rs`), `entity`,
+/// `light`, `tick` (`golden_tick.rs`), `hash`, `rng` (mc-core
+/// `golden_hash.rs`, `golden_rng.rs`), `math` (mc-core
+/// `math_sweep_report.rs`), `nbt` (mc-nbt `golden_nbt.rs`), `save`
+/// (`golden_save.rs`), `soak` (`golden_soak.rs`), `worldgen`
+/// (`golden_worldgen.rs`).
+#[test]
+fn every_fixture_area_has_a_coverage_check() {
+    let areas: Vec<String> = mc_golden::all_fixture_dirs()
+        .unwrap()
+        .iter()
+        .filter_map(|d| d.parent()?.file_name())
+        .map(|n| n.to_string_lossy().into_owned())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    assert_eq!(
+        areas,
+        [
+            "block", "entity", "hash", "item", "light", "math", "nbt", "recipe", "rng", "save",
+            "soak", "stat", "tick", "worldgen"
+        ]
+    );
+}

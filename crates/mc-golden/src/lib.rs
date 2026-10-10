@@ -35,7 +35,8 @@
 //!   decoded (PLAN_v4 §4.4 item 3).
 //! - [`Bits32`] / [`Bits64`] / [`hex_bytes`] / [`blake3_hex`] — the encoding
 //!   rules (ADR-007 §5.2).
-//! - [`fixture_dir`], [`workspace_root`], [`read_sidecar`], [`all_fixture_dirs`].
+//! - [`fixture_dir`], [`workspace_root`], [`read_sidecar`], [`all_fixture_dirs`],
+//!   [`fixture_names`] (an area's fixtures, for the coverage checks).
 //! - [`tick_driver::drive`] — the drive closure for `kind: "tick"`
 //!   scenarios: builds an `mc_sim` world, applies the ops, runs the
 //!   oracle's per-tick sequence and emits the dumps. Ops and world types the
@@ -84,8 +85,8 @@ pub use digest::blake3_hex;
 pub use error::GoldenError;
 pub use gaps::Gaps;
 pub use runner::{
-    GAPS_FILE, actual_dir_of, all_fixture_dirs, fixture_dir, read_sidecar, run, target_dir,
-    workspace_root,
+    GAPS_FILE, actual_dir_of, all_fixture_dirs, fixture_dir, fixture_names, read_sidecar, run,
+    target_dir, workspace_root,
 };
 pub use scenario::{
     ChunkPos, ChunkSel, Dimension, Draw, Dump, DumpKind, EntityWhich, HashOp, ItemSpec, NbtNode,

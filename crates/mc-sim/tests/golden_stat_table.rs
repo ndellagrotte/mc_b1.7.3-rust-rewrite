@@ -136,3 +136,10 @@ fn stat_stat_table() {
         panic!("stat/stat-table: {e}");
     }
 }
+
+/// Every `tests/golden/stat` fixture has a test (Gate 2 R6): `stat-table`
+/// above. A new fixture directory fails this until its test is written.
+#[test]
+fn every_stat_fixture_has_a_test() {
+    assert_eq!(mc_golden::fixture_names("stat").unwrap(), ["stat-table"]);
+}

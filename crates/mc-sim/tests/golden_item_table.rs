@@ -328,3 +328,10 @@ fn item_table_layout() {
         present
     );
 }
+
+/// Every `tests/golden/item` fixture has a test (Gate 1 N1): `item-table`
+/// above. A new fixture directory fails this until its test is written.
+#[test]
+fn every_item_fixture_has_a_test() {
+    assert_eq!(mc_golden::fixture_names("item").unwrap(), ["item-table"]);
+}

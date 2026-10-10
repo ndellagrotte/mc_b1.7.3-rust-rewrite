@@ -125,3 +125,14 @@ fn recipe_recipe_table() {
 fn recipe_count_is_151() {
     assert_eq!(CraftingManager::get_instance().get_recipe_list().len(), 151);
 }
+
+/// Every `tests/golden/recipe` fixture has a test (Gate 2 R6):
+/// `recipe-table` above. A new fixture directory fails this until its test
+/// is written.
+#[test]
+fn every_recipe_fixture_has_a_test() {
+    assert_eq!(
+        mc_golden::fixture_names("recipe").unwrap(),
+        ["recipe-table"]
+    );
+}

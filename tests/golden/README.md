@@ -856,7 +856,23 @@ D5 import refusal, the `level.dat` shapes of `nbt/level-dat-shape` and
 `nbt/testworld-level-dat`, and the cross-read both ways through
 `tools/oracle/java/harness/WorldReadDir.java`: `read <parent>` prints what the vanilla loaders
 read from `<parent>/world` exactly as a `world_read` scenario, `write <parent>` saves a small
-vanilla world there; run when `build/oracle` exists).
+vanilla world there). The two cross-read tests are `#[ignore]`d because they need the oracle
+build (`tools/oracle/build.sh`, which needs the reference tree and a JDK); run them after a
+regen with `cargo test -p mc-sim --test golden_save -- --ignored cross_read`. Run that way,
+a missing `build/oracle` fails them (until WP-4.8 they returned early and passed without
+checking anything, Gate 1 N6).
+
+### Coverage checks
+
+Every area has a non-ignored test that compares its fixture directories
+(`mc_golden::fixture_names(area)`, or `all_fixture_dirs`) with the fixtures its tests run, so
+a new fixture without a test fails the ordinary `cargo test`: `golden_tick.rs`
+(`entity`, `light`, `tick`), `golden_save.rs` (`save`), `golden_worldgen.rs`, `golden_soak.rs`,
+mc-nbt `golden_nbt.rs`, mc-core `golden_hash.rs`, `golden_rng.rs`, and since WP-4.8 (Gate 1
+N1, Gate 2 R6) mc-core `math_sweep_report.rs` (`math`) and `golden_block_table.rs`,
+`golden_item_table.rs`, `golden_recipe_table.rs`, `golden_stat_table.rs`.
+`crates/mc-golden/tests/runner.rs::every_fixture_area_has_a_coverage_check` lists the areas, so
+a new area fails until it gets its check.
 
 ### The gaps file (`gaps.json`, WP-4.8)
 

@@ -15,15 +15,19 @@
 //! 3. Write / re-read: a world saved through `SaveOldDir`, opened again in a
 //!    fresh `World`, compared by chunk arrays and parsed NBT trees (tile
 //!    entities, entities, the player, the re-saved chunks).
-//! 4. Cross-read both ways with the vanilla loaders (`harness.WorldReadDir`),
-//!    when the oracle is built (`tools/oracle/build.sh`); skipped otherwise.
+//! 4. Cross-read both ways with the vanilla loaders (`harness.WorldReadDir`):
+//!    `#[ignore]`d, since they need the oracle build (`tools/oracle/build.sh`,
+//!    which needs the git-ignored reference tree and a JDK). Run them with
+//!    `cargo test -p mc-sim --test golden_save -- --ignored cross_read`; run
+//!    so, they fail when the oracle is missing instead of passing without
+//!    checking anything (Gate 1 N6 / question 7, WP-4.8).
 //! 5. Import refusal (D5): a `testWorld` copy with block id 200 in one chunk,
 //!    another with item id 3000 in the chest; a clean copy passes.
 //! 6. `level.dat` shapes: `WorldInfo` and the player compound against
 //!    `nbt/level-dat-shape` and `nbt/testworld-level-dat`.
 //! 7. Save-handler behaviour no fixture reaches: the session lock, the
-//!    `level.dat` rename dance, the save list, entity classes the port
-//!    cannot construct yet (kept as compounds), the relocation bug.
+//!    `level.dat` rename dance, the save list, every stored entity class
+//!    constructed, the relocation bug.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -472,21 +476,24 @@ fn quick_save_writes_24_chunks() {
 
 // ---- 4. cross-read with the vanilla loaders -----------------------------------------------
 
-fn oracle_ready() -> bool {
-    let ok = workspace_root()
-        .join("build/oracle/harness/WorldReadDir.class")
-        .is_file();
-    if !ok {
-        eprintln!(
-            "skipped: build/oracle/harness/WorldReadDir.class missing (run tools/oracle/build.sh)"
-        );
-    }
-    ok
+/// The cross-read tests are `#[ignore]`d (module docs, item 4): run on
+/// purpose, a missing oracle build is a failure, not a silent pass.
+const NEEDS_ORACLE: &str = "build/oracle/harness/WorldReadDir.class missing: run tools/oracle/build.sh (needs the reference tree and a JDK)";
+
+/// Panics unless the oracle is built.
+fn require_oracle() {
+    assert!(
+        workspace_root()
+            .join("build/oracle/harness/WorldReadDir.class")
+            .is_file(),
+        "{NEEDS_ORACLE}"
+    );
 }
 
 /// Runs `harness.WorldReadDir <mode> <parent>`; its JSON lines (vanilla's
-/// static initialisers print a few other lines first).
-fn world_read_dir(mode: &str, parent: &Path) -> Option<Vec<TraceLine>> {
+/// static initialisers print a few other lines first). Panics if `sh` or
+/// `java` cannot be started.
+fn world_read_dir(mode: &str, parent: &Path) -> Vec<TraceLine> {
     let out = std::process::Command::new("sh")
         .arg("-c")
         .arg(
@@ -498,13 +505,7 @@ fn world_read_dir(mode: &str, parent: &Path) -> Option<Vec<TraceLine>> {
         .arg(parent)
         .env("ROOT", workspace_root())
         .output();
-    let out = match out {
-        Ok(o) => o,
-        Err(e) => {
-            eprintln!("skipped: cannot run sh/java: {e}");
-            return None;
-        }
-    };
+    let out = out.unwrap_or_else(|e| panic!("cannot run sh/java: {e}"));
     assert!(
         out.status.success(),
         "WorldReadDir {mode} failed: {}",
@@ -516,7 +517,7 @@ fn world_read_dir(mode: &str, parent: &Path) -> Option<Vec<TraceLine>> {
         .filter(|l| l.starts_with('{'))
         .map(|l| format!("{l}\n"))
         .collect();
-    Some(parse_jsonl(&text).unwrap())
+    parse_jsonl(&text).unwrap()
 }
 
 /// Host directory for the JVM (test-only; D9 binds the simulation, not its
@@ -547,10 +548,9 @@ fn rust_world_read(storage: MemoryStorage) -> Vec<TraceLine> {
 /// WorldInfo, region headers, chunk trees, loaded-chunk digests, tile
 /// entities).
 #[test]
+#[ignore = "needs the oracle build (tools/oracle/build.sh); run with --ignored"]
 fn cross_read_rust_written_world_by_vanilla() {
-    if !oracle_ready() {
-        return;
-    }
+    require_oracle();
     let store = store_over(MemoryStorage::default());
     let mut a = build_saved_world(&store, WORLD_DIR);
     a.try_save_world(true).unwrap();
@@ -558,9 +558,7 @@ fn cross_read_rust_written_world_by_vanilla() {
     let storage = snapshot(&store);
     let parent = target_dir().join("cross-read/rust-written");
     write_host_tree(&storage, WORLD_DIR, &parent);
-    let Some(vanilla) = world_read_dir("read", &parent) else {
-        return;
-    };
+    let vanilla = world_read_dir("read", &parent);
     let ours = rust_world_read(storage);
     assert!(vanilla.len() > 25);
     assert_eq!(vanilla.iter().filter(|l| l.e() == "tile_entity").count(), 3);
@@ -573,19 +571,14 @@ fn cross_read_rust_written_world_by_vanilla() {
 /// (`WorldReadDir write`: chest, furnace, sign, item and falling-sand
 /// entities) read by both loaders gives the same lines.
 #[test]
+#[ignore = "needs the oracle build (tools/oracle/build.sh); run with --ignored"]
 fn cross_read_vanilla_written_world_by_rust() {
-    if !oracle_ready() {
-        return;
-    }
+    require_oracle();
     let parent = target_dir().join("cross-read/vanilla-written");
     #[allow(clippy::disallowed_methods)]
     let _ = std::fs::remove_dir_all(&parent);
-    if world_read_dir("write", &parent).is_none() {
-        return;
-    }
-    let Some(vanilla) = world_read_dir("read", &parent) else {
-        return;
-    };
+    world_read_dir("write", &parent);
+    let vanilla = world_read_dir("read", &parent);
     let storage = load_save_dir(&parent, "world").unwrap();
     // The vanilla-written chunk (0, 0) holds two entities the Rust loader builds.
     let store = harness_store(storage.clone());

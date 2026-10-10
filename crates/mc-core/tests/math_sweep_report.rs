@@ -384,3 +384,15 @@ fn golden_math_sweep_strict_eq() {
 fn golden_math_sweep_strict_fixture_eq() {
     replay_jmath(STRICT);
 }
+
+/// Every `tests/golden/math` fixture has a test (Gate 1 N1): the two sweeps
+/// here (`golden_math_sweep_strict_eq`, `golden_math_sweep_strict_fixture_eq`,
+/// `math_sweep_report`) and `sine-table` in `golden_sine_table.rs`. A new
+/// fixture directory fails this until its test is written.
+#[test]
+fn every_math_fixture_has_a_test() {
+    assert_eq!(
+        mc_golden::fixture_names("math").unwrap(),
+        [SWEEP, STRICT, "sine-table"]
+    );
+}
