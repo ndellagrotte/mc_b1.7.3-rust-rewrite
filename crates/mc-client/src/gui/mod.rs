@@ -65,6 +65,7 @@ pub mod conflict_warning;
 pub mod container;
 pub mod debug_screens;
 pub mod draw;
+pub mod entity_draws;
 pub mod error_screen;
 pub mod font;
 pub mod ingame;
@@ -468,6 +469,9 @@ pub fn draw_current_screen(
     registry: Res<ScreenRegistry>,
     mut clipboard: Option<ResMut<bevy::clipboard::Clipboard>>,
     mut g: ResMut<GuiGl>,
+    rm: Option<NonSendMut<crate::render::RenderManager>>,
+    hook: Option<Res<crate::render::held_item::HeldItemHook>>,
+    colorizers: Option<Res<crate::textures::Colorizers>>,
 ) {
     let _perf = crate::perf::time(crate::perf::Phase::Gui);
     let mut read = clipboard_reader(clipboard.as_deref_mut());
@@ -479,6 +483,15 @@ pub fn draw_current_screen(
         &registry,
         Some(&mut read),
     );
+    let mut rm = rm;
+    if let (Some(rm), Some(colorizers)) = (rm.as_deref_mut(), colorizers.as_deref()) {
+        ctx.entities = Some(crate::render::GuiEntityRenderer {
+            rm,
+            colorizers,
+            font: &font,
+            held_item: hook.as_deref().and_then(|h| h.0.as_deref()),
+        });
+    }
     ctx.sync();
     if ctx.game.pending.is_some() || ctx.game.skip_render_world || ctx.game.current_screen.is_none()
     {

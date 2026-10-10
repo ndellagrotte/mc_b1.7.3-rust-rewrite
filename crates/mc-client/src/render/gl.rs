@@ -351,6 +351,25 @@ impl EntityGl {
         }
     }
 
+    /// The state `GuiInventory` calls `renderEntityWithPosYaw` in
+    /// (GuiInventory.java:28-50): the GUI's texturing, alpha test and
+    /// depth test, `GL_RESCALE_NORMAL` and the standard item lighting on,
+    /// no fog, culling on (EntityRenderer.java:772), white; the modelview
+    /// starts at the identity standing for the screen's matrix, and the
+    /// lights are given in that space
+    /// ([`crate::gui::entity_draws::lights_in_start_space`]).
+    // src: GuiInventory.java:28-50, GuiContainer.java:20-33
+    pub fn gui_start(normalize: bool, lights: [Vec3; 2]) -> Self {
+        let mut g = EntityGl::new(normalize);
+        g.state.fog = false;
+        g.state.rescale_normal = true;
+        g.state.bound = Some(TexRef::from(
+            crate::gui::container::inventory::INVENTORY_PNG,
+        ));
+        g.lights = lights;
+        g
+    }
+
     /// The current modelview (GL entity space).
     pub fn matrix(&self) -> Mat4 {
         self.matrix

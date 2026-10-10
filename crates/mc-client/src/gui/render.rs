@@ -204,11 +204,13 @@ impl Material for GuiMaterial {
         descriptor.primitive.cull_mode = None::<Face>;
         if let Some(ds) = descriptor.depth_stencil.as_mut() {
             ds.depth_write_enabled = Some(k.depth_write);
-            // GL_LEQUAL under Bevy's reverse-Z.
-            ds.depth_compare = Some(if k.depth_test {
-                CompareFunction::GreaterEqual
-            } else {
+            // GL_LEQUAL under Bevy's reverse-Z; GL_EQUAL is Equal.
+            ds.depth_compare = Some(if !k.depth_test {
                 CompareFunction::Always
+            } else if k.depth_equal {
+                CompareFunction::Equal
+            } else {
+                CompareFunction::GreaterEqual
             });
         }
         Ok(())

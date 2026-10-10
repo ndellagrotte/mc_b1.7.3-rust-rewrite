@@ -18,7 +18,8 @@
 //!   colour of its last vertex (the provoking vertex of `GL_QUADS`);
 //! - the alpha test (`GL_GREATER` only, the only function vanilla uses),
 //!   blending with any `glBlendFunc` pair, and the depth test (`GL_LEQUAL`,
-//!   Minecraft.java:265) and mask are kept per batch; `GL_LIGHTING` and
+//!   Minecraft.java:265, or `GL_EQUAL` for the inventory player's hurt
+//!   overlay, [`super::entity_draws`]) and mask are kept per batch; `GL_LIGHTING` and
 //!   `GL_FOG` are tracked and ignored (the 2D GUI never enables them).
 //!
 //! Each frame starts from [`GlState::frame_start`] (the state vanilla's GUI
@@ -121,6 +122,9 @@ pub struct GuiKey {
     pub depth_test: bool,
     /// `glDepthMask` (GL writes depth only with the test on).
     pub depth_write: bool,
+    /// `glDepthFunc(GL_EQUAL)` instead of `GL_LEQUAL` (the hurt overlay of
+    /// the inventory's player, `RenderLiving.doRenderLiving`).
+    pub depth_equal: bool,
 }
 
 impl Default for GuiKey {
@@ -129,6 +133,7 @@ impl Default for GuiKey {
             blend: None,
             depth_test: true,
             depth_write: true,
+            depth_equal: false,
         }
     }
 }
@@ -166,6 +171,8 @@ pub struct GlState {
     pub depth_test: bool,
     /// `glDepthMask`.
     pub depth_mask: bool,
+    /// `glDepthFunc(GL_EQUAL)` (false: `GL_LEQUAL`).
+    pub depth_equal: bool,
     /// `glShadeModel(GL_SMOOTH)` (false: `GL_FLAT`).
     pub smooth: bool,
     /// `GL_LIGHTING` (tracked, not drawn).
@@ -193,6 +200,7 @@ impl GlState {
             alpha_ref: 0.1,
             depth_test: true,
             depth_mask: true,
+            depth_equal: false,
             smooth: false,
             lighting: false,
             fog: false,
@@ -319,6 +327,12 @@ impl GuiGl {
     pub fn alpha_func(&mut self, func: u32, r: f32) {
         debug_assert_eq!(func, gl::GREATER);
         self.state.alpha_ref = r;
+    }
+
+    /// `glDepthFunc(func)`: `GL_EQUAL` (514) or `GL_LEQUAL` (515, the
+    /// default).
+    pub fn depth_func(&mut self, func: u32) {
+        self.state.depth_equal = func == 514;
     }
 
     /// `glDepthMask(flag)`.
@@ -474,6 +488,7 @@ impl GuiGl {
             blend: s.blend.then_some(s.blend_func),
             depth_test: s.depth_test,
             depth_write: s.depth_test && s.depth_mask,
+            depth_equal: s.depth_test && s.depth_equal,
         };
         let texture = if s.texture_2d {
             // An unbound texture samples as GL's texture 0 would: the

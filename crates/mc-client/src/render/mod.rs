@@ -858,6 +858,66 @@ pub fn render_entities(
     }
 }
 
+/// What a GUI screen needs to draw an entity through the renderers
+/// (`GuiInventory`'s player, [`crate::gui::entity_draws`]): the render
+/// manager as this frame's world pass left it, the colour maps, the font
+/// and the held-item hook.
+pub struct GuiEntityRenderer<'a> {
+    /// `RenderManager.instance`.
+    pub rm: &'a mut RenderManager,
+    /// The colour maps.
+    pub colorizers: &'a Colorizers,
+    /// `renderManager.getFontRenderer()`.
+    pub font: &'a FontRenderer,
+    /// `renderManager.itemRenderer`.
+    pub held_item: Option<&'a dyn HeldItemRenderer>,
+}
+
+impl GuiEntityRenderer<'_> {
+    /// `RenderManager.instance.playerViewY = 180;
+    /// renderEntityWithPosYaw(e, 0, 0, 0, 0, partial)` into an
+    /// [`EntityGl`] at the GUI's start state with `lights` in its start
+    /// space ([`EntityGl::gui_start`]): the draws, for
+    /// [`crate::gui::entity_draws::emit`]. `playerViewY` (only name tags
+    /// read it) stays 180 until the next frame's `cacheActiveRenderInfo`,
+    /// as in vanilla.
+    // src: GuiInventory.java:51-52, RenderManager.java:112-119
+    pub fn render(
+        &mut self,
+        world: &mut World,
+        e: &Entity,
+        lights: [Vec3; 2],
+        partial: f32,
+    ) -> gl::DrawList {
+        let mut glx = EntityGl::gui_start(self.rm.normalize_latched, lights);
+        self.rm.info.player_view_y = 180.0;
+        let info = self.rm.info.clone();
+        let statics = crate::terrain::snapshot::render_statics(&world.block_statics);
+        let mut cx = Ctx {
+            gl: &mut glx,
+            world,
+            info: &info,
+            statics: &statics,
+            colorizers: self.colorizers,
+            font: self.font,
+            held_item: self.held_item,
+        };
+        render_entity_with_pos_yaw(
+            &mut self.rm.renderers,
+            &mut cx,
+            e,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            partial,
+        );
+        // RenderSlime's GL_NORMALIZE stays on (gl module docs).
+        self.rm.normalize_latched |= glx.state.normalize;
+        glx.out
+    }
+}
+
 /// `renderLitParticles`' pickups: each `EntityPickupFX` draws its entity
 /// with `RenderManager.renderEntityWithPosYaw` at the particle's position
 /// (relative to its anchor), `glColor4f(light, light, light, 1)`, on the

@@ -494,6 +494,10 @@ pub struct ScreenCtx<'a> {
     registry: &'a ScreenRegistry,
     clipboard: Option<&'a mut dyn FnMut() -> Option<String>>,
     this_request: Option<ThisRequest>,
+    /// The entity renderers, for a screen that draws an entity
+    /// (`GuiInventory`'s player, WP-4.9); set by the screen-drawing system
+    /// ([`super::draw_current_screen`]), `None` elsewhere.
+    pub entities: Option<crate::render::GuiEntityRenderer<'a>>,
 }
 
 impl<'a> ScreenCtx<'a> {
@@ -514,6 +518,7 @@ impl<'a> ScreenCtx<'a> {
             registry,
             clipboard,
             this_request: None,
+            entities: None,
         }
     }
 
