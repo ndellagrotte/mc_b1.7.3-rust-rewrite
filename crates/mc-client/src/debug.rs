@@ -22,8 +22,11 @@ pub struct DebugSources {
     /// `effectRenderer.getStatistics()`: the particle count.
     pub particles: String,
     /// The Java heap lines' numbers (`Runtime.maxMemory/totalMemory/
-    /// freeMemory`): there is no JVM; the client may report process memory
-    /// here. Bytes.
+    /// freeMemory`), in bytes. There is no JVM: [`publish_debug_text`]
+    /// fills them from the process ([`process_memory`]: max = a quarter of
+    /// the physical memory, the JVM's default `-Xmx`; total = the resident
+    /// set; free = its file-backed and shared part, so "used" is the
+    /// anonymous memory, the heap's stand-in).
     pub max_memory: i64,
     /// See [`DebugSources::max_memory`].
     pub total_memory: i64,
@@ -108,6 +111,41 @@ pub fn debug_text(g: &Game, src: &DebugSources) -> DebugText {
     }
 }
 
+/// `kB` value of a `/proc` line `"<key>:   <n> kB"`, in bytes.
+pub fn proc_kb(text: &str, key: &str) -> Option<i64> {
+    text.lines().find_map(|l| {
+        let rest = l.strip_prefix(key)?.strip_prefix(':')?;
+        let n: i64 = rest.split_whitespace().next()?.parse().ok()?;
+        Some(n * 1024)
+    })
+}
+
+/// The stand-in for `Runtime.maxMemory()`, `totalMemory()` and
+/// `freeMemory()` (project-owned; P5 of docs/PARITY_CHECKLIST.md) from
+/// `/proc/self/status` and `/proc/meminfo`:
+///
+/// - max: `MemTotal / 4`, Java 8's default maximum heap on a machine with
+///   that much memory (vanilla, run with no `-Xmx`, showed `of 6932MB` on
+///   the test machine's 27.7 GB);
+/// - total ("Allocated"): `VmRSS`, the process's resident memory;
+/// - free: `VmRSS - RssAnon`, the resident file-backed and shared pages,
+///   so "Used" (`total - free`) is the anonymous memory (heap, stacks,
+///   buffers), the nearest thing to a JVM's live heap.
+pub fn memory_from_proc(status: &str, meminfo: &str) -> Option<(i64, i64, i64)> {
+    let max = proc_kb(meminfo, "MemTotal")? / 4;
+    let total = proc_kb(status, "VmRSS")?;
+    let anon = proc_kb(status, "RssAnon").unwrap_or(total);
+    Some((max, total, (total - anon).max(0)))
+}
+
+/// [`memory_from_proc`] for this process; `None` where there is no
+/// `/proc` (the lines then read 0, as before).
+pub fn process_memory() -> Option<(i64, i64, i64)> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let meminfo = std::fs::read_to_string("/proc/meminfo").ok()?;
+    memory_from_proc(&status, &meminfo)
+}
+
 /// The right column's first row of the project's lines: row 5 is y = 52,
 /// under the left column's lines at y = 2 to 42.
 // src: GuiIngame.java:172-176
@@ -119,10 +157,21 @@ pub const PERF_FIRST_ROW: usize = 5;
 /// column's five lines, so no row holds both.
 pub fn publish_debug_text(
     game: NonSend<Game>,
-    src: Res<DebugSources>,
+    mut src: ResMut<DebugSources>,
     perf: Option<Res<crate::perf::PerfStats>>,
     mut out: ResMut<DebugText>,
 ) {
+    // Runtime.getRuntime()'s numbers, read each frame the lines are shown
+    // (GuiIngame.java:178-183).
+    if game.game_settings.show_debug_info
+        && game.the_world.is_some()
+        && let Some((max, total, free)) = process_memory()
+        && (src.max_memory, src.total_memory, src.free_memory) != (max, total, free)
+    {
+        src.max_memory = max;
+        src.total_memory = total;
+        src.free_memory = free;
+    }
     let mut t = debug_text(&game, &src);
     if !t.right.is_empty()
         && let Some(p) = perf
@@ -139,6 +188,32 @@ pub fn publish_debug_text(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn memory_lines_from_proc() {
+        let status =
+            "Name:\tmc_b173\nVmRSS:\t  409600 kB\nRssAnon:\t  307200 kB\nRssFile:\t 102400 kB\n";
+        let meminfo = "MemTotal:       28385280 kB\nMemFree:  1 kB\n";
+        let (max, total, free) = memory_from_proc(status, meminfo).unwrap();
+        assert_eq!(max, 28385280 * 1024 / 4);
+        assert_eq!(total, 400 * 1024 * 1024);
+        assert_eq!(free, 100 * 1024 * 1024);
+        // GuiIngame.java:178-183's format: used = total - free.
+        let used = total - free;
+        assert_eq!(
+            format!(
+                "Used memory: {}% ({}MB) of {}MB",
+                used * 100 / max,
+                used / 1024 / 1024,
+                max / 1024 / 1024
+            ),
+            "Used memory: 4% (300MB) of 6930MB"
+        );
+        assert_eq!(proc_kb("VmRSSx: 5 kB\n", "VmRSS"), None);
+        assert!(memory_from_proc("", meminfo).is_none());
+    }
+
     #[test]
     fn facing_formula() {
         // f: floor_double(yaw * 4 / 360 + 0.5) & 3 — 0 south, 1 west, 2
