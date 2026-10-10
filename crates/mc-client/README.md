@@ -38,7 +38,15 @@ fallback exists (`paths` module docs, `docs/RUNNING.md`). Also since WP-4.3:
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--vsync on\|off` | `off` presents with `PresentMode::AutoNoVsync`, to measure the frame time (project addition) | `on` |
+| `--vsync on\|off` | `on` presents with `PresentMode::AutoVsync` (waits for the display), `off` with `PresentMode::AutoNoVsync` (project addition) | `off` since WP-4.9 (was `on`) |
+
+Since WP-4.9 the frame rate follows vanilla's limit (PARITY_CHECKLIST P6):
+b1.7.3 never turns on LWJGL's vsync, so "Performance: Balanced" (the
+default) and "Max FPS" run uncapped and "Power saver" sleeps to 40 fps
+(EntityRenderer.java:364-416, `terrain::power_saver_sleep`). `--vsync on`
+is the override for a capped, tear-free window. A nested or covered window
+may still be paced by the compositor (the nested Xwayland of the parity
+harness presents the Vulkan surface at 60 Hz whatever the mode).
 
 ## Module map
 
@@ -418,7 +426,13 @@ policy), `snapshot.rs` (what a mesh job reads).
   `bytesDrawn` statistic. Pass 1's sections are sorted by Bevy (back to
   front by entity); vanilla calls them nearest first (`sortedWorldRenderers`),
   which shows only with fast graphics, where pass 1 writes depth while
-  blending (overlapping water of two sections; WP-3.3b). `Chunk.isLit`
+  blending (overlapping water of two sections; WP-3.3b). *WP-4.9:* with
+  fast graphics each pass-1 section now has its own material whose sort
+  bias is its place in vanilla's call order
+  (`RenderGlobalTerrain::render_list_order`: nearest first, grouped by
+  `RenderList` anchor), so the nearer section is drawn first as in
+  vanilla; the floating origin is designed in `docs/PERF.md` §7, not
+  built. `Chunk.isLit`
   is a static that vanilla clears before `new ChunkCache(…)`, so chunks
   that cache loads or populates can set it (population reads
   `Chunk.getBlockLightValue`, e.g. `BlockFlower.canBlockStay`,
@@ -765,7 +779,11 @@ destination alpha anyway.
   `ItemRenderer.renderItem`, lit; no hurt overlay, shadow or fire) and the
   sign being edited
   (`container::edit_sign::render_tile_entity_sign_at`, `SignModel` and the
-  text). WP-3.5b's renderers may replace them.
+  text). WP-3.5b's renderers may replace them. *WP-4.9:* the inventory's
+  player now goes through them (`render::GuiEntityRenderer` →
+  `gui::entity_draws`, module docs there): `RenderPlayer` with the hurt
+  and death overlay, `doRenderShadowAndFire`'s shadow and fire; the batcher
+  copy of `RenderPlayer` is gone.
 - **Draw order:** `gui::render` sorts batches by `GuiMaterial::sort_bias`
   = index × 4096, which outweighs the batch meshes' AABB centre depth Bevy
   adds (z −1000..1000); with the plain index the HUD's counts, drawn with
@@ -790,6 +808,8 @@ destination alpha anyway.
   - *Inventory preview.* No hurt/death red overlay (needs
     `glDepthFunc(GL_EQUAL)` in `GuiGl`), no shadow or fire
     (`Render.doRenderShadowAndFire`, WP-3.5b).
+    Closed by WP-4.9 (`GuiGl::depth_func`, the preview through the
+    renderers). Its blends inherit the GUI's (`gui::render` module docs).
 
 ## Menus (WP-3.6c)
 
@@ -1018,10 +1038,12 @@ region cache. How it was checked against the vanilla client:
   `ItemRenderer::player_model_drawn(player.base.is_riding())` on the
   `item_renderer::ItemRenderer` resource. `render_hand` does it for third
   person and sleeping, and the entity pass after each `RenderPlayer` draw
-  (WP-3.9); `GuiInventory`'s preview does not yet.
+  (WP-3.9); `GuiInventory`'s preview does not yet. *WP-4.9:* it does
+  (`render::GuiEntityRenderer::render`).
 - **Not done:** the skin download (`getTextureForDownloadableImage`,
   deferred, D2: always `/mob/char.png`); anaglyph's second pass (the shell
-  draws one eye); `cameraZoom` (only the unused high-resolution screenshot
+  draws one eye; WP-4.9 keeps this as an accepted divergence, `docs/PERF.md`
+  §7); `cameraZoom` (only the unused high-resolution screenshot
   changes it, so `renderHand` always runs).
 
 ## Compositing in sRGB (WP-3.7b)
@@ -1269,6 +1291,7 @@ Actions run in order, as many per frame as are due.
 | `equip` | `slot` (0-35 inventory, 100-103 armour: boots … helmet), `item` (`[id, count, damage]`, absent: empty) | Dev (WP-3.5b): puts a stack into one of the player's slots (armour on the third-person player) |
 | `chat` | `text` | Dev (WP-3.6b): `ingameGUI.addChatMessage(text)` |
 | `dump_inventory` | `path` | Dev (WP-3.6b): the player's 36 main and 4 armour slots and the cursor stack, each `[id, count, damage]` or null, as JSON |
+| `screenshot_frames` | `dir`, `frames` | Dev (WP-4.9): captures each of the next `frames` frames into `dir/fNNNNN.png` (NNNNN = the script's frame number) without waiting for the files, and appends a line per frame to `dir/frames.jsonl` (`frame`, `nanos`, `millis` (wall clock, to line up with the log), `state`, `ticks_ran`, `loading`, the loading screen's `title`, `message` and `progress`, `world`). Follow it with a `wait` long enough for the captures to land before `quit`. `dump_debug` also writes F3's right column (`right`: the memory lines) since WP-4.9 |
 | `export_world` | `name`, `path`, `report` (optional) | Dev (WP-4.5): exports `saves/<name>` to `<path>/<name>` (`export::export_from_game`: the open world is saved first when it is that world; then validated, copied and read back). In game the save is a full `saveWorld(true)`, which vanilla runs only on quit or a world change, so the run's later autosaves write other chunks than an unexported run would. With `report`, writes `{"ok": true, "report": {path, files, bytes, regions, chunks, digest}}` (the digest lists every file's and every chunk's blake3) or `{"ok": false, "error": …}` |
 
 Example (put screenshots and dumps under `build/screens/`, which git ignores):
@@ -1290,3 +1313,39 @@ Example (put screenshots and dumps under `build/screens/`, which git ignores):
 ```text
 cargo run -p mc-app -- --data-dir /tmp/mcdata --world smoke --seed 123 --script a.json
 ```
+
+## Wave F fixes (WP-4.9)
+
+The client half of docs/PARITY_CHECKLIST.md §2, each checked against the
+original client (§13 there has the evidence):
+
+- **The view entity when dead (P3).** `render::render_entities` and
+  `item_renderer::compute_hand` resolve `renderViewEntity` / `thePlayer`
+  as `Game::render_view` does: the world's entity, else the detached copy
+  the shell keeps after the world dropped a dead player. The Game Over
+  screen shows the world's entities, the tile entities and the arm.
+- **F3's memory lines (P5).** `debug::process_memory` fills
+  `DebugSources::{max,total,free}_memory` from `/proc` (a quarter of the
+  physical memory as the JVM's default `-Xmx`, the resident set, its
+  file-backed part); elsewhere they read 0.
+- **The frame rate (P6).** See "Running" above.
+- **`portal.travel` (P7).** The tick's `UsePortal` is run by the frame
+  driver after `sound::play_client_sounds_now` has put that tick's sound
+  calls through the `SoundManager` and started their static plays on
+  kira's audio thread, so the sound starts before the world change blocks
+  the frame (EntityPlayerSP.java:58-59).
+- **Pipelines compile in the frame that needs them (P8, the exit
+  segfault).** `mc-app` sets `RenderPlugin::synchronous_pipeline_compilation`:
+  the first frame after a load draws the terrain (with `terrain.png`'s
+  still fluid tiles, as vanilla's first frame), not two blank frames, and
+  no pipeline is compiling on a task-pool thread when the process exits.
+  The cost is a one-off hitch the first time a pipeline is needed.
+- **The loading bar (P9)** was always drawn; `screenshot_frames` shows it.
+  The achievement window is no longer drawn over the loading screen.
+- **`updateRenderers`' budget (P10)** starts at the end of the previous
+  frame (`terrain::mark_render_end` in `Last`), as `renderEndNanoTime`.
+- **Pass 1 with fast graphics** is drawn nearest first (above).
+- **The inventory's player** is drawn by the renderers (above).
+- **Not done:** anaglyph's second eye (accepted) and a floating origin
+  (designed in `docs/PERF.md` §7).
+

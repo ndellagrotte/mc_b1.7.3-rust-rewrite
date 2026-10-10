@@ -78,13 +78,22 @@ mc_b173 --jar ~/Games/b1.7.3/minecraft.jar --resources ~/Games/b1.7.3/resources
 | `--world NAME` | open `saves/NAME`, or create it, skipping the title screen | title screen |
 | `--seed SEED` | the new world's seed (with `--world`) | random |
 | `--import DIR` | copy a vanilla Beta 1.7.3 save into `saves/`, then open it. A world with a block or item id Beta 1.7.3 does not have is refused, and nothing is copied (PLAN_v4 D5) | — |
-| `--vsync on\|off` | wait for the display's refresh (default `on`). Use `off` to measure frame times (F3 shows them) | `on` |
+| `--vsync on\|off` | `on` waits for the display's refresh (no tearing, the frame rate capped at the display's). `off`, the default, runs as the original game does (below) | `off` |
 | `--script FILE` | the scripted-input dev mode (`crates/mc-client/README.md`) | — |
 
 Without `--jar`/`--resources`, the defaults are taken from `--data-dir` when it
 is given: `mc_b173 --data-dir /tmp/mc` looks for `/tmp/mc/minecraft.jar` and
 `/tmp/mc/resources`. Explicit paths are used as given (a relative one is relative
 to the current directory).
+
+**Frame rate.** As in the original game, the "Performance" video option sets
+the limit: "Balanced" (the default) and "Max FPS" run as fast as the machine
+allows, and "Power saver" holds the game at about 40 frames a second. The
+original never waits for the display; `--vsync on` does, for a smoother
+picture without tearing. "Balanced" also gives the terrain builder a time budget
+of 1/120 s per frame, as the original does, so with `--vsync on` new chunks
+appear a little more slowly. A window that is covered or minimised may be
+slowed by the desktop whatever the setting.
 
 Worlds can also be imported in the game: Singleplayer, then "Import...", then
 type or paste the path of the save folder.

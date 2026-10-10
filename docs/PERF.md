@@ -457,11 +457,66 @@ waits for synced region writes. The terrain preload's per-frame budget
     process exit.
   - The save is written before it happens.
   - It was not seen with later quits.
+  - **Fixed by WP-4.9** (`6461094`, `RenderPlugin::synchronous_pipeline_compilation`
+    in `mc-app`): reproduced 8 of 8 times with asynchronous compilation
+    (`testWorld` imported, `quit` as soon as the world is in, nested Xwayland;
+    the core's crashing thread is in `wgpu_hal::vulkan::Device::create_render_pipeline`
+    inside `libnvidia-glcore`, called from `PipelineCache::start_create_render_pipeline`'s
+    task), 0 of 20 with synchronous compilation (and 0 of 20 more on Wayland
+    with the `g01` world). With nothing compiled off the frame, no pipeline task
+    is running when the process exits. The cost is a one-off hitch in the frame
+    that first needs a pipeline (the first world frame, the first mob of a kind).
 - **Scripts that click "Create New World" twice, 10 frames apart, stay on the
   Select World screen.** A screen opened by a click opens at the next tick hook
   (README "Known deviations"). With a fast `dist` frame rate, 10 frames are
   less than one tick. This affects only dev scripts.
 - The compositor paces a covered window even with `--vsync off` (§2.2).
+  Since WP-4.9 `off` is the default (vanilla's uncapped Balanced, PARITY_CHECKLIST
+  P6); a nested rootful Xwayland presents the Vulkan surface at 60 Hz whatever
+  the present mode (the parity harness's display), while the same build runs at
+  160-380 fps straight on Wayland.
+- **Anaglyph 3D draws one eye** (accepted, WP-4.9). Vanilla runs `renderWorld`'s
+  body twice with `glColorMask` per eye and the projection shifted by
+  `anaglyphField` (EntityRenderer.java:454-588). Here the anaglyph option
+  converts the textures (`refreshTextures`) and draws the first eye's colours
+  (`camera::setup_camera_transform(Some(0))`). The second eye would need a second
+  world camera with the other shift and a colour-write mask on every world
+  material (terrain, entities, particles, sky, clouds, weather, selection, hand),
+  each one a pipeline variant, for an option that is off by default; left as a
+  documented divergence.
+- **`f32` jitter far from the origin; floating-origin design** (WP-4.9, not built).
+  Bevy's `Transform`/`GlobalTransform` and `clip_from_world` are `f32`, and the
+  client places everything in world space: the camera at the eye
+  (`camera::camera_transform`), sections at their corner
+  (`terrain::section_transform`), the crack at its block, entity draws at
+  `EntityFrame::anchor` (`render_pos`), particles at their anchor, the
+  selection box, rain and snow columns, clouds. At |x| ≈ 1,000,000 the `f32`
+  step is 1/16 block (at the 30,000,000 border, 2 blocks), so vertices wobble
+  as the camera moves. Vanilla avoids it: a section's display list is compiled
+  at `posXClip = posX & 1023` and `RenderList` translates by
+  `(float)(posXMinus - viewX)` (RenderList.java:17-56, WorldRenderer.java:53-75),
+  and entities are drawn at `(float)(entityPos - renderPos)`.
+  The design:
+  1. A `RenderOrigin` resource: an `IVec3` of multiples of 1024 (vanilla's
+     `posXMinus` grid, y = 0), the view's cell, updated in `apply_camera`
+     before anything is placed; a change bumps `RenderOrigin::generation`.
+  2. Every world-space placement subtracts it in `f64`/`i32` before the cast
+     to `f32`: `camera_transform` (eye − origin), `section_transform`
+     (pos − origin, exact in `i32`), the crack, `render::apply` (anchor −
+     origin), the particle and pickup anchors, `selection`, `weather`,
+     `clouds` (its x/z offset), the sky (camera-centred already, unchanged).
+     The hand camera and the GUI are camera- or screen-relative and unchanged.
+  3. On a generation change, `terrain_frame` rewrites every section entity's
+     `Transform` (one pass over at most 8,712 renderers); the other systems
+     recompute their transforms every frame anyway.
+  4. Meshes stay as they are (sections are section-local, 0..16; entity and
+     particle batches are anchor-relative), the simulation is untouched (`f64`),
+     and Bevy's frustum culling and fog work in the shifted space unchanged.
+  5. Check: the same view at (8, 70, 0), (20,008, 70, −15,000) and
+     (1,000,008, 70, 0) pixel-compared (the soak site of WP-4.2 is the middle
+     one), plus `testWorld` and the `g` galleries unchanged at the origin.
+  About 150 lines in eight modules, most of them owned by the WP-3.x renderers;
+  not built in WP-4.9, whose verification budget went to the parity defects.
 
 ## 8. Reproducing
 
