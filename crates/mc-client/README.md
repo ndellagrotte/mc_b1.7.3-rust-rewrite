@@ -1344,6 +1344,13 @@ original client (§13 there has the evidence):
   water and lava of the next frames are vanilla's too in a fresh process:
   `TextureWaterFX` and `TextureLavaFX` start from zeroed arrays and take
   seconds to develop (PARITY_CHECKLIST §13).
+- **No Power saver sleep and no `renderEndNanoTime` while a world loads**
+  (`terrain::power_saver_sleep`, `terrain::mark_render_end`): vanilla's
+  `func_6255_d` blocks the loop that runs them.
+- **GL draws sample at the centroid** (`gl_material.wgsl`, as
+  `terrain.wgsl`): under the cameras' MSAA an edge pixel's centre can lie
+  outside the polygon and sample the next atlas tile (lines along the
+  preview's fire, stray texels at 3D icons' edges).
 - **The loading bar (P9)** was always drawn; `screenshot_frames` shows it.
   The achievement window is no longer drawn over the loading screen.
 - **`updateRenderers`' budget (P10)** starts at the end of the previous

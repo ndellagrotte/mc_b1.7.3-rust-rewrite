@@ -40,11 +40,18 @@ struct Vertex {
 #endif
 };
 
+// The texture coordinates and colours are interpolated at the centroid, as
+// in terrain.wgsl: with the cameras' MSAA a pixel on a polygon's edge is
+// shaded at its centre, which can lie outside the polygon, and a coordinate
+// extrapolated there samples the atlas tile next to the one drawn (a one-texel
+// line along the edges of the fire around a burning entity in the inventory
+// preview, Render.java:30-89). Vanilla draws without multisampling, where the
+// centre is always inside.
 struct VertexOutput {
     @invariant @builtin(position) clip_position: vec4<f32>,
     @location(0) world_position: vec3<f32>,
-    @location(1) uv: vec2<f32>,
-    @location(2) color: vec4<f32>,
+    @location(1) @interpolate(perspective, centroid) uv: vec2<f32>,
+    @location(2) @interpolate(perspective, centroid) color: vec4<f32>,
 };
 
 @vertex

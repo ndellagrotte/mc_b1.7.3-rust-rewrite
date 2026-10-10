@@ -197,8 +197,8 @@ pub struct Terrain {
     serial: u64,
     /// The snapshot template of the current world.
     template: Option<SnapshotTemplate>,
-    /// `EntityRenderer.renderEndNanoTime`, taken at the start of the frame
-    /// ([`mark_render_end`]).
+    /// `EntityRenderer.renderEndNanoTime`, taken at the end of the frame
+    /// ([`mark_render_end`]); left alone while a world loads.
     render_end_nano_time: i64,
     /// The settings the grid was built with: fancy graphics, AO.
     built_with: Option<(bool, bool)>,
@@ -279,8 +279,16 @@ fn max_pending_jobs() -> usize {
 /// the default; with `--vsync on` the wait now uses up the budget and
 /// `updateRenderers` runs about once a frame, as vanilla's would with the
 /// driver's vsync forced on.)
+///
+/// Not while a world loads: `func_6255_d` blocks the run loop, so no
+/// `updateCameraAndRender` runs and the first frame after the load sees the
+/// time taken before it (Minecraft.java:1294, :1346-1378,
+/// LoadingScreenRenderer.java:59-122).
 // src: EntityRenderer.java:364-391
-pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
+pub fn mark_render_end(game: NonSend<Game>, mut terrain: ResMut<Terrain>) {
+    if game.pending.is_some() {
+        return;
+    }
     terrain.render_end_nano_time = clock::nano_time();
 }
 
@@ -292,9 +300,16 @@ pub fn mark_render_end(mut terrain: ResMut<Terrain>) {
 /// (the window does not wait for the display either: b1.7.3 never turns
 /// LWJGL's vsync on). Vanilla sleeps before taking `renderEndNanoTime` and
 /// drawing the GUI; here the sleep ends the frame (`Last`), right before
-/// [`mark_render_end`] takes the time, which gives the same period. The binary's `--vsync on` additionally waits for the display.
+/// [`mark_render_end`] takes the time, which gives the same period. The
+/// binary's `--vsync on` additionally waits for the display. No sleep on the
+/// loading screen's frames: vanilla's `func_6255_d` blocks the run loop, so
+/// `updateCameraAndRender` (and its sleep) does not run while a world loads
+/// (Minecraft.java:1294, :1346-1378, LoadingScreenRenderer.java:59-122).
 // src: EntityRenderer.java:364-372, :381-391, :403-416
 pub fn power_saver_sleep(game: NonSend<Game>, terrain: Res<Terrain>) {
+    if game.pending.is_some() {
+        return;
+    }
     let s = &game.game_settings;
     if let Some(ms) = power_saver_sleep_ms(
         s.limit_framerate,
