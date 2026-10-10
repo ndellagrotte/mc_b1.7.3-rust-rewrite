@@ -236,6 +236,14 @@ pub fn draw_achievement_window(
     font: Res<FontRenderer>,
 ) {
     let _perf = crate::perf::time(crate::perf::Phase::Gui);
+    // updateAchievementWindow is in Minecraft.run's loop body, which does
+    // not run while func_6255_d blocks on a world's terrain: the loading
+    // screen's repaints (LoadingScreenRenderer.java:59-122) have no window
+    // over them (WP-4.9: the frames of a portal's load drew it).
+    // src: Minecraft.java:585
+    if game.pending.is_some() {
+        return;
+    }
     let r = ScaledResolution::new(
         game.game_settings.gui_scale,
         game.display_width,
