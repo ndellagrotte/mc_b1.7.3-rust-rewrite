@@ -3485,7 +3485,7 @@ dependencies = [
 
 [[package]]
 name = "mc-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bevy",
  "embed-resource",
@@ -3497,7 +3497,7 @@ dependencies = [
 
 [[package]]
 name = "mc-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bevy",
  "bevy_asset_loader",
@@ -3516,7 +3516,7 @@ dependencies = [
 
 [[package]]
 name = "mc-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "libm",
  "mc-golden",
@@ -3524,7 +3524,7 @@ dependencies = [
 
 [[package]]
 name = "mc-golden"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "blake3",
  "mc-sim",
@@ -3534,7 +3534,7 @@ dependencies = [
 
 [[package]]
 name = "mc-nbt"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flate2",
  "mc-golden",
@@ -3543,7 +3543,7 @@ dependencies = [
 
 [[package]]
 name = "mc-sim"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "mc-core",
  "mc-golden",

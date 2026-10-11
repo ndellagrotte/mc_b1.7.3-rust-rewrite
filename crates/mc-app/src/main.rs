@@ -49,8 +49,10 @@ const USAGE: &str =
                [--vsync on|off]
 
   --data-dir DIR    options, saves, screenshots, stats (default: the platform data dir + mc_b173)
-  --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang; default: DATA-DIR/minecraft.jar)
-  --resources DIR   the resources/ directory (sounds, music; default: DATA-DIR/resources)
+  --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang; default: minecraft.jar next
+                    to the AppImage/executable, else DATA-DIR/minecraft.jar)
+  --resources DIR   the resources/ directory (sounds, music; default: resources/ next to the
+                    AppImage/executable, else DATA-DIR/resources)
   --username NAME   the player name (default: Player<millis % 1000>)
   --world NAME      open saves/NAME, creating it when missing (skips the title screen)
   --seed SEED       the new world's seed, as the Create World screen reads it
@@ -106,18 +108,24 @@ fn fail(msg: &str) -> ! {
 fn main() {
     mc_client::perf::mark_process_start();
     let args = parse_args().unwrap_or_else(|e| fail(&e));
-    // The jar and resources/ default to the (possibly given) data
-    // directory, with development fallbacks (mc_client::paths docs).
-    let mut paths = match args.data_dir {
-        Some(d) => ClientPaths::for_data_dir(d),
-        None => ClientPaths::default(),
+    // The jar and resources/: the flags, else next to the AppImage or the
+    // executable, else in the (possibly given) data directory, else the
+    // development fallbacks (mc_client::paths docs). The two lines say
+    // which were picked before anything can fail on them (CI greps them).
+    let data_dir = args
+        .data_dir
+        .unwrap_or_else(mc_client::paths::default_data_dir);
+    let paths = ClientPaths {
+        jar: args
+            .jar
+            .unwrap_or_else(|| mc_client::paths::jar_for(&data_dir)),
+        resources: args
+            .resources
+            .unwrap_or_else(|| mc_client::paths::resources_for(&data_dir)),
+        data_dir,
     };
-    if let Some(j) = args.jar {
-        paths.jar = j;
-    }
-    if let Some(r) = args.resources {
-        paths.resources = r;
-    }
+    eprintln!("mc_b173: minecraft.jar: {}", paths.jar.display());
+    eprintln!("mc_b173: resources: {}", paths.resources.display());
     let script = args.script.map(|p| {
         mc_client::script::Script::load(&p).unwrap_or_else(|e| {
             eprintln!("mc_b173: {e}");

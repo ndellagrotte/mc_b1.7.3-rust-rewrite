@@ -20,8 +20,8 @@ cargo run -p mc-app -- [--data-dir DIR] [--jar FILE] [--resources DIR] [--userna
 | Flag | Meaning | Default |
 |---|---|---|
 | `--data-dir` | options, `saves/`, `screenshots/`, `stats/` | `$XDG_DATA_HOME/mc_b173` or `~/.local/share/mc_b173` (macOS `~/Library/Application Support/mc_b173`, Windows `%APPDATA%\mc_b173`); never the real `.minecraft` |
-| `--jar` | your Beta 1.7.3 `minecraft.jar` | `.reference/mc_b1.7.3_release/1.7.3-LTS/jars/bin/minecraft.jar` in the workspace |
-| `--resources` | the `resources/` directory (`sound/`, `newsound/`, `music/`, …) | the Prism Launcher (Flatpak) `b1.7.3` instance's |
+| `--jar` | your Beta 1.7.3 `minecraft.jar` | `minecraft.jar` next to the AppImage / the `mc_b173` executable (or the only `*.jar` there with `terrain.png`), else `<data dir>/minecraft.jar`; dev fallback `.reference/mc_b1.7.3_release/1.7.3-LTS/jars/bin/minecraft.jar` in the workspace |
+| `--resources` | the `resources/` directory (`sound/`, `newsound/`, `music/`, …) | `resources/` next to the AppImage / the `mc_b173` executable, else `<data dir>/resources`; dev fallback the Prism Launcher (Flatpak) `b1.7.3` instance's |
 | `--username` | the player name (names the stats file) | vanilla's `Player<millis % 1000>` |
 | `--world NAME` | open `saves/NAME` (as the Select World screen does), or create it (as the Create World screen does) | title screen |
 | `--seed SEED` | the new world's seed text: a `long`, else its `String.hashCode()`; empty or `0` = random | random |
@@ -29,11 +29,16 @@ cargo run -p mc-app -- [--data-dir DIR] [--jar FILE] [--resources DIR] [--userna
 | `--script FILE` | the scripted-input dev mode (below) | — |
 
 A missing jar or `resources/` directory stops the program with a message
-naming the path.
+naming the path. At start-up two stderr lines name the paths chosen
+(`mc_b173: minecraft.jar: <path>`, `mc_b173: resources: <path>`).
 
-Since WP-4.3, `--jar` and `--resources` default to `<data-dir>/minecraft.jar`
-and `<data-dir>/resources`; the two paths in the table above are only
-development fallbacks, used when the data-directory file is missing and the
+Without `--jar` / `--resources`, each is looked for first next to the game
+(`paths::bundle_dir`: the directory the `.AppImage` file is in, else the
+executable's; `minecraft.jar` by name, else the single `*.jar` there that
+contains `terrain.png`, none if several do, with a stderr line; `resources/`
+by name), then, as since WP-4.3, at `<data-dir>/minecraft.jar` and
+`<data-dir>/resources`. The dev paths in the table above are only
+development fallbacks, used when neither place has the file and the
 fallback exists (`paths` module docs, `docs/RUNNING.md`). Also since WP-4.3:
 
 | Flag | Meaning | Default |

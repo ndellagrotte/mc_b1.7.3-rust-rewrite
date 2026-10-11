@@ -82,7 +82,8 @@ jobs:
           overwrite: true
 
   build-linux:
-    runs-on: ubuntu-latest
+    # 22.04 (glibc 2.35): the binary, and so the AppImage, runs on that glibc or newer.
+    runs-on: ubuntu-22.04
     needs: get-version
     env:
       VERSION: ${{needs.get-version.outputs.version}}
@@ -98,6 +99,13 @@ jobs:
       - name: Build release
         run: |
           cargo build --profile dist -p mc-app
+      - name: Keep the binary for the AppImage job
+        uses: actions/upload-artifact@v4
+        with:
+          name: mc_b173-linux-x86_64
+          path: target/dist/${{ env.GAME_EXECUTABLE_NAME }}
+          if-no-files-found: error
+          retention-days: 1
       - name: Prepare release
         run: |
           chmod +x target/dist/${{ env.GAME_EXECUTABLE_NAME }}
@@ -114,6 +122,49 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ env.GAME_EXECUTABLE_NAME }}_linux.tar.gz
           asset_name: ${{ env.GAME_EXECUTABLE_NAME }}_${{ env.VERSION }}_linux.tar.gz
+          release_name: ${{ env.VERSION }}
+          tag: ${{ env.VERSION }}
+          overwrite: true
+
+  build-linux-appimage:
+    # Packages the build-linux binary as an x86_64 AppImage. ALSA, libudev and
+    # libwayland-client stay on the host (the AppImage excludelist); the user's
+    # minecraft.jar and resources/ are found next to the .AppImage file (docs/RUNNING.md).
+    runs-on: ubuntu-22.04
+    needs: [get-version, build-linux]
+    env:
+      VERSION: ${{needs.get-version.outputs.version}}
+      APPIMAGETOOL_VERSION: "1.9.1"
+      APPIMAGE_RUNTIME_VERSION: "20251108"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: mc_b173-linux-x86_64
+          path: dist-bin
+      - name: Make the binary executable
+        run: chmod +x dist-bin/${{ env.GAME_EXECUTABLE_NAME }}
+      - name: Install runtime libraries (smoke test only)
+        run: sudo apt-get update && sudo apt-get install -y libasound2 libudev1 libwayland-client0
+      - name: Fetch appimagetool and runtime
+        run: |
+          curl -fsSL -o appimagetool "https://github.com/AppImage/appimagetool/releases/download/${APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+          curl -fsSL -o runtime-x86_64 "https://github.com/AppImage/type2-runtime/releases/download/${APPIMAGE_RUNTIME_VERSION}/runtime-x86_64"
+          chmod +x appimagetool
+      - name: Build AppImage
+        run: |
+          APPIMAGETOOL=./appimagetool APPIMAGE_RUNTIME=./runtime-x86_64 build/linux/make_appimage.sh dist-bin/${{ env.GAME_EXECUTABLE_NAME }} "${{ env.GAME_EXECUTABLE_NAME }}_${VERSION}_x86_64.AppImage"
+      - name: Smoke test AppImage
+        run: |
+          build/linux/smoke_appimage.sh "${{ env.GAME_EXECUTABLE_NAME }}_${VERSION}_x86_64.AppImage"
+      - name: Upload release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ env.GAME_EXECUTABLE_NAME }}_${{ env.VERSION }}_x86_64.AppImage
+          asset_name: ${{ env.GAME_EXECUTABLE_NAME }}_${{ env.VERSION }}_x86_64.AppImage
           release_name: ${{ env.VERSION }}
           tag: ${{ env.VERSION }}
           overwrite: true
