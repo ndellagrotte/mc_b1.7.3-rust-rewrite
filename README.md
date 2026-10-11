@@ -9,9 +9,14 @@ JVM oracle. Worlds use the vanilla McRegion format and open unchanged.
 
 ## Status
 
-**Phase 0 (foundations). Nothing is playable.** The workspace compiles as
-stubs; `cargo run -p mc-app` opens an empty window. See `docs/PLAN_v4.md` §5
-for the phases and work packages.
+**Phases 0-4 complete; Gate 4 ("vanilla parity on native") passed on
+2026-10-10 and is tagged v0.1.0.** Singleplayer is playable from the title
+screen: create, play, save, reload, import and export worlds, death and
+respawn, Nether portals. Every block, screen, mob and sound trigger has been
+compared side by side against the original client
+(`docs/PARITY_CHECKLIST.md`, `docs/GATE4_REVIEW.md`). Phase 5 (the browser
+client) has not started. See `docs/PLAN_v4.md` §5 for the phases and work
+packages.
 
 ## Requirements
 
