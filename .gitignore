@@ -12,3 +12,6 @@ dist/
 /build/golden-out/
 # client screenshots and smoke-run dumps (WP-3.1 scripted mode)
 /build/screens/
+
+# Claude Code session transcripts
+/2026-*.txt
