@@ -16,7 +16,8 @@ dev = ["bevy/dynamic_linking"]
 [dependencies]
 mc-client = { path = "../mc-client" }
 bevy.workspace = true
-winit.workspace = true
+# libwayland-client is dlopen'd (winit's default), so portable Linux builds do not link it (tools/portable)
+winit = { workspace = true, features = ["wayland-dlopen"] }
 image.workspace = true
 log.workspace = true
 

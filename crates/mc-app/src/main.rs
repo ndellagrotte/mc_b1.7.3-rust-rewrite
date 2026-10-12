@@ -42,12 +42,12 @@ struct Args {
     vsync: bool,
 }
 
-const USAGE: &str =
-    "usage: mc_b173 [--data-dir DIR] [--prism-instance DIR] [--username NAME]
+const USAGE: &str = "usage: mc_b173 [--data-dir DIR] [--prism-instance DIR] [--username NAME]
                [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
                [--vsync on|off]
 
-  --data-dir DIR    options, saves, screenshots, stats (default: the platform data dir + mc_b173)
+  --data-dir DIR    options, saves, screenshots, stats, exports (default: data/ beside the game
+                    if it exists, else the platform data dir + mc_b173)
   --prism-instance DIR
                     your Prism Launcher b1.7.3 instance, .../PrismLauncher/instances/b1.7.3
                     (the client jar and sounds; default: found in the standard Prism places)
@@ -105,12 +105,24 @@ fn fail(msg: &str) -> ! {
 fn main() {
     mc_client::perf::mark_process_start();
     let args = parse_args().unwrap_or_else(|e| fail(&e));
-    // The jar and resources/ come from the Prism b1.7.3 instance: the flag,
-    // else the first one in the standard Prism places (mc_client::paths
-    // docs). The lines say which were picked (CI greps them).
-    let data_dir = args
-        .data_dir
-        .unwrap_or_else(mc_client::paths::default_data_dir);
+    // The data directory: --data-dir, else a portable data/ folder beside
+    // the game, else the platform's. The jar and resources/ come from the
+    // Prism b1.7.3 instance: the flag, else the first one in the standard
+    // Prism places (mc_client::paths docs). The lines say which were picked,
+    // the data dir first, before the Prism lookup can fail
+    // (tools/portable's smoke test greps them).
+    let (data_dir, portable) = match args.data_dir {
+        Some(d) => (d, false),
+        None => match mc_client::paths::portable_data_dir() {
+            Some(d) => (d, true),
+            None => (mc_client::paths::default_data_dir(), false),
+        },
+    };
+    eprintln!(
+        "mc_b173: data dir: {}{}",
+        data_dir.display(),
+        if portable { " (portable)" } else { "" }
+    );
     let instance = args
         .prism_instance
         .or_else(mc_client::paths::find_prism_instance)

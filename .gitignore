@@ -2,6 +2,7 @@ target/
 .idea/
 .DS_Store
 
+# tools/portable output (zips, caches)
 dist/
 
 # Mojang-derived reference material: never committed (PLAN_v4 D8)

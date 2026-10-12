@@ -53,10 +53,13 @@ The client jar is always looked for two levels up from the instance, under
 `libraries/` (Prism's own layout; a custom instance folder in Prism's settings
 is not supported).
 
-At start-up the game prints on stderr the instance and the two paths it chose,
+At start-up the game prints on stderr the data directory (with " (portable)"
+when it is the `data/` folder beside the game), the instance and the two paths
+it chose,
 for example:
 
 ```text
+mc_b173: data dir: /home/you/.local/share/mc_b173
 mc_b173: prism instance: /home/you/.local/share/PrismLauncher/instances/b1.7.3
 mc_b173: minecraft.jar: /home/you/.local/share/PrismLauncher/libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar
 mc_b173: resources: /home/you/.local/share/PrismLauncher/instances/b1.7.3/minecraft/resources
@@ -76,6 +79,34 @@ mc_b173: found the Prism instance at /home/you/.local/share/PrismLauncher/instan
 
 A directory that is not a Prism instance (no `instance.cfg`) is refused too.
 
+### Portable builds
+
+Portable zips are named `mc_b173_<ver>_<target>.zip`: `linux-x86_64` and
+`linux-aarch64` (an AppImage inside), `windows-x86_64` and `windows-aarch64`
+(an `.exe`), `macos-aarch64` and `macos-x86_64` (a `.app`; not produced yet, it
+needs an Apple SDK). Each holds one folder with the game, an empty `data/`
+tree, `NOTICE`, `LICENSE`, this file and `credits/`.
+
+Unzip anywhere and run the AppImage, `.exe` or `.app` inside the folder. A
+folder named `data` next to the game (next to the `.AppImage`, `mc_b173.exe` or
+the `.app`) is used as the data directory; `--data-dir` wins over it. Delete or
+rename `data/` to fall back to the platform folder (section 3). Prism Launcher
+with the b1.7.3 instance is still required, as above.
+
+There is no auto-update. To upgrade, unzip the new build and copy the old
+`data/` into it (or just `options.txt` and `saves/`).
+
+- Linux: needs glibc 2.31 or newer and the system's ALSA, libudev, Wayland or
+  X11 and GPU driver. Without FUSE, run `./mc_b173.AppImage --appimage-extract-and-run`.
+  If unzip dropped the executable bit: `chmod +x mc_b173.AppImage`.
+- Windows: the exe is unsigned; at the SmartScreen warning choose "More info",
+  then "Run anyway".
+- macOS: run `xattr -dr com.apple.quarantine <unzipped folder>` first, or macOS
+  runs the app from a hidden copy that does not see `data/`.
+
+They are built with `tools/portable/build.sh --check`, then
+`tools/portable/build.sh [targets]` (see `tools/portable/README.md`).
+
 ## 3. The data directory
 
 The game keeps its own files in its own data directory and never touches your
@@ -87,13 +118,19 @@ real `.minecraft` or the Prism instance's saves:
 | macOS | `~/Library/Application Support/mc_b173` |
 | Windows | `%APPDATA%\mc_b173` |
 
-Inside it, as in vanilla: `options.txt`, `saves/`, `screenshots/`, `stats/`.
+Inside it, as in vanilla: `options.txt`, `saves/`, `screenshots/`, `stats/`, `exports/`.
+
+**Portable builds.** A folder named `data` next to the game is used instead of
+the table above; `--data-dir` overrides both. The game prints
+`mc_b173: data dir: <path>` on stderr at start, with ` (portable)` appended in
+this mode. Any `data/` folder beside a bare binary is honoured too. There is no
+auto-update: copy `data/` into the new build by hand.
 
 ## 4. Command line
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--data-dir DIR` | options, `saves/`, `screenshots/`, `stats/` | the table above |
+| `--data-dir DIR` | options, `saves/`, `screenshots/`, `stats/`, `exports/` | `data/` next to the game when present, else the table above |
 | `--prism-instance DIR` | your Prism Launcher b1.7.3 instance (the client jar and `resources/`) | the first instance found in section 2's table |
 | `--username NAME` | the player name (names the stats file) | vanilla's `Player<millis % 1000>` |
 | `--world NAME` | open `saves/NAME`, or create it, skipping the title screen | title screen |
@@ -130,7 +167,9 @@ release workflow (`.github/workflows/release.yaml`, on a `v*` tag) builds for
 Linux, Windows and macOS. Each archive holds the binary, `assets/` (project
 files only), `credits/`, `NOTICE`, `LICENSE` and this file, and nothing of
 Mojang's. On Linux, ALSA (`libasound.so.2`), `libudev.so.1`,
-`libwayland-client.so.0` and the GPU driver come from the system.
+`libwayland-client.so.0` and the GPU driver come from the system. The six
+portable zips (section "Portable builds") are built locally with
+`tools/portable/build.sh`.
 
 ## Saves on disk
 

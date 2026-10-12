@@ -19,7 +19,7 @@ cargo run -p mc-app -- [--data-dir DIR] [--prism-instance DIR] [--username NAME]
 
 | Flag | Meaning | Default |
 |---|---|---|
-| `--data-dir` | options, `saves/`, `screenshots/`, `stats/` | `$XDG_DATA_HOME/mc_b173` or `~/.local/share/mc_b173` (macOS `~/Library/Application Support/mc_b173`, Windows `%APPDATA%\mc_b173`); never the real `.minecraft` |
+| `--data-dir` | options, `saves/`, `screenshots/`, `stats/`, `exports/` | a `data/` folder next to the game (the executable, the `.AppImage`, or the `.app` bundle) when it exists; else `$XDG_DATA_HOME/mc_b173` or `~/.local/share/mc_b173` (macOS `~/Library/Application Support/mc_b173`, Windows `%APPDATA%\mc_b173`); never the real `.minecraft` |
 | `--prism-instance` | the Prism Launcher `b1.7.3` instance directory (`.../PrismLauncher/instances/b1.7.3`): the jar is `<instance>/../../libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar`, `resources/` is `<instance>/minecraft/resources` (or `.minecraft/resources`) | the first `instances/b1.7.3` in the standard Prism data directories (`paths::prism_roots`: `$XDG_DATA_HOME/PrismLauncher` or `~/.local/share/PrismLauncher`, then the Flatpak's; macOS `~/Library/Application Support/PrismLauncher`; Windows `%APPDATA%\PrismLauncher`) |
 | `--username` | the player name (names the stats file) | vanilla's `Player<millis % 1000>` |
 | `--world NAME` | open `saves/NAME` (as the Select World screen does), or create it (as the Create World screen does) | title screen |

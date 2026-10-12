@@ -7,8 +7,11 @@ fn main() {
     #[allow(clippy::disallowed_methods)]
     let target = env::var("TARGET").unwrap();
     if target.contains("windows") {
-        // on windows we will set our game icon as icon for the executable
-        // (path is relative to this package directory, where build scripts run)
+        // The game icon as the executable's icon (the path is relative to
+        // this package directory, where build scripts run). On a Linux host
+        // it is embedded only when <arch>-w64-mingw32-windres exists
+        // (x86_64-pc-windows-gnu); otherwise embed-resource skips it
+        // silently, and the window icon is still set at run time.
         embed_resource::compile("../../build/windows/icon.rc");
     }
 }

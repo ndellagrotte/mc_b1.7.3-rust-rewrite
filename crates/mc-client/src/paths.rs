@@ -9,7 +9,14 @@
 //! Support` on macOS, `%APPDATA%` on Windows). Vanilla's `getAppDir`
 //! (Minecraft.java:359-387) picks `~/.minecraft` / `%APPDATA%\.minecraft` /
 //! `~/Library/Application Support/minecraft` the same way. Inside it, as in
-//! vanilla: `options.txt`, `saves/`, `screenshots/`, `stats/`.
+//! vanilla: `options.txt`, `saves/`, `screenshots/`, `stats/`, plus the
+//! project's `exports/`.
+//!
+//! Portable mode: a folder named `data` beside the game (the `.AppImage`
+//! file, the `.app` bundle on macOS, else the executable) is the data
+//! directory when it exists ([`portable_data_dir`]), so a portable zip keeps
+//! its settings and saves with it (tools/portable). `--data-dir` overrides
+//! it; without either, the platform directory above is used.
 //!
 //! The jar and `resources/` come from the user's Prism Launcher `b1.7.3`
 //! instance (`.../PrismLauncher/instances/b1.7.3`), given with
@@ -36,12 +43,15 @@ pub const DATA_DIR_NAME: &str = "mc_b173";
 /// "saves")`, Minecraft.java:237), as a storage path.
 pub const SAVES_DIR: &str = "saves";
 
+/// The portable data directory's name beside the game (module docs,
+/// [`portable_data_dir`]).
+pub const PORTABLE_DATA_DIR: &str = "data";
+
 /// The Prism instance's directory name looked for under `instances/`.
 pub const PRISM_INSTANCE_NAME: &str = "b1.7.3";
 
 /// The client jar under the Prism data directory.
-pub const PRISM_JAR_REL: &str =
-    "libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar";
+pub const PRISM_JAR_REL: &str = "libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar";
 
 /// The client's paths (module docs).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -83,7 +93,10 @@ impl std::fmt::Display for PrismError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PrismError::NotFound { tried } => {
-                write!(f, "no Prism Launcher {PRISM_INSTANCE_NAME} instance found (tried ")?;
+                write!(
+                    f,
+                    "no Prism Launcher {PRISM_INSTANCE_NAME} instance found (tried "
+                )?;
                 for (i, p) in tried.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -105,7 +118,11 @@ impl std::fmt::Display for PrismError {
                 jar,
                 resources,
             } => {
-                write!(f, "found the Prism instance at {} but not ", instance.display())?;
+                write!(
+                    f,
+                    "found the Prism instance at {} but not ",
+                    instance.display()
+                )?;
                 match (jar, resources) {
                     (Some(j), Some(r)) => write!(
                         f,
@@ -260,6 +277,63 @@ pub fn default_data_dir() -> PathBuf {
     base.join(DATA_DIR_NAME)
 }
 
+/// The directory a portable build's [`PORTABLE_DATA_DIR`] sits in, from the
+/// executable's path: beside the `.AppImage` file when `exe` runs from inside
+/// the mounted image (`appimage` and `appdir` are the AppImage runtime's
+/// `$APPIMAGE` and `$APPDIR`), beside the `.app` bundle when `exe` is in
+/// `<X>.app/Contents/MacOS/`, else beside `exe`. Pure: the caller supplies
+/// the environment ([`portable_data_dir`]).
+pub fn portable_base(
+    exe: &Path,
+    appimage: Option<&Path>,
+    appdir: Option<&Path>,
+) -> Option<PathBuf> {
+    let exe_dir = exe.parent()?;
+    if let (Some(image), Some(dir)) = (appimage, appdir)
+        && !dir.as_os_str().is_empty()
+        && exe.starts_with(dir)
+    {
+        return image.parent().map(Path::to_path_buf);
+    }
+    if exe_dir.ends_with("Contents/MacOS")
+        && let Some(app) = exe_dir.parent().and_then(Path::parent)
+        && app.extension().is_some_and(|e| e == "app")
+    {
+        return app.parent().map(Path::to_path_buf);
+    }
+    Some(exe_dir.to_path_buf())
+}
+
+/// `<base>/data` when it is a directory.
+fn existing_portable_dir(base: &Path) -> Option<PathBuf> {
+    let d = base.join(PORTABLE_DATA_DIR);
+    d.is_dir().then_some(d)
+}
+
+/// The portable data directory (module docs): [`PORTABLE_DATA_DIR`] in the
+/// [`portable_base`] of `std::env::current_exe` (already canonical on Linux,
+/// via `/proc/self/exe`; canonicalized on macOS, where a symlinked launcher
+/// would otherwise hide the bundle; left alone on Windows, where
+/// canonicalizing adds a `\\?\` prefix), `$APPIMAGE` and `$APPDIR`, when that
+/// folder exists. `$APPDIR` is canonicalized: in extract-and-run mode it
+/// lives under `$TMPDIR`, which may hold symlinks. `mc-app` prefers this to
+/// [`default_data_dir`]; `--data-dir` overrides both.
+pub fn portable_data_dir() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    #[cfg(target_os = "macos")]
+    let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
+    let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
+    let appdir = std::env::var_os("APPDIR").map(|d| {
+        let d = PathBuf::from(d);
+        std::fs::canonicalize(&d).unwrap_or(d)
+    });
+    existing_portable_dir(&portable_base(
+        &exe,
+        appimage.as_deref(),
+        appdir.as_deref(),
+    )?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,7 +389,11 @@ mod tests {
         let e = ClientPaths::from_prism_instance(PathBuf::from("/data"), &inst).unwrap_err();
         assert!(matches!(
             &e,
-            PrismError::NotLaunched { jar: Some(_), resources: None, .. }
+            PrismError::NotLaunched {
+                jar: Some(_),
+                resources: None,
+                ..
+            }
         ));
         let s = e.to_string();
         assert!(s.contains("minecraft-b1.7.3-client.jar"), "{s}");
@@ -326,7 +404,11 @@ mod tests {
         let e = ClientPaths::from_prism_instance(PathBuf::from("/data"), &inst).unwrap_err();
         assert!(matches!(
             e,
-            PrismError::NotLaunched { jar: Some(_), resources: Some(_), .. }
+            PrismError::NotLaunched {
+                jar: Some(_),
+                resources: Some(_),
+                ..
+            }
         ));
     }
 
@@ -352,6 +434,73 @@ mod tests {
             instance_candidates(&roots)[0],
             roots[0].join("instances/b1.7.3")
         );
+    }
+
+    fn base(exe: &str, appimage: Option<&str>, appdir: Option<&str>) -> Option<PathBuf> {
+        portable_base(
+            Path::new(exe),
+            appimage.map(Path::new),
+            appdir.map(Path::new),
+        )
+    }
+
+    #[test]
+    fn appimage_in_appdir_uses_appimage_parent() {
+        assert_eq!(
+            base(
+                "/tmp/.mount_ab/usr/bin/mc_b173",
+                Some("/home/u/Games/mc_b173.AppImage"),
+                Some("/tmp/.mount_ab"),
+            ),
+            Some(PathBuf::from("/home/u/Games"))
+        );
+    }
+
+    #[test]
+    fn appimage_env_ignored_when_exe_outside_appdir() {
+        let image = Some("/home/u/Games/mc_b173.AppImage");
+        let exe = "/opt/mc/mc_b173";
+        let opt = Some(PathBuf::from("/opt/mc"));
+        assert_eq!(base(exe, image, Some("/tmp/.mount_ab")), opt);
+        assert_eq!(base(exe, image, None), opt);
+        // An empty $APPDIR would be a prefix of every path.
+        assert_eq!(base(exe, image, Some("")), opt);
+    }
+
+    #[test]
+    fn mac_bundle_uses_bundle_parent() {
+        assert_eq!(
+            base("/Users/u/mc/mc_b173.app/Contents/MacOS/mc_b173", None, None),
+            Some(PathBuf::from("/Users/u/mc"))
+        );
+        // A `Contents/MacOS/` outside a `.app` is a plain directory.
+        assert_eq!(
+            base("/Users/u/bin/Contents/MacOS/mc_b173", None, None),
+            Some(PathBuf::from("/Users/u/bin/Contents/MacOS"))
+        );
+    }
+
+    #[test]
+    fn plain_exe_uses_exe_dir() {
+        assert_eq!(
+            base("/games/mc/mc_b173.exe", None, None),
+            Some(PathBuf::from("/games/mc"))
+        );
+    }
+
+    #[test]
+    fn portable_needs_existing_data_dir() {
+        let r = TempDir::new("portable");
+        let exe = r.0.join("mc_b173");
+        let b = portable_base(&exe, None, None).unwrap();
+        assert_eq!(b, r.0);
+        assert_eq!(existing_portable_dir(&b), None);
+        // A file named data is not the data directory.
+        std::fs::write(b.join(PORTABLE_DATA_DIR), b"").unwrap();
+        assert_eq!(existing_portable_dir(&b), None);
+        std::fs::remove_file(b.join(PORTABLE_DATA_DIR)).unwrap();
+        std::fs::create_dir(b.join(PORTABLE_DATA_DIR)).unwrap();
+        assert_eq!(existing_portable_dir(&b), Some(r.0.join("data")));
     }
 
     #[test]

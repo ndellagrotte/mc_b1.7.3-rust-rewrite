@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Minecraft Beta 1.7.3 (Rust)
+Comment=Rust rewrite of Minecraft Beta 1.7.3 (needs a Prism Launcher b1.7.3 instance)
+Exec=mc_b173
+Icon=mc_b173
+Categories=Game;
+Terminal=false

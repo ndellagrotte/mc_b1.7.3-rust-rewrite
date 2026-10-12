@@ -50,7 +50,10 @@ Add `--features dev` to `cargo run` for Bevy dynamic linking during development.
 The release build is `cargo build --profile dist -p mc-app` (opt-level 3, LTO;
 `target/dist/mc_b173`), which `.github/workflows/release.yaml` packages for
 Linux, Windows and macOS with `docs/RUNNING.md`, `NOTICE`, `LICENSE` and
-`credits/`.
+`credits/`. Portable zips for Linux (AppImage) and Windows, each with a
+`data/` folder for saves and settings, are built locally with
+`tools/portable/build.sh` (macOS is wired but needs an Apple SDK; see
+`tools/portable/README.md` and `docs/RUNNING.md`).
 
 ## Layout
 
@@ -65,6 +68,7 @@ crates/
   mc-client/               Bevy shell: ClientPlugin
   mc-app/                  the binary `mc_b173`: window, icon
 tools/oracle/              Java harness sources; build.sh, regen.sh
+tools/portable/            local portable-zip builder (tools/portable/README.md)
 tests/golden/<area>/<name>/{scenario.json, expected.jsonl}
 docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md
 credits/                   CREDITS.md, licenses/
