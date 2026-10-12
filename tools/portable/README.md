@@ -50,15 +50,27 @@ zig 0.15 or 0.16 is expected (other versions only warn). The targets are not lis
 ## Usage
 
 ```
+export PATH="$HOME/.cargo/bin:$PATH"
 tools/portable/build.sh --check
 tools/portable/build.sh linux-aarch64 windows-x86_64
 tools/portable/build.sh            # all six; macOS is skipped without an SDK
 ```
 
-Options: `--low-mem` (thin LTO, 16 codegen units), `--clean-after` (remove `target/<triple>` after
-each verified zip), `-j N` (cargo jobs, default 2). Targets build one at a time, linux-aarch64 first.
-Exit status: 0 when every selected target was built (macOS SKIPs count as success), 1 when one failed,
-2 on a usage or prerequisite error.
+The four targets this host can produce, one after another (about 9 minutes each once the
+dependencies are cached, on an 8 GB machine with thin LTO):
+
+```
+tools/portable/build.sh --low-mem linux-aarch64 linux-x86_64 windows-x86_64 windows-aarch64
+```
+
+Options: `--low-mem` (thin LTO, 16 codegen units; the binary is a little bigger and slower than with
+the dist profile's fat LTO, but the final link needs far less memory), `--clean-after` (remove
+`target/<triple>` after each verified zip), `-j N` (cargo jobs, default 2). Targets always build one at
+a time, in the table's order whatever the argument order (default: all six). Exit status: 0 when every selected
+target was built (macOS SKIPs count as success), 1 when one failed, 2 on a usage or prerequisite error.
+
+There is no parallel mode. Running several `build.sh` processes at once does not help: they share
+`target/`, and cargo serialises them on the build-directory lock while their output interleaves.
 
 Outputs, all under the git-ignored `dist/`:
 
