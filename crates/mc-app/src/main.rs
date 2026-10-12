@@ -6,7 +6,7 @@
 //! `startMainThread`, Minecraft.java:1478-1529: an 854×480 window).
 //!
 //! ```text
-//! mc_b173 [--data-dir DIR] [--jar FILE] [--resources DIR] [--username NAME]
+//! mc_b173 [--data-dir DIR] [--prism-instance DIR] [--username NAME]
 //!         [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
 //!         [--vsync on|off]
 //! ```
@@ -31,8 +31,7 @@ use winit::window::Icon;
 #[derive(Debug, Default)]
 struct Args {
     data_dir: Option<PathBuf>,
-    jar: Option<PathBuf>,
-    resources: Option<PathBuf>,
+    prism_instance: Option<PathBuf>,
     username: Option<String>,
     world: Option<String>,
     seed: Option<String>,
@@ -44,15 +43,14 @@ struct Args {
 }
 
 const USAGE: &str =
-    "usage: mc_b173 [--data-dir DIR] [--jar FILE] [--resources DIR] [--username NAME]
+    "usage: mc_b173 [--data-dir DIR] [--prism-instance DIR] [--username NAME]
                [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
                [--vsync on|off]
 
   --data-dir DIR    options, saves, screenshots, stats (default: the platform data dir + mc_b173)
-  --jar FILE        your Beta 1.7.3 minecraft.jar (textures, lang; default: minecraft.jar next
-                    to the AppImage/executable, else DATA-DIR/minecraft.jar)
-  --resources DIR   the resources/ directory (sounds, music; default: resources/ next to the
-                    AppImage/executable, else DATA-DIR/resources)
+  --prism-instance DIR
+                    your Prism Launcher b1.7.3 instance, .../PrismLauncher/instances/b1.7.3
+                    (the client jar and sounds; default: found in the standard Prism places)
   --username NAME   the player name (default: Player<millis % 1000>)
   --world NAME      open saves/NAME, creating it when missing (skips the title screen)
   --seed SEED       the new world's seed, as the Create World screen reads it
@@ -68,8 +66,7 @@ fn parse_args() -> Result<Args, String> {
         let mut value = |name: &str| it.next().ok_or_else(|| format!("{name} needs a value"));
         match arg.as_str() {
             "--data-dir" => a.data_dir = Some(value("--data-dir")?.into()),
-            "--jar" => a.jar = Some(value("--jar")?.into()),
-            "--resources" => a.resources = Some(value("--resources")?.into()),
+            "--prism-instance" => a.prism_instance = Some(value("--prism-instance")?.into()),
             "--username" => a.username = Some(value("--username")?),
             "--world" => a.world = Some(value("--world")?),
             "--seed" => a.seed = Some(value("--seed")?),
@@ -95,8 +92,8 @@ fn parse_args() -> Result<Args, String> {
     Ok(a)
 }
 
-/// Exits with a message (start-up errors: D8's missing jar, an import
-/// refusal).
+/// Exits with a message (start-up errors: D8's missing Prism instance or
+/// jar, an import refusal).
 fn fail(msg: &str) -> ! {
     if !msg.is_empty() {
         eprintln!("mc_b173: {msg}");
@@ -108,22 +105,26 @@ fn fail(msg: &str) -> ! {
 fn main() {
     mc_client::perf::mark_process_start();
     let args = parse_args().unwrap_or_else(|e| fail(&e));
-    // The jar and resources/: the flags, else next to the AppImage or the
-    // executable, else in the (possibly given) data directory, else the
-    // development fallbacks (mc_client::paths docs). The two lines say
-    // which were picked before anything can fail on them (CI greps them).
+    // The jar and resources/ come from the Prism b1.7.3 instance: the flag,
+    // else the first one in the standard Prism places (mc_client::paths
+    // docs). The lines say which were picked (CI greps them).
     let data_dir = args
         .data_dir
         .unwrap_or_else(mc_client::paths::default_data_dir);
-    let paths = ClientPaths {
-        jar: args
-            .jar
-            .unwrap_or_else(|| mc_client::paths::jar_for(&data_dir)),
-        resources: args
-            .resources
-            .unwrap_or_else(|| mc_client::paths::resources_for(&data_dir)),
-        data_dir,
-    };
+    let instance = args
+        .prism_instance
+        .or_else(mc_client::paths::find_prism_instance)
+        .unwrap_or_else(|| {
+            fail(
+                &mc_client::paths::PrismError::NotFound {
+                    tried: mc_client::paths::prism_instance_candidates(),
+                }
+                .to_string(),
+            )
+        });
+    eprintln!("mc_b173: prism instance: {}", instance.display());
+    let paths = ClientPaths::from_prism_instance(data_dir, &instance)
+        .unwrap_or_else(|e| fail(&e.to_string()));
     eprintln!("mc_b173: minecraft.jar: {}", paths.jar.display());
     eprintln!("mc_b173: resources: {}", paths.resources.display());
     let script = args.script.map(|p| {

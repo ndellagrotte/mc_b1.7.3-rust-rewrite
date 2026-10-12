@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Smoke test for the mc_b173 AppImage: smoke_appimage.sh <appimage>.
 # 1. --help prints the usage and exits 0.
-# 2. a minecraft.jar candidate and resources/ beside the .AppImage are found.
-# 3. two candidate jars beside it are ambiguous: none is used.
+# 2. a Prism b1.7.3 instance under $XDG_DATA_HOME/PrismLauncher is auto-detected.
+# 3. --prism-instance finds the same instance given explicitly.
+# 4. an instance without the client jar asks for a launch from Prism.
 # SMOKE_ONLY_HELP=1 runs step 1 alone. Runs without FUSE (CI runners have none).
 set -euo pipefail
 
@@ -38,7 +39,7 @@ make_jar() {
 }
 run_game() {
     # No display on CI: the game exits non-zero after printing the paths.
-    XDG_DATA_HOME="$s/xdg" timeout 60 "$s/game.AppImage" >"$s/log" 2>&1 || true
+    XDG_DATA_HOME="$s/xdg" timeout 60 "$img" "$@" >"$s/log" 2>&1 || true
 }
 fail() {
     echo "----- log -----"
@@ -48,22 +49,32 @@ fail() {
     exit 1
 }
 
-# 2. lookup beside the AppImage
-cp "$img" "$s/game.AppImage"
-mkdir "$s/resources"
-make_jar "$s/b173-client.jar"
-run_game
-grep -qxF "mc_b173: minecraft.jar: $s/b173-client.jar" "$s/log" || fail "jar beside the AppImage not found"
-grep -qxF "mc_b173: resources: $s/resources" "$s/log" || fail "resources/ beside the AppImage not found"
-echo "smoke: lookup beside the AppImage OK"
+# A launched Prism instance: instance.cfg, resources/ and the library jar.
+prism="$s/xdg/PrismLauncher"
+inst="$prism/instances/b1.7.3"
+jar="$prism/libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar"
+mkdir -p "$inst/minecraft/resources" "$(dirname "$jar")"
+touch "$inst/instance.cfg"
+make_jar "$jar"
+check_paths() {
+    grep -qxF "mc_b173: minecraft.jar: $jar" "$s/log" || fail "$1: client jar not found"
+    grep -qxF "mc_b173: resources: $inst/minecraft/resources" "$s/log" || fail "$1: resources/ not found"
+}
 
-# 3. ambiguity
-make_jar "$s/second.jar"
+# 2. auto-detection
 run_game
-grep -qF "several jars" "$s/log" || fail "two jars did not report 'several jars'"
-if grep -qF "minecraft.jar: $s/b173-client.jar" "$s/log"; then
-    fail "an ambiguous jar was used"
-fi
-echo "smoke: ambiguous jars OK"
+check_paths "auto-detect"
+echo "smoke: Prism auto-detection OK"
+
+# 3. explicit instance
+run_game --prism-instance "$inst"
+check_paths "--prism-instance"
+echo "smoke: --prism-instance OK"
+
+# 4. never launched: no jar
+rm "$jar"
+run_game
+grep -qF "at least once" "$s/log" || fail "a missing jar did not ask to launch the instance"
+echo "smoke: missing jar OK"
 
 echo "smoke OK"

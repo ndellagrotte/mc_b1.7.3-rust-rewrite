@@ -112,8 +112,8 @@ jobs:
           mv target/dist/${{ env.GAME_EXECUTABLE_NAME }} .
           cp docs/RUNNING.md .
       - name: Bundle release
-        # The game needs the player's own minecraft.jar and resources/ (PLAN_v4 D8):
-        # RUNNING.md says where to put them. NOTICE carries the Apache-2.0 credit (D4).
+        # The game reads the client jar and resources/ from the player's Prism
+        # Launcher b1.7.3 instance (PLAN_v4 D8): RUNNING.md says how. NOTICE carries the Apache-2.0 credit (D4).
         run: |
           tar -czf ${{ env.GAME_EXECUTABLE_NAME }}_linux.tar.gz ${{ env.GAME_EXECUTABLE_NAME }} assets credits NOTICE LICENSE RUNNING.md
       - name: Upload release
@@ -128,8 +128,8 @@ jobs:
 
   build-linux-appimage:
     # Packages the build-linux binary as an x86_64 AppImage. ALSA, libudev and
-    # libwayland-client stay on the host (the AppImage excludelist); the user's
-    # minecraft.jar and resources/ are found next to the .AppImage file (docs/RUNNING.md).
+    # libwayland-client stay on the host (the AppImage excludelist); the client
+    # jar and resources/ come from the user's Prism b1.7.3 instance (docs/RUNNING.md).
     runs-on: ubuntu-22.04
     needs: [get-version, build-linux]
     env:

@@ -18,7 +18,7 @@
 #![allow(clippy::disallowed_methods)]
 
 use std::collections::BTreeMap;
-use std::io::{BufReader, Cursor, Read};
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 use bevy::asset::RenderAssetUsages;
@@ -87,12 +87,12 @@ impl std::fmt::Display for AssetError {
         match self {
             AssetError::Jar { path, reason } => write!(
                 f,
-                "cannot read minecraft.jar at {} ({reason}); give your own Beta 1.7.3 client jar with --jar <path>, or without --jar put it next to the AppImage or the mc_b173 executable, or copy it to <data dir>/minecraft.jar (docs/RUNNING.md)",
+                "cannot read the Beta 1.7.3 client jar at {} ({reason}); check the Prism Launcher b1.7.3 instance (--prism-instance), or launch it from Prism once more so it downloads the jar again (docs/RUNNING.md)",
                 path.display()
             ),
             AssetError::Resources { path } => write!(
                 f,
-                "no resources/ directory at {}; give the directory with the sound/, music/, newsound/... folders with --resources <path>, or without --resources put it next to the AppImage or the mc_b173 executable, or copy it to <data dir>/resources (docs/RUNNING.md)",
+                "no resources/ directory at {}; check the Prism Launcher b1.7.3 instance (--prism-instance), or launch it from Prism once so it downloads the sounds and music (docs/RUNNING.md)",
                 path.display()
             ),
             AssetError::Missing { name, jar } => {
@@ -108,23 +108,6 @@ impl std::error::Error for AssetError {}
 /// [`TERRAIN_PNG`]'s zip entry name (no leading `/`).
 fn terrain_entry() -> &'static str {
     TERRAIN_PNG.trim_start_matches('/')
-}
-
-/// Whether the file at `path` is a zip with a `terrain.png` entry (with or
-/// without a leading `/`): how a renamed client jar is recognised next to
-/// the bundle (`crate::paths::bundle_jar`). Any error counts as no.
-// Reads only the zip central directory through a file handle, not the whole
-// jar, so probing a directory's jars stays cheap.
-#[allow(clippy::disallowed_types)]
-pub fn jar_has_terrain(path: &Path) -> bool {
-    let Ok(file) = std::fs::File::open(path) else {
-        return false;
-    };
-    let Ok(zip) = zip::ZipArchive::new(BufReader::new(file)) else {
-        return false;
-    };
-    zip.file_names()
-        .any(|n| n.trim_start_matches('/') == terrain_entry())
 }
 
 /// The jar's resources (module docs).
@@ -327,37 +310,9 @@ mod tests {
         let e = JarAssets::open(Path::new("/nonexistent/minecraft.jar")).unwrap_err();
         let s = e.to_string();
         assert!(s.contains("/nonexistent/minecraft.jar"), "{s}");
-        assert!(s.contains("--jar"), "{s}");
+        assert!(s.contains("--prism-instance"), "{s}");
         let e = ResourcesDir::open(Path::new("/nonexistent/resources")).unwrap_err();
         assert!(e.to_string().contains("/nonexistent/resources"));
-    }
-
-    #[test]
-    fn jar_has_terrain_checks_the_entry() {
-        use std::io::Write;
-        fn zip_with(names: &[&str]) -> Vec<u8> {
-            let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
-            for n in names {
-                w.start_file(*n, zip::write::SimpleFileOptions::default())
-                    .unwrap();
-                w.write_all(b"x").unwrap();
-            }
-            w.finish().unwrap().into_inner()
-        }
-        let d = crate::storage::tests::TempDir::new("jar_has_terrain");
-        let plain = d.0.join("plain.jar");
-        std::fs::write(&plain, zip_with(&["terrain.png", "pack.png"])).unwrap();
-        assert!(jar_has_terrain(&plain));
-        let slash = d.0.join("slash.jar");
-        std::fs::write(&slash, zip_with(&["/terrain.png"])).unwrap();
-        assert!(jar_has_terrain(&slash));
-        let other = d.0.join("other.jar");
-        std::fs::write(&other, zip_with(&["pack.png"])).unwrap();
-        assert!(!jar_has_terrain(&other));
-        let text = d.0.join("text.jar");
-        std::fs::write(&text, b"not a zip").unwrap();
-        assert!(!jar_has_terrain(&text));
-        assert!(!jar_has_terrain(&d.0.join("missing.jar")));
     }
 
     #[test]

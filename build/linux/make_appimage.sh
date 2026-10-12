@@ -2,8 +2,8 @@
 # Builds an x86_64 AppImage of mc_b173: make_appimage.sh <binary> <output>.
 # The AppDir holds only the binary, the desktop entry, our own icon and the
 # project's NOTICE, LICENSE, docs/RUNNING.md and credits/. Nothing
-# Mojang-derived enters: the player's minecraft.jar and resources/ are found
-# next to the .AppImage file at run time (docs/RUNNING.md).
+# Mojang-derived enters: the client jar and resources/ are read from the
+# player's Prism Launcher b1.7.3 instance at run time (docs/RUNNING.md).
 # Needs APPIMAGETOOL (appimagetool-x86_64.AppImage) and APPIMAGE_RUNTIME
 # (the type2 runtime-x86_64 file).
 set -euo pipefail

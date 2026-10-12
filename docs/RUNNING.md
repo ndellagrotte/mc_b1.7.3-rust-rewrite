@@ -2,44 +2,45 @@
 
 `mc_b173` is a Rust rewrite of Minecraft Beta 1.7.3. **It contains nothing of
 Mojang's.** It reads the textures and the `lang/` files from your own copy of the
-Beta 1.7.3 client jar (`minecraft.jar`), and sounds and music from a `resources/`
-directory, at run time (PLAN_v4 D8). You have to supply both.
+Beta 1.7.3 client jar, and sounds and music from a `resources/` directory, at
+run time (PLAN_v4 D8). Both come from a Prism Launcher b1.7.3 instance.
 
-## 1. Get the files
+## 1. Set up Prism Launcher
 
-**`minecraft.jar`.** This is the Beta 1.7.3 client jar, about 1.5 MB. It must
-contain `terrain.png` (the game checks this at start-up). Some ways to get it:
+1. Install [Prism Launcher](https://prismlauncher.org/) (the native package or
+   the Flatpak).
+2. Create an instance of Minecraft **b1.7.3** and leave its name as `b1.7.3`
+   (its folder is then `.../PrismLauncher/instances/b1.7.3`).
+3. **Launch it from Prism at least once.** Prism downloads the client jar and the
+   sounds on the first launch; you can quit as soon as the title screen shows.
 
-- From a launcher that installs Beta 1.7.3. In Prism Launcher, create a b1.7.3
-  instance and start it once. The jar is then in the launcher's data folder
-  under `libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar`.
-  Next to the game it may keep that name if it is the only jar there that
-  contains `terrain.png` (section 2); anywhere else rename it to
-  `minecraft.jar` or point `--jar` at it.
-- From an old `.minecraft/bin/minecraft.jar` that you kept.
-
-A modded jar works if `terrain.png`, `gui/`, `lang/` and the other resources
-are where vanilla puts them. Texture packs are not supported (deferred, PLAN_v4 D3).
-
-**`resources/`.** The game reads only these folders: `sound/`, `newsound/`
-(effects), `music/`, `newmusic/` (music) and `streaming/` (records), with
-`.ogg` and `.mus` files. Old launchers downloaded them into
-`.minecraft/resources/`. A Prism Launcher b1.7.3 instance has them in
-`<instance>/minecraft/resources/` after its first start. An empty directory
-works (the game is then silent); a missing one is an error.
-
-## 2. Put them next to the game
-
-The simplest layout is one folder with the game and the two files:
+Afterwards the files the game reads are:
 
 ```text
-Games/b1.7.3/
-  mc_b173_<ver>_x86_64.AppImage   or the unpacked archive's mc_b173
-  minecraft.jar                   your Beta 1.7.3 client jar
-  resources/                      sound/, newsound/, music/, newmusic/, streaming/
+<Prism data dir>/
+  libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar   the client jar
+  instances/b1.7.3/
+    instance.cfg
+    minecraft/resources/        sound/, newsound/, music/, newmusic/, streaming/
 ```
 
-Then start the game with no arguments. The AppImage (Linux, x86_64):
+(Older instances use `.minecraft/` instead of `minecraft/`; both work.) The game
+reads only these folders in `resources/`: `sound/`, `newsound/` (effects),
+`music/`, `newmusic/` (music) and `streaming/` (records). Texture packs are not
+supported (deferred, PLAN_v4 D3).
+
+## 2. Start the game
+
+With the instance named `b1.7.3` in Prism's default data directory, start the
+game with no arguments. These places are tried, in order:
+
+| System | Instance looked for |
+|---|---|
+| Linux | `$XDG_DATA_HOME/PrismLauncher/instances/b1.7.3` (else `~/.local/share/...`), then the Flatpak's `~/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances/b1.7.3` |
+| macOS | `~/Library/Application Support/PrismLauncher/instances/b1.7.3` |
+| Windows | `%APPDATA%\PrismLauncher\instances\b1.7.3` |
+
+The AppImage (Linux, x86_64):
 
 ```sh
 chmod +x mc_b173_<ver>_x86_64.AppImage
@@ -51,33 +52,44 @@ run it with `./mc_b173_<ver>_x86_64.AppImage --appimage-extract-and-run`.
 
 From the unpacked archive: `./mc_b173`.
 
-"Next to the game" means the directory the `.AppImage` file is really in, or
-for the unpacked archive the directory of the `mc_b173` executable. A symlink
-to either does not count: the directory of the file it points to does.
-A tool such as AppImageLauncher that moves the file into its own folder
-changes which directory that is, so put the two files where the AppImage
-ended up.
+If the instance has another name, or Prism keeps its data elsewhere, give the
+instance directory:
 
-The jar is found by the name `minecraft.jar`. If there is none, the one
-`*.jar` file there that contains `terrain.png` is used, so the launcher's
-`minecraft-b1.7.3-client.jar` works without renaming. If several jars there
-contain `terrain.png`, none of them is used, the game says so on stderr
-
-```text
-mc_b173: several jars with terrain.png in /home/you/Games/b1.7.3: /home/you/Games/b1.7.3/a.jar and /home/you/Games/b1.7.3/b.jar; using none (rename yours to minecraft.jar or pass --jar)
+```sh
+mc_b173 --prism-instance ~/Games/PrismLauncher/instances/my-beta
 ```
 
-and looks in the data directory instead (section 3). The sounds must be in a
-directory named exactly `resources`.
+The client jar is always looked for two levels up from the instance, under
+`libraries/` (Prism's own layout; a custom instance folder in Prism's settings
+is not supported).
 
-Only the jar and `resources/` are found next to the game. Options, saves,
-screenshots and statistics still go to the data directory (section 3) or to
-`--data-dir`.
+At start-up the game prints on stderr the instance and the two paths it chose,
+for example:
 
-## 3. Or put them in the data directory
+```text
+mc_b173: prism instance: /home/you/.local/share/PrismLauncher/instances/b1.7.3
+mc_b173: minecraft.jar: /home/you/.local/share/PrismLauncher/libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar
+mc_b173: resources: /home/you/.local/share/PrismLauncher/instances/b1.7.3/minecraft/resources
+```
 
-The game keeps its files in its own data directory and never touches your real
-`.minecraft`:
+If something is missing, the game stops and says what. No instance found:
+
+```text
+mc_b173: no Prism Launcher b1.7.3 instance found (tried ...); create a b1.7.3 instance in Prism Launcher, launch it once, and pass --prism-instance <.../PrismLauncher/instances/b1.7.3> if it is elsewhere (docs/RUNNING.md)
+```
+
+The instance exists but has never been launched:
+
+```text
+mc_b173: found the Prism instance at /home/you/.local/share/PrismLauncher/instances/b1.7.3 but not the client jar at /home/you/.local/share/PrismLauncher/libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar; launch the b1.7.3 instance from Prism Launcher at least once so it downloads them, then try again
+```
+
+A directory that is not a Prism instance (no `instance.cfg`) is refused too.
+
+## 3. The data directory
+
+The game keeps its own files in its own data directory and never touches your
+real `.minecraft` or the Prism instance's saves:
 
 | System | Data directory |
 |---|---|
@@ -86,52 +98,13 @@ The game keeps its files in its own data directory and never touches your real
 | Windows | `%APPDATA%\mc_b173` |
 
 Inside it, as in vanilla: `options.txt`, `saves/`, `screenshots/`, `stats/`.
-Put the two files next to them:
 
-```text
-<data dir>/
-  minecraft.jar        your Beta 1.7.3 client jar
-  resources/           sound/, newsound/, music/, newmusic/, streaming/
-  options.txt  saves/  screenshots/  stats/     (the game makes these)
-```
-
-Then start the game with no arguments. On Linux, from the unpacked release
-archive or with the AppImage (section 2 for `chmod +x` and the no-FUSE flag):
-
-```sh
-./mc_b173
-./mc_b173_<ver>_x86_64.AppImage
-```
-
-At start-up the game prints on stderr the two paths it chose, for example:
-
-```text
-mc_b173: minecraft.jar: /home/you/.local/share/mc_b173/minecraft.jar
-mc_b173: resources: /home/you/.local/share/mc_b173/resources
-```
-
-If a file is missing, the game stops and prints the path it tried, for
-example:
-
-```text
-mc_b173: cannot read minecraft.jar at /home/you/.local/share/mc_b173/minecraft.jar (No such file or directory (os error 2)); give your own Beta 1.7.3 client jar with --jar <path>, or without --jar put it next to the AppImage or the mc_b173 executable, or copy it to <data dir>/minecraft.jar (docs/RUNNING.md)
-```
-
-The message for a missing `resources/` directory reads the same way.
-
-## 4. Or point at them
-
-You can leave the files where they are and give their paths instead:
-
-```sh
-mc_b173 --jar ~/Games/b1.7.3/minecraft.jar --resources ~/Games/b1.7.3/resources
-```
+## 4. Command line
 
 | Flag | Meaning | Default |
 |---|---|---|
 | `--data-dir DIR` | options, `saves/`, `screenshots/`, `stats/` | the table above |
-| `--jar FILE` | your Beta 1.7.3 `minecraft.jar` | `minecraft.jar` next to the AppImage/executable, else `<data dir>/minecraft.jar` |
-| `--resources DIR` | the `resources/` directory | `resources/` next to the AppImage/executable, else `<data dir>/resources` |
+| `--prism-instance DIR` | your Prism Launcher b1.7.3 instance (the client jar and `resources/`) | the first instance found in section 2's table |
 | `--username NAME` | the player name (names the stats file) | vanilla's `Player<millis % 1000>` |
 | `--world NAME` | open `saves/NAME`, or create it, skipping the title screen | title screen |
 | `--seed SEED` | the new world's seed (with `--world`) | random |
@@ -139,14 +112,7 @@ mc_b173 --jar ~/Games/b1.7.3/minecraft.jar --resources ~/Games/b1.7.3/resources
 | `--vsync on\|off` | `on` waits for the display's refresh (no tearing, the frame rate capped at the display's). `off`, the default, runs as the original game does (below) | `off` |
 | `--script FILE` | the scripted-input dev mode (`crates/mc-client/README.md`) | — |
 
-Without `--jar`/`--resources`, each file is looked for in this order: next to
-the game (section 2), then in the data directory (`--data-dir` when it is
-given, else the default of section 3), then the development fallbacks (below).
-So with nothing next to the game, `mc_b173 --data-dir /tmp/mc` looks for
-`/tmp/mc/minecraft.jar` and `/tmp/mc/resources`. Explicit paths always win and
-are used as given (a relative one is relative to the current directory). The
-two start-up lines (`mc_b173: minecraft.jar: <path>`, `mc_b173: resources:
-<path>`) show which paths were chosen.
+A relative `--prism-instance` is relative to the current directory.
 
 **Frame rate.** As in the original game, the "Performance" video option sets
 the limit: "Balanced" (the default) and "Max FPS" run as fast as the machine
@@ -162,17 +128,7 @@ type or paste the path of the save folder.
 
 ## Development builds
 
-A build from this repository falls back to the developer's files when neither
-the game's directory nor the data directory has them:
-
-- the jar of the vanilla reference checkout,
-  `.reference/mc_b1.7.3_release/1.7.3-LTS/jars/bin/minecraft.jar` in the
-  workspace the binary was built from (`docs/REFERENCES.md`);
-- the `resources/` of the Prism Launcher (Flatpak) instance named `b1.7.3`,
-  `~/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher/instances/b1.7.3/minecraft/resources`.
-
-These paths are used only when they exist, so a packaged build on another
-machine never depends on them.
+Development builds find the jar and `resources/` the same way (section 2).
 
 ```sh
 cargo run -p mc-app -- --world test --seed 123          # dev profile

@@ -7,39 +7,32 @@ calls into Bevy; this crate drives it and turns its event queue into Bevy
 messages.
 
 Nothing of Mojang's is embedded (D8): textures and `lang/` come from the user's
-`minecraft.jar`, sounds and music from a `resources/` directory, both read at
-runtime.
+Beta 1.7.3 client jar, sounds and music from a `resources/` directory, both
+read at runtime from the user's Prism Launcher `b1.7.3` instance.
 
 ## Running
 
 ```text
-cargo run -p mc-app -- [--data-dir DIR] [--jar FILE] [--resources DIR] [--username NAME]
+cargo run -p mc-app -- [--data-dir DIR] [--prism-instance DIR] [--username NAME]
                        [--world NAME [--seed SEED] | --import DIR] [--script FILE.json]
 ```
 
 | Flag | Meaning | Default |
 |---|---|---|
 | `--data-dir` | options, `saves/`, `screenshots/`, `stats/` | `$XDG_DATA_HOME/mc_b173` or `~/.local/share/mc_b173` (macOS `~/Library/Application Support/mc_b173`, Windows `%APPDATA%\mc_b173`); never the real `.minecraft` |
-| `--jar` | your Beta 1.7.3 `minecraft.jar` | `minecraft.jar` next to the AppImage / the `mc_b173` executable (or the only `*.jar` there with `terrain.png`), else `<data dir>/minecraft.jar`; dev fallback `.reference/mc_b1.7.3_release/1.7.3-LTS/jars/bin/minecraft.jar` in the workspace |
-| `--resources` | the `resources/` directory (`sound/`, `newsound/`, `music/`, …) | `resources/` next to the AppImage / the `mc_b173` executable, else `<data dir>/resources`; dev fallback the Prism Launcher (Flatpak) `b1.7.3` instance's |
+| `--prism-instance` | the Prism Launcher `b1.7.3` instance directory (`.../PrismLauncher/instances/b1.7.3`): the jar is `<instance>/../../libraries/com/mojang/minecraft/b1.7.3/minecraft-b1.7.3-client.jar`, `resources/` is `<instance>/minecraft/resources` (or `.minecraft/resources`) | the first `instances/b1.7.3` in the standard Prism data directories (`paths::prism_roots`: `$XDG_DATA_HOME/PrismLauncher` or `~/.local/share/PrismLauncher`, then the Flatpak's; macOS `~/Library/Application Support/PrismLauncher`; Windows `%APPDATA%\PrismLauncher`) |
 | `--username` | the player name (names the stats file) | vanilla's `Player<millis % 1000>` |
 | `--world NAME` | open `saves/NAME` (as the Select World screen does), or create it (as the Create World screen does) | title screen |
 | `--seed SEED` | the new world's seed text: a `long`, else its `String.hashCode()`; empty or `0` = random | random |
 | `--import DIR` | copy a vanilla save folder into `saves/` (refused, with nothing copied, at the first block or item id Beta 1.7.3 does not define — D5), then open it | — |
 | `--script FILE` | the scripted-input dev mode (below) | — |
 
-A missing jar or `resources/` directory stops the program with a message
-naming the path. At start-up two stderr lines name the paths chosen
-(`mc_b173: minecraft.jar: <path>`, `mc_b173: resources: <path>`).
-
-Without `--jar` / `--resources`, each is looked for first next to the game
-(`paths::bundle_dir`: the directory the `.AppImage` file is in, else the
-executable's; `minecraft.jar` by name, else the single `*.jar` there that
-contains `terrain.png`, none if several do, with a stderr line; `resources/`
-by name), then, as since WP-4.3, at `<data-dir>/minecraft.jar` and
-`<data-dir>/resources`. The dev paths in the table above are only
-development fallbacks, used when neither place has the file and the
-fallback exists (`paths` module docs, `docs/RUNNING.md`). Also since WP-4.3:
+No instance found, a directory without `instance.cfg`, or an instance whose
+jar or `resources/` is missing (never launched from Prism) stops the program
+with a message naming the paths (`paths::PrismError`). At start-up three
+stderr lines name the paths chosen (`mc_b173: prism instance: <path>`,
+`mc_b173: minecraft.jar: <path>`, `mc_b173: resources: <path>`; see the
+`paths` module docs and `docs/RUNNING.md`). Since WP-4.3:
 
 | Flag | Meaning | Default |
 |---|---|---|

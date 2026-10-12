@@ -23,16 +23,17 @@ packages.
 - Rust stable (see `rust-toolchain.toml`; the pinned version is informative
   for system toolchains and binding for `rustup`).
 - A JDK (21 or newer) to build and run the Java oracle that generates fixtures.
-- Your own `minecraft.jar` for Beta 1.7.3 (textures and `lang/` files) and a
-  `resources/` directory (sounds and music). **This project ships no Mojang
-  assets**; put the two next to the AppImage (or the executable) or in the
-  game's data directory, or pass their paths; see `docs/RUNNING.md`.
+- A Prism Launcher `b1.7.3` instance, launched at least once: the game reads
+  the client jar (textures and `lang/` files) and the `resources/` directory
+  (sounds and music) from it. **This project ships no Mojang assets**; the
+  instance is auto-detected or given with `--prism-instance`; see
+  `docs/RUNNING.md`.
 - The read-only reference tree under `.reference/` for development; see
   `docs/REFERENCES.md`. It is git-ignored and never committed.
 
 Since Phase 3 the game is playable from the title screen (create, import,
-play, save, reload; `docs/GATE3_REVIEW.md`). How to supply `minecraft.jar` and
-`resources/` and the command-line flags: [`docs/RUNNING.md`](docs/RUNNING.md).
+play, save, reload; `docs/GATE3_REVIEW.md`). How to set up the Prism instance
+and the command-line flags: [`docs/RUNNING.md`](docs/RUNNING.md).
 Performance measurements and their method: [`docs/PERF.md`](docs/PERF.md).
 
 ## Build and run
