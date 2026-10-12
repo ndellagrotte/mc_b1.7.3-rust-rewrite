@@ -465,7 +465,7 @@ exercised, N = documentation nit.
   "in progress", WP-4.7 "not scheduled", the Gate 4 row "after wave F".
   §3.2's container close-timing row is closed by WP-4.7.
   Closed after the review by the Phase 4 docs commit (see git log).
-- **N4. The handoff's "47 `deferred` tags"** (HANDOFF_PHASE4_REST.md §1,
+- **N4. The handoff's "47 `deferred` tags"** (docs/handoff/HANDOFF_PHASE4_REST.md §1,
   untracked) matches neither grep of §7; use §7's commands.
 
 ## 9. Interface changes to `mc-sim` in Phase 4 (for approval)

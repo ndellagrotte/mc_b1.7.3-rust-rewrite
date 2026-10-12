@@ -1,8 +1,8 @@
 # Handoff: the rest of Phase 4 (PLAN_v4 §5)
 
 Written 2026-10-10 by the orchestrating session after the Phase 3 and Phase 4
-waves. Untracked, like the other `HANDOFF_*` files. Companion files at the
-repo root, also untracked:
+waves; kept as a record in `docs/handoff/` now that Phase 4 is complete.
+Companion files beside it:
 
 - `HANDOFF_PHASE4_wave.js` — the Workflow script every wave since Phase 3 ran
   (transcribe → review against the Java → fix → integrator merge → optional
@@ -82,7 +82,7 @@ In the orchestrating session (ultracode on), with the worktrees already in
 place:
 
 ```text
-Workflow({ scriptPath: "<repo>/HANDOFF_PHASE4_wave.js",
+Workflow({ scriptPath: "<repo>/docs/handoff/HANDOFF_PHASE4_wave.js",
            args: <contents of HANDOFF_PHASE4_wave-args.json> })
 ```
 
@@ -95,7 +95,7 @@ transcribe → review (sees only the diff and the Java, runs the DoD and the
 smoke) → fix (if findings) → integrator (rebase onto the branch, DoD, ff-merge
 in the main checkout). Expect ~5–6 h wall clock for three WPs plus the gate.
 
-If a worktree is missing: `sh HANDOFF_PHASE4_mkwt.sh 4.7 phase-4` (creates
+If a worktree is missing: `sh docs/handoff/HANDOFF_PHASE4_mkwt.sh 4.7 phase-4` (creates
 `.worktrees/wp-4.7` on branch `wp-4.7`, the `.reference` symlink, and a
 reflinked `target/`; `/home` is btrfs). Pre-warm with
 `cd .worktrees/wp-4.7 && cargo build -p mc-app` (~4 min cold).

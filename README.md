@@ -72,7 +72,7 @@ tools/oracle/              Java harness sources; build.sh, regen.sh
 tools/portable/            local portable-zip builder (tools/portable/README.md)
 b1.7.3-mmc-instance/       Prism Launcher instance export to import (b1.7.3.zip: instance.cfg, mmc-pack.json)
 tests/golden/<area>/<name>/{scenario.json, expected.jsonl}
-docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md
+docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md; handoff/ (Phase 4 orchestration records)
 credits/                   CREDITS.md, licenses/
 assets/                    project-owned files only
 build/                     icons, macOS .app template, Windows icon and installer
