@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Minecraft Beta 1.7.3 (Rust)
-Comment=Rust rewrite of Minecraft Beta 1.7.3 (bring your own minecraft.jar and resources/)
-Exec=mc_b173
-Icon=mc_b173
-Categories=Game;
-Terminal=false

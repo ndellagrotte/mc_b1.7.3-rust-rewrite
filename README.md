@@ -50,8 +50,7 @@ Add `--features dev` to `cargo run` for Bevy dynamic linking during development.
 The release build is `cargo build --profile dist -p mc-app` (opt-level 3, LTO;
 `target/dist/mc_b173`), which `.github/workflows/release.yaml` packages for
 Linux, Windows and macOS with `docs/RUNNING.md`, `NOTICE`, `LICENSE` and
-`credits/`. Linux gets both a tarball and an x86_64 AppImage (built on Ubuntu
-22.04, glibc 2.35 or newer).
+`credits/`.
 
 ## Layout
 

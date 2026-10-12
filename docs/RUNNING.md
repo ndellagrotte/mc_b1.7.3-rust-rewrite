@@ -40,17 +40,7 @@ game with no arguments. These places are tried, in order:
 | macOS | `~/Library/Application Support/PrismLauncher/instances/b1.7.3` |
 | Windows | `%APPDATA%\PrismLauncher\instances\b1.7.3` |
 
-The AppImage (Linux, x86_64):
-
-```sh
-chmod +x mc_b173_<ver>_x86_64.AppImage
-./mc_b173_<ver>_x86_64.AppImage
-```
-
-On a system without FUSE 2 or 3 support the AppImage cannot mount itself;
-run it with `./mc_b173_<ver>_x86_64.AppImage --appimage-extract-and-run`.
-
-From the unpacked archive: `./mc_b173`.
+From the unpacked release tarball (Linux): `./mc_b173`.
 
 If the instance has another name, or Prism keeps its data elsewhere, give the
 instance directory:
@@ -138,13 +128,9 @@ cargo build --profile dist -p mc-app                    # the release build: tar
 The `dist` profile (opt-level 3, LTO, one codegen unit, stripped) is what the
 release workflow (`.github/workflows/release.yaml`, on a `v*` tag) builds for
 Linux, Windows and macOS. Each archive holds the binary, `assets/` (project
-files only), `credits/`, `NOTICE`, `LICENSE` and this file. For Linux the
-release has both `mc_b173_<ver>_linux.tar.gz` and an x86_64 AppImage,
-`mc_b173_<ver>_x86_64.AppImage`, which holds the binary, the icon, a `.desktop`
-entry, `credits/`, `NOTICE`, `LICENSE` and this file. Neither contains anything
-of Mojang's. Both are built on Ubuntu 22.04, so they need glibc 2.35 or newer;
-ALSA (`libasound.so.2`), `libudev.so.1`, `libwayland-client.so.0` and the GPU
-driver come from the system.
+files only), `credits/`, `NOTICE`, `LICENSE` and this file, and nothing of
+Mojang's. On Linux, ALSA (`libasound.so.2`), `libudev.so.1`,
+`libwayland-client.so.0` and the GPU driver come from the system.
 
 ## Saves on disk
 
