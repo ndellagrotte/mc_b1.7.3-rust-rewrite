@@ -23,6 +23,10 @@ DIST=$ROOT/dist
 CACHE=$DIST/.cache
 WORK=$DIST/.work
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"   # rustup's cargo before /usr/bin/cargo
+# zig's linker opens every object file at once (3000+ with thin LTO); the
+# usual soft limit of 1024 open files fails it with ProcessFdQuotaExceeded.
+ulimit -S -n "$(ulimit -H -n)" 2>/dev/null || true
+FD_MIN=8192
 
 TOOLCHAIN=1.99.0
 GLIBC=2.31
@@ -120,7 +124,7 @@ row() {
 }
 
 check_common() {
-    local t missing="" kb zv
+    local t missing="" kb zv fd
     if command -v rustup >/dev/null; then row OK rustup
     else row MISSING rustup "install rustup (https://rustup.rs or 'sudo dnf install rustup && rustup-init -y --default-toolchain none')"; fi
     if (cd "$ROOT" && cargo --version 2>/dev/null) | grep -q "^cargo $TOOLCHAIN"; then row OK "cargo $TOOLCHAIN (rustup)"
@@ -139,6 +143,10 @@ check_common() {
     done
     if [ -z "$missing" ]; then row OK "host tools"
     else row MISSING "host tools:$missing" "sudo dnf install curl coreutils binutils tar xz zip unzip file squashfs-tools"; fi
+    fd=$(ulimit -S -n)
+    if [ "$fd" != unlimited ] && [ "$fd" -lt "$FD_MIN" ]; then
+        row WARN "open files limit $fd" "zig's linker needs more (ulimit -n $FD_MIN, or raise the hard limit in /etc/security/limits.d)"
+    fi
     kb=$(awk '/^MemAvailable:/{print $2}' /proc/meminfo)
     if [ "${kb:-0}" -lt $((3 * 1024 * 1024)) ]; then row WARN "memory: $((kb / 1024)) MiB available" "close other programs or use --low-mem"; fi
     kb=$(df -Pk "$ROOT" | awk 'NR==2{print $4}')
@@ -158,8 +166,12 @@ check_target() {
     fi
     row OK "$1 ($TRIPLE)"
     case $1 in
-        windows-x86_64) command -v x86_64-w64-mingw32-windres >/dev/null \
-            || row WARN "$1 icon" "no Explorer icon in the exe (optional: sudo dnf install mingw64-binutils)" ;;
+        windows-x86_64)
+            if ! command -v x86_64-w64-mingw32-windres >/dev/null; then
+                row WARN "$1 icon" "no Explorer icon in the exe (optional: sudo dnf install mingw64-binutils gcc)"
+            elif ! command -v gcc >/dev/null; then
+                row MISSING "$1 icon" "x86_64-w64-mingw32-windres needs a C preprocessor: sudo dnf install gcc"
+            fi ;;
         windows-aarch64) row INFO "$1 icon" "the exe has no Explorer icon (window icon unaffected)" ;;
         macos-*) command -v rcodesign >/dev/null \
             || row WARN "$1 signing" "rcodesign missing, the .app stays unsigned (cargo install --locked apple-codesign)" ;;
@@ -201,6 +213,19 @@ ensure_sysroot() {
     touch "$s/.done"
 }
 
+# windres_wrapper: prints the path of a windres that preprocesses with the host gcc.
+windres_wrapper() {
+    local w=$CACHE/bin/x86_64-w64-mingw32-windres-hostcpp
+    mkdir -p "$CACHE/bin"
+    cat >"$w.tmp" <<'EOS'
+#!/bin/sh
+# tools/portable: windres with the host gcc as the .rc preprocessor.
+exec x86_64-w64-mingw32-windres --preprocessor=gcc --preprocessor-arg=-E --preprocessor-arg=-xc --preprocessor-arg=-DRC_INVOKED "$@"
+EOS
+    chmod 755 "$w.tmp" && mv "$w.tmp" "$w"
+    echo "$w"
+}
+
 # target_env T: per-target environment; only ever called inside the target's subshell.
 target_env() {
     local u s
@@ -208,6 +233,15 @@ target_env() {
     unset PKG_CONFIG_PATH PKG_CONFIG_LIBDIR PKG_CONFIG_SYSROOT_DIR RC RUSTFLAGS CARGO_ENCODED_RUSTFLAGS
     if [ "$LOWMEM" = 1 ]; then export CARGO_PROFILE_DIST_LTO=thin CARGO_PROFILE_DIST_CODEGEN_UNITS=16; fi
     case $OS in
+        windows)
+            # mingw64-binutils' windres preprocesses .rc files with
+            # x86_64-w64-mingw32-gcc, which Fedora ships separately; the host
+            # gcc is enough for icon.rc. embed-resource takes the resource
+            # compiler from RC_<target> and accepts anything that answers
+            # -V with "GNU windres". Without windres the icon is skipped.
+            if [ "$TRIPLE" = x86_64-pc-windows-gnu ] && command -v x86_64-w64-mingw32-windres >/dev/null; then
+                export "RC_${TRIPLE//-/_}=$(windres_wrapper)"
+            fi ;;
         linux)
             u=${TRIPLE//-/_} s=$CACHE/sysroot-$DEBARCH
             export PKG_CONFIG_ALLOW_CROSS=1 "PKG_CONFIG_ALLOW_CROSS_$u=1" "PKG_CONFIG_SYSROOT_DIR_$u=$s" \

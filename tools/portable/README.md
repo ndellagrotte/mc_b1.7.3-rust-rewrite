@@ -41,11 +41,15 @@ rustup toolchain install 1.99.0 --profile minimal -c rustfmt,clippy
 cargo install --locked cargo-zigbuild@0.23.4
 rustup target add --toolchain 1.99.0 x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu \
     x86_64-pc-windows-gnu aarch64-pc-windows-gnullvm
-sudo dnf install mingw64-binutils           # optional: Explorer icon in the x86_64 exe
+sudo dnf install mingw64-binutils gcc       # optional: Explorer icon in the x86_64 exe
 ```
 
 zig 0.15 or 0.16 is expected (other versions only warn). The targets are not listed in
 `rust-toolchain.toml` on purpose, so CI does not install them.
+
+zig's linker opens every object file at once (over 3,000 with `--low-mem`), so the script raises the
+soft open-files limit to the hard limit itself. If `--check` warns about the limit, the hard limit is
+also low; raise it with `ulimit -n 8192` or a `/etc/security/limits.d` entry.
 
 ## Usage
 
@@ -111,7 +115,10 @@ available memory or 15 GiB of free disk. Expect 15-40 minutes per target on a co
 
 The window icon is set at run time on every platform. The Explorer icon is embedded only in the
 `windows-x86_64` exe, and only when `x86_64-w64-mingw32-windres` (mingw64-binutils) is installed;
-the `windows-aarch64` exe never has one. The log says `icon: yes` or `icon: no`.
+the `windows-aarch64` exe never has one. The log says `icon: yes` or `icon: no`. windres preprocesses
+`icon.rc` with `x86_64-w64-mingw32-gcc`, which Fedora ships as a separate package; the script instead
+hands embed-resource a wrapper (`dist/.cache/bin/`) that uses the host `gcc`, so `mingw64-binutils`
+and `gcc` are all it needs.
 
 ## macOS (not produced yet)
 
