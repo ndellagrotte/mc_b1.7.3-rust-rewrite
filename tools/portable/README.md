@@ -25,7 +25,8 @@ mc_b173_<ver>_<target>.zip
 `data/` beside the game is the game's data directory (portable mode, `crates/mc-client/src/paths.rs`);
 `--data-dir` still overrides it. There is no auto-update: to upgrade, unzip the new build and copy
 `data/` into it by hand. `data/README.txt` (from `data-README.txt`) tells players the same. The game
-still needs a Prism Launcher b1.7.3 instance for `minecraft.jar` and `resources/` (docs/RUNNING.md).
+still needs a Prism Launcher b1.7.3 instance for `minecraft.jar` and `resources/`; the repository's
+`b1.7.3-mmc-instance/b1.7.3.zip` is an importable one (docs/RUNNING.md).
 
 ## Prerequisites
 

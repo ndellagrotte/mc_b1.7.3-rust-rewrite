@@ -26,9 +26,10 @@ packages.
 - A JDK (21 or newer) to build and run the Java oracle that generates fixtures.
 - A Prism Launcher `b1.7.3` instance, launched at least once: the game reads
   the client jar (textures and `lang/` files) and the `resources/` directory
-  (sounds and music) from it. **This project ships no Mojang assets**; the
-  instance is auto-detected or given with `--prism-instance`; see
-  `docs/RUNNING.md`.
+  (sounds and music) from it. Import `b1.7.3-mmc-instance/b1.7.3.zip` into
+  Prism to get one. **This project ships no Mojang assets** (the instance
+  export is two config files); the instance is auto-detected or given with
+  `--prism-instance`; see `docs/RUNNING.md`.
 - The read-only reference tree under `.reference/` for development; see
   `docs/REFERENCES.md`. It is git-ignored and never committed.
 
@@ -69,6 +70,7 @@ crates/
   mc-app/                  the binary `mc_b173`: window, icon
 tools/oracle/              Java harness sources; build.sh, regen.sh
 tools/portable/            local portable-zip builder (tools/portable/README.md)
+b1.7.3-mmc-instance/       Prism Launcher instance export to import (b1.7.3.zip: instance.cfg, mmc-pack.json)
 tests/golden/<area>/<name>/{scenario.json, expected.jsonl}
 docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md
 credits/                   CREDITS.md, licenses/

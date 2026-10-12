@@ -9,8 +9,11 @@ run time (PLAN_v4 D8). Both come from a Prism Launcher b1.7.3 instance.
 
 1. Install [Prism Launcher](https://prismlauncher.org/) (the native package or
    the Flatpak).
-2. Create an instance of Minecraft **b1.7.3** and leave its name as `b1.7.3`
-   (its folder is then `.../PrismLauncher/instances/b1.7.3`).
+2. Import the instance that ships with this repository:
+   `b1.7.3-mmc-instance/b1.7.3.zip` (Prism: *Add Instance → Import → Browse*).
+   It is a plain MultiMC/Prism instance export, Minecraft **b1.7.3** named
+   `b1.7.3`, nothing else; its folder is then `.../PrismLauncher/instances/b1.7.3`.
+   Creating an instance of b1.7.3 by hand and naming it `b1.7.3` works the same.
 3. **Launch it from Prism at least once.** Prism downloads the client jar and the
    sounds on the first launch; you can quit as soon as the title screen shows.
 
