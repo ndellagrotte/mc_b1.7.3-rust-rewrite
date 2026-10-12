@@ -1,9 +1,8 @@
 //! Host file access, the only place in the crate that touches `std::fs`.
 //!
 //! `clippy.toml` bans `std::fs::{File, read, write, read_dir}` workspace-wide
-//! to keep the simulation crates browser-ready (PLAN_v4 D9). `mc-golden` is a
-//! host-only test-support crate (ADR-007 §7) and never ships in the sim or the
-//! web build, so `lib.rs` allows those lints for this module alone.
+//! to keep the simulation crates pure (PLAN_v4 D9). `mc-golden` is a host-only
+//! test-support crate (ADR-007 §7) and never ships in the game, so `lib.rs` allows those lints for this module alone.
 
 use std::fs::File;
 use std::io::{Read, Write};

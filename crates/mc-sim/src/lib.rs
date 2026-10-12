@@ -33,9 +33,8 @@
 //! [`world::World::skipped_systems`], block/entity overrides in
 //! [`world::World::unimplemented_hits`], each where the Java code would run.
 //!
-//! Browser-ready: no `std::fs`, threads, clocks, environment access or `rand`
-//! (D9). Storage goes through [`save::Storage`]; time is passed in. No
-//! `unsafe`.
+//! Pure (D9): no `std::fs`, threads, clocks, environment access or `rand`.
+//! Storage goes through [`save::Storage`]; time is passed in. No `unsafe`.
 
 #![forbid(unsafe_code)]
 

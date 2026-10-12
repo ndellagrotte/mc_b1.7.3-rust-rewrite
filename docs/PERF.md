@@ -42,7 +42,6 @@ Run in the worktree at the step 4 commit (Arch Linux, kernel 7.2.8, AMD Ryzen 7
 | `cargo clippy --workspace --all-targets --all-features -- -Dwarnings` | clean |
 | `cargo fmt --all --check` | clean |
 | `cargo test --workspace` | pass: 1,123 passed, 0 failed, 5 ignored (the soaks) (§1.1) |
-| `cargo check -p mc-core -p mc-nbt -p mc-sim --target wasm32-unknown-unknown` | pass (with `zlib-rs`) |
 | `cargo test -p mc-golden` (221 default fixtures) | pass |
 | `cargo test -p mc-golden --test golden_soak -- --ignored` (5 soaks) | pass, test and `dist` profiles |
 | `sh tools/oracle/regen.sh` | no drift (`git status --short tests/golden` empty) |
@@ -153,8 +152,8 @@ depending on how the arrays lie in memory (§6, question 1).
    Java's map is a `HashMap` used for lookup only (ChunkProvider.java:28-29,
    :45, :73). The port never iterates it either: the save and unload loops
    walk `chunk_list` and `dropped_chunks_set`. So its order is never
-   observable (§3.4 rule 4), and the hasher is unseeded (deterministic,
-   wasm-safe). `get_chunk_from_chunk_coords` computes the key once.
+   observable (§3.4 rule 4), and the hasher is unseeded (deterministic).
+   `get_chunk_from_chunk_coords` computes the key once.
 2. **Random ticks** (World.java:1952-1962):
    - Java holds the chunk (`var14`) for all 80 draws. The port now looks it
      up once per run of draws that hit no ticking block, and again after
@@ -173,8 +172,8 @@ depending on how the arrays lie in memory (§6, question 1).
    - Nothing else writes the set.
    - The cost was larger than its sample share suggested: the soaks gained
      about 1.5× from this change alone.
-4. **Deflate backend:** `flate2` now uses `zlib-rs` (pure Rust, builds for
-   wasm) instead of `miniz_oxide`.
+4. **Deflate backend:** `flate2` now uses `zlib-rs` (pure Rust)
+   instead of `miniz_oxide`.
    - On the 784 chunks of `testWorld` a chunk deflates in 0.32–0.48 ms
      instead of 0.48–0.65 ms.
    - The compressed bytes differ from `miniz_oxide`'s and from Java's
@@ -207,10 +206,7 @@ JVM start-up included (tests/golden/README.md "Soak"; `seed-8675309`: 19–20 s)
 The full parallel `cargo test -p mc-golden --test golden_soak -- --ignored` now
 takes 37–47 s; WP-4.2 measured about 2.5 min.
 
-`cargo test --release` uses the `release` profile, which the template sets to
-`opt-level = "s"` for the web build. It ran the soaks *slower* than the test
-profile in a contended run (231 ticks/s on `nether-8675309`), so it is not the
-profile to measure speed with. Use `dist`.
+`cargo test --release` uses the `release` profile. When this was measured, the template set it to `opt-level = "s"` (removed since), and it ran the soaks *slower* than the test profile in a contended run (231 ticks/s on `nether-8675309`). Use `dist` to measure speed.
 
 ### 3.4 What is left (after, `soak/seed-123`, opt-level 3, 32 s under the sampler)
 
@@ -404,9 +400,6 @@ waits for synced region writes. The terrain preload's per-frame budget
     mc_b173`), the Windows installer (`target\dist\mc_b173.exe`) and the
     icons (`build/macos/AppIcon.iconset`, `build/windows/icon.rc`) already
     matched. No mobile workflow is left.
-  - The `build-web` job is set to `if: false` until Phase 5: `cargo check -p
-    mc-app --target wasm32-unknown-unknown` fails (`kira::sound::streaming`).
-    `deploy-page.yaml` (manual only) has a note saying the same.
 - `ci.yml` already matched the layout and is unchanged.
 - **Proof:**
   - `cargo build --profile dist -p mc-app` succeeds (7 min 10 s from the dev

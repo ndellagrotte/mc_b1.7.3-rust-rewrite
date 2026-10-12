@@ -16,8 +16,8 @@ pub const SIN_TABLE_LEN: usize = 65536;
 /// is IEEE-754 `f64::sqrt` (correctly rounded, identical everywhere).
 ///
 /// **Every** port of a `Math.sin/cos/atan2/atan/pow/sqrt/log` call goes
-/// through this module, never through `f64::sin` & co. (glibc natively, the
-/// `libm` crate on wasm, both differing from fdlibm 5.3 in the last bit).
+/// through this module, never through `f64::sin` & co. (the platform's libm,
+/// which differs from fdlibm 5.3 in the last bit).
 ///
 /// Why `StrictMath`: the WP-0.3 sweep (`tests/math_sweep_report.rs`) showed
 /// HotSpot's x86-64 `sin`/`cos`/`pow` intrinsics match no available Rust
@@ -25,8 +25,7 @@ pub const SIN_TABLE_LEN: usize = 65536;
 /// (`tools/oracle/env.sh`), which makes its `java.lang.Math` bit-identical to
 /// `StrictMath` on every JDK and CPU. These functions reproduce
 /// `tests/golden/math/math-sweep` (and `math-sweep-strict`) bit for bit,
-/// NaN bit patterns included, on native and wasm targets alike. Accepted
-/// cost: the real client, with intrinsics on, differs by 1 ulp on a few
+/// NaN bit patterns included, on every target. Accepted cost: the real client, with intrinsics on, differs by 1 ulp on a few
 /// percent of `sin`/`cos`/`pow` inputs.
 ///
 /// Vanilla also calls `Math.abs`, `Math.round`, `Math.ceil`, `Math.max`, which

@@ -44,7 +44,7 @@
 //! - nesting is bounded by [`MAX_DEPTH`];
 //! - writing refuses a list whose items do not all have its element type.
 //!
-//! Browser-ready (PLAN_v4 D9): no `std::fs`, threads, clocks or environment
+//! Pure (PLAN_v4 D9): no `std::fs`, threads, clocks or environment
 //! access, and no `unsafe`.
 
 #![forbid(unsafe_code)]

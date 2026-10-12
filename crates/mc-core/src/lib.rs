@@ -18,7 +18,7 @@
 //! `tests/golden/math` (see `tests/` in this crate).
 //!
 //! No dependencies. No `std::fs`, threads, clocks, environment access or the
-//! `rand` crate (D9); must build for `wasm32-unknown-unknown`. No `unsafe`.
+//! `rand` crate (D9). No `unsafe`.
 
 #![forbid(unsafe_code)]
 

@@ -42,7 +42,7 @@ seen to break parity in play.
 | G4-14 | Performance vs the oracle and the vanilla client | **pass** | §4: the simulation runs the soaks at 2,198-2,801 ticks/s (oracle ~2,300-2,400); the client at 2-4× vanilla's frame rate on this machine |
 | G4-15 | Packaging | **pass** | §5: `dist` build, the Linux bundle packed as `release.yaml` does, run from the data-dir layout of `docs/RUNNING.md` |
 | G4-16 | Soak | **pass** | §1: the 5 soaks pass (36 s parallel; serial ticks/s in §4.1); `SOAK=only regen.sh` changes nothing |
-| G4-17 | Gate commands (build, dist build, tests, clippy, fmt, wasm32, regen ×2, reproducibility) | **pass** | §1 (the client itself does not build for wasm32 yet; that is Phase 5, §11) |
+| G4-17 | Gate commands (build, dist build, tests, clippy, fmt, wasm32, regen ×2, reproducibility) | **pass** | §1 |
 
 Screenshots, dumps, logs and the scripts that made them are under
 `build/screens/gate4/` (git-ignored; paths below are relative to it). The
@@ -515,7 +515,7 @@ still matches (§1).
    since: Q12 and Q13 done (WP-4.8); Q18, Q20, Q24, Q25 delivered (WP-4.6,
    3.9, 3.9, 4.3/4.9); Q34 acted on by WP-4.7 (the stats autosave and the
    received-file merge are implemented and the labels relabelled) but the D2
-   text in PLAN_v4.md:100 still lists "stats sync" — amend it in PLAN_v5.
+   text in PLAN_v4.md:97 still lists "stats sync" — amend it in PLAN_v5.
    Still open, among others: Q2 (`Math` == `StrictMath`), Q3/Q4 (gate
    sign-offs and the workflow), Q5-Q8 and Q28-Q29 (earlier interface and
    harness decisions), Q15-Q16, Q21 (the data dir and `--jar`/`--resources`
@@ -539,55 +539,7 @@ still matches (§1).
 10. **Export default folder** (EXPORT.md §7 Q2): `<data-dir>/exports`, or the
     Prism instance's `saves/` when it exists.
 
-## 11. Recommended Phase 5 start conditions
-
-PLAN_v4 Phase 5: compile `mc-client`/`mc-app` to wasm through Trunk and
-`deploy-page.yaml`; a browser `Storage` (IndexedDB or OPFS) behind the same
-trait; `minecraft.jar` and `resources/` from a file picker, never hosted;
-audio on the first gesture; a single-threaded meshing budget; download size.
-
-- **D9 holds.** `cargo check -p mc-core -p mc-nbt -p mc-sim --target
-  wasm32-unknown-unknown` passes (§1) and runs in CI. `mc-sim` has no file,
-  thread, clock or `rand` dependency; it uses `zlib-rs` (pure Rust) for
-  deflate.
-- **`mc-client` for wasm fails today** (`cargo check -p mc-client --target
-  wasm32-unknown-unknown`, `logs/wasm_client.log`): every dependency
-  (Bevy 0.19, `bevy_kira_audio`, `kira`, `zip`, `image`, `blake3`) checks;
-  the crate stops at one resolve error, `unresolved import
-  kira::sound::streaming` (`sound/mod.rs`; `kira` builds without its
-  streaming module there), which hides any later type errors. The client
-  has no `cfg(target_arch = "wasm32")` code yet. Further blockers visible
-  in the code: `storage::FsStorage` (std::fs, the `mc-storage-writer`
-  thread), `paths` (XDG/`APPDATA` data dir), `export`/`import` (std::fs
-  copies), `kira::sound::streaming` with `cpal` (PERF.md §5; the
-  `build-web` job is `if: false` until Phase 5), `libc::localtime_r` for
-  screenshot names (unix only), `/proc` memory (falls back to 0), the jar
-  read through `std::fs`.
-- **The `Storage` trait is ready.** `mc_sim::save::storage::Storage` is five
-  synchronous calls on relative paths (`read`, `write`, `list`, `rename`,
-  `delete`), implemented by `MemoryStorage` (mc-sim), `FsStorage` (client)
-  and the example's `DirStorage`. A browser backend must answer them
-  synchronously: an in-memory `MemoryStorage` loaded from IndexedDB/OPFS at
-  world open and flushed asynchronously (the write-behind queue's semantics,
-  PERF.md §4.3, without its thread) fits, since the simulation never blocks
-  on durability. `level.dat`'s write-then-rename dance and the region
-  journal need no file system.
-- **What the browser build needs first**: a picker and in-memory index for
-  the user's `minecraft.jar` (the `zip` reader already works on bytes) and
-  `resources/`; the import/export screens re-done as picker/download (Q22;
-  both are typed paths today); audio started on the first gesture with
-  `kira` streaming replaced or gated; Bevy's task pool degrades to one
-  thread, so `terrain`'s off-thread meshing (`max_pending_jobs`) needs a
-  per-frame budget on the main thread (`updateRenderers`' 1/120 s budget,
-  P10, is the natural cap); and whether `mc-app`'s
-  `synchronous_pipeline_compilation` (WP-4.9, set for the native exit
-  segfault) stalls the first web frames needs measuring there.
-- **Before starting**: the owner's answers to §10 items 3 (P6 default; the
-  browser presents with vsync anyway), 5 (Q21, Q22) and 7; the N1-N3 doc
-  fixes; and a CI wasm check of `mc-client` added (failing, as a tracked
-  target) so Phase 5 can measure progress.
-
-## 12. Reproducing
+## 11. Reproducing
 
 `build/screens/gate4/` (git-ignored):
 

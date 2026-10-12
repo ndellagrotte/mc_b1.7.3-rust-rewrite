@@ -169,11 +169,6 @@ fn main() {
                         title: "Minecraft Beta 1.7.3 (Rust)".to_string(),
                         // src: Minecraft.java:1488 (the canvas's 854×480)
                         resolution: (854u32, 480u32).into(),
-                        // Bind to canvas included in `index.html`
-                        canvas: Some("#bevy".to_owned()),
-                        fit_canvas_to_parent: true,
-                        // Tells wasm not to override default event handling, like F5 and Ctrl+R
-                        prevent_default_event_handling: false,
                         // b1.7.3 never enables LWJGL's vsync: Balanced and
                         // Max run uncapped and Power saver sleeps to 40 fps
                         // (EntityRenderer.java:364-416,

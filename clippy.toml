@@ -1,4 +1,4 @@
-# PLAN_v4 D9: the simulation crates must compile for the browser and stay deterministic.
+# PLAN_v4 D9: the simulation crates stay pure and deterministic (no files, threads, clocks or environment access).
 #
 # This file applies to the whole workspace, which is intentional for now:
 # `mc-client` and `mc-app` add `#[allow(clippy::disallowed_types)]` /

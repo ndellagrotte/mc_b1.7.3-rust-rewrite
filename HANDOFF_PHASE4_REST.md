@@ -129,9 +129,4 @@ the `wp-*` branches (the owner reviews them), do not push.
 
 ## 5. After Phase 4
 
-PLAN_v4 Phase 5 (browser build) starts from the D9 guarantees: `mc-core`,
-`mc-nbt`, `mc-sim` already pass `cargo check --target wasm32-unknown-unknown`
-in CI; the client needs a browser `Storage`, the file-picker for
-`minecraft.jar`/`resources/`, audio start on gesture and a single-threaded
-meshing budget (`crates/mc-client/src/terrain/` already runs on Bevy's task
-pool, which degrades to one thread). Phase 6 items stay owner-gated (D3).
+PLAN_v4 Phase 5 (multiplayer, texture packs, sky dimension, pre-McRegion conversion) stays owner-gated (D3).

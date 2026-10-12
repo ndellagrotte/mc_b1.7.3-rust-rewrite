@@ -1210,8 +1210,7 @@ are drawn.
   operation is logged and does not stop the next (RegionFile.java:233-234
   prints and goes on); the first error per root comes back only from
   `flush_writes()` / `FsStorage::flush_writes()`. If the writer thread
-  cannot start, operations run at once on the calling thread. Not for
-  wasm32 (no threads).
+  cannot start, operations run at once on the calling thread.
 
 ## Stats autosave and the dead player (WP-4.7)
 

@@ -1,10 +1,6 @@
-# Records the stable toolchain this project is built with (PLAN_v4 D6).
-#
-# The Arch system toolchain (`pacman` package `rust`) ignores this file; it
-# exists for `rustup` users and for CI, which read it automatically. The wasm
-# target is listed so that `rustup` installs it for the D9 browser check
-# (`cargo check -p mc-core -p mc-nbt -p mc-sim --target wasm32-unknown-unknown`).
+# Pinned toolchain (PLAN_v4 D6): `rustup` reads this file (CI, the local
+# portable-build tool). Cross targets for `tools/portable` are added on demand
+# with `rustup target add` (tools/portable/README.md); do not list them here.
 [toolchain]
 channel = "1.99.0"
 components = ["rustfmt", "clippy"]
-targets = ["wasm32-unknown-unknown"]

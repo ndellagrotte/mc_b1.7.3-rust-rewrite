@@ -219,7 +219,7 @@ impl ChunkProviderCache {
 #[allow(clippy::disallowed_types)]
 pub type ChunkMap = std::collections::HashMap<i32, Box<Chunk>, BuildHasherDefault<ChunkKeyHasher>>;
 
-/// A fixed (unseeded, so deterministic and wasm-safe) hasher for the
+/// A fixed (unseeded, so deterministic) hasher for the
 /// `chunkXZ2Int` keys of [`ChunkMap`]: a 64-bit multiply by the golden ratio
 /// with the high half folded into the low half, so both the bucket index
 /// (low bits) and the control byte (high bits) depend on every key bit.

@@ -1,6 +1,6 @@
 // Adapted from MinecraftOSS third_party/minecraftoss/core/src/nbt.rs @ 4013a68 by chasmlol, Apache-2.0; modified
 //! Gzip and zlib framing around [`read_named`] / [`write_named`], via
-//! `flate2` (pure-Rust `miniz_oxide` backend, so it builds for the browser).
+//! `flate2` (a pure-Rust backend, `zlib-rs` since WP-4.3).
 //!
 //! Compressed bytes are never compared with vanilla's (PLAN_v4 §4.3 Tier S):
 //! `java.util.zip` and `miniz_oxide` produce different deflate streams for the

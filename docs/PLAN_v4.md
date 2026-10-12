@@ -6,7 +6,6 @@ to execute from WP-0.1.
 
 **Goal:** a native Rust + Bevy game with **vanilla Minecraft Beta 1.7.3
 singleplayer parity**, proven by fixtures generated from the vanilla Java code.
-Then a browser build.
 
 **What changed from v3.** The owner created the target repository from a Bevy
 game template and installed Rust; the remaining owner items from v3 are
@@ -15,7 +14,7 @@ turns WP-0.1 into a concrete adaptation of that template.
 
 | v3 item | Answer | Effect |
 |---|---|---|
-| Rust installed, repo created | `cargo 1.99.0` / `rustc 1.99.0` from the Arch `rust` package (no `rustup`); repository at `/home/nick/IdeaProjects/mc_b1.7.3-rust-rewrite`, remote `github.com/ndellagrotte/mc_b1.7.3-rust-rewrite`, one commit, from Niklas Eicker's `bevy_game_template` (Bevy 0.19) | §1, §3.1, WP-0.1. The `wasm32-unknown-unknown` standard library is **not** installed (§8) |
+| Rust installed, repo created | `cargo 1.99.0` / `rustc 1.99.0` from the Arch `rust` package (no `rustup`); repository at `/home/nick/IdeaProjects/mc_b1.7.3-rust-rewrite`, remote `github.com/ndellagrotte/mc_b1.7.3-rust-rewrite`, one commit, from Niklas Eicker's `bevy_game_template` (Bevy 0.19) | §1, §3.1, WP-0.1 |
 | MinecraftOSS credit wording | Owner's call, must name the author (chasmlol) and the repository (2010-rust-rewrite-mashup) | Text fixed in D4 |
 | Imported worlds with ids newer than b1.7.3 | **Refuse** | D5 |
 | Freezing the vanilla reference | Does not matter; nobody will touch it and upstream is dormant | Current checkout is the reference; its commit is recorded once in `docs/REFERENCES.md` and never revisited |
@@ -37,18 +36,16 @@ Contents: 1 Environment · 2 Decisions · 3 Architecture · 4 Oracle and fixture
   `gameplay/*`).
 - Dependencies: `bevy 0.19` (features `2d`, `3d`, `ui`; `bevy_audio` off),
   `bevy_kira_audio 0.26`, `bevy_asset_loader 0.27`, `rand 0.9`, `webbrowser`,
-  `winit 0.30`, `image 0.25`; `getrandom` wasm backend wired in
-  `.cargo/config.toml`.
+  `winit 0.30`, `image 0.25`.
 - Profiles: `dev` opt-level 1 with dependencies at 3; `release` optimised for
   size with LTO; a `dist` profile at opt-level 3. `dev` feature enables Bevy
   dynamic linking.
-- Tooling: `Trunk.toml` + `index.html` for the web build; `build.rs` embeds a
-  Windows icon; `build/` holds icons and web CSS; `nix/` flake;
+- Tooling: `build.rs` embeds a Windows icon; `build/` holds icons; `nix/` flake;
   `.vscode/launch.json`.
 - CI: `.github/workflows/ci.yml` runs `cargo test`, doc tests and
   `cargo clippy --workspace --all-targets --all-features -- -Dwarnings` plus
   `cargo fmt --check` on Linux, Windows and macOS; `release.yaml` builds all
-  platforms on `v*` tags; `deploy-page.yaml` publishes the web build; two mobile
+  platforms on `v*` tags; two mobile
   store workflows.
 - `LICENSE` is CC0 (the template's). `credits/CREDITS.md` lists the Bevy icon.
 - `.gitignore`: `target/`, `.idea/`, `.DS_Store`, `dist/`.
@@ -99,8 +96,7 @@ and resolve against it. Vanilla bugs are transcribed and flagged, never fixed.
 Out of scope even though vanilla has it: anything depending on defunct online
 services (login, skin and cloak downloads, resource downloads, stats sync).
 
-**D3 — Scope order.** (1) Native singleplayer with vanilla parity. (2) Browser
-build. (3) Later, each gated on an owner decision: multiplayer (the server tree
+**D3 — Scope order.** (1) Native singleplayer with vanilla parity. (2) Later, each gated on an owner decision: multiplayer (the server tree
 is available for it), texture packs, sky dimension, pre-McRegion world
 conversion. Agents that meet out-of-scope code cite it, skip it and tag the
 task `deferred`. Mobile targets are not planned; the template's mobile files
@@ -141,9 +137,8 @@ copied. Export is planned, low priority: an "Export" action plus validation in
 the Prism client (WP-4.5). Not supported: the web port's save layout and EPK
 archives; pre-McRegion worlds (deferred, D3).
 
-**D6 — Toolchain.** Rust from the system package, pinned by recording the
-version in `rust-toolchain.toml` for machines that have `rustup` (the Arch
-toolchain ignores the file). Bevy **0.19**, as the template and the copyable
+**D6 — Toolchain.** Rust via `rustup`, pinned by `rust-toolchain.toml` (1.99.0),
+binding for every rustup checkout and CI. Bevy **0.19**, as the template and the copyable
 scaffolding already use; not upgraded before Gate 4. Audio through
 `bevy_kira_audio` (the template's choice; `bevy_audio` stays off). The oracle
 builds with `javac` from the installed JDK 25.
@@ -163,16 +158,15 @@ instance's). Nothing of Mojang's is embedded in the binary or committed. The
 template's `assets/` directory keeps only project-owned files (icons, shaders,
 fonts we make).
 
-**D9 — Browser readiness from day one.** `mc-core`, `mc-nbt` and `mc-sim` use
-no `std::fs`, `std::thread`, `std::time::{Instant,SystemTime}`, environment
-access, or the `rand` crate. Storage goes through a `Storage` trait (byte-blob
-read, write, list, rename, delete); time is passed in. Enforced by clippy
-`disallowed-types`/`disallowed-methods` and a CI job running
-`cargo check --target wasm32-unknown-unknown` on those crates.
+**D9 — Simulation purity.** `mc-core`, `mc-nbt` and `mc-sim` use no `std::fs`,
+`std::thread`, `std::time::{Instant,SystemTime}`, environment access, or the
+`rand` crate, so the simulation stays deterministic and replayable against the
+oracle. Storage goes through a `Storage` trait (byte-blob read, write, list,
+rename, delete); time is passed in. Enforced by clippy
+`disallowed-types`/`disallowed-methods` (`clippy.toml`).
 
 **D10 — Template policy.** Keep what serves the plan: the CI workflow (with
-`-Dwarnings`), the release workflow, the web deploy workflow (Phase 5), Trunk
-config, icon build, credits layout, profiles. Remove the example game, the
+`-Dwarnings`), the release workflow, icon build, credits layout, profiles. Remove the example game, the
 `mobile` crate and its two workflows, `webbrowser`, `rand` (from the sim; the
 client may keep it for nothing gameplay-related), the nix flake unless the
 owner uses Nix. The project licence file (CC0, from the template) is the
@@ -187,7 +181,7 @@ are preserved.
 
 ```
 Cargo.toml                 workspace: members = ["crates/*"], shared [workspace.dependencies], lints
-rust-toolchain.toml  clippy.toml  .cargo/config.toml
+rust-toolchain.toml  clippy.toml
 crates/
   mc-core/   mc-nbt/   mc-sim/   mc-golden/   mc-client/   mc-app/   (mc-app is the binary, was src/)
 tools/oracle/              Java harness sources; build.sh, regen.sh (§4.1)
@@ -195,8 +189,8 @@ tests/golden/<area>/<name>/{scenario.json, expected.jsonl}
 docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md
 credits/                   CREDITS.md, licenses/
 assets/                    project-owned only
-build/  index.html  Trunk.toml   web and packaging (template)
-.github/workflows/         ci.yml (+ wasm check), release.yaml, deploy-page.yaml
+build/                     icons and packaging
+.github/workflows/         ci.yml, release.yaml
 .reference/                git-ignored inputs (§1.2)
 ```
 
@@ -207,7 +201,7 @@ build/  index.html  Trunk.toml   web and packaging (template)
 | `mc-sim` | core, nbt | Everything that ticks: block and item registries and behaviour, world, chunks, lighting, worldgen, tile entities, entities, AI, inventory, crafting, stats; McRegion and `level.dat` codecs over `Storage` | all remaining non-render, non-GUI, non-net classes |
 | `mc-golden` | sim | Scenario runner and trace writer; dev-dependency only | — |
 | `mc-client` | sim, bevy, bevy_kira_audio | Bevy plugins: tick driver, native `Storage`, jar/resources asset loading, mesher, entity and sky rendering, particles, GUI, audio, input, settings | `Render*`, `Model*`, `Gui*`, `EntityRenderer`, `RenderGlobal`, `EffectRenderer`, `SoundManager`, `GameSettings`, `TexturePackDefault` (asset paths only) |
-| `mc-app` | client | Binary; thin; window icon and canvas setup from the template's `main.rs` | `Minecraft.java` |
+| `mc-app` | client | Binary; thin; window and icon setup from the template's `main.rs` | `Minecraft.java` |
 
 `mc-sim` is one crate on purpose: blocks call the world, the world calls blocks,
 entities call both, items place blocks and spawn entities. Modules inside it
@@ -238,8 +232,7 @@ times hurt.
   notifications) go through an `IWorldAccess`-equivalent event queue that
   `mc-client` drains each frame. The simulation never calls into Bevy.
 - **Single-threaded and synchronous**, like the Java. Background work (chunk
-  meshing) belongs to the client and uses Bevy's task pool, which degrades to
-  one thread in the browser.
+  meshing) belongs to the client and uses Bevy's task pool.
 
 ### 3.3 Tick order (vanilla `Minecraft.runTick` → `World.updateEntities`, `World.tick`)
 
@@ -421,13 +414,11 @@ review of the resulting tree before anything else lands):
 3. Delete `src/gameplay`, `src/loading.rs`, `src/menu.rs`, `mobile/`, the two
    mobile workflows, `assets/audio/flying.ogg`, `assets/textures/{bevy,github}.png`,
    and the `webbrowser` dependency; rename every `bevy_game`/`ToDo` occurrence
-   (`index.html`, workflows, `Trunk.toml` if needed, `build.rs`).
+   (workflows, `build.rs`).
 4. Add `clippy.toml` and workspace `[lints]` per D4 and D9 (`disallowed-types`
    and `disallowed-methods` lists; `excessive_precision` and `approx_constant`
    allowed); `rust-toolchain.toml` recording the current stable version.
-5. CI: keep `ci.yml` as is and add a job
-   `cargo check -p mc-core -p mc-nbt -p mc-sim --target wasm32-unknown-unknown`.
-   Add `golden-regen` as a manual (`workflow_dispatch`) job that installs a JDK
+5. CI: keep `ci.yml` as is. Add `golden-regen` as a manual (`workflow_dispatch`) job that installs a JDK
    and runs `tools/oracle/regen.sh`; it needs the reference tree, so it runs
    only where that exists (self-hosted or skipped with a clear message).
 6. `NOTICE`, `credits/licenses/MinecraftOSS_Apache-2.0.md`, the D4 credit text
@@ -435,7 +426,7 @@ review of the resulting tree before anything else lands):
    with a short project description, the build/run instructions, the asset
    settings (D8) and a pointer to `docs/PLAN_v4.md`.
 7. `cargo build --workspace` and `cargo clippy --workspace -- -Dwarnings` pass
-   with the stubs; the wasm check passes once the target is installed (§8).
+   with the stubs.
 
 | WP | Deliverable |
 |---|---|
@@ -507,16 +498,7 @@ or import of `testWorld`, play, save and reload.
 
 **Gate 4 = vanilla parity on native.** WP-4.5 may slip past the gate.
 
-### Phase 5 — Browser build
-
-Compile `mc-client`/`mc-app` to wasm through the template's Trunk setup and
-`deploy-page.yaml`; browser `Storage` (IndexedDB or OPFS) behind the same
-trait; the user supplies `minecraft.jar` and `resources/` through a file picker
-(never hosted by us); audio start on first gesture; single-threaded meshing
-budget; download size. The simulation crates already compile for the target
-(D9), so this phase is client work.
-
-### Phase 6 — Later, each gated on an owner decision
+### Phase 5 — Later, each gated on an owner decision
 
 Multiplayer (client protocol 4.6k LOC; the vanilla server tree is available for
 a test server or an integrated one), texture packs, sky dimension, pre-McRegion
@@ -549,8 +531,7 @@ Rules:       §3.4, D9 and the Definition of Done below
 
 **Definition of Done.**
 1. `cargo build`, `cargo clippy -- -Dwarnings`, `cargo fmt --check` and
-   `cargo test -p <crate>` pass, including the wasm check for simulation
-   crates.
+   `cargo test -p <crate>` pass.
 2. Named fixtures pass; new behaviour has a new scenario, or the report says
    which behaviour is unverified and why.
 3. Every non-obvious constant and ordering carries a `// src:` citation into
@@ -585,7 +566,7 @@ and report it. Do not loosen the comparison.
 | `HashSet` iteration order must be reproduced | `JavaHashSet` in `mc-core`, fixture with a known insertion sequence dumped from the oracle |
 | 26.3 behaviour leaks in through copied code | D4 "do not copy" list; reviewer checks origin headers; beta fixtures are the only acceptance |
 | Region writing corrupts a world | Import copies, never edits in place; Tier S write/re-read and cross-read; atomic write-then-rename in the native `Storage`; WP-4.5 validation in the Prism client |
-| Simulation picks up a file, thread, clock or `rand` dependency that blocks Phase 5 | D9 lint lists and the wasm CI job from WP-0.1 |
+| Simulation picks up a file, thread, clock or `rand` dependency that breaks determinism | D9 lint lists (`clippy.toml`) |
 | Template leftovers confuse agents (example game, `bevy_game` name, mobile) | WP-0.1 removes them before any other task starts; owner reviews the tree |
 | Interface churn in the `mc-sim` skeleton invalidates parallel work | Gate 0 owner review; one worked block and entity before fan-out |
 | Rendering has no exact oracle | Transcribe data paths exactly; human side-by-side checklist in Phase 4 against the real client |
@@ -600,7 +581,7 @@ and report it. Do not loosen the comparison.
 
 | # | Item | Needed for |
 |---|---|---|
-| 1 | Install the `wasm32-unknown-unknown` standard library. With the Arch toolchain that is `sudo pacman -S rust-wasm`; the alternative is switching to `rustup` (`rustup target add wasm32-unknown-unknown`). Trunk (`cargo install --locked trunk`) is only needed in Phase 5 | WP-0.1 step 7 (the wasm CI check), D9 |
+| 1 | *(withdrawn)* | — |
 | 2 | Approve the WP-0.1 tree before Phase 0 continues | Gate 0 |
 | 3 | Decide whether the oracle may apply a **second** scripted rewrite, `Entity.java:96` `this.rand = new Random();` → `harness.HarnessMath.entityRandom(this.entityId)`. §4.2 allows only the `Math.random()` rewrite today. Without it, `EntityMob`/`EntityGhast`/`EntitySlime.getCanSpawnHere` draw from an unseeded `rand` before the join hook can seed it, so hostile-mob spawning fixtures are irreproducible; the harness defaults `difficulty` to 0 meanwhile (see `tools/oracle/census.md` §3) | Tier B/C mob-spawning fixtures (Phase 2) |
 | 4 | Confirm two WP-0.3 decisions taken by the orchestrator: (a) §3.4 rule 5 as recorded (oracle with intrinsics disabled, fdlibm in Rust; 1-ulp divergence from the real client accepted); (b) `JavaHashMap` targets the JDK 8+ algorithm incl. tree bins, written clean-room from a behavioural spec because OpenJDK is GPLv2+CPE and this project is CC0 | Gate 0 |

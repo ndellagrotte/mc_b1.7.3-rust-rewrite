@@ -14,14 +14,15 @@ JVM oracle. Worlds use the vanilla McRegion format and open unchanged.
 screen: create, play, save, reload, import and export worlds, death and
 respawn, Nether portals. Every block, screen, mob and sound trigger has been
 compared side by side against the original client
-(`docs/PARITY_CHECKLIST.md`, `docs/GATE4_REVIEW.md`). Phase 5 (the browser
-client) has not started. See `docs/PLAN_v4.md` §5 for the phases and work
+(`docs/PARITY_CHECKLIST.md`, `docs/GATE4_REVIEW.md`). See `docs/PLAN_v4.md` §5 for the phases and work
 packages.
 
 ## Requirements
 
-- Rust stable (see `rust-toolchain.toml`; the pinned version is informative
-  for system toolchains and binding for `rustup`).
+- Rust 1.99.0 via `rustup` (`rust-toolchain.toml` selects it; install rustup
+  from https://rustup.rs or your distro's `rustup` package, then run
+  `rustup show` in the checkout). `cargo` must be rustup's proxy: put
+  `~/.cargo/bin` before the distro's `/usr/bin/cargo` on PATH.
 - A JDK (21 or newer) to build and run the Java oracle that generates fixtures.
 - A Prism Launcher `b1.7.3` instance, launched at least once: the game reads
   the client jar (textures and `lang/` files) and the `resources/` directory
@@ -52,18 +53,6 @@ Linux, Windows and macOS with `docs/RUNNING.md`, `NOTICE`, `LICENSE` and
 `credits/`. Linux gets both a tarball and an x86_64 AppImage (built on Ubuntu
 22.04, glibc 2.35 or newer).
 
-### Browser build (Phase 5)
-
-The Trunk configuration from the template is kept for the later browser
-build. It is not exercised yet.
-
-- Install [trunk](https://github.com/trunk-rs/trunk): `cargo install --locked trunk`
-- Install the target: `rustup target add wasm32-unknown-unknown`
-  (Arch: `sudo pacman -S rust-wasm`)
-- Serve locally: `trunk serve`
-- Deploy: run the `deploy-github-page` workflow, then enable GitHub Pages from
-  the `gh-pages` branch. Re-run the workflow to deploy a newer version.
-
 ## Layout
 
 ```
@@ -75,14 +64,14 @@ crates/
   mc-sim/                  the simulation: block, item, world, worldgen, entity, inventory, save
   mc-golden/               golden-fixture harness (serde, serde_json)
   mc-client/               Bevy shell: ClientPlugin
-  mc-app/                  the binary `mc_b173`: window, icon, canvas setup
+  mc-app/                  the binary `mc_b173`: window, icon
 tools/oracle/              Java harness sources; build.sh, regen.sh
 tests/golden/<area>/<name>/{scenario.json, expected.jsonl}
 docs/                      PLAN_v*.md, ADRs, mappings.md, REFERENCES.md
 credits/                   CREDITS.md, licenses/
 assets/                    project-owned files only
-build/  index.html  Trunk.toml   web and packaging (template)
-.github/workflows/         ci.yml (+ wasm check, golden-regen), release.yaml, deploy-page.yaml
+build/                     icons, macOS .app template, Windows icon and installer
+.github/workflows/         ci.yml (+ golden-regen, soak), release.yaml
 .reference/                git-ignored inputs (docs/REFERENCES.md)
 ```
 

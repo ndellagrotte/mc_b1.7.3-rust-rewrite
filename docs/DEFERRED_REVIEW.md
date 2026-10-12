@@ -45,7 +45,7 @@ tree was read.
     and at shutdown, so a crash loses the whole session's stats. This should
     be scheduled (§2.3, proposed WP-4.7). PLAN_v4's own WP-2.7 row repeats
     the mislabel ("`StatsSyncher` deferred per D2"), and so does **D2
-    itself**: PLAN_v4.md:100 lists "stats sync" among the defunct online
+    itself**: PLAN_v4.md:97 lists "stats sync" among the defunct online
     services. Scheduling it therefore amends the text of an owner decision,
     not only a WP row (Q34).
 - **One tag text was wrong and is fixed.** `crates/mc-client/src/game.rs:88` (89 after the fix)
@@ -108,7 +108,7 @@ Disposition legend:
 - **D2**: a defunct online service; stays out of scope, with nothing to
   schedule (vanilla today behaves the same).
 - **D3-MP / D3-TP / D3-SKY / D3-CONV**: multiplayer, texture packs, the sky
-  dimension or pre-McRegion conversion; stays deferred to Phase 6, which
+  dimension or pre-McRegion conversion; stays deferred to Phase 5, which
   needs an owner decision.
 - **PLAT**: the Java applet; not applicable.
 - **SCHED**: not out of scope, scheduled or proposed.
@@ -126,7 +126,7 @@ edited.
 
 | # | Site | What is skipped (Java) | Kind | Cite | Disposition |
 |---|---|---|---|---|---|
-| 1 | assets.rs:11 | `TexturePackCustom`, `TexturePackList`; default pack = the jar | D3-TP | ok (line nits, §2.4) | stays, Phase 6 |
+| 1 | assets.rs:11 | `TexturePackCustom`, `TexturePackList`; default pack = the jar | D3-TP | ok (line nits, §2.4) | stays, Phase 5 |
 | 2 | assets.rs:230 | `ThreadDownloadResources` (downloads from `s3.amazonaws.com/MinecraftResources/`, ThreadDownloadResources.java:34); `resources/` is the user's | D2 | ok (Minecraft.java:1380-1396) | stays |
 | 3 | session.rs:3 | login, session id | D2 | ok (field cites one line early, §2.4) | stays |
 | 4 | settings.rs:236 | `skin` = texture pack name, kept for `options.txt` | D3-TP | ok (GameSettings.java:27) | stays |
@@ -135,7 +135,7 @@ edited.
 | 7 | game.rs:521 | `isMultiplayerWorld()` always false | D3-MP | ok (Minecraft.java:1187-1189) | stays |
 | 8 | game.rs:1021 | :945-947 has-paid, :949 `func_27178_d` | D2 + **SCHED** | ok | as #5 |
 | 9 | game.rs:1022 | continuation of #8 ("stats sync, deferred D2") | **SCHED** | label wrong (not online) | §2.3 |
-| 10 | game.rs:1474 | `convertMapFormat` | D3-CONV | ok (Minecraft.java:1194-1195, :1339-1344) | stays, Phase 6 |
+| 10 | game.rs:1474 | `convertMapFormat` | D3-CONV | ok (Minecraft.java:1194-1195, :1339-1344) | stays, Phase 5 |
 | 11 | game.rs:1476 | the refusal message for #10 | D3-CONV | n/a | stays |
 | 12 | gui/achievement.rs:17 | "Unlicensed Copy :(" lines (`hasPaidCheckTime`) | D2 | ok (GuiAchievement.java:58-71) | stays |
 | 13 | gui/ingame.rs:23 | F3 text shifted 32 px when `hasPaidCheckTime > 0` | D2 | ok (GuiIngame.java:168-170) | stays |
@@ -167,7 +167,7 @@ edited.
 | 34 | 517 | `RenderPlayer` skins and cloaks | D2 | stays |
 | 35 | 564 | `/mob/char.png`, skin downloads deferred | D2 | stays |
 | 36 | 785 | title: Multiplayer always disabled | D3-MP | stays (Q33) |
-| 37 | 799 | world needing conversion: "Must be converted!", opening fails | D3-CONV | stays, Phase 6 |
+| 37 | 799 | world needing conversion: "Must be converted!", opening fails | D3-CONV | stays, Phase 5 |
 | 38 | 833 | texture packs: default pack only | D3-TP | stays (Q33) |
 | 39 | 958 | item renderer: skin download | D2 | stays |
 
@@ -187,7 +187,7 @@ edited.
 | 49 | world/sky.rs:18 | `WorldProviderSky` overrides | D3-SKY | ok | stays; unreachable in singleplayer (§2.3) |
 | 50 | world/sky.rs:79 | `getCloudHeight()` 8 in the sky dimension | D3-SKY | ok (WorldProvider.java:110-112; WorldProviderSky.java:45-47) | stays |
 | 51 | world/sky.rs:86 | `func_28112_c()` false in the sky dimension | D3-SKY | ok (WorldProvider.java:114-116; WorldProviderSky.java:41-43) | stays |
-| 52 | save/mod.rs:47 | pre-McRegion `ChunkLoader` files and `SaveConverterMcRegion.convertMapFormat` | D3-CONV | ok (SaveConverterMcRegion.java:62-171, file is 171 lines) | stays, Phase 6 |
+| 52 | save/mod.rs:47 | pre-McRegion `ChunkLoader` files and `SaveConverterMcRegion.convertMapFormat` | D3-CONV | ok (SaveConverterMcRegion.java:62-171, file is 171 lines) | stays, Phase 5 |
 | 53 | save/mod.rs:109 | `SaveError::Deferred` variant | — | — | — |
 | 54 | save/mod.rs:121 | its `Display` | — | — | — |
 | 55 | save/save_handler.rs:8 | `SaveHandler.getChunkLoader` (pre-McRegion) | D3-CONV | ok | stays |
@@ -209,13 +209,13 @@ edited.
 | # | Site | Says | Disposition |
 |---|---|---|---|
 | 68 | tests/golden_save.rs:1175 | asserts `SaveError::Deferred` for a pre-McRegion world | — (pins #52-61) |
-| 69 | PLAN_v4.md:106 | D3 defines the `deferred` tag | — |
-| 70 | PLAN_v4.md:142 | D5: pre-McRegion worlds deferred | D3-CONV, Phase 6 |
-| 71 | PLAN_v4.md:400 | networking 72 files / 4.6k LOC deferred | D3-MP, Phase 6 |
-| 72 | PLAN_v4.md:476 | WP-2.7: "`StatsSyncher` deferred per D2" | **wrong**, §2.3; fix in PLAN_v5, together with D2's own "stats sync" (PLAN_v4.md:100, a line without the word `deferred`) |
-| 73 | PLAN_v4.md:505 | this WP | — |
-| 74 | PLAN_v4.md:546 | brief template "Out of scope: deferred code it will meet" | — |
-| 75 | PLAN_v4.md:563 | DoD 7 "deferred code skipped" | — |
+| 69 | PLAN_v4.md:102 | D3 defines the `deferred` tag | — |
+| 70 | PLAN_v4.md:138 | D5: pre-McRegion worlds deferred | D3-CONV, Phase 5 |
+| 71 | PLAN_v4.md:393 | networking 72 files / 4.6k LOC deferred | D3-MP, Phase 5 |
+| 72 | PLAN_v4.md:467 | WP-2.7: "`StatsSyncher` deferred per D2" | **wrong**, §2.3; fix in PLAN_v5, together with D2's own "stats sync" (PLAN_v4.md:97, a line without the word `deferred`) |
+| 73 | PLAN_v4.md:496 | this WP | — |
+| 74 | PLAN_v4.md:528 | brief template "Out of scope: deferred code it will meet" | — |
+| 75 | PLAN_v4.md:544 | DoD 7 "deferred code skipped" | — |
 
 Tally of the 64 tags, by each line's main subject:
 
@@ -273,7 +273,7 @@ accurate.
      `func_27425_c` / `func_27420_b` with the 100-tick countdown, the send run
      synchronously, called every tick from `Game::run_tick_begin`
      (Minecraft.java:949).
-   - **The label comes from D2 itself.** PLAN_v4.md:100 names "stats sync"
+   - **The label comes from D2 itself.** PLAN_v4.md:97 names "stats sync"
      among the defunct online services that are out of scope. In b1.7.3
      there is no server side to it: every "sync" is a local file. So D2's
      list should drop "stats sync" (or narrow it to a server upload, which
@@ -299,7 +299,7 @@ accurate.
      `stats_<user>.dat` is read at open and merged on the first tick.
    - Relabel when that WP lands: game.rs:16, :1021-1022, gui/menu/mod.rs:42,
      stats/mod.rs:18-19, stats/file_writer.rs:29, :398, PLAN_v5's WP-2.7
-     row, and PLAN_v5's D2 text (PLAN_v4.md:100). **Done in the code
+     row, and PLAN_v5's D2 text (PLAN_v4.md:97). **Done in the code
      (WP-4.7, `9f2708b`, `260e9a8`):** the stats tags no longer say
      "deferred, D2" and the menu docs no longer call `StatsSyncher` an
      upload; the two PLAN_v5 entries are for PLAN_v5.
@@ -312,7 +312,7 @@ accurate.
 3. **Pre-McRegion conversion is reachable** in vanilla singleplayer (a
    pre-Beta-1.3 save in `saves/`). The port lists such a world with "Must
    be converted!" and refuses to open it (game.rs:1470-1478). D5 import
-   refuses it too. Phase 6, owner decision (Q32).
+   refuses it too. Phase 5, owner decision (Q32).
 4. **Texture packs**: with no pack installed, vanilla's screen matches the
    port's except for the enabled "Open texture pack folder" button. The
    same holds for the always-enabled Multiplayer button on the title
@@ -820,8 +820,7 @@ the WP; PLAN_v4 does not list it. Every per-WP branch still exists
 | 4.8 | Gap hygiene (§3.6) | **proposed here** | 10 | `42acc5d..07c3cd0` | done (wave F) |
 | wave F | Parity fixes from `PARITY_CHECKLIST.md` (WP-4.9) | planned by the orchestrator | 13 | `0695eaa..a2e73c3` | done → PARITY_CHECKLIST §13 |
 | Gate 4 | Review → `docs/GATE4_REVIEW.md` | plan | 1 | `c521317` | done; Gate 4 passes |
-| Phase 5 | Browser build: Trunk, browser `Storage`, the user's jar/`resources/` by file picker, audio on first gesture | plan | — | — | not started. The import path box (Q22) needs its browser counterpart there |
-| Phase 6 | Multiplayer, texture packs, sky dimension, pre-McRegion conversion | plan | — | — | owner decisions (Q32) |
+| Phase 5 | Multiplayer, texture packs, sky dimension, pre-McRegion conversion | plan | — | — | owner decisions (Q32) |
 
 Gate documents: `docs/GATE0_REVIEW.md` (added in `a094a54`, WP-0.5's last
 commit), `66c6d09` (Gate 1), `e969e7b` (Gate 2, updated by WP-2.H),
@@ -830,7 +829,7 @@ initial commit) and `a165739` (PLAN_v4 §3.1 `worldgen`).
 
 ## 5. Owner-question backlog (deduplicated)
 
-Sources: PLAN_v4 §8 items 1–4, Gate 0 §2 and §3, Gate 1 §8 Q1–11, Gate 2 §8
+Sources: PLAN_v4 §8 items 2–4 (item 1 withdrawn), Gate 0 §2 and §3, Gate 1 §8 Q1–11, Gate 2 §8
 Q1–10, Gate 3 §8 Q1–11, and this review. No owner answer is recorded in
 the tree. The owner's two instructions, "continue execution" (2026-10-06)
 and "do phase 1 and 2" / "do phase 3 and 4", were taken as approval to
@@ -859,22 +858,21 @@ proceed (Gate 1 §5.1).
 | Q19 | Where nether travel lives | G2 Q7; G3 Q3 | **resolved** (WP-3.1/3.1b); confirm. The real walk-in is scheduled in WP-3.9 | — |
 | Q20 | Gate 3 D1/D2: a short WP or WP-4.1? | G3 Q1 | **scheduled** WP-3.9 | — |
 | Q21 | Data directory default `$XDG_DATA_HOME/mc_b173` (never `.minecraft`); the `--jar` / `--resources` defaults | G3 Q5 | **open** | WP-4.3's packaging and `docs/RUNNING.md` defaults |
-| Q22 | Import by typed path, or add a native dialog (e.g. `rfd`)? | G3 Q6 | **open** | Phase 5 needs its own picker either way |
+| Q22 | Import by typed path, or add a native dialog (e.g. `rfd`)? | G3 Q6 | **open** | nothing |
 | Q23 | Default username: vanilla's `Player<millis % 1000>` makes stats and achievements per launch; persist a name? | G3 Q9 (O3) | **open** | stats persistence |
 | Q24 | Clean-ups N1–N3, O1 | G3 Q10 | **scheduled** WP-3.9 | — |
 | Q25 | Uncapped present mode and frame-time histogram for the baseline | G3 Q11 | **scheduled** WP-4.3 | — |
-| Q26 | Install the `wasm32-unknown-unknown` std | PLAN §8.1 | **resolved** (Arch `rust-wasm` 1.99.0, 2026-10-05; every gate ran the check) | — |
 | Q27 | Approve the WP-0.1 tree | PLAN §8.2 | **resolved** ("continue execution", 2026-10-06, read as approval) | — |
 | Q28 | Gate 0 decisions 3, 4, 6: trace comparison per parsed JSON line; NBT written in sorted key order; `"world": "empty"` scenarios | G0 §2 | **open** (confirm) | nothing |
 | Q29 | Orchestrator decisions of Phases 1–2 not covered above (G1 §5: explode seeding, minimal player, `u8` worldgen ids, in-memory `RegionFile`, save-path choices; G2 §5: statistics on the player, spawn kinds, item/map state as world fields, `getEyeHeight` landing in 2.3b, the `gate2-session` construction, sensitivity workarounds, `testworld-6000` with spawning off) | G1 §5; G2 §5 | **open** (confirm or overturn) | nothing |
 | Q30 | Commit trailers: the briefs ask for `Claude Fable 5.1`; the commits carry `Claude Opus 5.5`, the model that made them | G1 §5.12; G2 §5.13 | **open**; pick one for PLAN_v5 | nothing |
 | Q31 | **New.** The portal-with-workbench double drop (§3.2): accept the value-stack divergence, or emulate vanilla's shared `ItemStack`s? | this review | **open** | nothing |
-| Q32 | **New, restating PLAN Phase 6.** Decide each D3 item: multiplayer; texture packs; the sky dimension (unreachable in vanilla singleplayer, §2.3); pre-McRegion conversion (reachable for old saves; D5 refuses them today) | PLAN §5 Phase 6; D3 | **open** | Phase 6 |
+| Q32 | **New, restating PLAN Phase 5.** Decide each D3 item: multiplayer; texture packs; the sky dimension (unreachable in vanilla singleplayer, §2.3); pre-McRegion conversion (reachable for old saves; D5 refuses them today) | PLAN §5 Phase 5; D3 | **open** | Phase 5 |
 | Q33 | **New.** Vanilla enables the Multiplayer button and "Open texture pack folder"; the port disables both (D3). Keep them disabled, or enable them as no-ops / with a "not supported" screen? | this review | **open** | WP-4.1 checklist entries |
-| Q34 | **New. Amend D2** (PLAN_v4.md:100): drop "stats sync" from D2's out-of-scope list, or narrow it to a server upload, which b1.7.3 never had, since every stats "sync" is local file I/O (§2.3). Then: schedule the stats autosave (proposed WP-4.7 item 1) or accept saving only at world change and shutdown; and merge an existing `stats_<user>.dat` (WP-4.7 item 6) or accept that divergence | this review | **open** | the D2 text in PLAN_v5; WP-4.7 items 1 and 6 |
+| Q34 | **New. Amend D2** (PLAN_v4.md:97): drop "stats sync" from D2's out-of-scope list, or narrow it to a server upload, which b1.7.3 never had, since every stats "sync" is local file I/O (§2.3). Then: schedule the stats autosave (proposed WP-4.7 item 1) or accept saving only at world change and shutdown; and merge an existing `stats_<user>.dat` (WP-4.7 item 6) or accept that divergence | this review | **open** | the D2 text in PLAN_v5; WP-4.7 items 1 and 6 |
 
 Totals:
-- resolved (4): Q9, Q19, Q26, Q27;
+- resolved (3): Q9, Q19, Q27;
 - scheduled (4): Q18, Q20, Q24, Q25;
 - done or moot (2): Q17, Q14;
 - open (24): the rest. Q12, Q13 and Q34 have a WP proposed in §3.6. Q5's

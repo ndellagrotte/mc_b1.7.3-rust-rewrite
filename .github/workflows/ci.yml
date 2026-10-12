@@ -78,25 +78,6 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
       - name: Check format
         run: cargo fmt --all -- --check
-  wasm-check:
-    # PLAN_v4 D9: the simulation crates must build for the browser.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ubuntu-latest-cargo-wasm-check-${{ hashFiles('**/Cargo.toml') }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-      - name: Check simulation crates for wasm32-unknown-unknown
-        run: cargo check -p mc-core -p mc-nbt -p mc-sim --target wasm32-unknown-unknown
   golden-regen:
     # Manual only. Regenerates golden fixtures from the Java oracle (PLAN_v4 §4.1).
     # Needs the git-ignored reference tree, so it only does real work on a

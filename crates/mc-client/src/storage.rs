@@ -68,8 +68,7 @@
 //!
 //! **Threads.** The writer is a `std::thread`. If it cannot be started,
 //! the queue falls back to executing every operation at once on the
-//! calling thread (logged once). `with_write_behind` is for native builds:
-//! Phase 5's wasm32 client has no threads and must not use it.
+//! calling thread (logged once).
 //!
 //! This is the one place the client touches files for the simulation;
 //! the `#[allow(clippy::disallowed_*)]` attributes mark it (clippy.toml).

@@ -144,7 +144,7 @@ release has both `mc_b173_<ver>_linux.tar.gz` and an x86_64 AppImage,
 entry, `credits/`, `NOTICE`, `LICENSE` and this file. Neither contains anything
 of Mojang's. Both are built on Ubuntu 22.04, so they need glibc 2.35 or newer;
 ALSA (`libasound.so.2`), `libudev.so.1`, `libwayland-client.so.0` and the GPU
-driver come from the system. The browser build is Phase 5.
+driver come from the system.
 
 ## Saves on disk
 

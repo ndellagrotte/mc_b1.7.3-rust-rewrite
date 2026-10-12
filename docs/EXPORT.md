@@ -349,7 +349,6 @@ Run in the worktree after the last code change:
 | `cargo test --workspace` | pass: 1,130 tests (1,113 at Gate 3 plus the 17 new ones in `mc-client`), 0 failed |
 | `cargo clippy --workspace --all-targets --all-features -- -Dwarnings` | clean |
 | `cargo fmt --all --check` | clean |
-| wasm32 check | not needed: `mc-core`, `mc-nbt` and `mc-sim` are untouched |
 
 ## 6. Changes outside the brief's file list
 

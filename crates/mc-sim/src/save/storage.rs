@@ -1,8 +1,8 @@
 //! The `Storage` trait (PLAN_v4 D9): the only way the simulation touches
 //! persistent bytes. Paths are `/`-separated, relative to the storage root
 //! (e.g. `"world/level.dat"`, `"world/region/r.0.0.mcr"`). The native
-//! implementation (files, atomic write-then-rename) lives in `mc-client`; the
-//! browser one (IndexedDB/OPFS) in Phase 5. [`MemoryStorage`] is for tests.
+//! implementation (files, atomic write-then-rename) lives in `mc-client`.
+//! [`MemoryStorage`] is for tests.
 
 use std::collections::BTreeMap;
 use std::fmt;

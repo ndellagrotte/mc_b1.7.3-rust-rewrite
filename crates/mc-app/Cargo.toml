@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 license.workspace = true
-description = "Binary entry point: window, icon and canvas setup around mc-client"
+description = "Binary entry point: window and icon setup around mc-client"
 
 [[bin]]
 name = "mc_b173"

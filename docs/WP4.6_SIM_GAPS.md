@@ -169,8 +169,7 @@ fall into these groups:
   pass with `cargo test -p mc-golden --test golden_soak -- --ignored`
   (230 s, after the review fix).
 - `cargo test --workspace`, `cargo clippy --workspace --all-targets
-  --all-features -- -Dwarnings`, `cargo fmt --all --check` and the wasm
-  check of `mc-core`/`mc-nbt`/`mc-sim` all pass.
+  --all-features -- -Dwarnings`, `cargo fmt --all --check` all pass.
 - Smoke run (`build/screens/wp-4.6/scripts/cart_{fresh,testworld}.json`):
   a chest minecart was spawned on a fresh seed-123 world and on the
   `testWorld` import, then right-clicked. `GuiChest` opened titled
