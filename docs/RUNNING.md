@@ -88,13 +88,15 @@ Portable zips are named `mc_b173_<ver>_<target>.zip`: `linux-x86_64` and
 `linux-aarch64` (an AppImage inside), `windows-x86_64` and `windows-aarch64`
 (an `.exe`), `macos-aarch64` and `macos-x86_64` (a `.app`; not produced yet, it
 needs an Apple SDK). Each holds one folder with the game, an empty `data/`
-tree, `NOTICE`, `LICENSE`, this file and `credits/`.
+tree, `b1.7.3-mmc-instance.zip` (the Prism instance export from section 1,
+to import), `NOTICE`, `LICENSE`, this file and `credits/`.
 
 Unzip anywhere and run the AppImage, `.exe` or `.app` inside the folder. A
 folder named `data` next to the game (next to the `.AppImage`, `mc_b173.exe` or
 the `.app`) is used as the data directory; `--data-dir` wins over it. Delete or
 rename `data/` to fall back to the platform folder (section 3). Prism Launcher
-with the b1.7.3 instance is still required, as above.
+with the b1.7.3 instance is still required: import the bundled
+`b1.7.3-mmc-instance.zip` and launch it once, as in section 1.
 
 There is no auto-update. To upgrade, unzip the new build and copy the old
 `data/` into it (or just `options.txt` and `saves/`).

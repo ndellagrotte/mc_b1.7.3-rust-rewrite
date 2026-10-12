@@ -18,6 +18,7 @@ mc_b173_<ver>_<target>.zip
 └─ mc_b173_<ver>_<target>/
    ├─ mc_b173.AppImage | mc_b173.exe | mc_b173.app/
    ├─ data/{saves/,screenshots/,stats/,exports/,README.txt}
+   ├─ b1.7.3-mmc-instance.zip      the Prism instance export (b1.7.3-mmc-instance/b1.7.3.zip)
    ├─ NOTICE  LICENSE  RUNNING.md
    └─ credits/
 ```
@@ -25,8 +26,8 @@ mc_b173_<ver>_<target>.zip
 `data/` beside the game is the game's data directory (portable mode, `crates/mc-client/src/paths.rs`);
 `--data-dir` still overrides it. There is no auto-update: to upgrade, unzip the new build and copy
 `data/` into it by hand. `data/README.txt` (from `data-README.txt`) tells players the same. The game
-still needs a Prism Launcher b1.7.3 instance for `minecraft.jar` and `resources/`; the repository's
-`b1.7.3-mmc-instance/b1.7.3.zip` is an importable one (docs/RUNNING.md).
+still needs a Prism Launcher b1.7.3 instance for `minecraft.jar` and `resources/`; every zip carries the
+repository's importable instance export as `b1.7.3-mmc-instance.zip` (docs/RUNNING.md).
 
 ## Prerequisites
 
@@ -98,8 +99,8 @@ Cargo output goes to `target/<triple>/dist/`. There are no stamps: rerunning a t
   AppImage before exiting for the missing Prism instance. The x86_64 AppImage is only checked, not run.
 - Windows: the exe must be a GUI-subsystem PE of the right machine type that imports only system DLLs
   (no libgcc, winpthread, libunwind or C++ runtime DLLs).
-- Every zip is tested with `unzip -t` and must contain the `data/` tree, the docs and the game file
-  (mode 0755 for the AppImage), and no `.jar`.
+- Every zip is tested with `unzip -t` and must contain the `data/` tree, the docs, the instance
+  export and the game file (mode 0755 for the AppImage), and no `.jar`.
 
 Every download is pinned by sha256 at the top of `build.sh`; a mismatch stops the build. To bump a pin,
 download the new file and compute its sha256 (for the debs, cross-check the `SHA256` field in

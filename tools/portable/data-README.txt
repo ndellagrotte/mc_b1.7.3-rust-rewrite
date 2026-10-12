@@ -8,8 +8,8 @@ folder over the new build's data folder.
 --data-dir DIR overrides this folder. Delete or rename it and the game uses
 the normal platform data folder instead.
 The game still needs a Prism Launcher b1.7.3 instance for minecraft.jar and
-resources/: import b1.7.3-mmc-instance/b1.7.3.zip from the project repository
-into Prism Launcher and launch it once (see RUNNING.md).
+resources/: import b1.7.3-mmc-instance.zip (next to this folder) into Prism
+Launcher (Add Instance > Import) and launch it once (see RUNNING.md).
 
 Linux: needs glibc 2.31 or newer and the system's ALSA, libudev, Wayland or
 X11 and GPU driver. Without FUSE, run ./mc_b173.AppImage --appimage-extract-and-run.

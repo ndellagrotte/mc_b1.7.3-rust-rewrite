@@ -306,6 +306,10 @@ stage_common() {
     install -m644 "$HERE/data-README.txt" "$st/data/README.txt"
     install -m644 "$ROOT/NOTICE" "$ROOT/LICENSE" "$st/"
     install -m644 "$ROOT/docs/RUNNING.md" "$st/RUNNING.md"
+    # The Prism instance export (instance.cfg + mmc-pack.json): players
+    # import it instead of creating the b1.7.3 instance by hand.
+    install -m644 "$ROOT/b1.7.3-mmc-instance/b1.7.3.zip" "$st/b1.7.3-mmc-instance.zip"
+    unzip -Z1 "$st/b1.7.3-mmc-instance.zip" | grep -qx instance.cfg || fail "b1.7.3-mmc-instance.zip has no instance.cfg"
     cp -r "$ROOT/credits" "$st/credits"
     [ -z "$(find "$st" -name '*.jar')" ] || fail "a .jar ended up in the zip"
 }
@@ -382,7 +386,7 @@ verify_zip() {
         macos) payload=mc_b173.app/Contents/MacOS/mc_b173 ;;
     esac
     for e in data/saves/ data/screenshots/ data/stats/ data/exports/ data/README.txt \
-        NOTICE LICENSE RUNNING.md credits/ "$payload"; do
+        NOTICE LICENSE RUNNING.md credits/ b1.7.3-mmc-instance.zip "$payload"; do
         grep -qxF "$PFX/$e" <<<"$list" || fail "zip lacks $PFX/$e"
     done
     if [ "$OS" = linux ]; then
